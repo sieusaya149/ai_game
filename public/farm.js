@@ -1,6 +1,6 @@
 // Dựng bản đồ vườn từ state.farm (đất đã mua, đường đất, các thực thể đã đặt). Thuần JS, chạy được trong Node.
 // mapOf(state) có nhớ tạm theo state.farm.rev: đổi bố cục thì gọi bumpLayout(state).
-import { TS, GROUND, BUILDING_DEFS, PEN_DEFS, FIELD_SIZE, SCENES } from './layout.js';
+import { TS, GROUND, BUILDING_DEFS, PEN_DEFS, FIELD_SIZE, SCENES, tileHash } from './layout.js';
 
 const cache = new WeakMap();
 export const bumpLayout = s => { s.farm.rev = (s.farm.rev || 0) + 1; };
@@ -41,7 +41,7 @@ function build(f) {
   const { mw, mh, owned } = f, W = mw * TS, H = mh * TS;
   const idx = (c, r) => r * mw + c;
   const ground = new Uint8Array(mw * mh), solid = new Uint8Array(mw * mh);
-  const fences = [], buildings = [], pens = {}, troughs = [], trees = [], decos = [], fields = [];
+  const fences = [], buildings = [], pens = {}, troughs = [], trees = [], decos = [], fields = [], clutter = [];
   const plotPos = new Map(), plotByTile = new Map();
   const inside = (c, r) => c >= 0 && r >= 0 && c < mw && r < mh;
   const fill = (c, r, w, h, g) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (inside(x, y)) ground[idx(x, y)] = g; };
@@ -87,6 +87,9 @@ function build(f) {
     } else if (e.kind === 'tree') {
       trees.push({ x: px + 8, y: py + 14, ent: e });
       block(e.c, e.r);
+    } else if (e.kind === 'bush' || e.kind === 'rock') {   // bụi, đá chưa dọn: chắn đường
+      clutter.push({ id: e.id, kind: e.kind, x: px, y: py, v: tileHash(e.c, e.r) % 3, ent: e });
+      block(e.c, e.r);
     } else if (e.kind === 'deco') {
       decos.push({ id: e.id, kind: e.item, x: px + 8, y: py + 12, ent: e });
     } else {
@@ -115,11 +118,11 @@ function build(f) {
   const { border, bushes } = edge(owned, c => open.some(([oc, or]) => oc === c && or === owned.r + owned.h));
 
   const isSolid = (c, r) => !inside(c, r) || solid[idx(c, r)] === 1;
-  const pad = 2 * TS;
+  const pad = 4 * TS;   // chừa đủ chỗ thấy trọn dải đất kế tiếp (dày 4 ô) từ mép vườn
   const view = { x0: Math.max(0, owned.c * TS - pad), y0: Math.max(0, owned.r * TS - pad), x1: Math.min(W, (owned.c + owned.w) * TS + pad), y1: Math.min(H, (owned.r + owned.h) * TS + pad) };
   const plotTile = i => plotPos.get(i) ?? null;
   return {
-    scene: 'farm', rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, troughs, trees, border, bushes, decos, fields, mud, mudSpot,
+    scene: 'farm', rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, troughs, trees, border, bushes, decos, fields, clutter, mud, mudSpot,
     doors, arrive,
     spawn: spawn ?? { x: (owned.c + 2) * TS, y: (owned.r + 2) * TS }, dogHome: dogHome ?? spawn, gateIn,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)),
@@ -175,7 +178,7 @@ function buildFixed(id, d) {
     : { x0: 0, y0: 0, x1: W, y1: H };
   return {
     scene: id, interior: !out, outdoor: out, name: d.name, mw, mh, W, H, owned, view, ground, solid,
-    fences: [], buildings, pens: {}, troughs: [], trees, border: border.filter(p => !clear(p)), bushes, decos: [], fields: [], mud: null, mudSpot: null,
+    fences: [], buildings, pens: {}, troughs: [], trees, border: border.filter(p => !clear(p)), bushes, decos: [], fields: [], clutter: [], mud: null, mudSpot: null,
     props: d.props, doors, arrive: d.arrive, spawn: Object.values(d.arrive)[0], dogHome: null, gateIn: null,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)), isOwned: (c, r) => inside(c, r),
     building: bid => buildings.find(b => b.id === bid) ?? null,

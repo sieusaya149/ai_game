@@ -123,11 +123,26 @@ export const ITEMS = {
   feed_ga:    { name: 'Cám gà',            kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
   feed_heo:   { name: 'Cám heo',           kind: 'feed',   price: 10, lv: 3, desc: 'Thức ăn cho heo.' },
   hay:        { name: 'Cỏ khô',            kind: 'feed',   price: 8,  lv: 5, desc: 'Thức ăn cho bò và cừu.' },
+  wood:       { name: 'Gỗ',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi dọn bụi cây trên đất mới.' },
+  stone:      { name: 'Đá',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi đập đá trên đất mới.' },
   dogfood:    { name: 'Xương cho chó',     kind: 'feed',   price: 8,  lv: 1, desc: 'Cho chó Mực ăn để nó lớn và chịu giữ nhà.' },
   deco_scarecrow: { name: 'Bù nhìn',       kind: 'deco',   price: 150, lv: 2, desc: 'Cắm gần ruộng, quạ không dám tới.' },
   deco_flower:    { name: 'Chậu hoa',      kind: 'deco',   price: 30,  lv: 1, desc: 'Cho nông trại thêm xinh.' },
   deco_lamp:      { name: 'Đèn lồng',      kind: 'deco',   price: 90,  lv: 3, desc: 'Sáng lung linh ban đêm, trộm ngại vào hơn.' },
   deco_bench:     { name: 'Ghế đá',        kind: 'deco',   price: 70,  lv: 2, desc: 'Ngồi nghỉ chân.' },
+};
+
+// ---------- Mua đất ----------
+// Dải đất dày depth ô, dài bằng cạnh hiện tại của vườn. LAND_STRIPS[n] = giá & cấp của dải thứ n+1 đã mua (tăng dần).
+export const LAND_STRIP = { depth: 4 };
+export const LAND_STRIPS = [500, 800, 1200, 1700, 2400, 3300, 4500, 6000, 8000, 10500, 14000, 18000, 23000, 29000, 36000, 44000, 53000, 63000, 75000, 90000]
+  .map((price, i) => ({ price, lv: Math.min(40, 5 + 2 * i) }));
+export const DIR_NAME = { N: 'Bắc', S: 'Nam', E: 'Đông', W: 'Tây' };
+// Bụi, đá rải trên dải mới: xác suất mỗi ô (theo băm toạ độ, không ngẫu nhiên). Dọn tay: tốn thể lực STAMINA.cost[cost], được qty món item.
+export const CLUTTER_RATE = { bush: 0.16, rock: 0.09 };
+export const CLUTTER = {
+  bush: { name: 'Bụi cây', act: 'Dọn bụi', icon: '🌿', item: 'wood',  qty: 2, cost: 'clearBush' },
+  rock: { name: 'Tảng đá', act: 'Đập đá', icon: '⛏️', item: 'stone', qty: 2, cost: 'breakRock' },
 };
 
 // Nông sản & sản phẩm bán ở kho.

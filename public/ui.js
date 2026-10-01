@@ -38,6 +38,7 @@ const EMOJI = {
   trung: '🥚', sua: '🥛', len: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑',
+  wood: '🪵', stone: '🪨',
   ga: '🐔', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕',
 };
 const iconCache = new Map();
@@ -45,6 +46,7 @@ function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
   let u = null;
   try { u = art.icon(key) || null; } catch { u = null; }
+  if (!u) try { u = SPR2?.[key]?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá)
   iconCache.set(key, u);
   return u;
 }
@@ -179,7 +181,7 @@ const notifier = createNotifier({ show: (id, text) => pushToast(text, '', 'n' + 
 export function toast(text) { pushToast(text); }
 
 // ---------- Hộp xác nhận ----------
-function confirmBox(text, yes = 'Đồng ý', no = 'Thôi', danger = false) {
+export function confirmBox(text, yes = 'Đồng ý', no = 'Thôi', danger = false) {
   return new Promise(resolve => {
     const root = $('dialog-root');
     const done = v => { root.hidden = true; root.replaceChildren(); dialogResolve = null; resolve(v); };
@@ -649,6 +651,7 @@ PANELS.bag = {
       ['Hạt giống', s.inv, k => D.ITEMS[k]?.kind === 'seed'],
       ['Vật tư', s.inv, k => D.ITEMS[k]?.kind === 'supply'],
       ['Thức ăn', s.inv, k => D.ITEMS[k]?.kind === 'feed'],
+      ['Nguyên liệu', s.inv, k => D.ITEMS[k]?.kind === 'material'],
       ['Đồ trang trí', s.inv, k => D.ITEMS[k]?.kind === 'deco'],
     ];
     let any = false;

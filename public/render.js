@@ -1,9 +1,9 @@
 // Vẽ thế giới: lớp nền tĩnh (vẽ một lần) + lớp động mỗi khung hình. Không giữ trạng thái game.
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
-import { TS, GROUND } from './layout.js';
+import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, actionsFor } from './state.js';
+import { canMove, marketOpen, actionsFor, nextStrip } from './state.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
@@ -266,6 +266,9 @@ function outdoorLayer(m) {
   const x = staticCanvas.getContext('2d');
   x.imageSmoothingEnabled = false;
   x.drawImage(land, 0, 0);
+  // rừng ngoài đất: lát ô cây liền nhau, chọn biến thể theo băm toạ độ (chưa có art thì giữ màu xanh phẳng ở trên)
+  const fv = SPR2?.forest;
+  if (fv?.length) for (let r = 0; r < MH; r++) for (let c = 0; c < MW; c++) if (ground[r * MW + c] === GROUND.FOREST) x.drawImage(fv[tileHash(c, r) % fv.length], c * TS, r * TS);
 
   // vũng bùn chuồng heo
   if (MUD && SPR.mud) x.drawImage(SPR.mud, MUD.x, MUD.y);
@@ -438,6 +441,13 @@ export function render(ctx, f) {
 
   for (const t of [...m.trees, ...m.border]) if (vis(t.x, t.y, 30)) add(t.y, () => blit(SPR.tree, t.x - 16, t.y - 44));
   for (const b of m.bushes) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
+  // bụi, đá chưa dọn trên đất mới mua
+  for (const o of m.clutter ?? []) if (vis(o.x, o.y, 20)) add(o.y + TS, () => {
+    const im = (o.kind === 'bush' ? SPR2?.bushes : SPR2?.rocks)?.[o.v];
+    if (im) blit(im, o.x, o.y);
+    else if (o.kind === 'bush') blit(SPR.bush, o.x, o.y + 2);
+    else { ctx.fillStyle = '#7d7a80'; ctx.beginPath(); ctx.ellipse(o.x + 8, o.y + 11, 7, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#a8a4aa'; ctx.fillRect(o.x + 5, o.y + 8, 4, 2); }
+  });
 
   for (const b of m.buildings) {
     const img = b.id === 'bed' && wd.sleeping && SPR2?.bedSleep ? SPR2.bedSleep : buildingImg(b);   // đang ngủ: giường có người nằm
@@ -611,6 +621,16 @@ export function render(ctx, f) {
             ctx.fillRect(o.c * TS, o.r * TS, TS, TS);
             ctx.strokeRect(o.c * TS + 0.5, o.r * TS + 0.5, TS - 1, TS - 1);
           }
+        }
+      }
+      if (tg.target.kind === 'strip') {   // viền mờ dải đất kế tiếp
+        const d = nextStrip(state, tg.target.dir);
+        if (d) {
+          ctx.globalAlpha = 0.55 + 0.25 * Math.sin(now / 250);
+          ctx.fillStyle = 'rgba(255,240,150,0.3)'; ctx.fillRect(d.c * TS, d.r * TS, d.w * TS, d.h * TS);
+          ctx.strokeStyle = '#ffe58a'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+          ctx.strokeRect(d.c * TS + 0.5, d.r * TS + 0.5, d.w * TS - 1, d.h * TS - 1);
+          ctx.setLineDash([]); ctx.globalAlpha = 1;
         }
       }
       const extra = bubbles.some(b => Math.abs(b.x - a.x) < 9 && Math.abs(b.y - (a.top + 2)) < 6) ? 15 : 0;

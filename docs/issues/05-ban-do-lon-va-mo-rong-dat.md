@@ -16,10 +16,10 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: dải đất theo thứ tự, cần đủ giá và cấp, không vượt quá 64×48 ô.
-- [ ] Unit test: dọn bụi được gỗ, dọn đá được đá. Đặt công trình lên ô chưa dọn thì bị từ chối kèm lý do.
-- [ ] E2E: mua dải đất phía Đông → dọn một bụi → thấy gỗ trong túi → đặt được đồ lên ô vừa dọn.
-- [ ] Vườn chuyển từ v1 thấy vùng cũ nằm giữa bản đồ lớn, không mất gì.
+- [x] Unit test: dải đất theo thứ tự, cần đủ giá và cấp, không vượt quá 64×48 ô.
+- [x] Unit test: dọn bụi được gỗ, dọn đá được đá. Đặt công trình lên ô chưa dọn thì bị từ chối kèm lý do.
+- [x] E2E: mua dải đất phía Đông → dọn một bụi → thấy gỗ trong túi → đặt được đồ lên ô vừa dọn.
+- [x] Vườn chuyển từ v1 thấy vùng cũ nằm giữa bản đồ lớn, không mất gì.
 
 ## Blocked by
 

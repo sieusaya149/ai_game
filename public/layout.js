@@ -5,6 +5,8 @@ export const TS = 16;                       // 1 ô = 16x16 điểm ảnh
 export const MAP = { mw: 64, mh: 48 };      // vườn tối đa 64x48 ô
 export const GROUND = { GRASS: 0, ROAD: 1, FIELD: 2, PEN: 3, MUD: 4, FOREST: 5, FLOOR: 6, WALL: 7 };
 export const FIELD_SIZE = 3;                // ruộng là các khối 3x3
+// Băm ô (c, r) ra số nguyên không âm: cố định theo toạ độ, dùng chọn bụi/đá rải trên dải đất mới và biến thể ảnh
+export const tileHash = (c, r) => (Math.imul(c + 101, 73856093) ^ Math.imul(r + 211, 19349663)) >>> 8;
 
 // Công trình: foot là các ô chắn đường (w, h), spr là góc vẽ sprite so với góc trên-trái của foot (điểm ảnh),
 // at là điểm đứng để tương tác (null = không tương tác). fixed: không dời được.
@@ -123,7 +125,7 @@ export const SCENES = {
 // Khi chuyển bản lưu, cả bản đồ cũ được đặt vào giữa bản đồ mới, lệch (OX, OY) ô.
 export const V1 = {
   OX: 15, OY: 10, GRID: 6,
-  owned: { c: 1, r: 2, w: 32, h: 24 },      // phần trong viền cây của bản cũ
+  owned: { c: 0, r: 0, w: 34, h: 27 },      // cả bản đồ cũ 34x27 đã là đất đã mua
   field: { c: 21, r: 4 },                   // ô ruộng idx ở (c + idx % 6, r + idx / 6)
   ents: [
     { kind: 'house', c: 3, r: 3 },

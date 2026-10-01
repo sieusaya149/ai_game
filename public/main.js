@@ -1,10 +1,11 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
+  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
+import { DIR_NAME } from './data.js';
 import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
@@ -92,12 +93,20 @@ function applyResult(res, target, id) {
   if (res.msg && (!res.ok || !res.fx?.length)) ui.toast(res.msg);
   if (res.open) ui.openPanel(res.open);
   if (res.go) goScene(res.go);
+  if (res.buyStrip) askStrip(res.buyStrip);
   if (res.sleep) goSleep();
   if (res.ok && target && /pet|vuot|stroke|love/i.test(id ?? '')) {
     const key = target.kind === 'dog' ? 'dog' : target.kind === 'animal' ? 'a' + target.id : null;
     if (key) world.emotes.set(key, { icon: 'heart', until: now + 1600 });
   }
   changed();
+}
+
+// Mua đất phải xác nhận một lần
+async function askStrip(dir) {
+  const d = nextStrip(state, dir);
+  if (!d || !await ui.confirmBox(`Mua đất phía ${DIR_NAME[dir]}? Tốn ${d.price} xu.`, 'Mua', 'Thôi')) return;
+  applyResult(buyStrip(state, dir));
 }
 
 function finishAction() {

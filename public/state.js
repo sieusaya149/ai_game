@@ -3,8 +3,9 @@ import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
+  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
 } from './data.js';
-import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE } from './layout.js';
+import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
 import { migrate, newFarm } from './migrate.js';
 import { now } from './clock.js';
@@ -621,7 +622,7 @@ const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 export function actionsFor(s, t) {
   if (!t) return [];
   const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: s => [mk('collect', '🥚', 'Nhặt trứng', room(s) < 1 ? FULL : null)],
-    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs }[t.kind];
+    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
   return f ? f(s, t) : [];
 }
 
@@ -727,6 +728,18 @@ function decoActs(s, t) {
   return e?.item === 'deco_bench' ? benchActs(s) : [];
 }
 
+// Bụi, đá trên đất mới: { kind: 'clutter', id }. Dọn bằng tay, tốn thể lực, được gỗ / đá vào kho.
+function clutterActs(s, t) {
+  const e = s.farm.ents.find(x => x.id === t.id), d = e && CLUTTER[e.kind];
+  return d ? [mk('clear', d.icon, `${d.act} (+${d.qty} ${itemName(d.item).toLowerCase()})`)] : [];
+}
+// Mua dải đất ở mép vườn: { kind: 'strip', dir }
+function stripActs(s, t) {
+  const d = nextStrip(s, t.dir);
+  if (!d) return [];
+  return [mk('buy', '🗺️', `Mua đất phía ${DIR_NAME[t.dir]} — ${d.price} xu, cấp ${d.level}`, level(s) < d.level ? `Cần cấp ${d.level} mới mua được` : s.coins < d.price ? 'Chưa đủ xu' : null)];
+}
+
 // Cửa sang bản đồ khác: { kind: 'door', to }
 const doorOf = (s, to) => sceneMap(s).doors.find(d => d.to === to) ?? null;
 function doorActs(s, t) {
@@ -747,6 +760,7 @@ function posOf(s, t) {
   if (t.kind === 'building') return sceneMap(s).building(t.id)?.at ?? s.player;
   if (t.kind === 'door') return doorOf(s, t.to)?.at ?? s.player;
   if (t.kind === 'deco') return m.decos.find(d => d.id === t.id) ?? s.player;
+  if (t.kind === 'clutter') { const e = s.farm.ents.find(x => x.id === t.id); return e ? { x: e.c * TS + 8, y: e.r * TS + 8 } : s.player; }
   if (t.kind === 'dog') return s.dog;
   const list = { animal: s.animals, egg: s.eggs, poop: s.poops, threat: s.threats }[t.kind];
   return list?.find(x => x.id === t.id) ?? s.player;
@@ -905,6 +919,19 @@ const DO = {
   },
 
   deco(s, t, id, at) { return sitDown(s, at); },
+
+  clutter(s, t, id, at) {
+    const i = s.farm.ents.findIndex(x => x.id === t.id), d = CLUTTER[s.farm.ents[i]?.kind];
+    if (!d) return bad('Không thấy đâu cả', at);
+    s.farm.ents.splice(i, 1);
+    bumpLayout(s);
+    give(s, d.item, d.qty);
+    spend(s, STAMINA.cost[d.cost]);
+    return res(true, `Được ${d.qty} ${itemName(d.item).toLowerCase()}`, [say(at, `+${d.qty} ${itemName(d.item)}`, COL.good)], 'pop');
+  },
+
+  // Mua đất phải xác nhận: main.js hỏi rồi mới gọi buyStrip
+  strip(s, t) { return res(true, '', [], 'click', { buyStrip: t.dir }); },
 
   // Chỉ báo ý định sang bản đồ khác (go); main.js mờ màn hình rồi mới gọi enterScene.
   door(s, t) { return res(true, '', [], 'click', { go: t.to }); },
@@ -1086,12 +1113,13 @@ export function placeDeco(s, itemId) {
 const SCARED_MS = 6000;
 const no = (reason, msg) => ({ ok: false, reason, msg });
 const overlaps = (a, b) => a.c < b.c + b.w && b.c < a.c + a.w && a.r < b.r + b.h && b.r < a.r + a.h;
-export const canMove = e => !!e && e.kind !== 'tree' && !BUILDING_DEFS[e.kind]?.fixed;
+export const canMove = e => !!e && e.kind !== 'tree' && !CLUTTER[e.kind] && !BUILDING_DEFS[e.kind]?.fixed;
 export function entName(e) {
   if (e.kind === 'field') return 'Khối ruộng';
   if (e.kind === 'pen') return PEN_DEFS[e.pen].name;
   if (e.kind === 'deco') return ITEMS[e.item]?.name ?? 'Đồ trang trí';
   if (e.kind === 'tree') return 'Cây';
+  if (CLUTTER[e.kind]) return CLUTTER[e.kind].name;
   return BUILDING_DEFS[e.kind]?.name ?? 'Công trình';
 }
 
@@ -1113,6 +1141,7 @@ export function canPlace(s, what, c, r) {
   if (!old && what.kind === 'pen' && f.ents.some(x => x.kind === 'pen' && x.pen === what.pen)) return no('exists', `Bạn đã có ${PEN_DEFS[what.pen].name.toLowerCase()} rồi`);
   const e = { ...(old ?? what), c, r }, ft = footprint(e), o = f.owned;
   if (ft.c < o.c || ft.r < o.r || ft.c + ft.w > o.c + o.w || ft.r + ft.h > o.r + o.h) return no('outside', 'Chỗ này ngoài đất của bạn');
+  if (f.ents.some(x => CLUTTER[x.kind] && overlaps(ft, footprint(x)))) return no('uncleared', 'Còn bụi cây, đá chưa dọn');
   if (f.ents.some(x => x !== old && overlaps(ft, footprint(x)))) return no('overlap', 'Chồng lên công trình khác');
   if (!old && what.kind === 'field' && fieldCount(s) >= fieldLimit(s)) {
     const nx = fieldNextLevel(s);
@@ -1124,6 +1153,55 @@ export function canPlace(s, what, c, r) {
   const lost = after.find(t => !t.ok && (before.get(t.key) ?? true));
   if (lost) return no('blocks_path', lost.key === 'house' ? 'Chặn mất đường từ cổng vào nhà' : `Chặn mất đường tới ${lost.name.toLowerCase()}`);
   return { ok: true };
+}
+
+// ---------- Mua đất theo dải ----------
+// owned luôn là một hình chữ nhật: mỗi lần mua thêm một dải dày LAND_STRIP.depth ô sát một cạnh, dài bằng cạnh đó, không vượt bản đồ.
+// Giá & cấp theo số dải đã mua (s.farm.strips, mọi hướng cộng chung).
+export function nextStrip(s, dir) {
+  const f = s.farm, o = f.owned, tier = LAND_STRIPS[f.strips ?? 0], d = LAND_STRIP.depth;
+  if (!tier || !DIR_NAME[dir]) return null;
+  const h = dir === 'N' ? Math.min(d, o.r) : dir === 'S' ? Math.min(d, f.mh - o.r - o.h) : o.h;
+  const w = dir === 'W' ? Math.min(d, o.c) : dir === 'E' ? Math.min(d, f.mw - o.c - o.w) : o.w;
+  if (w <= 0 || h <= 0) return null;
+  const c = dir === 'E' ? o.c + o.w : dir === 'W' ? o.c - w : o.c, r = dir === 'S' ? o.r + o.h : dir === 'N' ? o.r - h : o.r;
+  return { c, r, w, h, dir, price: tier.price, level: tier.lv };
+}
+
+// Cổng nằm sát mép Nam thì dời xuống mép mới (kéo dài đường đất ra cổng), để lối ra làng vẫn ở rìa vườn.
+function moveGate(f, dy) {
+  const g = f.ents.find(e => e.kind === 'gate'), o = f.owned;
+  if (!g || g.r + 2 < o.r + o.h) return;
+  const cols = [g.c - 2, g.c - 1], from = g.r + 1;
+  g.r += dy;
+  for (let r = from; r <= g.r + 1; r++) for (const c of cols) f.paths.push([c, r]);
+}
+
+export function buyStrip(s, dir) {
+  if (s.scene && s.scene !== 'farm') return R(false, 'Ra vườn rồi hãy mua đất nhé', { reason: 'scene' });
+  const d = nextStrip(s, dir);
+  if (!d) return R(false, DIR_NAME[dir] ? `Hết đất để mua phía ${DIR_NAME[dir]}` : 'Không có hướng này', { reason: 'max' });
+  if (level(s) < d.level) return R(false, `Cần cấp ${d.level} mới mua được đất phía ${DIR_NAME[dir]}`, { reason: 'level' });
+  if (s.coins < d.price) return R(false, 'Chưa đủ xu', { reason: 'coins' });
+  const f = s.farm;
+  s.coins -= d.price;
+  if (dir === 'S') moveGate(f, d.h);
+  f.owned = { c: Math.min(f.owned.c, d.c), r: Math.min(f.owned.r, d.r), w: f.owned.w + (d.dir === 'E' || d.dir === 'W' ? d.w : 0), h: f.owned.h + (d.dir === 'N' || d.dir === 'S' ? d.h : 0) };
+  f.strips = (f.strips ?? 0) + 1;
+  // rải bụi, đá lên ô trống của dải (theo băm toạ độ); chừa đường đất, chỗ cổng và lối ra
+  const taken = new Set(f.paths.map(([c, r]) => c + ',' + r));
+  const g = f.ents.find(e => e.kind === 'gate');
+  if (g) for (const [dc, dr] of [[0, 0], [1, 0], [2, 0], [-2, 1], [-1, 1]]) taken.add((g.c + dc) + ',' + (g.r + dr));
+  for (const e of f.ents) { const ft = footprint(e); for (let y = ft.r; y < ft.r + ft.h; y++) for (let x = ft.c; x < ft.c + ft.w; x++) taken.add(x + ',' + y); }
+  for (let r = d.r; r < d.r + d.h; r++) for (let c = d.c; c < d.c + d.w; c++) {
+    if (taken.has(c + ',' + r)) continue;
+    const h = (tileHash(c, r) % 1000) / 1000;
+    const kind = h < CLUTTER_RATE.bush ? 'bush' : h < CLUTTER_RATE.bush + CLUTTER_RATE.rock ? 'rock' : null;
+    if (kind) f.ents.push({ id: s.nextId++, kind, c, r });
+  }
+  bumpLayout(s);
+  unstick(s);
+  return R(true, `Đã mua đất phía ${DIR_NAME[dir]}`, { dir, sound: 'coin' });
 }
 
 // ---------- Đặt đồ mới & cất đồ (chế độ xây dựng) ----------

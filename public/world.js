@@ -1,6 +1,6 @@
 // Thế giới: di chuyển, va chạm, tìm đường, AI con vật/chó/quạ/trộm, tìm target. Không vẽ gì.
 import { TS, GROUND } from './layout.js';
-import { ANIMALS, CROPS, DOG } from './data.js';
+import { ANIMALS, CROPS, DOG, DIR_NAME } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
 import { animalImg, dogImg, crowImg, eggSize, poopSize, buildingImg, decoSize } from './render.js';
@@ -256,11 +256,19 @@ function updateThreats(state, w, dt) {
 }
 
 // ---------- Target & phạm vi tương tác ----------
-export const keyOf = t => t.kind + (t.id ?? t.idx ?? t.pen ?? t.to ?? '');
+export const keyOf = t => t.kind + (t.id ?? t.idx ?? t.pen ?? t.to ?? t.dir ?? '');
 const doorOf = to => M.doors.find(d => d.to === to);
 const inDoor = (d, x, y) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h;
 const troughAnchor = pen => { const t = M.pens[pen].trough; return { x: t.x, y: t.r * TS + 8 }; };
 const coop = () => M.building('coop');
+// Điểm trên ranh đất nhà theo hướng dir, thẳng với người chơi (target mua đất: đứng sát mép là chạm được)
+function stripEdge(state, dir) {
+  const o = M.owned, p = state.player;
+  if (!ST.nextStrip(state, dir)) return null;
+  const x = dir === 'E' ? (o.c + o.w) * TS : dir === 'W' ? o.c * TS : clamp(p.x, o.c * TS, (o.c + o.w) * TS);
+  const y = dir === 'S' ? (o.r + o.h) * TS : dir === 'N' ? o.r * TS : clamp(p.y, o.r * TS, (o.r + o.h) * TS);
+  return { x, y };
+}
 const findBy = (list, id) => (list ?? []).find(e => e.id === id);
 
 export function targetPos(state, t) {
@@ -277,6 +285,8 @@ export function targetPos(state, t) {
     case 'building': return M.buildings.find(b => b.id === t.id)?.at ?? null;
     case 'door': return doorOf(t.to)?.at ?? null;
     case 'deco': return M.decos.find(d => d.id === t.id) ?? null;
+    case 'clutter': { const c = M.clutter.find(o => o.id === t.id); return c ? { x: c.x + 8, y: c.y + 8 } : null; }
+    case 'strip': return stripEdge(state, t.dir);
   }
   return null;
 }
@@ -285,10 +295,11 @@ export function exists(state, t) {
   if (!atFarm() && !['building', 'door'].includes(t.kind)) return false;
   if (t.kind === 'plot') return !!state.plots[t.idx]?.unlocked;
   if (t.kind === 'lockedPlot') return t.idx === ST.nextLockedPlot(state);
+  if (t.kind === 'strip' && !atFarm()) return false;
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
 }
-const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, nest: 22, building: 22, door: 22, deco: 22 };
+const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -331,6 +342,8 @@ export function findTarget(state, w) {
     for (const t of state.threats ?? []) consider({ kind: 'threat', id: t.id });
     consider({ kind: 'dog' });
     consider({ kind: 'nest' });
+    for (const c of M.clutter) consider({ kind: 'clutter', id: c.id });
+    for (const dir of ['N', 'S', 'E', 'W']) consider({ kind: 'strip', dir });
   }
   for (const { pen } of M.troughs) consider({ kind: 'trough', pen });
   for (const d of M.decos) if (d.kind === 'deco_bench') consider({ kind: 'deco', id: d.id });
@@ -355,6 +368,8 @@ export function nameOf(state, t) {
     case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
     case 'deco': return 'Ghế đá';
+    case 'clutter': return M.clutter.find(o => o.id === t.id) ? ST.entName(M.clutter.find(o => o.id === t.id).ent) : '';
+    case 'strip': return `Đất phía ${DIR_NAME[t.dir]}`;
   }
   return '';
 }
@@ -378,6 +393,8 @@ export function anchorOf(state, t) {
     }
     case 'door': return { x: pos.x, top: pos.y - 14 };
     case 'deco': return { x: pos.x, top: pos.y - decoSize(pos.kind).h - 1 };
+    case 'clutter': return { x: pos.x, top: pos.y - 14 };
+    case 'strip': return { x: pos.x, top: pos.y - 16 };
   }
   return null;
 }
@@ -410,6 +427,7 @@ export function hitTest(state, wx, wy) {
     const im = buildingImg(b);
     if (hitRect(b.x, b.y, im?.width ?? 24, im?.height ?? 24, wx, wy, 0) || (b.hit && hitRect(b.hit.x, b.hit.y, b.hit.w, b.hit.h, wx, wy, 0))) return { kind: 'building', id: b.id };
   }
+  if (atFarm()) for (const c of M.clutter) if (hitRect(c.x, c.y - 4, TS, TS + 4, wx, wy, 0)) return { kind: 'clutter', id: c.id };
   const idx = M.plotAt(Math.floor(wx / TS), Math.floor(wy / TS));
   if (idx >= 0) {
     if (state.plots[idx]?.unlocked) return { kind: 'plot', idx };
