@@ -234,6 +234,7 @@ export function renderHUD(s) {
   const bar = $('hud-exp'), pct = Math.min(100, (li.cur / li.need) * 100) + '%';
   if (bar.style.width !== pct) bar.style.width = pct;
   drawAvatar(s.look);
+  $('bb-build').style.display = s.scene && s.scene !== 'farm' ? 'none' : '';   // chế độ xây dựng chỉ có ở vườn
 
   const coinsTxt = fmt(s.coins);
   if (memo.get('hud-coins-n') !== coinsTxt) {
@@ -345,7 +346,7 @@ function shell(title) {
 export function openPanel(id) {
   if (!api || !PANELS[id]) return;
   if (creatorOpen) return;
-  if (id === 'house') wardLook = null;
+  if (id === 'house') { wardLook = null; tabs.house = 'wardrobe'; }   // mở từ tủ đồ trong nhà
   panel = id;
   const root = $('panel-root');
   root.replaceChildren(h('div', { class: 'backdrop', on: { click: closePanel } }), shell(PANELS[id].title));

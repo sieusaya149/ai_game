@@ -1,6 +1,6 @@
 // Dựng bản đồ vườn từ state.farm (đất đã mua, đường đất, các thực thể đã đặt). Thuần JS, chạy được trong Node.
 // mapOf(state) có nhớ tạm theo state.farm.rev: đổi bố cục thì gọi bumpLayout(state).
-import { TS, GROUND, BUILDING_DEFS, PEN_DEFS, FIELD_SIZE } from './layout.js';
+import { TS, GROUND, BUILDING_DEFS, PEN_DEFS, FIELD_SIZE, SCENES } from './layout.js';
 
 const cache = new WeakMap();
 export const bumpLayout = s => { s.farm.rev = (s.farm.rev || 0) + 1; };
@@ -42,6 +42,7 @@ function build(f) {
   for (const [c, r] of f.paths) if (inside(c, r)) ground[idx(c, r)] = GROUND.ROAD;
 
   let spawn = null, dogHome = null, gateIn = null, mud = null, mudSpot = null;
+  const doors = [], unblock = [], arrive = {};
   for (const e of f.ents) {
     const px = e.c * TS, py = e.r * TS;
     if (e.kind === 'field') {
@@ -88,11 +89,18 @@ function build(f) {
       if (d.home) dogHome = { x: px + d.home.x, y: py + d.home.y };
       if (d.in) gateIn = { x: px + d.in.x, y: py + d.in.y };
       if (d.exit) for (const [dc, dr] of d.exit) open.push([e.c + dc, e.r + dr]);
+      if (d.door) {
+        const o = d.door;
+        doors.push({ to: o.to, name: d.name, x: (e.c + o.c) * TS, y: (e.r + o.r) * TS, w: o.w * TS, h: o.h * TS, at: b.at });
+        for (let y = 0; y < o.h; y++) for (let x = 0; x < o.w; x++) unblock.push([e.c + o.c + x, e.r + o.r + y]);
+        if (b.at) arrive[o.to] = { x: b.at.x, y: b.at.y, dir: 0 };   // từ trong đó đi ra: đứng trước cửa
+      }
       if (e.kind === 'house') spawn = { x: px + 32, y: py + 78 };
     }
   }
   for (const fe of fences) block(fe.c, fe.r);
   for (const [c, r] of open) if (inside(c, r)) { solid[idx(c, r)] = 0; ground[idx(c, r)] = GROUND.ROAD; }
+  for (const [c, r] of unblock) if (inside(c, r)) solid[idx(c, r)] = 0;
 
   // viền cây quanh đất: cây phía trên và hai bên, bụi phía dưới (chừa lối ra cổng)
   const border = [], bushes = [];
@@ -106,7 +114,8 @@ function build(f) {
   const view = { x0: Math.max(0, owned.c * TS - pad), y0: Math.max(0, owned.r * TS - pad), x1: Math.min(W, (owned.c + owned.w) * TS + pad), y1: Math.min(H, (owned.r + owned.h) * TS + pad) };
   const plotTile = i => plotPos.get(i) ?? null;
   return {
-    rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, troughs, trees, border, bushes, decos, fields, mud, mudSpot,
+    scene: 'farm', rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, troughs, trees, border, bushes, decos, fields, mud, mudSpot,
+    doors, arrive,
     spawn: spawn ?? { x: (owned.c + 2) * TS, y: (owned.r + 2) * TS }, dogHome: dogHome ?? spawn, gateIn,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)),
     isOwned: (c, r) => inRect(owned, c, r),
@@ -114,6 +123,41 @@ function build(f) {
     plotTile,
     plotCenter: i => { const t = plotPos.get(i); return t ? { x: t.c * TS + 8, y: t.r * TS + 8 } : null; },
     plotAt: (c, r) => plotByTile.get(idx(c, r)) ?? -1,
+  };
+}
+
+// ---------- Bản đồ của cảnh đang đứng (state.scene) ----------
+// Vườn dựng từ state.farm; cảnh khác là bản đồ cố định trong SCENES. Cùng giao diện với mapOf để world/render dùng chung.
+export const sceneMap = s => (!s.scene || s.scene === 'farm' ? mapOf(s) : fixedMap(s.scene));
+export const hasScene = id => id === 'farm' || !!SCENES[id];
+
+const fixed = new Map();
+function fixedMap(id) {
+  if (!fixed.has(id)) fixed.set(id, buildFixed(id, SCENES[id]));
+  return fixed.get(id);
+}
+function buildFixed(id, d) {
+  const { mw, mh } = d, W = mw * TS, H = mh * TS, idx = (c, r) => r * mw + c;
+  const ground = new Uint8Array(mw * mh).fill(GROUND.FLOOR), solid = new Uint8Array(mw * mh);
+  const inside = (c, r) => c >= 0 && r >= 0 && c < mw && r < mh;
+  const block = (c, r, w, h, g) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (inside(x, y)) { solid[idx(x, y)] = 1; if (g != null) ground[idx(x, y)] = g; } };
+  for (const [c, r, w, h] of d.walls) block(c, r, w, h, GROUND.WALL);
+  const buildings = d.furniture.map(o => {
+    const f = o.foot, px = f.c * TS, py = f.r * TS;
+    block(f.c, f.r, f.w, f.h);
+    return { id: o.kind, kind: o.kind, name: o.name, sprite: o.sprite, interior: true, x: px + o.spr.x, y: py + o.spr.y,
+      foot: { ...f }, at: o.at ? { x: px + o.at.x, y: py + o.at.y } : null };
+  });
+  const doors = d.doors.map(o => ({ to: o.to, name: o.name, x: o.c * TS, y: o.r * TS, w: o.w * TS, h: o.h * TS, at: o.at }));
+  const isSolid = (c, r) => !inside(c, r) || solid[idx(c, r)] === 1;
+  const owned = { c: 0, r: 0, w: mw, h: mh };
+  return {
+    scene: id, interior: true, name: d.name, mw, mh, W, H, owned, view: { x0: 0, y0: 0, x1: W, y1: H }, ground, solid,
+    fences: [], buildings, pens: {}, troughs: [], trees: [], border: [], bushes: [], decos: [], fields: [], mud: null, mudSpot: null,
+    props: d.props, doors, arrive: d.arrive, spawn: Object.values(d.arrive)[0], dogHome: null, gateIn: null,
+    isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)), isOwned: (c, r) => inside(c, r),
+    building: bid => buildings.find(b => b.id === bid) ?? null,
+    plotTile: () => null, plotCenter: () => null, plotAt: () => -1,
   };
 }
 

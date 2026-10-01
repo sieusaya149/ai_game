@@ -16,9 +16,11 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const dirOf = (dx, dy) => Math.abs(dy) > Math.abs(dx) ? (dy > 0 ? 0 : 3) : (dx < 0 ? 1 : 2);
 
-// Bản đồ của vườn đang chơi. Mọi hàm xuất ra nhận state đều gọi use(state) trước khi đụng tới M.
+// Bản đồ của cảnh đang đứng (vườn hoặc trong nhà...). Mọi hàm xuất ra nhận state đều gọi use(state) trước khi đụng tới M.
+// Con vật, chó, quạ, trộm, trứng, phân luôn ở vườn: chỉ chạy/vẽ/chạm được khi đang ở vườn (atFarm).
 let M = null;
-const use = s => (M = ST.mapOf(s));
+const use = s => (M = ST.sceneMap(s));
+const atFarm = () => M.scene === 'farm';
 export const nextLockedIdx = s => ST.nextLockedPlot(s);
 
 export function createWorld() {
@@ -29,7 +31,7 @@ export function createWorld() {
     input: { x: 0, y: 0 },    // bàn phím / joystick
     path: null, pending: null, pendingT: 0, repathT: 0, stuckT: 0,
     stun: 0, moving: false, walkT: 0, busy: false,
-    marker: null, lastSlip: null, curKey: null,
+    marker: null, lastSlip: null, curKey: null, doorArmed: false,
     nextLocked: nextLockedIdx,
     anchorOf,
     playerFrames: look => character(look),
@@ -100,13 +102,13 @@ export function findPath(sx, sy, gx, gy, smooth = true) {
 const inArea = (a, m = 0) => ({ x: rnd(a.x + m, a.x + a.w - m), y: rnd(a.y + m, a.y + a.h - m) });
 export function ensurePositions(state) {
   use(state);
-  const p = state.player;
+  const p = state.player, F = ST.mapOf(state);
   if (p.x == null || p.y == null) { p.x = M.spawn.x; p.y = M.spawn.y; }
   p.dir ??= 0;
-  for (const a of state.animals) if ((a.x == null || a.y == null) && M.pens[ANIMALS[a.type].pen]) Object.assign(a, inArea(M.pens[ANIMALS[a.type].pen].area));
+  for (const a of state.animals) if ((a.x == null || a.y == null) && F.pens[ANIMALS[a.type].pen]) Object.assign(a, inArea(F.pens[ANIMALS[a.type].pen].area));
   const d = state.dog;
-  if (d.x == null || d.y == null) { d.x = M.dogHome.x; d.y = M.dogHome.y; }
-  for (const e of state.eggs ?? []) if (e.x == null) Object.assign(e, inArea((M.pens.chicken ?? Object.values(M.pens)[0]).area));
+  if (d.x == null || d.y == null) { d.x = F.dogHome.x; d.y = F.dogHome.y; }
+  for (const e of state.eggs ?? []) if (e.x == null) Object.assign(e, inArea((F.pens.chicken ?? Object.values(F.pens)[0]).area));
   for (const o of state.poops ?? []) if (o.x == null) { o.x = d.x; o.y = d.y; }
 }
 
@@ -254,7 +256,9 @@ function updateThreats(state, w, dt) {
 }
 
 // ---------- Target & phạm vi tương tác ----------
-export const keyOf = t => t.kind + (t.id ?? t.idx ?? t.pen ?? '');
+export const keyOf = t => t.kind + (t.id ?? t.idx ?? t.pen ?? t.to ?? '');
+const doorOf = to => M.doors.find(d => d.to === to);
+const inDoor = (d, x, y) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h;
 const troughAnchor = pen => { const t = M.pens[pen].trough; return { x: t.x, y: t.r * TS + 8 }; };
 const coop = () => M.building('coop');
 const findBy = (list, id) => (list ?? []).find(e => e.id === id);
@@ -271,16 +275,19 @@ export function targetPos(state, t) {
     case 'trough': return troughAnchor(t.pen);
     case 'nest': return coop()?.at ?? null;
     case 'building': return M.buildings.find(b => b.id === t.id)?.at ?? null;
+    case 'door': return doorOf(t.to)?.at ?? null;
   }
   return null;
 }
 export function exists(state, t) {
+  use(state);
+  if (!atFarm() && !['building', 'door'].includes(t.kind)) return false;
   if (t.kind === 'plot') return !!state.plots[t.idx]?.unlocked;
   if (t.kind === 'lockedPlot') return t.idx === ST.nextLockedPlot(state);
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
 }
-const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, nest: 22, building: 22 };
+const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, nest: 22, building: 22, door: 22 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -316,14 +323,17 @@ export function findTarget(state, w) {
     if (state.plots[idx]?.unlocked) consider({ kind: 'plot', idx });
     else if (idx === ST.nextLockedPlot(state)) consider({ kind: 'lockedPlot', idx });
   }
-  for (const a of state.animals) consider({ kind: 'animal', id: a.id });
-  for (const e of state.eggs ?? []) consider({ kind: 'egg', id: e.id });
-  for (const o of state.poops ?? []) consider({ kind: 'poop', id: o.id });
-  for (const t of state.threats ?? []) consider({ kind: 'threat', id: t.id });
-  consider({ kind: 'dog' });
+  if (atFarm()) {
+    for (const a of state.animals) consider({ kind: 'animal', id: a.id });
+    for (const e of state.eggs ?? []) consider({ kind: 'egg', id: e.id });
+    for (const o of state.poops ?? []) consider({ kind: 'poop', id: o.id });
+    for (const t of state.threats ?? []) consider({ kind: 'threat', id: t.id });
+    consider({ kind: 'dog' });
+    consider({ kind: 'nest' });
+  }
   for (const { pen } of M.troughs) consider({ kind: 'trough', pen });
-  consider({ kind: 'nest' });
   for (const b of M.buildings) if (b.at && b.id !== 'coop') consider({ kind: 'building', id: b.id });
+  if (M.interior) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì vào nhà bằng nút của nhà
   w.curKey = best ? keyOf(best) : null;
   return best;
 }
@@ -341,6 +351,7 @@ export function nameOf(state, t) {
     case 'trough': return `Máng ăn (${M.pens[t.pen].name})`;
     case 'nest': return 'Ổ ấp trứng';
     case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
+    case 'door': return doorOf(t.to)?.name ?? 'Cửa';
   }
   return '';
 }
@@ -362,6 +373,7 @@ export function anchorOf(state, t) {
       const b = M.buildings.find(bb => bb.id === t.id);
       return { x: b.at.x, top: Math.max(b.y - 2, (b.foot.r + b.foot.h) * TS - 44) };
     }
+    case 'door': return { x: pos.x, top: pos.y - 14 };
   }
   return null;
 }
@@ -370,18 +382,21 @@ export function anchorOf(state, t) {
 const hitRect = (x, y, w, h, wx, wy, pad = 3) => wx >= x - pad && wx <= x + w + pad && wy >= y - pad && wy <= y + h + pad;
 export function hitTest(state, wx, wy) {
   use(state);
-  for (const t of state.threats ?? []) {
+  if (M.interior) for (const d of M.doors) if (hitRect(d.x, d.y - TS, d.w, d.h + TS, wx, wy, 0)) return { kind: 'door', to: d.to };   // ô cửa + thảm chùi chân
+  for (const t of atFarm() ? state.threats ?? [] : []) {
     if (t.x == null) continue;
     if (t.kind === 'crow' ? Math.hypot(wx - t.x, wy - t.y + 6) < 12 : hitRect(t.x - 8, t.y - 24, 16, 26, wx, wy)) return { kind: 'threat', id: t.id };
   }
-  for (const a of [...state.animals].sort((u, v) => v.y - u.y)) {
-    const im = animalImg(a.type, a.adult, 'left', 0);
-    if (im && hitRect(a.x - im.width / 2, a.y - im.height, im.width, im.height, wx, wy)) return { kind: 'animal', id: a.id };
+  if (atFarm()) {
+    for (const a of [...state.animals].sort((u, v) => v.y - u.y)) {
+      const im = animalImg(a.type, a.adult, 'left', 0);
+      if (im && hitRect(a.x - im.width / 2, a.y - im.height, im.width, im.height, wx, wy)) return { kind: 'animal', id: a.id };
+    }
+    const dog = state.dog, di = dogImg(dog.adult, 'left', 0);
+    if (di && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
+    for (const o of state.poops ?? []) if (Math.hypot(wx - o.x, wy - o.y + 3) < 9) return { kind: 'poop', id: o.id };
+    for (const e of state.eggs ?? []) if (Math.hypot(wx - e.x, wy - e.y + 3) < 8) return { kind: 'egg', id: e.id };
   }
-  const dog = state.dog, di = dogImg(dog.adult, 'left', 0);
-  if (di && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
-  for (const o of state.poops ?? []) if (Math.hypot(wx - o.x, wy - o.y + 3) < 9) return { kind: 'poop', id: o.id };
-  for (const e of state.eggs ?? []) if (Math.hypot(wx - e.x, wy - e.y + 3) < 8) return { kind: 'egg', id: e.id };
   for (const { pen } of M.troughs) { const tr = M.pens[pen].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen }; }
   const cp = coop();
   if (cp && hitRect(cp.x, cp.y, 30, 28, wx, wy, 0) || cp && hitRect(cp.at.x - 9, cp.at.y - 12, 18, 12, wx, wy)) return { kind: 'nest' };
@@ -443,7 +458,8 @@ export function pickEntity(state, wx, wy) {
 }
 
 // ---------- Cập nhật mỗi khung hình ----------
-// Trả về { results: [kết quả perform (trượt phân)], arrived: target đã tới nơi khi đang đi tới thứ được chạm }
+// Trả về { results: [kết quả perform (trượt phân)], arrived: target đã tới nơi khi đang đi tới thứ được chạm,
+//   door: cửa vừa bước vào (main.js chuyển bản đồ) }
 export function update(state, w, dt) {
   ensurePositions(state);
   if (w.map !== M) { if (w.map) relayout(state, w); w.map = M; }
@@ -478,6 +494,34 @@ export function update(state, w, dt) {
   }
   if (w.moving) w.walkT += dt;
 
+  // bước vào ô cửa → sang bản đồ khác (phải ra khỏi ô cửa một lần rồi mới tính, khỏi bị đẩy qua lại)
+  const door = M.doors.find(d => inDoor(d, p.x, p.y));
+  if (!door) w.doorArmed = true;
+  else if (w.doorArmed && w.moving) { w.doorArmed = false; w.path = null; w.pending = null; out.door = door; }
+  // ở trong nhà: con vật, chó, quạ ngoài vườn đứng yên (luật vẫn chạy trong tick)
+  if (atFarm()) updateFarm(state, w, dt, out);
+
+  // đang đi tới thứ được chạm
+  const t = w.pending;
+  if (t) {
+    w.pendingT += dt;
+    if (!exists(state, t) || w.pendingT > 15) { w.pending = null; w.path = null; }
+    else if (inRange(state, t)) { out.arrived = t; w.pending = null; w.path = null; }
+    else {
+      w.repathT -= dt;
+      if (!w.path || w.repathT <= 0) {
+        const pos = targetPos(state, t);
+        w.path = findPath(p.x, p.y, pos.x, pos.y);
+        w.repathT = 0.5;
+      }
+    }
+  }
+  return out;
+}
+
+// Phần chỉ chạy khi đang ở vườn: giẫm phân, con vật, chó, quạ, trộm
+function updateFarm(state, w, dt, out) {
+  const p = state.player;
   // giẫm phân
   if (w.lastSlip != null) {
     const o = findBy(state.poops, w.lastSlip);
@@ -496,21 +540,4 @@ export function update(state, w, dt) {
   updateAnimals(state, w, dt);
   updateDog(state, w, dt);
   updateThreats(state, w, dt);
-
-  // đang đi tới thứ được chạm
-  const t = w.pending;
-  if (t) {
-    w.pendingT += dt;
-    if (!exists(state, t) || w.pendingT > 15) { w.pending = null; w.path = null; }
-    else if (inRange(state, t)) { out.arrived = t; w.pending = null; w.path = null; }
-    else {
-      w.repathT -= dt;
-      if (!w.path || w.repathT <= 0) {
-        const pos = targetPos(state, t);
-        w.path = findPath(p.x, p.y, pos.x, pos.y);
-        w.repathT = 0.5;
-      }
-    }
-  }
-  return out;
 }

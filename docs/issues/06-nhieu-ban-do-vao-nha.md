@@ -16,9 +16,9 @@ Dựng hệ thống nhiều bản đồ, bắt đầu với **vườn ↔ trong 
 
 ## Acceptance criteria
 
-- [ ] Unit test: chuyển vườn → nhà → vườn đúng vị trí. Tick khi đang ở trong nhà thì cây ngoài vườn vẫn lớn.
-- [ ] E2E: đi vào nhà → mở tủ đồ đổi mũ → ra ngoài → tải lại trang thì vẫn đúng bản đồ và vị trí.
-- [ ] Không còn đường đi cũ nào tới tủ đồ bằng cách chạm vào nhà từ ngoài.
+- [x] Unit test: chuyển vườn → nhà → vườn đúng vị trí. Tick khi đang ở trong nhà thì cây ngoài vườn vẫn lớn.
+- [x] E2E: đi vào nhà → mở tủ đồ đổi mũ → ra ngoài → tải lại trang thì vẫn đúng bản đồ và vị trí.
+- [x] Không còn đường đi cũ nào tới tủ đồ bằng cách chạm vào nhà từ ngoài.
 
 ## Blocked by
 

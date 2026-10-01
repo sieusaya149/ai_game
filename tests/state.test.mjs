@@ -120,7 +120,7 @@ test('bình tưới và giếng', () => {
   assert.ok(r.ok); assert.equal(r.sound, 'water');
   assert.equal(s.can, FARMING.canMax);
   assert.equal(G.perform(s, { kind: 'building', id: 'shop' }, 'open').open, 'shop');
-  for (const id of ['shed', 'house', 'board', 'gate']) assert.equal(G.perform(s, { kind: 'building', id }, 'open').open, id);
+  for (const id of ['shed', 'board', 'gate']) assert.equal(G.perform(s, { kind: 'building', id }, 'open').open, id);
 });
 
 test('bón phân tăng sản lượng, thuốc tăng trưởng đẩy nhanh', () => {

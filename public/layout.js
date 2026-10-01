@@ -3,13 +3,15 @@
 
 export const TS = 16;                       // 1 ô = 16x16 điểm ảnh
 export const MAP = { mw: 64, mh: 48 };      // vườn tối đa 64x48 ô
-export const GROUND = { GRASS: 0, ROAD: 1, FIELD: 2, PEN: 3, MUD: 4, FOREST: 5 };
+export const GROUND = { GRASS: 0, ROAD: 1, FIELD: 2, PEN: 3, MUD: 4, FOREST: 5, FLOOR: 6, WALL: 7 };
 export const FIELD_SIZE = 3;                // ruộng là các khối 3x3
 
 // Công trình: foot là các ô chắn đường (w, h), spr là góc vẽ sprite so với góc trên-trái của foot (điểm ảnh),
 // at là điểm đứng để tương tác (null = không tương tác). fixed: không dời được.
+// door: các ô (so với góc foot) bỏ chắn để bước vào là sang bản đồ to.
 export const BUILDING_DEFS = {
-  house:    { name: 'Nhà',           sprite: 'house',     foot: { w: 4, h: 4 }, spr: { x: -8, y: -22 }, at: { x: 32, y: 74 }, fixed: true },
+  house:    { name: 'Nhà',           sprite: 'house',     foot: { w: 4, h: 4 }, spr: { x: -8, y: -22 }, at: { x: 32, y: 74 }, fixed: true,
+    door: { c: 1, r: 3, w: 2, h: 1, to: 'house' } },
   board:    { name: 'Bảng đơn hàng', sprite: 'board',     foot: { w: 1, h: 1 }, spr: { x: -4, y: -8 },  at: { x: 8, y: 24 } },
   shed:     { name: 'Nhà kho',       sprite: 'shed',      foot: { w: 4, h: 3 }, spr: { x: 0, y: -10 },  at: { x: 32, y: 58 } },
   well:     { name: 'Giếng nước',    sprite: 'well',      foot: { w: 1, h: 1 }, spr: { x: 0, y: -8 },   at: { x: 8, y: 24 } },
@@ -60,6 +62,32 @@ export const START_FARM = {
   // đường đất: các hình chữ nhật (c, r, w, h)
   paths: [[22, 19, 16, 2], [27, 21, 2, 3], [36, 21, 2, 13]],
   spawn: { x: 368, y: 318 },
+};
+
+// ---------- Bản đồ cố định (trong nhà; sau này thêm làng) ----------
+// Toạ độ theo ô của chính bản đồ đó. walls: hình chữ nhật chắn đường (c, r, w, h).
+// furniture: đồ đặc chắn đường; foot (ô), spr = góc vẽ sprite so với góc foot, at = chỗ đứng để dùng (null = chỉ để ngắm).
+// props: hình vẽ nằm dưới chân, không chắn (thảm, cửa sổ trên vách). doors: ô cửa, bước vào là sang bản đồ to.
+// arrive[from]: chỗ đứng (điểm ảnh) + hướng nhìn khi từ bản đồ from đi tới.
+export const SCENES = {
+  house: {
+    name: 'Trong nhà', mw: 12, mh: 10,
+    walls: [[0, 0, 12, 2], [0, 2, 1, 8], [11, 2, 1, 8], [1, 9, 4, 1], [7, 9, 4, 1]],
+    furniture: [
+      { kind: 'bed', name: 'Giường', sprite: 'bed', foot: { c: 1, r: 2, w: 2, h: 2 }, spr: { x: 0, y: 4 }, at: { x: 40, y: 20 } },
+      { kind: 'wardrobe', name: 'Tủ đồ', sprite: 'wardrobe', foot: { c: 9, r: 2, w: 2, h: 1 }, spr: { x: 4, y: -16 }, at: { x: 16, y: 26 } },
+      { kind: 'stove', name: 'Bếp', sprite: 'stove', foot: { c: 6, r: 2, w: 2, h: 1 }, spr: { x: 4, y: -8 }, at: null },
+      { kind: 'table', name: 'Bàn', sprite: 'table', foot: { c: 4, r: 5, w: 2, h: 1 }, spr: { x: 0, y: -4 }, at: null },
+      { kind: 'plant', name: 'Chậu cây', sprite: 'pottedPlant', foot: { c: 10, r: 8, w: 1, h: 1 }, spr: { x: 0, y: -8 }, at: null },
+    ],
+    props: [
+      { sprite: 'window', x: 64, y: 6 }, { sprite: 'window', x: 128, y: 6 },
+      { sprite: 'rug', x: 56, y: 70 },
+      { sprite: 'doorMat', x: 80, y: 128 }, { sprite: 'doorMat', x: 96, y: 128 },
+    ],
+    doors: [{ c: 5, r: 9, w: 2, h: 1, to: 'farm', name: 'Cửa ra vườn', at: { x: 96, y: 138 } }],
+    arrive: { farm: { x: 96, y: 126, dir: 3 } },
+  },
 };
 
 // ---------- Bản v1 (bản đồ cố định 34x27) ----------

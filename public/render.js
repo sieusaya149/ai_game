@@ -1,7 +1,8 @@
 // Vẽ thế giới: lớp nền tĩnh (vẽ một lần) + lớp động mỗi khung hình. Không giữ trạng thái game.
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
 import { TS, GROUND } from './layout.js';
-import { mapOf, footprint } from './farm.js';
+import { SPR2 } from './art2.js';
+import { sceneMap, footprint } from './farm.js';
 import { canMove } from './state.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
@@ -121,6 +122,35 @@ const decoFallback = kind => once('deco' + kind, () => {
 });
 const decoImg = kind => SPR.deco?.[kind] ?? decoFallback(kind);
 
+// Nội thất dự phòng (khi SPR2 chưa có): khối gỗ đơn giản đúng kích thước sprite thật
+const FURN = { bed: [32, 24, '#e5452f'], wardrobe: [24, 32, '#b07a45'], stove: [24, 24, '#9a9a94'], table: [32, 20, '#c98c4a'],
+  pottedPlant: [16, 24, '#3d8c2a'], rug: [48, 32, '#c44434'], window: [16, 16, '#8fd3ff'], doorMat: [16, 16, '#d9b860'] };
+const furnFallback = k => once('furn' + k, () => {
+  const [w, h, col] = FURN[k] ?? [16, 16, '#b07a45'], c = mkCanvas(w, h), x = c.getContext('2d');
+  rect(x, '#3b2412', 0, 0, w, h); rect(x, col, 1, 1, w - 2, h - 2); rect(x, 'rgba(255,255,255,0.25)', 1, 1, w - 2, 2);
+  return c;
+});
+const sprite2 = k => SPR2?.[k] ?? furnFallback(k);
+
+// Lớp nền trong nhà: sàn gỗ, vách sau (2 ô), vách hai bên + dưới, khe cửa sáng, rồi thảm/cửa sổ (props)
+function interiorLayer(m) {
+  const { mw, mh, W, H, ground } = m, c = mkCanvas(W, H), x = c.getContext('2d');
+  x.imageSmoothingEnabled = false;
+  const floors = SPR2?.floors ?? [SPR2?.floorWood].filter(Boolean);
+  for (let r = 0; r < mh; r++) for (let col = 0; col < mw; col++) {
+    const px = col * TS, py = r * TS;
+    if (ground[r * mw + col] === GROUND.FLOOR) {
+      if (floors.length) x.drawImage(floors[Math.floor(hash(col, r) * floors.length)], px, py);
+      else { rect(x, '#a06a3a', px, py, TS, TS); rect(x, '#4a2c14', px, py + 15, TS, 1); }
+    } else if (r < 2) {
+      if (r === 0) { if (SPR2?.wallInner) x.drawImage(SPR2.wallInner, px, 0); else { rect(x, '#ead4a8', px, 0, TS, 24); rect(x, '#8a5a2b', px, 24, TS, 8); } }
+    } else { rect(x, '#2e1a0c', px, py, TS, TS); rect(x, '#5c3a1a', px + 1, py + 1, TS - 2, TS - 2); rect(x, '#8a5a2b', px + 1, py + 1, TS - 2, 1); }
+  }
+  for (const d of m.doors) { rect(x, '#5c3a1a', d.x, d.y, d.w, 3); rect(x, '#f3e3b0', d.x, d.y + 3, d.w, d.h - 3); rect(x, '#9bd06a', d.x, d.y + d.h - 5, d.w, 5); }
+  for (const p of m.props ?? []) x.drawImage(sprite2(p.sprite), p.x, p.y);
+  return c;
+}
+
 const STATUS_ROWS = {
   heart: ['.rr.rr.', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'],
   sick: ['.MMMMM.', 'MMMMMMM', 'MkMMMkM', 'MMMMMMM', '.MMkMM.', '..M.M..'],
@@ -155,6 +185,7 @@ export function crowImg(face, frame) {
 export const eggSize = () => { const e = eggImg(); return { w: e.width, h: e.height }; };
 export const poopSize = () => { const e = poopImg(); return { w: e.width, h: e.height }; };
 export function buildingImg(b) {
+  if (b.interior) return SPR2?.[b.sprite] ?? furnFallback(b.sprite);
   if (b.sprite === 'well') return wellImg();
   if (b.sprite === 'board') return boardImg();
   return SPR[b.sprite] ?? null;
@@ -166,6 +197,7 @@ export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h
 let staticCanvas = null, staticFor = null;
 export function staticLayer(m) {
   if (staticCanvas && staticFor === m) return staticCanvas;
+  if (m.interior) { staticCanvas = interiorLayer(m); staticFor = m; return staticCanvas; }
   const { ground, solid, fences, mw: MW, mh: MH, W, H, mud: MUD } = m;
   const gAt = (c, r) => (c < 0 || r < 0 || c >= MW || r >= MH) ? -1 : ground[r * MW + c];
   const isRoad = (c, r) => { const g = gAt(c, r); return g === GROUND.ROAD || g === -1; };
@@ -353,10 +385,10 @@ export function render(ctx, f) {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#25491a';
+  const m = sceneMap(state), farm = !m.interior;   // trong nhà: không vẽ con vật, chó, quạ, trứng, phân ngoài vườn
+  ctx.fillStyle = farm ? '#25491a' : '#1a100a';
   ctx.fillRect(0, 0, width, height);
   ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
-  const m = mapOf(state);
   ctx.drawImage(staticLayer(m), 0, 0);
 
   const blit = (img, x, y) => { if (img) ctx.drawImage(img, Math.round(x), Math.round(y)); };
@@ -385,9 +417,10 @@ export function render(ctx, f) {
 
   // 2) bóng dưới chân
   shadow(state.player.x, state.player.y, 6);
-  for (const a of state.animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : a.adult ? 6 : 4);
-  if (state.dog.x != null) shadow(state.dog.x, state.dog.y, 6);
-  for (const t of state.threats) if (t.x != null) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
+  const animals = farm ? state.animals : [], threats = farm ? state.threats ?? [] : [];
+  for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : a.adult ? 6 : 4);
+  if (farm && state.dog.x != null) shadow(state.dog.x, state.dog.y, 6);
+  for (const t of threats) if (t.x != null) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
 
   // 3) các vật nhô lên, sắp theo y chân
   const items = [];
@@ -450,8 +483,8 @@ export function render(ctx, f) {
   }
 
   // trứng, phân
-  for (const e of state.eggs ?? []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = eggImg(); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
-  for (const p of state.poops ?? []) {
+  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = eggImg(); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
+  for (const p of farm ? state.poops ?? [] : []) {
     if (p.x == null || !vis(p.x, p.y)) continue;
     add(p.y, () => {
       const im = poopImg(), st = stinkImgs();
@@ -470,7 +503,7 @@ export function render(ctx, f) {
   }
 
   // con vật
-  for (const a of state.animals) {
+  for (const a of animals) {
     if (a.x == null || !vis(a.x, a.y)) continue;
     const rt = wd.rt.get('a' + a.id) ?? {};
     const frame = rt.walking ? Math.floor(rt.anim * 7) % 2 : rt.peck ? Math.floor(rt.anim * 6) % 2 : 0;
@@ -491,7 +524,7 @@ export function render(ctx, f) {
   }
   // chó
   const dog = state.dog;
-  if (dog.x != null) {
+  if (farm && dog.x != null) {
     const rt = wd.rt.get('dog') ?? {};
     const im = dogImg(dog.adult, rt.face ?? 'right', rt.walking ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0);
     if (im) {
@@ -502,7 +535,7 @@ export function render(ctx, f) {
     }
   }
   // quạ & thằng Tèo
-  for (const t of state.threats ?? []) {
+  for (const t of threats) {
     if (t.x == null || !vis(t.x, t.y, 40)) continue;
     const rt = wd.rt.get('t' + t.id) ?? {};
     if (t.kind === 'crow') {
@@ -581,7 +614,7 @@ export function render(ctx, f) {
   // 5) đêm, đèn, mưa
   if (night > 0.01) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = `rgba(12,20,74,${(0.52 * night).toFixed(3)})`;
+    ctx.fillStyle = `rgba(12,20,74,${((farm ? 0.52 : 0.3) * night).toFixed(3)})`;   // trong nhà có đèn, tối nhẹ hơn
     ctx.fillRect(0, 0, width, height);
     ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
     ctx.globalCompositeOperation = 'lighter';
@@ -598,7 +631,7 @@ export function render(ctx, f) {
     ctx.globalCompositeOperation = 'source-over';
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (state.weather === 'rain') {
+  if (farm && state.weather === 'rain') {   // trong nhà: không thấy mưa, mây
     ctx.fillStyle = 'rgba(40,60,100,0.13)'; ctx.fillRect(0, 0, width, height);
     ctx.strokeStyle = 'rgba(200,228,255,0.55)'; ctx.lineWidth = Math.max(1, Math.round(dpr));
     const len = 14 * dpr, sp = 750 * dpr, n = Math.min(160, Math.round(width * height / (9000 * dpr * dpr)));
@@ -610,7 +643,7 @@ export function render(ctx, f) {
       ctx.moveTo(x, y); ctx.lineTo(x - len * 0.22, y + len);
     }
     ctx.stroke();
-  } else if (state.weather === 'cloud') {
+  } else if (farm && state.weather === 'cloud') {
     ctx.fillStyle = 'rgba(70,80,100,0.07)'; ctx.fillRect(0, 0, width, height);
   }
 

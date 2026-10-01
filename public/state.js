@@ -5,10 +5,10 @@ import {
   expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
-import { mapOf, reachable, bumpLayout, footprint, buildMap } from './farm.js';
+import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
 import { migrate, newFarm } from './migrate.js';
 
-export { levelInfo, mapOf, reachable, footprint };
+export { levelInfo, mapOf, reachable, footprint, sceneMap };
 export const SAVE_KEY = 'nongtrai-save-v2';
 const OLD_KEYS = ['nongtrai-save-v1'];   // đọc được để chuyển, không bao giờ ghi đè hay xóa
 const MIGRATED_KEY = 'nongtrai-migrated';
@@ -98,7 +98,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
   const s = {
     v: 2, name, look: lk, owned, coins: START.coins, exp: 0,
     time: 0, speed: 1, day: 1, weather: 'sun', savedAt: Date.now(),
-    farm: nf.farm,
+    farm: nf.farm, scene: 'farm',     // scene: bản đồ đang đứng; player.x/y tính theo bản đồ đó
     player: { x: 0, y: 0, dir: 0 }, can: FARMING.canMax, selectedSeed: 'cai',
     inv: { ...START.items },
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
@@ -159,6 +159,7 @@ export function loadGame() {
   s.troughs = { ...base.troughs, ...s.troughs };
   for (const k of ['owned', 'achievements', 'inv', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
   for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
+  if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   evq = [];
   const elapsed = clamp(Date.now() - (s.savedAt || Date.now()), 0, MAX_CATCHUP_MS);
   if (elapsed > 3000) {
@@ -403,7 +404,7 @@ const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở sạp nhé`;
 export function actionsFor(s, t) {
   if (!t) return [];
   const f = { plot: plotActs, lockedPlot: lockedActs, animal: animalActs, egg: () => [mk('collect', '🥚', 'Nhặt trứng')],
-    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs }[t.kind];
+    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs }[t.kind];
   return f ? f(s, t) : [];
 }
 
@@ -484,12 +485,21 @@ function threatActs(s, t) {
 }
 
 function buildingActs(s, t) {
-  const b = mapOf(s).building(t.id);
+  const b = sceneMap(s).building(t.id);
   if (!b) return [];
-  const open = { shop: ['🛒', 'Vào sạp hàng'], shed: ['📦', 'Vào nhà kho'], house: ['🏠', 'Vào nhà'], board: ['📋', 'Xem đơn hàng'], gate: ['🚪', 'Ra cổng'] }[b.id];
+  const open = { shop: ['🛒', 'Vào sạp hàng'], shed: ['📦', 'Vào nhà kho'], board: ['📋', 'Xem đơn hàng'], gate: ['🚪', 'Ra cổng'], wardrobe: ['👕', 'Mở tủ đồ'] }[b.id];
   if (open) return [mk('open', open[0], open[1])];
+  if (b.id === 'house') return [mk('enter', '🏠', 'Vào nhà')];
+  if (b.id === 'bed') return [mk('sleep', '🛏️', 'Ngủ', 'Để dành cho tối nay')];
   if (b.id === 'well') return [mk('refill', '🪣', `Múc nước (bình ${s.can}/${FARMING.canMax})`, s.can >= FARMING.canMax ? 'Bình đầy rồi' : null)];
   return [];
+}
+
+// Cửa sang bản đồ khác: { kind: 'door', to }
+const doorOf = (s, to) => sceneMap(s).doors.find(d => d.to === to) ?? null;
+function doorActs(s, t) {
+  const d = doorOf(s, t.to);
+  return d ? [mk('go', '🚪', d.to === 'farm' ? 'Ra vườn' : `Vào ${d.name.toLowerCase()}`)] : [];
 }
 
 // ---------- perform ----------
@@ -502,7 +512,8 @@ function posOf(s, t) {
   if (t.kind === 'plot' || t.kind === 'lockedPlot') return m.plotCenter(t.idx) ?? s.player;
   if (t.kind === 'trough') return m.pens[t.pen]?.trough ?? s.player;
   if (t.kind === 'nest') return m.building('coop')?.at ?? s.player;
-  if (t.kind === 'building') return m.building(t.id)?.at ?? s.player;
+  if (t.kind === 'building') return sceneMap(s).building(t.id)?.at ?? s.player;
+  if (t.kind === 'door') return doorOf(s, t.to)?.at ?? s.player;
   if (t.kind === 'dog') return s.dog;
   const list = { animal: s.animals, egg: s.eggs, poop: s.poops, threat: s.threats }[t.kind];
   return list?.find(x => x.id === t.id) ?? s.player;
@@ -638,9 +649,25 @@ const DO = {
 
   building(s, t, id, at) {
     if (id === 'refill') { s.can = FARMING.canMax; return res(true, 'Đã múc đầy bình', [say(at, 'Đầy bình! 💧', '#7ad7ff')], 'water'); }
-    return res(true, '', [], 'click', { open: t.id });
+    if (id === 'enter') return res(true, '', [], 'click', { go: BUILDING_DEFS[t.id].door.to });
+    return res(true, '', [], 'click', { open: t.id === 'wardrobe' ? 'house' : t.id });
   },
+
+  // Chỉ báo ý định sang bản đồ khác (go); main.js mờ màn hình rồi mới gọi enterScene.
+  door(s, t) { return res(true, '', [], 'click', { go: t.to }); },
 };
+
+// ---------- Chuyển bản đồ ----------
+// Đi qua cửa từ bản đồ đang đứng sang bản đồ to: phải có cửa dẫn tới to. Tới nơi thì đứng ở arrive[nơi vừa đi].
+export function enterScene(s, to) {
+  if (!doorOf(s, to)) return R(false, 'Không có lối sang đó', { reason: 'no_door' });
+  if (!hasScene(to)) return R(false, 'Chỗ này chưa mở', { reason: 'unknown' });
+  const from = s.scene || 'farm';
+  s.scene = to;
+  const m = sceneMap(s), a = m.arrive[from] ?? m.spawn;
+  Object.assign(s.player, { x: a.x, y: a.y, dir: a.dir ?? 0 });
+  return R(true, '', { scene: to });
+}
 
 // ---------- Cửa hàng & kinh tế ----------
 const R = (ok, msg, extra) => ({ ok, msg, ...extra });
@@ -713,6 +740,7 @@ export function fulfillOrder(s, orderId) {
 
 export function placeDeco(s, itemId) {
   if (ITEMS[itemId]?.kind !== 'deco' || have(s, itemId) <= 0) return R(false, 'Bạn chưa có món này');
+  if (s.scene && s.scene !== 'farm') return R(false, 'Ra vườn rồi hãy đặt nhé');
   const m = mapOf(s), c = Math.floor(s.player.x / TS), r = Math.floor(s.player.y / TS);
   if (m.isSolid(c, r) || m.plotAt(c, r) >= 0) return R(false, 'Chỗ này không đặt được, thử chỗ khác nhé');
   if (m.decos.some(o => o.ent.c === c && o.ent.r === r)) return R(false, 'Chỗ này có đồ rồi');

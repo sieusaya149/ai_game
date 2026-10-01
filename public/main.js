@@ -1,6 +1,6 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
-  loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf,
+  loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
   canPlace, canMove, moveEntity, entName, footprint, snapLayout, restoreLayout,
 } from './state.js';
 import * as ui from './ui.js';
@@ -56,8 +56,8 @@ function updateCamera(dt, snap) {
   const topW = px(document.getElementById('hud')?.getBoundingClientRect().bottom || 0);
   const barTop = document.getElementById(world.build ? 'buildbar' : 'bottombar')?.getBoundingClientRect().top;
   const botW = px(barTop ? innerHeight - barTop : 0);
-  // camera không trôi quá đất nhà quá 2 ô (m.view)
-  const v = mapOf(state).view;
+  // camera không trôi quá đất nhà quá 2 ô (m.view); bản đồ nhỏ hơn màn hình thì nằm giữa
+  const v = sceneMap(state).view;
   const fit = (t, size, a, b, lo = 0, hi = 0) => size - lo - hi >= b - a ? a + (b - a - size + hi - lo) / 2 : clamp(t, a - lo, b - size + hi);
   const tx = fit(p.x - vw / 2, vw, v.x0, v.x1);
   const ty = fit(p.y - 8 - topW - (vh - topW - botW) / 2, vh, v.y0, v.y1, topW, botW);
@@ -70,7 +70,7 @@ function updateCamera(dt, snap) {
 function changed() { dirty = true; }
 
 function doAction(target, id) {
-  if (!state || busy || world.stun > 0) return;
+  if (!state || busy || fading || world.stun > 0) return;
   const pos = V.targetPos(state, target);
   if (pos) V.faceTo(state, pos.x, pos.y);
   V.cancelMove(world);
@@ -89,6 +89,7 @@ function applyResult(res, target, id) {
   if (evs.length) ui.handleEvents(evs);
   if (res.msg && (!res.ok || !res.fx?.length)) ui.toast(res.msg);
   if (res.open) ui.openPanel(res.open);
+  if (res.go) goScene(res.go);
   if (res.ok && target && /pet|vuot|stroke|love/i.test(id ?? '')) {
     const key = target.kind === 'dog' ? 'dog' : target.kind === 'animal' ? 'a' + target.id : null;
     if (key) world.emotes.set(key, { icon: 'heart', until: now + 1600 });
@@ -131,7 +132,7 @@ const api = {
     begin();
   },
   buildStart() {
-    if (!state || world.build || busy) return;
+    if (!state || world.build || busy || fading || state.scene !== 'farm') return;   // chỉ xây dựng ở vườn
     V.cancelMove(world);
     world.build = { snap: snapLayout(state), focus: { x: state.player.x, y: state.player.y }, ghost: null, drag: null, pan: null };
     ui.showBuild(true);
@@ -160,6 +161,30 @@ const api = {
     ui.showCreator();
   },
 };
+
+// ---------- Chuyển bản đồ: mờ dần → đổi bản đồ (luật ở state.enterScene) → hiện dần ----------
+const FADE_MS = 220;
+let fading = false;
+function goScene(to) {
+  if (!state || fading || world.build) return;
+  fading = true;
+  V.cancelMove(world);
+  world.busy = true; world.input.x = world.input.y = 0;
+  const el = document.getElementById('fade');
+  el.classList.add('on');
+  setTimeout(() => {
+    fading = false; world.busy = false;
+    el.classList.remove('on');
+    if (!state) return;
+    const r = enterScene(state, to);
+    if (!r.ok) { ui.toast(r.msg); return; }
+    world.fx = []; world.marker = null;
+    curTarget = null; lastTargetKey = ''; dirty = true;
+    updateCamera(0, true);
+    ui.renderHUD(state);
+    save();
+  }, FADE_MS);
+}
 
 // ---------- Nhập liệu: bàn phím ----------
 const KEYMAP = { KeyW: 'u', ArrowUp: 'u', KeyS: 'd', ArrowDown: 'd', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r' };
@@ -229,7 +254,7 @@ canvas.addEventListener('pointerup', e => {
 });
 
 function onTap(cx, cy) {
-  if (!state || busy || world.stun > 0 || ui.isBlocking()) return;
+  if (!state || busy || fading || world.stun > 0 || ui.isBlocking()) return;
   const r = canvas.getBoundingClientRect();
   const wx = ((cx - r.left) * dpr + view.camX) / scale, wy = ((cy - r.top) * dpr + view.camY) / scale;
   const hit = V.hitTest(state, wx, wy);
@@ -330,6 +355,7 @@ function frame(now) {
   for (const r of res.results) applyResult(r);
   if (busy && now - busy.t0 >= ACTION_MS) finishAction();
   if (res.arrived && !busy) autoAct(res.arrived);
+  if (res.door) goScene(res.door.to);
 
   // 4) target
   syncTarget(now);
@@ -338,7 +364,7 @@ function frame(now) {
   updateCamera(dt, false);
   view = { camX: Math.round(cam.x * scale), camY: Math.round(cam.y * scale) };
   world.fx = world.fx.filter(f => now - f.t0 < 1500);
-  for (const e of events) if (e.type === 'fx') world.fx.push({ text: e.text, color: e.color, x: e.x, y: e.y, t0: now });
+  if (state.scene === 'farm') for (const e of events) if (e.type === 'fx') world.fx.push({ text: e.text, color: e.color, x: e.x, y: e.y, t0: now });
   R.render(ctx, {
     state, w: world, cam, scale, width: canvas.width, height: canvas.height, dpr, now,
     target: curTarget ? { target: curTarget } : null,
