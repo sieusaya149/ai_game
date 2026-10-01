@@ -17,7 +17,7 @@ Trạng thái: ⬜ chưa làm · 🔶 đang làm · ✅ xong
 | 09 | [Thể lực](09-the-luc.md) | 06 | ✅ |
 | 10 | [Công cụ 3 cấp và tiệm rèn](10-cong-cu-va-tiem-ren.md) | 07, 09 | ✅ |
 | 11 | [Giỏ có sức chứa](11-gio-co-suc-chua.md) | 02 | ✅ |
-| 12 | [Thời gian: đóng băng và vắng nhà](12-thoi-gian-dong-bang-vang-nha.md) | 02 | ⬜ |
+| 12 | [Thời gian: đóng băng và vắng nhà](12-thoi-gian-dong-bang-vang-nha.md) | 02 | ✅ |
 | 13 | [Thông báo 3 mức](13-thong-bao-3-muc.md) | 02 | ⬜ |
 | 14 | [Việc cần làm và bản đồ nhỏ](14-viec-can-lam-va-ban-do-nho.md) | 06, 13 | ⬜ |
 | 15 | [Hiệu năng](15-hieu-nang.md) | 05 | ⬜ |

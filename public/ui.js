@@ -68,7 +68,7 @@ const tabs = { market: 'seed', house: 'wardrobe' };
 let marketWasOpen = true;    // chợ đang mở lúc vẽ bảng lần gần nhất, để vẽ lại khi chợ đóng/mở giữa chừng
 let wardLook = null;         // ngoại hình đang xem thử trong tủ đồ
 let cur = { target: null, actions: [], name: '' };
-let creatorOpen = false, celebOpen = false, dialogResolve = null;
+let creatorOpen = false, celebOpen = false, awayOpen = false, dialogResolve = null;
 const celebQueue = [];
 const flags = { sold: false, bought: false };
 const st = () => api.getState();
@@ -80,7 +80,7 @@ const typing = el => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA
 const bareLabel = a => a.icon && a.label.startsWith(a.icon) ? a.label.slice(a.icon.length).trim() : a.label;
 
 export function isBlocking() {
-  return !!panel || creatorOpen || celebOpen || !!dialogResolve || building || typing(document.activeElement);
+  return !!panel || creatorOpen || celebOpen || awayOpen ||!!dialogResolve || building || typing(document.activeElement);
 }
 
 // ---------- Chế độ xây dựng (main.js lo kéo thả, ở đây chỉ bật/tắt giao diện) ----------
@@ -259,6 +259,15 @@ export function renderHUD(s) {
   try { clock = S.clockText(s); } catch { clock = ''; }
   if (!/Ngày/i.test(clock)) clock = `Ngày ${s.day} · ${clock}`;
   setText('hud-time', clock);
+  const se = S.seasonOf(s);
+  if (memo.get('hud-season') !== se.key) {
+    memo.set('hud-season', se.key);
+    setText('hud-season', se.name);
+    const ic = SPR2?.season?.[se.key], cx = $('hud-season-ico').getContext('2d');
+    cx.clearRect(0, 0, 12, 12);
+    if (ic) cx.drawImage(ic, 0, 0);
+  }
+  $('hud-clock').title = `Mùa ${se.name}, ngày ${se.dayIn}/7`;
   let night = false;
   try { night = S.isNight(s); } catch {}
   setText('hud-weather', (night ? '🌙' : '') + (night && s.weather !== 'rain' ? '' : WEATHER[s.weather] || '☀️'));
@@ -841,6 +850,33 @@ function nextCelebration() {
   root.hidden = false;
   sound.play('levelup');
 }
+// ---------- Màn "Trong lúc bạn vắng nhà…" (away = s.away từ loadGame) ----------
+export function closeAway() {
+  awayOpen = false;
+  const root = $('away');
+  root.hidden = true; root.replaceChildren();
+}
+export function showAway(away) {
+  if (!away || awayOpen || creatorOpen) return;
+  awayOpen = true;
+  const root = $('away'), frozen = l => l.startsWith('Vườn đã đóng băng');
+  const gone = spanOf(away.ms);
+  root.replaceChildren(h('div', { class: 'away-card', role: 'dialog', 'aria-label': 'Trong lúc bạn vắng nhà' },
+    h('div', { class: 'away-ico' }, '🏡'),
+    h('h2', {}, 'Trong lúc bạn vắng nhà…'),
+    h('p', { class: 'away-sub' }, `Bạn đã đi ${gone}.`),
+    away.lines.length
+      ? h('ul', { class: 'away-list' }, away.lines.map(l => h('li', { class: frozen(l) ? 'cold' : '' }, h('span', { class: 'ico emo' }, frozen(l) ? '❄️' : '•'), h('span', {}, l))))
+      : h('p', { class: 'mini' }, 'Mọi thứ vẫn yên ổn, không có gì đặc biệt.'),
+    away.frozenMs > 0 ? h('p', { class: 'mini' }, 'Vườn chỉ chạy tối đa 8 giờ khi bạn đi vắng, phần còn lại được giữ nguyên.') : null,
+    btn('Về làm việc thôi!', () => { sound.play('pop'); closeAway(); }, 'orange big')));
+  root.hidden = false;
+  sound.play('levelup');
+}
+function spanOf(ms) {
+  const tot = Math.round(ms / 60000), hr = Math.floor(tot / 60), m = tot % 60;
+  return hr ? `${hr} giờ${m ? ' ' + m + ' phút' : ''}` : `${Math.max(1, m)} phút`;
+}
 export function handleEvents(events) {
   if (!events || !events.length) return;
   const hasToast = events.some(e => e.type === 'toast');
@@ -883,7 +919,8 @@ export function initUI(a) {
 
   addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      if (dialogResolve) dialogResolve(false);
+      if (awayOpen) closeAway();
+      else if (dialogResolve) dialogResolve(false);
       else if (building) api.buildCancel();
       else if (panel) closePanel();
       return;

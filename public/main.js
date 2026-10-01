@@ -412,8 +412,11 @@ resize();
 setupJoystick();
 ui.initUI(api);
 state = loadGame();
-if (state) begin();
-else {
+if (state) {
+  begin();
+  const away = state.away; delete state.away;   // chỉ hiện một lần, không lưu lại
+  ui.showAway(away);
+} else {
   ui.showCreator();
   if (loadProblem()) ui.toast('Không đọc được bản lưu cũ, bản cũ vẫn được giữ nguyên. Bạn có thể bắt đầu vườn mới.');
 }

@@ -16,9 +16,9 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: vắng 3 tiếng thì chạy đủ 3 tiếng. Vắng 12 tiếng thì chỉ chạy 8 tiếng và ghi đóng băng 4 tiếng. Bộ đếm giờ vườn tăng đúng. Mùa đổi sau mỗi 7 ngày.
-- [ ] Unit test: tóm tắt gộp đúng ("5 ô cà chua đã chín").
-- [ ] E2E: lùi `savedAt` 12 tiếng → thấy màn tóm tắt có dòng đóng băng → đóng lại được → HUD có mùa.
+- [x] Unit test: vắng 3 tiếng thì chạy đủ 3 tiếng. Vắng 12 tiếng thì chỉ chạy 8 tiếng và ghi đóng băng 4 tiếng. Bộ đếm giờ vườn tăng đúng. Mùa đổi sau mỗi 7 ngày.
+- [x] Unit test: tóm tắt gộp đúng ("5 ô cà chua đã chín").
+- [x] E2E: lùi `savedAt` 12 tiếng → thấy màn tóm tắt có dòng đóng băng → đóng lại được → HUD có mùa.
 
 ## Blocked by
 

@@ -43,6 +43,14 @@ export async function timeWarp(page, ms) {
   await page.evaluate(v => sessionStorage.setItem('__warp', String(v)), ms);
   await page.reload();
   await page.waitForFunction(() => globalThis.__farm?.state);
+  await closeAway(page);
+}
+// Đóng màn "Trong lúc bạn vắng nhà" nếu nó hiện (nó che game).
+export async function closeAway(page) {
+  const away = page.locator('#away');
+  try { await away.waitFor({ state: 'visible', timeout: 1500 }); } catch { return; }
+  await away.getByRole('button').click();
+  await expect(away).toBeHidden();
 }
 
 // ---------- Thao tác UI ----------

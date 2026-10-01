@@ -7,6 +7,7 @@ import {
 import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
 import { migrate, newFarm } from './migrate.js';
+import { now } from './clock.js';
 
 export { levelInfo, mapOf, reachable, footprint, sceneMap };
 export const SAVE_KEY = 'nongtrai-save-v2';
@@ -117,7 +118,8 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
   const nf = newFarm(1);
   const s = {
     v: 2, name, look: lk, owned, coins: START.coins, exp: 0,
-    time: 0, speed: 1, day: 1, weather: 'sun', savedAt: Date.now(),
+    time: 0, speed: 1, day: 1, weather: 'sun', savedAt: now(),
+    simMs: 0, frozenMs: 0, frozenTotal: 0,   // giờ vườn đã chạy · khoảng đóng băng lần mở gần nhất · tổng đóng băng
     farm: nf.farm, scene: 'farm',     // scene: bản đồ đang đứng; player.x/y tính theo bản đồ đó
     player: { x: 0, y: 0, dir: 0 }, stamina: STAMINA.max, sit: false, can: FARMING.canMax, selectedSeed: 'cai',
     tools: Object.fromEntries(Object.keys(TOOLS).map(k => [k, { lv: 1 }])), smith: null,   // smith: { tool, doneAt } công cụ đang nằm lò rèn
@@ -140,7 +142,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
 }
 
 export function saveGame(s) {
-  try { s.savedAt = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* không có localStorage */ }
+  try { s.savedAt = now(); localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* không có localStorage */ }
 }
 export function resetGame() {
   try { localStorage.removeItem(SAVE_KEY); localStorage.setItem(MIGRATED_KEY, '1'); } catch { /* bỏ qua */ }
@@ -190,20 +192,70 @@ export function loadGame() {
   s.tools = Object.fromEntries(Object.keys(TOOLS).map(k => [k, { lv: clamp(Math.floor(s.tools?.[k]?.lv) || 1, 1, TOOL_MAX) }]));
   if (!(s.smith?.tool in TOOLS) || !Number.isFinite(s.smith.doneAt)) s.smith = null;
   s.can = clamp(Number.isFinite(s.can) ? s.can : FARMING.canMax, 0, canMax(s));
+  // giờ vườn: bản lưu cũ chưa có thì lấy theo thời gian đã chạy
+  s.simMs = Number.isFinite(s.simMs) ? s.simMs : s.time || 0;
+  s.frozenTotal = Number.isFinite(s.frozenTotal) ? s.frozenTotal : 0;
+  s.frozenMs = 0; delete s.away;
   evq = [];
-  const elapsed = clamp(Date.now() - (s.savedAt || Date.now()), 0, MAX_CATCHUP_MS);
+  const t = now(), gone = Math.max(0, t - (s.savedAt || t)), elapsed = Math.min(gone, MAX_CATCHUP_MS);
+  let events = [];
   if (elapsed > 3000) {
     s.threats = [];
     catchUp = true;
-    try { tick(s, elapsed); } finally { catchUp = false; }
+    try { events = tick(s, elapsed); } finally { catchUp = false; }
     s.threats = [];
     evq = [];
     log(s, `Chào mừng trở lại! Nông trại đã chạy thêm ${Math.round(elapsed / MIN)} phút.`);
     evq = [];
   }
-  s.savedAt = Date.now();
+  s.frozenMs = gone - elapsed;   // phần vắng vượt 8 giờ: không chạy, chỉ ghi lại
+  s.frozenTotal += s.frozenMs;
+  const lines = awaySummary(events, s.frozenMs);
+  s.away = lines.length || gone >= AWAY_SHOW_MS ? { lines, frozenMs: s.frozenMs, ms: gone } : null;
+  s.savedAt = t;
   return s;
 }
+
+// ---------- Trong lúc bạn vắng nhà ----------
+const AWAY_SHOW_MS = 5 * MIN;   // vắng ít hơn mức này mà chẳng có gì xảy ra thì không hiện màn tóm tắt
+const lc = x => String(x ?? '').toLowerCase();
+const count = (evs, type) => {
+  const m = new Map();
+  for (const e of evs) if (e.type === type) { const k = e.crop ?? e.animal ?? e.who ?? ''; m.set(k, (m.get(k) || 0) + 1); }
+  return [...m];
+};
+const spanText = ms => {
+  const tot = Math.round(ms / MIN), h = Math.floor(tot / 60), m = tot % 60;
+  return [h && `${h} giờ`, m && `${m} phút`].filter(Boolean).join(' ') || '0 phút';
+};
+// Gộp event lúc chạy bù thành các dòng tiếng Việt. Hàm thuần: events đến từ tick().
+export function awaySummary(events, frozenMs = 0) {
+  const out = [], cropName = id => lc(CROPS[id]?.name ?? id);
+  for (const [type, verb] of [['ripe', 'đã chín'], ['rotten', 'đã héo'], ['dead', 'đã chết']]) {
+    for (const [id, n] of count(events, type)) out.push(`${n} ô ${cropName(id)} ${verb}`);
+  }
+  const eggs = events.filter(e => e.type === 'egg').length;
+  if (eggs) out.push(`${eggs} quả trứng mới`);
+  for (const [name, n] of count(events, 'hungry')) out.push(`${n} con ${lc(name)} đói lả`);
+  for (const [name, n] of count(events, 'sick')) out.push(`${n} con ${lc(name)} bị bệnh`);
+  const n = type => events.filter(e => e.type === type).length;
+  if (n('crow')) out.push(`Quạ đã ăn mất ${n('crow')} cây`);
+  if (n('thief')) out.push(`Thằng Tèo đã hái trộm ${n('thief')} cây`);
+  const guard = n('guard');
+  if (guard) out.push(`Chó đã đuổi quạ và trộm ${guard} lần`);
+  const coins = events.reduce((a, e) => a + (e.type === 'shipped' ? e.coins : 0), 0);
+  if (coins) out.push(`Lái buôn trả ${coins} xu`);
+  if (frozenMs >= MIN) out.push(`Vườn đã đóng băng ${spanText(frozenMs)}`);
+  return out;
+}
+
+// Mùa chỉ để hiển thị: mỗi mùa 7 ngày game. dayIn = ngày thứ mấy trong mùa (1..7).
+const SEASONS = [['xuan', 'Xuân'], ['ha', 'Hạ'], ['thu', 'Thu'], ['dong', 'Đông']];
+export function seasonOf(s) {
+  const d = Math.max(0, (s.day || 1) - 1), [key, name] = SEASONS[Math.floor(d / 7) % 4];
+  return { key, name, dayIn: d % 7 + 1 };
+}
+export const farmHours = s => (s.simMs || 0) / 3600_000;
 
 // ---------- Thời gian ----------
 const dayFrac = s => (s.time % DAY_MS) / DAY_MS;
@@ -253,6 +305,7 @@ export function tick(s, dtGame) {
 
 function step(s, d) {
   s.time += d;
+  s.simMs = (s.simMs || 0) + d;
   const day = Math.floor(s.time / DAY_MS) + 1;
   if (day !== s.day) {
     s.day = day;
@@ -285,11 +338,11 @@ function stepPlot(s, p, d) {
   const def = CROPS[c.id], at = plotCenter(s, p.idx);
   if (c.progress >= 1) { // chín: tiếp tục già đi, quá OVERRIPE thì héo
     c.progress += d / def.grow;
-    if (c.progress >= OVERRIPE) { c.rotten = true; fxEv(at.x, at.y, 'Héo mất rồi 🥀', COL.bad); log(s, `${def.name} chín quá nên héo mất`); }
+    if (c.progress >= OVERRIPE) { c.rotten = true; emit({ type: 'rotten', crop: c.id }); fxEv(at.x, at.y, 'Héo mất rồi 🥀', COL.bad); log(s, `${def.name} chín quá nên héo mất`); }
     return;
   }
   if (c.sick) {
-    if (s.time - c.sickSince >= FARMING.sickToDead) { c.dead = true; fxEv(at.x, at.y, 'Cây chết rồi 💀', COL.bad); log(s, `${def.name} bị bệnh nặng và chết mất`); }
+    if (s.time - c.sickSince >= FARMING.sickToDead) { c.dead = true; emit({ type: 'dead', crop: c.id }); fxEv(at.x, at.y, 'Cây chết rồi 💀', COL.bad); log(s, `${def.name} bị bệnh nặng và chết mất`); }
     return;
   }
   if (c.bugs) {
@@ -297,7 +350,7 @@ function stepPlot(s, p, d) {
     return;
   }
   if (p.water > 0) c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1);
-  if (c.progress >= 1) { c.ripeAt = s.time; fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
+  if (c.progress >= 1) { c.ripeAt = s.time; emit({ type: 'ripe', crop: c.id }); fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
   else if (chance(FARMING.bugChancePerMin, d)) { c.bugs = true; c.bugSince = s.time; fxEv(at.x, at.y, 'Có sâu! 🐛', COL.bad); }
 }
 
@@ -312,9 +365,9 @@ function stepAnimals(s, d) {
     if (a.happy > 50) a.happy = Math.max(50, a.happy - HUSBANDRY.happyDecayPerMin * d / MIN);
     a.happy = Math.max(0, a.happy - stink);
     // đói lả -> bệnh
-    if (a.hunger <= 0) { if (!a.starvingSince) a.starvingSince = s.time; } else a.starvingSince = 0;
+    if (a.hunger <= 0) { if (!a.starvingSince) { a.starvingSince = s.time; emit({ type: 'hungry', animal: def.name }); } } else a.starvingSince = 0;
     if (!a.sick && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving) || chance(HUSBANDRY.sickChancePerMin, d))) {
-      a.sick = true; fxEv(a.x, a.y, `${def.name} bị bệnh 🤒`, COL.bad); log(s, `${def.name} bị bệnh, cho uống thuốc thú y nhé`);
+      a.sick = true; emit({ type: 'sick', animal: def.name }); fxEv(a.x, a.y, `${def.name} bị bệnh 🤒`, COL.bad); log(s, `${def.name} bị bệnh, cho uống thuốc thú y nhé`);
     }
     if (a.sick) continue;
     if (!a.adult) {
@@ -324,7 +377,7 @@ function stepAnimals(s, d) {
     }
     if (a.hunger <= HUSBANDRY.growNeedsHunger || a.type === 'heo' || s.time < a.nextProduct) continue;
     if (a.type === 'ga') {
-      if (s.eggs.length < 30) { const e = { id: s.nextId++, x: a.x, y: a.y, laidAt: s.time }; s.eggs.push(e); spawnEv('egg', e.x, e.y); }
+      if (s.eggs.length < 30) { const e = { id: s.nextId++, x: a.x, y: a.y, laidAt: s.time }; s.eggs.push(e); emit({ type: 'egg' }); spawnEv('egg', e.x, e.y); }
       a.nextProduct = s.time + def.every;
     } else if (!a.ready) { a.ready = true; fxEv(a.x, a.y, a.type === 'bo' ? 'Có sữa! 🥛' : 'Có lông! ✂️'); }
   }
@@ -420,7 +473,7 @@ function stepThreats(s, d) {
       else if (s.time >= t.arriveAt) {
         t.state = 'eating'; t.since = s.time;
         if (guardOn(s) && Math.random() < DOG.guardChance) {
-          t.state = 'leaving'; t.since = s.time; s.stats[crow ? 'crows' : 'thieves']++;
+          t.state = 'leaving'; t.since = s.time; s.stats[crow ? 'crows' : 'thieves']++; emit({ type: 'guard', who: crow ? 'crow' : 'thief' });
           toast(`${s.dog.name} sủa vang, đuổi ${who.toLowerCase()} đi rồi! 🐕`); snd('bark');
         }
       }
@@ -429,6 +482,7 @@ function stepThreats(s, d) {
       else if (s.time - t.since >= (crow ? THREATS.crowEatMs : THREATS.thiefStealMs)) {
         const nm = CROPS[p.crop.id].name;
         p.crop = null; t.state = 'leaving'; t.since = s.time; t.loot = !crow;
+        emit({ type: crow ? 'crow' : 'thief' });
         const c = plotCenter(s, p.idx);
         fxEv(c.x, c.y, crow ? 'Quạ ăn mất cây! 😢' : 'Bị hái trộm! 😢', COL.bad);
         const lost = crow ? `Quạ đã ăn mất ${nm}` : `Thằng Tèo hái trộm mất ${nm}`;
