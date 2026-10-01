@@ -1,5 +1,8 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
-import { loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf } from './state.js';
+import {
+  loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf,
+  canPlace, canMove, moveEntity, entName, footprint, snapLayout, restoreLayout,
+} from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
 import * as R from './render.js';
@@ -46,11 +49,12 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
 
 function updateCamera(dt, snap) {
-  const vw = canvas.width / scale, vh = canvas.height / scale, p = state.player;
+  // chế độ xây dựng: camera theo điểm nhìn riêng (kéo chỗ trống để xem chỗ khác)
+  const vw = canvas.width / scale, vh = canvas.height / scale, p = world.build?.focus ?? state.player;
   // Chừa chỗ cho HUD trên và thanh dưới: nhân vật nằm giữa phần màn hình còn thấy được.
   const px = v => v * dpr / scale;
   const topW = px(document.getElementById('hud')?.getBoundingClientRect().bottom || 0);
-  const barTop = document.getElementById('bottombar')?.getBoundingClientRect().top;
+  const barTop = document.getElementById(world.build ? 'buildbar' : 'bottombar')?.getBoundingClientRect().top;
   const botW = px(barTop ? innerHeight - barTop : 0);
   // camera không trôi quá đất nhà quá 2 ô (m.view)
   const v = mapOf(state).view;
@@ -100,12 +104,22 @@ function finishAction() {
 }
 
 function begin() {
+  if (world.build) ui.showBuild(false);
   world = V.createWorld();
   busy = null; lastTargetKey = ''; curTarget = null; dirty = true;
   V.ensurePositions(state);
   updateCamera(0, true);
   ui.renderHUD(state);
-  saveGame(state);
+  save();
+}
+
+// Lưu game. Đang trong chế độ xây dựng thì lưu bố cục lúc trước khi vào (chỉ Xong mới lưu bố cục mới).
+function save() {
+  if (!state) return;
+  if (!world.build) { saveGame(state); return; }
+  const c = structuredClone(state);
+  restoreLayout(c, world.build.snap);
+  saveGame(c);
 }
 
 const api = {
@@ -116,7 +130,30 @@ const api = {
     state = createGame({ name, look });
     begin();
   },
+  buildStart() {
+    if (!state || world.build || busy) return;
+    V.cancelMove(world);
+    world.build = { snap: snapLayout(state), focus: { x: state.player.x, y: state.player.y }, ghost: null, drag: null, pan: null };
+    ui.showBuild(true);
+  },
+  buildDone() {
+    if (!world.build) return;
+    world.build = null;
+    ui.showBuild(false);
+    saveGame(state);
+    ui.toast('Đã lưu bố cục mới');
+    changed();
+  },
+  buildCancel() {
+    if (!world.build) return;
+    restoreLayout(state, world.build.snap);
+    world.build = null;
+    ui.showBuild(false);
+    saveGame(state);
+    changed();
+  },
   resetGame() {
+    if (world.build) { world.build = null; ui.showBuild(false); }
     resetSave();
     state = null; busy = null; curTarget = null; lastTargetKey = '';
     ui.setTarget(null, [], '');
@@ -174,9 +211,17 @@ function setupJoystick() {
 
 // ---------- Nhập liệu: chạm / click vào bản đồ ----------
 let down = null;
-canvas.addEventListener('pointerdown', e => { down = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() }; });
-canvas.addEventListener('pointercancel', () => { down = null; });
+canvas.addEventListener('pointerdown', e => {
+  if (world.build) { buildDown(e); return; }
+  down = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
+});
+canvas.addEventListener('pointermove', e => { if (world.build) buildMove(e); });
+canvas.addEventListener('pointercancel', () => {
+  down = null;
+  if (world.build) { Object.assign(world.build, { drag: null, pan: null, ghost: null }); ui.buildMsg('Chạm và kéo công trình để dời chỗ', null); }
+});
 canvas.addEventListener('pointerup', e => {
+  if (world.build) { buildUp(e); return; }
   if (!down || down.id !== e.pointerId) return;
   const ok = Math.hypot(e.clientX - down.x, e.clientY - down.y) < 12 && performance.now() - down.t < 700;
   down = null;
@@ -191,6 +236,54 @@ function onTap(cx, cy) {
   if (!hit) { V.walkTo(state, world, wx, wy); return; }
   if (V.inRange(state, hit)) autoAct(hit);
   else V.goToTarget(state, world, hit);
+}
+
+// ---------- Chế độ xây dựng: kéo thả công trình, kéo chỗ trống để xem chỗ khác ----------
+const toWorld = (cx, cy) => {
+  const r = canvas.getBoundingClientRect();
+  return { x: ((cx - r.left) * dpr + view.camX) / scale, y: ((cy - r.top) * dpr + view.camY) / scale };
+};
+function buildDown(e) {
+  const b = world.build;
+  if (b.drag || b.pan) return;   // ngón thứ hai: bỏ qua
+  canvas.setPointerCapture?.(e.pointerId);
+  const p = toWorld(e.clientX, e.clientY), ent = V.pickEntity(state, p.x, p.y);
+  if (ent && canMove(ent)) {
+    const ft = footprint(ent);
+    b.drag = { pid: e.pointerId, id: ent.id, oc: clamp(Math.floor(p.x / TS) - ent.c, 0, ft.w - 1), or: clamp(Math.floor(p.y / TS) - ent.r, 0, ft.h - 1) };
+    ui.buildMsg(`Kéo ${entName(ent).toLowerCase()} tới chỗ mới`, null);
+    return;
+  }
+  if (ent) ui.buildMsg(`${entName(ent)} không dời được`, false);
+  b.pan = { pid: e.pointerId, x: e.clientX, y: e.clientY };
+}
+function buildMove(e) {
+  const b = world.build, d = b.drag;
+  if (d?.pid === e.pointerId) {
+    const ent = state.farm.ents.find(x => x.id === d.id), p = toWorld(e.clientX, e.clientY);
+    const c = Math.floor(p.x / TS) - d.oc, r = Math.floor(p.y / TS) - d.or;
+    if (!ent || (b.ghost ? b.ghost.c === c && b.ghost.r === r : c === ent.c && r === ent.r)) return;
+    const ft = footprint(ent), chk = canPlace(state, { id: d.id }, c, r);
+    b.ghost = { id: d.id, c, r, w: ft.w, h: ft.h, ok: chk.ok, reason: chk.reason ?? null };
+    ui.buildMsg(chk.ok ? 'Thả ra để đặt ở đây' : chk.msg, chk.ok);
+  } else if (b.pan?.pid === e.pointerId) {
+    const v = mapOf(state).view;
+    b.focus.x = clamp(b.focus.x - (e.clientX - b.pan.x) * dpr / scale, v.x0, v.x1);
+    b.focus.y = clamp(b.focus.y - (e.clientY - b.pan.y) * dpr / scale, v.y0, v.y1);
+    b.pan.x = e.clientX; b.pan.y = e.clientY;
+  }
+}
+function buildUp(e) {
+  const b = world.build;
+  if (b.pan?.pid === e.pointerId) b.pan = null;
+  if (b.drag?.pid !== e.pointerId) return;
+  const g = b.ghost;
+  b.drag = null; b.ghost = null;
+  if (!g) { ui.buildMsg('Chạm và kéo công trình để dời chỗ', null); return; }
+  const r = moveEntity(state, g.id, g.c, g.r);
+  ui.buildMsg(r.msg || 'Chạm và kéo công trình để dời chỗ', r.ok ? true : false);
+  ui.handleEvents([{ type: 'sound', name: r.ok ? 'pop' : 'error' }]);
+  changed();
 }
 
 // Tự làm hành động chính của target (không tự chọn hành động phụ như Bán)
@@ -258,11 +351,11 @@ function frame(now) {
   if (forUI.length) ui.handleEvents(forUI);
   if (now - lastHud > 250) { lastHud = now; ui.renderHUD(state); }
   if (joy.el) joy.el.style.display = ui.isBlocking() ? 'none' : '';
-  if (now - lastSave > 5000) { lastSave = now; saveGame(state); }
+  if (now - lastSave > 5000) { lastSave = now; save(); }
 }
 
-document.addEventListener('visibilitychange', () => { if (document.hidden && state) saveGame(state); });
-window.addEventListener('pagehide', () => { if (state) saveGame(state); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+window.addEventListener('pagehide', save);
 
 // ---------- Khởi động ----------
 resize();

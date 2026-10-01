@@ -19,10 +19,10 @@ Người chơi bật **chế độ xây dựng** bằng một nút, rồi kéo c
 
 ## Acceptance criteria
 
-- [ ] Có unit test cho từng lý do không hợp lệ, có test riêng cho trường hợp chặn đường. Có test dời khối ruộng đang có cây, và dời chuồng có con vật.
-- [ ] Hủy thì trả mọi thứ về như trước khi vào chế độ xây dựng.
-- [ ] E2E bằng chuột và bằng chạm: dời giếng tới chỗ hợp lệ → Xong → tải lại trang vẫn ở chỗ mới. Kéo vào chỗ chặn đường thì thấy bóng đỏ và đúng lý do.
-- [ ] Không vào chế độ xây dựng thì không chạm nhầm được.
+- [x] Có unit test cho từng lý do không hợp lệ, có test riêng cho trường hợp chặn đường. Có test dời khối ruộng đang có cây, và dời chuồng có con vật.
+- [x] Hủy thì trả mọi thứ về như trước khi vào chế độ xây dựng.
+- [x] E2E bằng chuột và bằng chạm: dời giếng tới chỗ hợp lệ → Xong → tải lại trang vẫn ở chỗ mới. Kéo vào chỗ chặn đường thì thấy bóng đỏ và đúng lý do. (chạm: chỉ giả lập trong Chromium, chưa thử máy thật)
+- [x] Không vào chế độ xây dựng thì không chạm nhầm được.
 
 ## Blocked by
 

@@ -4,11 +4,11 @@ import {
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START,
   expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice,
 } from './data.js';
-import { TS, PEN_DEFS } from './layout.js';
-import { mapOf, reachable, bumpLayout } from './farm.js';
+import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
+import { mapOf, reachable, bumpLayout, footprint, buildMap } from './farm.js';
 import { migrate, newFarm } from './migrate.js';
 
-export { levelInfo, mapOf, reachable };
+export { levelInfo, mapOf, reachable, footprint };
 export const SAVE_KEY = 'nongtrai-save-v2';
 const OLD_KEYS = ['nongtrai-save-v1'];   // đọc được để chuyển, không bao giờ ghi đè hay xóa
 const MIGRATED_KEY = 'nongtrai-migrated';
@@ -720,6 +720,100 @@ export function placeDeco(s, itemId) {
   s.farm.ents.push({ id: s.nextId++, kind: 'deco', item: itemId, c, r });
   bumpLayout(s);
   return R(true, `Đã đặt ${ITEMS[itemId].name.toLowerCase()}`);
+}
+
+// ---------- Chế độ xây dựng: luật đặt công trình (ADR 0005) ----------
+// Mọi lần đặt/dời đều qua canPlace. what: { id } = thực thể đang có (dời), hoặc { kind, pen?, item? } = thực thể mới.
+// Kết quả { ok: true } hoặc { ok: false, reason, msg }. Thêm luật mới (vd. số khối ruộng tối đa, ô chưa dọn)
+// thì thêm một bước kiểm tra trước bước tìm đường, kèm reason mới.
+const SCARED_MS = 6000;
+const no = (reason, msg) => ({ ok: false, reason, msg });
+const overlaps = (a, b) => a.c < b.c + b.w && b.c < a.c + a.w && a.r < b.r + b.h && b.r < a.r + a.h;
+export const canMove = e => !!e && e.kind !== 'tree' && !BUILDING_DEFS[e.kind]?.fixed;
+export function entName(e) {
+  if (e.kind === 'field') return 'Khối ruộng';
+  if (e.kind === 'pen') return PEN_DEFS[e.pen].name;
+  if (e.kind === 'deco') return ITEMS[e.item]?.name ?? 'Đồ trang trí';
+  if (e.kind === 'tree') return 'Cây';
+  return BUILDING_DEFS[e.kind]?.name ?? 'Công trình';
+}
+
+// Những chỗ phải đi tới được từ cổng: cửa nhà, chỗ đứng của công trình, cửa chuồng, khối ruộng.
+function access(m) {
+  const from = m.gateIn ?? m.spawn, out = [];
+  const add = (key, name, p) => out.push({ key, name, ok: reachable(m, from, p) });
+  const mid = (c, r) => ({ x: c * TS + 8, y: r * TS + 8 });
+  for (const b of m.buildings) if (b.at && b.id !== 'gate') add(b.id === 'house' ? 'house' : `b${b.ent.id}${b.id}`, b.name, b.at);
+  for (const p of Object.values(m.pens)) add(`p${p.ent.id}`, p.name, mid(...p.gates[0]));
+  for (const e of m.fields) add(`f${e.id}`, 'Khối ruộng', mid(e.c + 1, e.r + 1));
+  return out;
+}
+
+export function canPlace(s, what, c, r) {
+  const f = s.farm, old = what.id != null ? f.ents.find(e => e.id === what.id) : null;
+  if (what.id != null && !old) return no('missing', 'Không thấy công trình này');
+  if (old && !canMove(old)) return no('fixed', `${entName(old)} không dời được`);
+  const e = { ...(old ?? what), c, r }, ft = footprint(e), o = f.owned;
+  if (ft.c < o.c || ft.r < o.r || ft.c + ft.w > o.c + o.w || ft.r + ft.h > o.r + o.h) return no('outside', 'Chỗ này ngoài đất của bạn');
+  if (f.ents.some(x => x !== old && overlaps(ft, footprint(x)))) return no('overlap', 'Chồng lên công trình khác');
+  // Thử bố cục mới: chỗ nào trước đi tới được từ cổng thì sau vẫn phải tới được (cái mới đặt thì phải tới được).
+  const before = new Map(access(mapOf(s)).map(t => [t.key, t.ok]));
+  const after = access(buildMap({ ...f, ents: old ? f.ents.map(x => (x === old ? e : x)) : [...f.ents, e] }));
+  const lost = after.find(t => !t.ok && (before.get(t.key) ?? true));
+  if (lost) return no('blocks_path', lost.key === 'house' ? 'Chặn mất đường từ cổng vào nhà' : `Chặn mất đường tới ${lost.name.toLowerCase()}`);
+  return { ok: true };
+}
+
+// Ô trống (đi được, trong đất nhà) gần điểm o nhất
+function nearestFree(m, o) {
+  const c0 = Math.floor(o.x / TS), r0 = Math.floor(o.y / TS);
+  for (let d = 1; d < Math.max(m.mw, m.mh); d++) {
+    let best = null;
+    for (let r = r0 - d; r <= r0 + d; r++) for (let c = c0 - d; c <= c0 + d; c++) {
+      if (Math.max(Math.abs(c - c0), Math.abs(r - r0)) !== d || m.isSolid(c, r) || !m.isOwned(c, r)) continue;
+      const x = c * TS + 8, y = r * TS + 8, k = Math.hypot(x - o.x, y - o.y);
+      if (!best || k < best.k) best = { x, y, k };
+    }
+    if (best) return { x: best.x, y: best.y };
+  }
+  return { x: o.x, y: o.y };
+}
+// Nhân vật, chó đứng trên ô vừa thành ô chắn thì dời ra ô trống gần nhất (hộp chân 10x6)
+function unstick(s) {
+  const m = mapOf(s);
+  const free = o => [[-5, -3], [5, -3], [-5, 3], [5, 3]].every(([dx, dy]) => !m.isSolidPx(o.x + dx, o.y + dy));
+  for (const o of [s.player, s.dog]) if (o.x != null && !free(o)) Object.assign(o, nearestFree(m, o));
+}
+
+// Dời thực thể id tới ô (c, r). Miễn phí, không giới hạn số lần.
+export function moveEntity(s, id, c, r) {
+  const chk = canPlace(s, { id }, c, r);
+  if (!chk.ok) return R(false, chk.msg, { reason: chk.reason });
+  const e = s.farm.ents.find(x => x.id === id), dx = (c - e.c) * TS, dy = (r - e.r) * TS;
+  if (!dx && !dy) return R(true, '');
+  if (e.kind === 'pen') {   // con vật, trứng trong chuồng đi theo; con vật hoảng một lúc
+    const ft = footprint(e), inPen = o => o.x >= ft.c * TS && o.x < (ft.c + ft.w) * TS && o.y >= ft.r * TS && o.y < (ft.r + ft.h) * TS;
+    for (const a of s.animals) if (ANIMALS[a.type].pen === e.pen && a.x != null) { a.x += dx; a.y += dy; a.scaredUntil = s.time + SCARED_MS; }
+    for (const o of s.eggs) if (o.x != null && inPen(o)) { o.x += dx; o.y += dy; }
+  }
+  e.c = c; e.r = r;
+  bumpLayout(s);
+  unstick(s);
+  return R(true, `Đã dời ${entName(e).toLowerCase()}`);
+}
+
+// Chụp lại bố cục + vị trí lúc vào chế độ xây dựng; restoreLayout trả về đúng như cũ (nút Hủy).
+const posMap = list => Object.fromEntries((list ?? []).map(o => [o.id, o.scaredUntil != null ? { x: o.x, y: o.y, scaredUntil: o.scaredUntil } : { x: o.x, y: o.y }]));
+export function snapLayout(s) {
+  return structuredClone({ farm: s.farm, player: { x: s.player.x, y: s.player.y }, dog: { x: s.dog.x, y: s.dog.y }, animals: posMap(s.animals), eggs: posMap(s.eggs) });
+}
+export function restoreLayout(s, snap) {
+  s.farm = structuredClone(snap.farm);
+  Object.assign(s.player, snap.player); Object.assign(s.dog, snap.dog);
+  for (const k of ['animals', 'eggs']) for (const o of s[k] ?? []) {
+    const p = snap[k][o.id];
+    if (p) { delete o.scaredUntil; Object.assign(o, p); }
+  }
 }
 
 export function selectSeed(s, cropId) {

@@ -1,7 +1,8 @@
 // Vẽ thế giới: lớp nền tĩnh (vẽ một lần) + lớp động mỗi khung hình. Không giữ trạng thái game.
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
 import { TS, GROUND } from './layout.js';
-import { mapOf } from './farm.js';
+import { mapOf, footprint } from './farm.js';
+import { canMove } from './state.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
@@ -125,6 +126,7 @@ const STATUS_ROWS = {
   sick: ['.MMMMM.', 'MMMMMMM', 'MkMMMkM', 'MMMMMMM', '.MMkMM.', '..M.M..'],
   zzz: ['UUUUU..', '..UU...', '.UU....', 'UUUUU..'],
   pregnant: ['.nn.nn.', 'nnnnnnn', 'nnnnnnn', '.nnnnn.', '..nnn..', '...n...'],
+  scared: ['.rr.', '.rr.', '.rr.', '.rr.', '....', '.rr.'],
   hungry: null,
 };
 function statusIcon(name) {
@@ -309,6 +311,35 @@ export function plotProblem(p) {
 }
 const problemIcon = k => k === 'bug' ? SPR.problem.bug : k === 'weed' ? SPR.problem.weed : k === 'dry' ? SPR.problem.dry : statusIcon('sick');
 
+// ---------- Chế độ xây dựng: viền các thứ dời được, bóng xanh/đỏ chỗ định đặt ----------
+// b: { ghost: { id, c, r, w, h, ok } | null }
+function drawBuild(ctx, state, m, b, now) {
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 2]); ctx.lineDashOffset = -Math.floor(now / 120) % 5;
+  ctx.strokeStyle = 'rgba(255,248,225,0.75)';
+  for (const e of state.farm.ents) {
+    if (!canMove(e) || e.id === b.ghost?.id) continue;
+    const ft = footprint(e);
+    ctx.strokeRect(ft.c * TS + 0.5, ft.r * TS + 0.5, ft.w * TS - 1, ft.h * TS - 1);
+  }
+  ctx.setLineDash([]);
+  const g = b.ghost;
+  if (!g) return;
+  const e = state.farm.ents.find(x => x.id === g.id);
+  const dx = e ? (g.c - e.c) * TS : 0, dy = e ? (g.r - e.r) * TS : 0;
+  const col = g.ok ? '90,220,90' : '240,70,60';
+  ctx.fillStyle = `rgba(${col},0.38)`; ctx.fillRect(g.c * TS, g.r * TS, g.w * TS, g.h * TS);
+  ctx.strokeStyle = `rgba(${col},0.95)`; ctx.lineWidth = 2;
+  ctx.strokeRect(g.c * TS + 1, g.r * TS + 1, g.w * TS - 2, g.h * TS - 2);
+  // vẽ mờ công trình ở chỗ mới
+  ctx.globalAlpha = 0.6;
+  const bd = m.buildings.find(x => x.ent === e && x.ent.kind !== 'pen'), im = bd && buildingImg(bd);
+  if (im) ctx.drawImage(im, Math.round(bd.x + dx), Math.round(bd.y + dy));
+  const dc = m.decos.find(x => x.ent === e), di = dc && decoImg(dc.kind);
+  if (di) ctx.drawImage(di, Math.round(dc.x + dx - di.width / 2), Math.round(dc.y + dy - di.height + 1));
+  ctx.globalAlpha = 1;
+}
+
 // ---------- Vẽ một khung hình ----------
 // f: { state, w (world), cam:{x,y}, scale, width, height, dpr, now, target, busy, fx }
 export function render(ctx, f) {
@@ -450,6 +481,7 @@ export function render(ctx, f) {
     const emote = wd.emotes.get('a' + a.id);
     let icon = null;
     if (emote && emote.until > now) icon = statusIcon(emote.icon);
+    else if (state.time < (a.scaredUntil ?? 0)) icon = statusIcon('scared');
     else if (a.sick) icon = statusIcon('sick');
     else if (a.hunger < 35) icon = statusIcon('hungry');
     else if (a.ready) icon = statusIcon(a.type === 'cuu' ? 'wool' : 'milk');
@@ -508,8 +540,9 @@ export function render(ctx, f) {
     ctx.globalAlpha = 1;
     ctx.drawImage(b.icon, Math.round(bx + 6.5 - b.icon.width / 2), Math.round(by + 5.5 - b.icon.height / 2));
   }
+  if (wd.build) drawBuild(ctx, state, m, wd.build, now);
   const tg = f.target;
-  if (tg) {
+  if (tg && !wd.build) {
     const a = wd.anchorOf(state, tg.target);
     if (a) {
       if (tg.target.kind === 'plot' || tg.target.kind === 'lockedPlot') {

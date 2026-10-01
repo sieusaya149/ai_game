@@ -49,11 +49,21 @@
     <nav id="bottombar">
       <button class="bb-btn" id="bb-seed"><span class="bb-ico"></span><span class="bb-badge" id="bb-seed-n">0</span><span class="bb-lbl">Hạt</span></button>
       <button class="bb-btn" data-panel="bag"><span class="bb-ico">🎒</span><span class="bb-lbl">Túi đồ</span></button>
+      <button class="bb-btn" id="bb-build" title="Chế độ xây dựng: dời công trình"><span class="bb-ico">🔨</span><span class="bb-lbl">Xây dựng</span></button>
       <button class="bb-btn" data-panel="board"><span class="bb-ico">📋</span><i class="dot" id="dot-board" hidden></i><span class="bb-lbl">Đơn hàng</span></button>
       <button class="bb-btn" data-panel="achievements"><span class="bb-ico">🏆</span><span class="bb-lbl">Thành tựu</span></button>
       <button class="bb-btn" data-panel="log"><span class="bb-ico">📜</span><span class="bb-lbl">Nhật ký</span></button>
       <button class="bb-btn" data-panel="settings"><span class="bb-ico">⚙️</span><span class="bb-lbl">Cài đặt</span></button>
     </nav>
+
+    <!-- Chế độ xây dựng -->
+    <div id="buildbar" hidden>
+      <div id="build-msg" class="card">Chạm và kéo công trình để dời chỗ</div>
+      <div class="build-btns">
+        <button class="btn red big" id="build-cancel" type="button">✖ Hủy</button>
+        <button class="btn green big" id="build-done" type="button">✔ Xong</button>
+      </div>
+    </div>
 
     <div id="toasts"></div>
     <div id="badges"></div>

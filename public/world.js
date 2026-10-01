@@ -120,10 +120,12 @@ function updateAnimals(state, w, dt) {
     if (!pen) continue;
     const area = pen.area, rt = rtOf(w, 'a' + a.id);
     const near = Math.hypot(p.x - a.x, p.y - a.y) < 26;
-    const speed = (A_SPEED[a.type] ?? 14) * (a.adult ? 1 : 1.25) * (a.sick ? 0.5 : 1);
+    const scared = state.time < (a.scaredUntil ?? 0);   // vừa bị dời chuồng: chạy loạn một lúc
+    const speed = (A_SPEED[a.type] ?? 14) * (a.adult ? 1 : 1.25) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
     rt.walking = false; rt.peck = false;
+    if (scared && rt.mode !== 'walk') { const t = inArea(area, 2); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk'; }
     if (rt.mode === 'walk') {
-      if (near) { rt.mode = 'idle'; rt.timer = 0.8; }
+      if (near && !scared) { rt.mode = 'idle'; rt.timer = 0.8; }
       else {
         const dx = rt.tx - a.x, dy = rt.ty - a.y, d = Math.hypot(dx, dy);
         if (d < 1.5) { rt.mode = 'idle'; rt.timer = a.type === 'heo' && inMudSpot(a) ? rnd(3, 7) : rnd(1.2, 4); }
@@ -414,10 +416,37 @@ export function faceTo(state, x, y) {
 }
 export function cancelMove(w) { w.path = null; w.pending = null; }
 
+// ---------- Bố cục vừa đổi (dời công trình, hủy dời) ----------
+// Đường đã tính không còn đúng: bỏ đi để tự tìm lại; con vật/chó chọn đích mới.
+function relayout(state, w) {
+  w.path = null; w.repathT = 0; w.stuckT = 0; w.marker = null;
+  for (const [k, rt] of w.rt) {
+    if (k[0] === 't') rt.pathFor = null;
+    else { rt.mode = 'idle'; rt.timer = 0; rt.stuck = 0; }
+  }
+}
+
+// ---------- Chế độ xây dựng: chạm vào công trình nào ----------
+// Trả về thực thể trong state.farm.ents (kể cả nhà, cổng, cây để báo không dời được), hoặc null.
+export function pickEntity(state, wx, wy) {
+  use(state);
+  const c = Math.floor(wx / TS), r = Math.floor(wy / TS);
+  const inFoot = e => { const f = ST.footprint(e); return c >= f.c && r >= f.r && c < f.c + f.w && r < f.r + f.h; };
+  const ents = state.farm.ents;
+  const deco = ents.find(e => e.kind === 'deco' && inFoot(e));
+  if (deco) return deco;
+  for (const b of [...M.buildings].sort((u, v) => (v.foot.r + v.foot.h) - (u.foot.r + u.foot.h))) {
+    const im = buildingImg(b);
+    if (hitRect(b.x, b.y, im?.width ?? 16, im?.height ?? 16, wx, wy, 0) && b.ent.kind !== 'pen') return b.ent;
+  }
+  return ents.find(e => e.kind !== 'pen' && inFoot(e)) ?? ents.find(inFoot) ?? null;
+}
+
 // ---------- Cập nhật mỗi khung hình ----------
 // Trả về { results: [kết quả perform (trượt phân)], arrived: target đã tới nơi khi đang đi tới thứ được chạm }
 export function update(state, w, dt) {
   ensurePositions(state);
+  if (w.map !== M) { if (w.map) relayout(state, w); w.map = M; }
   const out = { results: [], arrived: null };
   const p = state.player;
   w.stun = Math.max(0, w.stun - dt * 1000);

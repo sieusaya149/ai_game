@@ -8,7 +8,7 @@ Trạng thái: ⬜ chưa làm · 🔶 đang làm · ✅ xong
 |---|---|---|---|
 | 01 | [Khung test e2e và smoke live](01-khung-test-e2e-va-smoke.md) | — | ✅ |
 | 02 | [Bản lưu v2: thực thể và khối ruộng](02-ban-luu-v2.md) | 01 | ✅ |
-| 03 | [Chế độ xây dựng: dời công trình](03-che-do-xay-dung-doi-cong-trinh.md) | 02 | ⬜ |
+| 03 | [Chế độ xây dựng: dời công trình](03-che-do-xay-dung-doi-cong-trinh.md) | 02 | ✅ |
 | 04 | [Đặt khối ruộng và đồ trang trí mới](04-dat-khoi-ruong-va-do-trang-tri.md) | 03 | ⬜ |
 | 05 | [Bản đồ lớn và mở rộng đất](05-ban-do-lon-va-mo-rong-dat.md) | 02 | ⬜ |
 | 06 | [Nhiều bản đồ: vào nhà](06-nhieu-ban-do-vao-nha.md) | 02 | ⬜ |

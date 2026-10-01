@@ -16,6 +16,17 @@ export function mapOf(s) {
 
 const inRect = (o, c, r) => c >= o.c && r >= o.r && c < o.c + o.w && r < o.r + o.h;
 
+// Các ô một thực thể chiếm chỗ { c, r, w, h }: chuồng tính cả khung rào, ruộng là khối 3x3, đồ trang trí/cây 1 ô.
+export function footprint(e) {
+  if (e.kind === 'field') return { c: e.c, r: e.r, w: FIELD_SIZE, h: FIELD_SIZE };
+  if (e.kind === 'pen') { const d = PEN_DEFS[e.pen]; return { c: e.c, r: e.r, w: d.w, h: d.h }; }
+  const d = BUILDING_DEFS[e.kind];
+  return { c: e.c, r: e.r, w: d?.foot.w ?? 1, h: d?.foot.h ?? 1 };
+}
+
+// Dựng bản đồ từ một bố cục bất kỳ, không nhớ tạm (để thử bố cục trước khi đặt).
+export const buildMap = f => build(f);
+
 function build(f) {
   const { mw, mh, owned } = f, W = mw * TS, H = mh * TS;
   const idx = (c, r) => r * mw + c;

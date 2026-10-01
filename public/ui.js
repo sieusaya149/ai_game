@@ -78,7 +78,23 @@ const typing = el => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA
 const bareLabel = a => a.icon && a.label.startsWith(a.icon) ? a.label.slice(a.icon.length).trim() : a.label;
 
 export function isBlocking() {
-  return !!panel || creatorOpen || celebOpen || !!dialogResolve || typing(document.activeElement);
+  return !!panel || creatorOpen || celebOpen || !!dialogResolve || building || typing(document.activeElement);
+}
+
+// ---------- Chế độ xây dựng (main.js lo kéo thả, ở đây chỉ bật/tắt giao diện) ----------
+let building = false;
+export function showBuild(on) {
+  building = on;
+  document.body.classList.toggle('building', on);
+  $('buildbar').hidden = !on;
+  $('bb-build').classList.toggle('on', on);
+  if (on) buildMsg('Chạm và kéo công trình để dời chỗ', null);
+}
+// ok: true = đặt được (xanh), false = không được (đỏ), null = gợi ý
+export function buildMsg(text, ok) {
+  const el = $('build-msg');
+  el.textContent = text;
+  if (ok == null) delete el.dataset.ok; else el.dataset.ok = ok ? '1' : '0';
 }
 
 function commit() {
@@ -768,9 +784,14 @@ export function initUI(a) {
     if (!b.disabled) setTimeout(() => b.blur(), 0); // tránh Space bấm lại nút
   });
 
+  $('bb-build').addEventListener('click', () => { if (!isBlocking()) api.buildStart(); });
+  $('build-done').addEventListener('click', () => api.buildDone());
+  $('build-cancel').addEventListener('click', () => api.buildCancel());
+
   addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (dialogResolve) dialogResolve(false);
+      else if (building) api.buildCancel();
       else if (panel) closePanel();
       return;
     }

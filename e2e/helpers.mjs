@@ -76,3 +76,32 @@ export async function tapPlot(page, idx, touch) {
   }
   throw new Error(`Không chạm được ô ruộng ${idx}`);
 }
+
+// Tâm ô (c, r) của bản đồ ra tọa độ màn hình (px CSS), theo camera hiện tại.
+export async function tilePoint(page, c, r) {
+  return page.evaluate(([c, r]) => {
+    const f = globalThis.__farm, rc = document.getElementById('game-canvas').getBoundingClientRect();
+    const wx = c * 16 + 8, wy = r * 16 + 8;
+    return { x: (wx * f.scale - f.view.camX) / f.dpr + rc.left, y: (wy * f.scale - f.view.camY) / f.dpr + rc.top };
+  }, [c, r]);
+}
+
+// Kéo từ điểm `from` bằng chuột hoặc ngón tay (CDP touch). Trả về { move(to), end() } để kiểm tra giữa chừng.
+export async function startDrag(page, touch, from) {
+  if (!touch) {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    return { move: to => page.mouse.move(to.x, to.y, { steps: 8 }), end: () => page.mouse.up() };
+  }
+  const cdp = await page.context().newCDPSession(page);
+  const touchAt = (type, p) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y }] : [] });
+  await touchAt('touchStart', from);
+  let at = from;
+  return {
+    async move(to) {
+      for (let i = 1; i <= 8; i++) await touchAt('touchMove', { x: at.x + (to.x - at.x) * i / 8, y: at.y + (to.y - at.y) * i / 8 });
+      at = to;
+    },
+    end: () => touchAt('touchEnd'),
+  };
+}
