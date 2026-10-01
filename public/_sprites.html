@@ -1,0 +1,44 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#5a9e3a;font:12px sans-serif;color:#fff">
+<canvas id="c"></canvas>
+<script type="module">
+import { SPR, character, icon } from './art.js';
+import { ITEMS } from './data.js';
+const S = 4, cv = document.getElementById('c'); cv.width = 1400; cv.height = 2400;
+const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.font = '11px sans-serif';
+let cx = 8, cy = 8, rowH = 0;
+function put(img, label) {
+  const w = img.width * S, h = img.height * S;
+  if (cx + Math.max(w, 60) > 1390) { cx = 8; cy += rowH + 18; rowH = 0; }
+  x.drawImage(img, cx, cy + 12, w, h);
+  x.fillStyle = '#fff'; x.fillText(label, cx, cy + 9);
+  cx += Math.max(w, 60) + 10; rowH = Math.max(rowH, h + 12);
+}
+const br = () => { cx = 8; cy += rowH + 18; rowH = 0; };
+put(SPR.soil.untilled, 'untilled'); put(SPR.soil.tilledWet, 'wet'); put(SPR.soil.tilledDry, 'dry'); put(SPR.plot,'plot');
+for (const k of ['seedling','sprout','grow','flowering','sick','dead','rotten']) put(SPR[k], k);
+for (const k in SPR.ripe) put(SPR.ripe[k], k);
+br();
+for (const t in SPR.animal) { put(SPR.animal[t].left[0], t+'L0'); put(SPR.animal[t].left[1], 'L1'); put(SPR.animal[t].right[0], 'R0'); }
+br();
+for (const t in SPR.baby) { put(SPR.baby[t].left[0], 'b'+t+'L0'); put(SPR.baby[t].left[1], 'L1'); put(SPR.baby[t].right[0], 'R0'); }
+put(SPR.crow.left[0],'crowL0'); put(SPR.crow.left[1],'L1'); put(SPR.crow.right[0],'R0');
+br();
+put(SPR.eggGround,'egg'); put(SPR.poop,'poop'); put(SPR.stink[0],'s0'); put(SPR.stink[1],'s1'); put(SPR.nestEmpty,'nest'); put(SPR.nestEgg,'nestEgg'); put(SPR.mud,'mud');
+put(SPR.well,'well'); put(SPR.board,'board');
+for (const k in SPR.deco) put(SPR.deco[k], k);
+for (const k in SPR.status) put(SPR.status[k], k);
+br();
+for (const k of Object.keys(SPR.items)) put(SPR.items[k], k);
+br();
+const looks = [
+ {skin:0,hair:0,hairColor:0,shirt:0,pants:0,hat:0,acc:0},
+ {skin:1,hair:1,hairColor:3,shirt:1,pants:1,hat:0,acc:0},
+ {skin:2,hair:2,hairColor:2,shirt:2,pants:2,hat:0,acc:0},
+];
+const hats = [1,2,3,4,5];
+for (const l of looks) { const f = character(l); for (let d=0; d<4; d++) put(f[d][0], 'd'+d); for (let d=0; d<4;d++) put(f[d][1],'w'+d); br(); }
+for (const h of hats) { const f = character({skin:0,hair:h%3,hairColor:1,shirt:h%6,pants:0,hat:h,acc:h===2?1:h===3?2:0}); for (let d=0; d<4; d++) put(f[d][0], 'hat'+h+'d'+d); }
+br();
+for (const a of [1,2]) for (const hair of [0,1,2]) { const f = character({skin:0,hair,hairColor:1,shirt:1,pants:0,hat:0,acc:a}); for (let d=0; d<4; d++) put(f[d][0], 'a'+a+'h'+hair+'d'+d); }
+document.title='done';
+</script>

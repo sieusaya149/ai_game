@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#5d3a1a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Nông Trại Vui</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap&subset=vietnamese" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="ui">
+    <!-- HUD trên -->
+    <div id="hud">
+      <div class="hud-row">
+        <div id="hud-player" class="card">
+          <canvas id="hud-avatar" width="44" height="44"></canvas>
+          <div class="hud-who">
+            <div class="hud-name"><b id="hud-name">-</b><span id="hud-level" class="lv">Cấp 1</span></div>
+            <div class="expbar"><i id="hud-exp"></i><span id="hud-exp-text"></span></div>
+          </div>
+        </div>
+        <div id="hud-coins" class="pill coins">🪙 <b id="hud-coins-n">0</b></div>
+      </div>
+      <div class="hud-row small">
+        <div class="pill" id="hud-clock"><span id="hud-weather">☀️</span> <span id="hud-time">Ngày 1</span></div>
+        <div class="pill" id="hud-water">💧 <b id="hud-can">0/10</b></div>
+        <button class="pill btn-pill" id="hud-speed" title="Tốc độ game">⏩ x1</button>
+      </div>
+      <div id="tutorial" hidden></div>
+    </div>
+
+    <!-- Hành động: góc dưới phải -->
+    <div id="actions">
+      <div id="target-name" hidden></div>
+      <div id="chips"></div>
+      <button id="main-action" class="btn" hidden>
+        <span class="ma-icon"></span><span class="ma-label"></span>
+      </button>
+    </div>
+
+    <!-- Thanh dưới -->
+    <nav id="bottombar">
+      <button class="bb-btn" id="bb-seed"><span class="bb-ico"></span><span class="bb-badge" id="bb-seed-n">0</span><span class="bb-lbl">Hạt</span></button>
+      <button class="bb-btn" data-panel="bag"><span class="bb-ico">🎒</span><span class="bb-lbl">Túi đồ</span></button>
+      <button class="bb-btn" data-panel="board"><span class="bb-ico">📋</span><i class="dot" id="dot-board" hidden></i><span class="bb-lbl">Đơn hàng</span></button>
+      <button class="bb-btn" data-panel="achievements"><span class="bb-ico">🏆</span><span class="bb-lbl">Thành tựu</span></button>
+      <button class="bb-btn" data-panel="log"><span class="bb-ico">📜</span><span class="bb-lbl">Nhật ký</span></button>
+      <button class="bb-btn" data-panel="settings"><span class="bb-ico">⚙️</span><span class="bb-lbl">Cài đặt</span></button>
+    </nav>
+
+    <div id="toasts"></div>
+    <div id="badges"></div>
+    <div id="panel-root" hidden></div>
+    <div id="celebrate" hidden></div>
+    <div id="dialog-root" hidden></div>
+    <div id="creator" hidden></div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
