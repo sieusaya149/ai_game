@@ -5,7 +5,15 @@
   "type": "module",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server.js",
-    "dev": "node --disable-warning=ExperimentalWarning --watch server.js"
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "test": "node --test",
+    "test:e2e": "playwright test",
+    "test:smoke": "playwright test -c playwright.smoke.config.mjs"
   },
-  "engines": { "node": ">=22.13" }
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
 }

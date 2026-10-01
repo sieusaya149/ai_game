@@ -10,6 +10,18 @@ npm start            # mở http://localhost:3000
 
 Cần Node.js 22.13 trở lên. `server.js` chỉ dùng để phục vụ các file trong `public/`; phần API nhiều người chơi của nó hiện chưa dùng tới.
 
+## Test
+
+```bash
+npm install                        # lần đầu
+npx playwright install chromium    # lần đầu: tải Chromium cho e2e
+npm test                           # unit test (node --test)
+npm run test:e2e                   # e2e: tự bật server tĩnh cho public/, chạy máy tính + điện thoại 360px
+npm run test:smoke                 # smoke trên https://game.huninna.com (đổi bằng biến SMOKE_URL)
+```
+
+Test chạy ở máy local, Chromium ẩn cửa sổ, 1 luồng (không dùng GitHub Actions). Trợ giúp dựng tình huống nằm ở `e2e/helpers.mjs`: ghi sẵn save vào localStorage và tua thời gian (lùi `savedAt` rồi tải lại).
+
 ## Deploy
 
 Trên VPS (`image.huninna.com`), repo nằm ở `~/project/ai_game`, chạy sau Caddy của `ai_gateway`:
