@@ -16,10 +16,10 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: mỗi loại việc được liệt kê đúng số lượng và đúng mức. Vị trí là chỗ gần người chơi nhất.
-- [ ] E2E: dựng bản lưu có 3 ô khô → mở bảng → chạm "💧 3 ô khô" → nhân vật đi tới đứng cạnh một ô khô.
-- [ ] E2E: đang ở trong nhà, chạm một việc ngoài vườn → nhân vật ra cửa rồi đi tới đúng chỗ.
-- [ ] Bản đồ nhỏ có chấm đúng màu ở đúng chỗ.
+- [x] Unit test: mỗi loại việc được liệt kê đúng số lượng và đúng mức. Vị trí là chỗ gần người chơi nhất.
+- [x] E2E: dựng bản lưu có 3 ô khô → mở bảng → chạm "💧 3 ô khô" → nhân vật đi tới đứng cạnh một ô khô.
+- [x] E2E: đang ở trong nhà, chạm một việc ngoài vườn → nhân vật ra cửa rồi đi tới đúng chỗ.
+- [x] Bản đồ nhỏ có chấm đúng màu ở đúng chỗ.
 
 ## Blocked by
 

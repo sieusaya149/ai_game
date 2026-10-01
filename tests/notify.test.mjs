@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
 import { EVENT_LEVEL, NOTIFY_CATS } from '../public/data.js';
+import { todoList } from '../public/todo.js';
 import { eventMeta, createNotifier, arrowFor, arrowTargets, EVENT_TYPES } from '../public/notify.js';
 
 const store = {};
@@ -109,9 +110,10 @@ test('urgentSpots: quạ đang ăn và con vật bệnh; ở bản đồ khác m
   assert.equal(spots.length, 2);
   assert.deepEqual([spots[0].x, spots[0].y], [c.x, c.y]);
   assert.equal(spots[1].key, 'sick:' + s.animals[0].id);
-  assert.deepEqual(arrowTargets(s, spots).map(t => t.key), spots.map(p => p.key));
+  const urgent = todoList(s).filter(i => i.level === 'urgent');
+  assert.deepEqual(arrowTargets(s, urgent).map(t => [t.x, t.y]).sort(), spots.map(p => [p.x, p.y]).sort());
   G.enterScene(s, 'village');
-  const t = arrowTargets(s, spots), door = G.sceneMap(s).doors.find(d => d.to === 'farm');
+  const t = arrowTargets(s, urgent), door = G.sceneMap(s).doors.find(d => d.to === 'farm');
   assert.equal(t.length, 1);
   assert.deepEqual([t[0].x, t[0].y], [door.x + door.w / 2, door.y + door.h / 2]);
   assert.deepEqual(arrowTargets(s, []), []);

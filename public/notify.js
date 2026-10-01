@@ -30,11 +30,10 @@ export function createNotifier({ show, on = () => true, win = NOTIFY_WINDOW }) {
   };
 }
 
-// Chỗ mũi tên chỉ tới. Ở vườn: chính các điểm sự cố. Ở bản đồ khác: cửa/cổng dẫn về vườn.
-// (Issue 14 có thể thay hàm này bằng vị trí lấy từ danh sách Việc cần làm.)
-export function arrowTargets(s, spots) {
-  if (!spots.length) return [];
-  if (s.scene === 'farm') return spots.map(p => ({ key: p.key, x: p.x, y: p.y }));
+// Chỗ mũi tên chỉ tới, lấy từ các việc gấp của todoList (todo.js). Ở vườn: chính các chỗ đó. Ở bản đồ khác: cửa/cổng dẫn về vườn.
+export function arrowTargets(s, items) {
+  if (!items.length) return [];
+  if (s.scene === 'farm') return items.flatMap(i => i.spots.map(p => ({ key: p.key, x: p.x, y: p.y })));
   const d = sceneMap(s).doors.find(o => o.to === 'farm');
   return d ? [{ key: 'door', x: d.x + d.w / 2, y: d.y + d.h / 2 }] : [];
 }

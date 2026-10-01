@@ -5,6 +5,8 @@ import * as D from './data.js';
 import * as sound from './sound.js';
 import { SPR2 } from './art2.js';
 import { createNotifier, arrowTargets, arrowFor } from './notify.js';
+import { todoList } from './todo.js';
+import { drawMini } from './minimap.js';
 
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n || 0).toLocaleString('vi-VN');
@@ -301,6 +303,7 @@ export function renderHUD(s) {
     if (ic) cx.drawImage(ic, 0, 0);
   }
   $('bb-build').style.display = s.scene && s.scene !== 'farm' ? 'none' : '';   // chế độ xây dựng chỉ có ở vườn
+  renderMini(s);
 
   const coinsTxt = fmt(s.coins);
   if (memo.get('hud-coins-n') !== coinsTxt) {
@@ -791,6 +794,51 @@ PANELS.log = {
   },
 };
 
+// ---------- Việc cần làm 📋 & bản đồ nhỏ ----------
+PANELS.todo = {
+  title: '📋 Việc cần làm',
+  render(body, s) {
+    const items = todoList(s);
+    if (!items.length) return body.append(empty('Hết việc rồi, nghỉ ngơi chút nhé 😌'));
+    if (s.scene && s.scene !== 'farm') body.append(h('div', { class: 'note' }, 'Bạn đang ở ngoài vườn: chạm một việc để đi về vườn rồi tới đúng chỗ.'));
+    body.append(...items.map(it => h('button', {
+      class: 'row todo-row nosound' + (it.level === 'urgent' ? ' urgent' : ''), type: 'button', 'data-kind': it.kind,
+      on: { click: () => { sound.play('click'); closePanel(); api.todoGo(it.kind); } },
+    }, h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, it.label)),
+    it.level === 'urgent' && h('span', { class: 'todo-tag' }, 'Gấp'), h('span', { class: 'todo-go' }, '›'))));
+  },
+};
+PANELS.map = {
+  title: '🗺️ Bản đồ',
+  render(body, s) {
+    const size = Math.min(320, innerWidth - 48), cv = h('canvas', { class: 'mini-big', width: size, height: size });
+    cv.style.width = cv.style.height = size + 'px';
+    drawMini(cv, s, todoList(s));
+    body.append(cv, h('div', { class: 'mini-legend' }, '🔴 Việc gấp   🟡 Có việc   🔵 Bạn'));
+  },
+};
+let miniKey = '';
+// Bản đồ nhỏ ở góc + nút 📋: vẽ lại theo nhịp HUD. Chấm xuất ra data-dots (điểm ảnh canvas) để kiểm tra.
+function renderMini(s) {
+  const wrap = $('mini-wrap');
+  wrap.hidden = false;
+  const items = todoList(s), hud = $('hud').getBoundingClientRect();
+  wrap.style.top = (innerWidth - hud.right >= 120 ? hud.top : hud.bottom + 8) + 'px';   // màn rộng: ngang HUD; màn hẹp: ngay dưới HUD
+  const m = drawMini($('mini-cv'), s, items), mm = $('minimap');
+  const key = JSON.stringify(m.dots);
+  if (key !== miniKey) { miniKey = key; mm.dataset.dots = key; }
+  mm.dataset.view = [m.k, m.ox, m.oy].map(v => v.toFixed(4)).join(',');
+  const n = items.length, urgent = items.some(i => i.level === 'urgent');
+  setText('todo-n', String(n));
+  $('todo-n').hidden = !n;
+  $('todo-btn').classList.toggle('urgent', urgent);
+  if (!memo.get('todo-ico')) {
+    memo.set('todo-ico', 1);
+    const ic = SPR2?.todo, g = $('todo-ico').getContext('2d');
+    if (ic) g.drawImage(ic, 0, 0); else { g.font = '10px sans-serif'; g.fillText('📋', 0, 10); }
+  }
+}
+
 let resetting = false;
 PANELS.settings = {
   title: '⚙️ Cài đặt',
@@ -968,7 +1016,7 @@ function arrowEl(key) {
 }
 // toScreen(x, y): toạ độ bản đồ đang đứng → px CSS trên màn hình
 export function updateAlerts(s, toScreen, nowMs = performance.now()) {
-  const spots = S.urgentSpots(s), keys = new Set(spots.map(p => p.key));
+  const spots = S.urgentSpots(s), urgent = todoList(s).filter(i => i.level === 'urgent'), keys = new Set(spots.map(p => p.key));
   if (spots.some(p => !seenUrgent.has(p.key))) {
     sound.play('alarm');
     try { navigator.vibrate?.([220, 90, 220]); } catch { /* máy không rung */ }
@@ -986,7 +1034,7 @@ export function updateAlerts(s, toScreen, nowMs = performance.now()) {
   const hud = $('hud').getBoundingClientRect(), bar = $('bottombar').getBoundingClientRect();
   const box = { l: 0, t: hud.bottom + 4, r: innerWidth, b: bar.top - 4 };
   const live = new Set();
-  for (const t of arrowTargets(s, spots)) {
+  for (const t of arrowTargets(s, urgent)) {
     const a = arrowFor(toScreen(t.x, t.y), box, 22), el = arrowEl(t.key);
     el.hidden = !a;
     if (!a) continue;
@@ -1005,6 +1053,8 @@ export function initUI(a) {
   $('bb-seed').addEventListener('click', () => { sound.play('click'); openPanel('seeds'); });
   $('main-action').addEventListener('click', () => runAction(cur.actions[0]));
   $('alert-banner').addEventListener('click', dismissBanner);
+  $('minimap').addEventListener('click', () => { if (!isBlocking()) openPanel('map'); });
+  $('todo-btn').addEventListener('click', () => { if (!isBlocking()) openPanel('todo'); });
   $('hud-speed').addEventListener('click', () => {
     const s = st(), i = D.SPEEDS.indexOf(s.speed);
     s.speed = D.SPEEDS[(i + 1) % D.SPEEDS.length];

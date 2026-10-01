@@ -445,8 +445,9 @@ export function walkTo(state, w, x, y) {
   w.marker = { x, y, t0: performance.now() };
   return w.path.length > 0;
 }
-export function goToTarget(state, w, t) {
-  w.pending = t; w.pendingT = 0; w.repathT = 0; w.path = null;
+// act = false: chỉ đi tới đứng trong tầm, không tự làm hành động chính (đi theo Việc cần làm)
+export function goToTarget(state, w, t, act = true) {
+  w.pending = t; w.pendingAct = act; w.pendingT = 0; w.repathT = 0; w.path = null;
 }
 export function faceTo(state, x, y) {
   const p = state.player;
@@ -530,7 +531,7 @@ export function update(state, w, dt) {
   if (t) {
     w.pendingT += dt;
     if (!exists(state, t) || w.pendingT > 15) { w.pending = null; w.path = null; }
-    else if (inRange(state, t)) { out.arrived = t; w.pending = null; w.path = null; }
+    else if (inRange(state, t)) { if (w.pendingAct !== false) out.arrived = t; w.pending = null; w.path = null; }
     else {
       w.repathT -= dt;
       if (!w.path || w.repathT <= 0) {

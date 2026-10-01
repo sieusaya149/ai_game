@@ -71,14 +71,17 @@ export async function tapPlot(page, idx, touch) {
       const top = document.getElementById('hud').getBoundingClientRect().bottom + 4;
       const bot = document.getElementById('bottombar').getBoundingClientRect().top - 4;
       const x = (wx * f.scale - f.view.camX) / f.dpr + r.left, y = (wy * f.scale - f.view.camY) / f.dpr + r.top;
-      const ok = x > 4 && x < innerWidth - 4 && y > top && y < bot;
-      return { x, y, ok, w: innerWidth, top, bot };
+      const mini = document.getElementById('mini-wrap').getBoundingClientRect();   // bản đồ nhỏ che một góc màn hình
+      const inMini = (x, y) => x > mini.left - 14 && x < mini.right + 14 && y > mini.top - 14 && y < mini.bottom + 14;
+      const ok = x > 4 && x < innerWidth - 4 && y > top && y < bot && !inMini(x, y);
+      return { x, y, ok, w: innerWidth, top, bot, miniBottom: mini.bottom + 24, miniLeft: mini.left - 24 };
     }, idx);
     if (pt.ok) {
       if (touch) await page.touchscreen.tap(pt.x, pt.y); else await page.mouse.click(pt.x, pt.y);
       return;
     }
-    const x = Math.min(pt.w - 20, Math.max(20, pt.x)), y = Math.min(pt.bot - 20, Math.max(pt.top + 20, pt.y));
+    let x = Math.min(pt.w - 20, Math.max(20, pt.x)), y = Math.min(pt.bot - 20, Math.max(pt.top + 20, pt.y));
+    if (x > pt.miniLeft && y < pt.miniBottom) y = Math.min(pt.bot - 20, pt.miniBottom);   // không chạm trúng bản đồ nhỏ
     if (touch) await page.touchscreen.tap(x, y); else await page.mouse.click(x, y);
     await page.waitForTimeout(700);
   }

@@ -9,6 +9,7 @@ import { DIR_NAME } from './data.js';
 import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
+import { todoList } from './todo.js';
 
 const ACTION_MS = 350;
 const actionMs = () => ACTION_MS * slowFactor(state);   // hết thể lực thì làm chậm
@@ -33,6 +34,7 @@ let busy = null;                  // { target, id, t0 }
 let dpr = 1, scale = 2;
 let cam = { x: 0, y: 0 }, view = { camX: 0, camY: 0 };
 let curTarget = null, lastTargetKey = '', dirty = true;
+let plan = null;                  // { kind, until }: việc cần làm ngoài vườn đang đi tới từ bản đồ khác (ra cửa/cổng, chuyển cảnh, đi tiếp)
 let lastHud = 0, lastActions = 0, lastSave = 0, last = performance.now();
 
 function computeScale() {
@@ -185,6 +187,17 @@ const api = {
     ui.buildTray(state, b);
     changed();
   },
+  // Đi tới chỗ gần nhất có việc loại kind (không tự làm). Ở bản đồ khác thì ra cửa/cổng trước, sang vườn rồi đi tiếp.
+  todoGo(kind) {
+    if (!state || busy || fading || world.build || world.stun > 0) return false;
+    const it = todoList(state).find(i => i.kind === kind);
+    if (!it) return false;
+    if (state.scene === 'farm') { plan = null; V.goToTarget(state, world, it.target, false); return true; }
+    if (!sceneMap(state).doors.some(d => d.to === 'farm')) return false;
+    plan = { kind, until: performance.now() + 30_000 };
+    V.goToTarget(state, world, { kind: 'door', to: 'farm' });
+    return true;
+  },
   resetGame() {
     if (world.build) { world.build = null; ui.showBuild(false); }
     resetSave();
@@ -212,6 +225,11 @@ function goScene(to) {
     if (!r.ok) { ui.toast(r.msg); return; }
     world.fx = []; world.marker = null;
     curTarget = null; lastTargetKey = ''; dirty = true;
+    if (plan && state.scene === 'farm' && performance.now() < plan.until) {   // việc cần làm: về tới vườn thì đi tiếp tới chỗ gần nhất
+      const it = todoList(state).find(i => i.kind === plan.kind);
+      if (it) V.goToTarget(state, world, it.target, false);
+    }
+    plan = null;
     updateCamera(0, true);
     ui.renderHUD(state);
     save();
@@ -309,6 +327,7 @@ canvas.addEventListener('pointerup', e => {
 
 function onTap(cx, cy) {
   if (!state || busy || fading || world.stun > 0 || ui.isBlocking()) return;
+  plan = null;
   const r = canvas.getBoundingClientRect();
   const wx = ((cx - r.left) * dpr + view.camX) / scale, wy = ((cy - r.top) * dpr + view.camY) / scale;
   const hit = V.hitTest(state, wx, wy);
@@ -434,6 +453,7 @@ function frame(now) {
   else {
     const kx = (keys.has('r') ? 1 : 0) - (keys.has('l') ? 1 : 0), ky = (keys.has('d') ? 1 : 0) - (keys.has('u') ? 1 : 0);
     world.input.x = kx || joy.x; world.input.y = ky || joy.y;
+    if (plan && (world.input.x || world.input.y)) plan = null;   // tự đi bằng tay thì bỏ kế hoạch
   }
   const res = V.update(state, world, dt);
   for (const r of res.results) applyResult(r);
