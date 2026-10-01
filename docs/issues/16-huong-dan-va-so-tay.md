@@ -12,9 +12,9 @@
 
 ## Acceptance criteria
 
-- [ ] E2E: người chơi mới đi hết các bước hướng dẫn tới lúc ngủ, mỗi bước tự chuyển sang bước sau.
-- [ ] E2E: nạp bản v1 → thấy thông báo "Bản mới có gì đổi" đúng một lần. Tải lại thì không thấy nữa.
-- [ ] Sổ tay mở được từ túi đồ, đủ các trang trên.
+- [x] E2E: người chơi mới đi hết các bước hướng dẫn tới lúc ngủ, mỗi bước tự chuyển sang bước sau.
+- [x] E2E: nạp bản v1 → thấy thông báo "Bản mới có gì đổi" đúng một lần. Tải lại thì không thấy nữa.
+- [x] Sổ tay mở được từ túi đồ, đủ các trang trên.
 
 ## Blocked by
 

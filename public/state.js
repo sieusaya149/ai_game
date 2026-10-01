@@ -129,7 +129,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
     dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name },
     poops: [], threats: [], orders: [], nextOrderAt: 0,
-    stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0 },
+    stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
     notify: {},   // loại thông báo 🟡 đã tắt: { ripe: false }; thiếu = bật. Mức 🔴 không tắt được
   };
@@ -293,9 +293,36 @@ export function sleep(s) {
   try { ev = tick(s, left); } finally { catchUp = was; }
   s.threats = [];
   s.stamina = STAMINA.max;
+  s.stats.slept++;
   evq.push(...ev);
+  advanceTutorial(s);
   return R(true, 'Chào buổi sáng! Thể lực đã đầy ☀️', { slept: true });
 }
+
+// ---------- Hướng dẫn người mới ----------
+// Mỗi bước xong khi việc tương ứng đã làm (tính theo số đếm tích lũy nên làm trước thứ tự vẫn được tính). s.tutorial = số bước đã qua; >= TUTORIAL.length là xong.
+export const TUTORIAL = [
+  { id: 'till', done: s => s.plots.some(p => p.soil === 'tilled' || p.crop) || s.stats.planted >= 1 },
+  { id: 'plant', done: s => s.stats.planted >= 1 || s.plots.some(p => p.crop) },
+  { id: 'water', done: s => s.plots.some(p => p.crop && p.water > 0) || s.stats.harvests >= 1 },
+  { id: 'harvest', done: s => s.stats.harvests >= 1 },
+  { id: 'ship', done: s => s.stats.shipped >= 1 },
+  { id: 'buy', done: s => s.stats.bought >= 1 || s.stats.slept >= 1 },
+  { id: 'sleep', done: s => s.stats.slept >= 1 },
+];
+// Đẩy bước lên theo việc đã làm; true nếu có đổi. Gọi sau mỗi hành động liên quan (perform, shipAdd, buy, sleep) và mỗi lần vẽ HUD.
+export function advanceTutorial(s) {
+  const was = Number.isFinite(s.tutorial) ? s.tutorial : 0;
+  let step = was;
+  while (step < TUTORIAL.length && TUTORIAL[step].done(s)) step++;
+  s.tutorial = step;
+  return step !== was;
+}
+
+// "Bản mới có gì đổi": chỉ cho save chuyển từ v1, xem một lần (đánh dấu trong save)
+export const WHATS_NEW_VERSION = 2;
+export const whatsNewDue = s => s.migratedFrom === 1 && (s.seenWhatsNew || 0) < WHATS_NEW_VERSION;
+export const markWhatsNew = s => { s.seenWhatsNew = WHATS_NEW_VERSION; };
 
 // ---------- Thông báo ----------
 export const notifyOn = (s, cat) => s.notify?.[cat] !== false;
@@ -782,6 +809,7 @@ export function perform(s, t, id) {
   const r = n > 1 ? doArea(s, act.tiles, id) : DO[t.kind](s, t, id, at);
   if (t.kind === 'plot' && STAMINA.cost[id]) spend(s, Math.round(STAMINA.cost[id] * GROUP_COST[n]));
   checkAch(s);
+  advanceTutorial(s);
   return r;
 }
 
@@ -966,6 +994,7 @@ export function buy(s, itemId, qty = 1) {
   const cost = it.price * qty;
   if (s.coins < cost) return R(false, 'Chưa đủ xu, cố lên nhé');
   s.coins -= cost; give(s, itemId, qty);
+  if (it.kind === 'seed') { s.stats.bought++; advanceTutorial(s); }
   return R(true, `Đã mua ${qty} ${it.name.toLowerCase()}`);
 }
 
@@ -1011,6 +1040,7 @@ export function shipAdd(s, itemId, qty = 1) {
   take(s, itemId, n);
   const it = s.shipbin.items;
   it[itemId] = (it[itemId] || 0) + n;
+  s.stats.shipped++; advanceTutorial(s);
   return R(true, `Bỏ ${n} ${itemName(itemId).toLowerCase()} vào thùng`, { moved: n });
 }
 // Lấy lại: về giỏ nếu còn chỗ, phần dư về kho

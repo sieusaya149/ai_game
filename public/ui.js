@@ -85,7 +85,7 @@ const typing = el => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA
 const bareLabel = a => a.icon && a.label.startsWith(a.icon) ? a.label.slice(a.icon.length).trim() : a.label;
 
 export function isBlocking() {
-  return !!panel || creatorOpen || celebOpen || awayOpen ||!!dialogResolve || building || typing(document.activeElement);
+  return !!panel || creatorOpen || celebOpen || awayOpen || newsOpen || !!dialogResolve || building || typing(document.activeElement);
 }
 
 // ---------- Chế độ xây dựng (main.js lo kéo thả, ở đây chỉ bật/tắt giao diện) ----------
@@ -355,37 +355,43 @@ export function renderHUD(s) {
 }
 
 // ---------- Hướng dẫn nhanh ----------
-const TUT = [
-  { text: 'Đi tới ruộng (góc trên phải) rồi bấm Cuốc đất.', done: s => s.plots.some(p => p.soil === 'tilled' || p.crop) },
-  { text: 'Gieo hạt cải xuống ô đất vừa cuốc.', done: s => s.stats.planted >= 1 || s.plots.some(p => p.crop) },
-  { text: 'Tưới nước cho cây. Hết nước thì ra giếng múc.', done: s => s.plots.some(p => p.crop && p.water > 0) || s.stats.harvests >= 1 },
-  { text: 'Đợi cây lớn. Sốt ruột thì bật x5 trong ⚙️ Cài đặt.', done: s => s.stats.harvests >= 1 || s.plots.some(p => p.crop && p.progress >= 1) },
-  { text: 'Cây chín rồi! Bấm Thu hoạch.', done: s => s.stats.harvests >= 1 },
-  { text: 'Ra cổng vườn tới làng, mang nông sản bán ở chợ Bà Tư (mở 6h–18h).', done: s => flags.sold || s.stats.earned > 0 },
-  { text: 'Ghé chợ Bà Tư mua thêm hạt giống.', done: () => flags.bought },
-  { text: 'Ra chuồng gà nhặt trứng và đổ cám vào máng.', done: s => s.stats.eggs >= 1 || (s.troughs?.chicken || 0) > 0 },
-  { text: 'Coi chừng chó Mực ỉa bậy! Thấy bãi phân thì xúc đi, đừng giẫm nhé.', done: s => s.stats.poops >= 1 || s.stats.slips >= 1 },
-];
-let shownStep = -1;
+// Luật chuyển bước nằm ở S.TUTORIAL / S.advanceTutorial; ở đây chỉ có lời nhắn theo bước (có thể đổi theo tình hình).
+const TUT = S.TUTORIAL.length;
+const TUT_TEXT = {
+  till: () => 'Đi tới ruộng (góc trên phải) rồi bấm Cuốc đất.',
+  plant: () => 'Gieo hạt cải xuống ô đất vừa cuốc.',
+  water: () => 'Tưới nước cho cây. Hết nước thì ra giếng múc.',
+  harvest: s => {
+    const live = s.plots.filter(p => p.crop && !p.crop.dead && !p.crop.rotten);
+    if (live.some(p => p.crop.progress >= 1)) return 'Cây chín rồi! Bấm Thu hoạch.';
+    if (!live.length) return 'Chưa có cây nào đang lớn. Cuốc đất rồi gieo hạt lại nhé.';
+    if (live.some(p => p.crop.bugs || p.crop.sick)) return 'Cây có sâu! Bấm Bắt sâu hoặc xịt thuốc trừ sâu cho cây.';
+    if (live.every(p => p.water <= 0)) return 'Cây khô nước rồi, tưới thêm cho cây lớn nhé.';
+    return 'Đợi cây lớn. Sốt ruột thì bật x5 trong ⚙️ Cài đặt.';
+  },
+  ship: () => 'Bỏ nông sản vào thùng giao hàng cạnh nhà kho. 6h sáng mai lái buôn trả xu.',
+  buy: s => (S.marketOpen(s) ? 'Ra cổng vườn tới làng, ghé chợ Bà Tư mua hạt giống.' : 'Chợ Bà Tư đóng cửa rồi. 6h sáng mai ra làng mua hạt giống nhé.'),
+  sleep: s => (S.canSleep(s) ? 'Về nhà, bấm giường để ngủ. Sáng mai thể lực đầy lại.' : `Tối nay ${D.STAMINA.sleepHour}h về nhà ngủ nhé. Sốt ruột thì bật x5 hoặc x20 trong ⚙️ Cài đặt.`),
+};
+let shownKey = '';
 function updateTutorial(s) {
   const box = $('tutorial');
   if (!box) return;
-  let step = Number.isFinite(s.tutorial) ? s.tutorial : 0;
-  while (step < TUT.length && TUT[step].done(s)) step++;
-  if (step !== s.tutorial) {
-    const fin = step >= TUT.length && (s.tutorial ?? 0) < TUT.length;
-    s.tutorial = step;
-    if (fin) pushToast('Bạn đã thành thạo việc nhà nông rồi!');
-    else if (step > 0 && shownStep >= 0) sound.play('pop');
+  const was = Number.isFinite(s.tutorial) ? s.tutorial : 0;
+  if (S.advanceTutorial(s)) {
+    if (s.tutorial >= TUT && was < TUT) pushToast('Bạn đã thành thạo việc nhà nông rồi!');
+    else if (shownKey) sound.play('pop');
   }
-  if (step >= TUT.length) { box.hidden = true; shownStep = step; return; }
-  if (shownStep === step && !box.hidden) return;
-  shownStep = step;
+  const step = s.tutorial;
+  if (step >= TUT) { box.hidden = true; shownKey = 'done'; return; }
+  const text = TUT_TEXT[S.TUTORIAL[step].id](s), key = step + text;
+  if (shownKey === key && !box.hidden) return;
+  shownKey = key;
   box.hidden = false;
   box.replaceChildren(
-    h('div', { class: 'tut-step' }, `Bước ${step + 1}/${TUT.length}`),
-    h('div', { class: 'tut-text' }, TUT[step].text),
-    h('button', { class: 'tut-x', type: 'button', title: 'Bỏ qua hướng dẫn', on: { click: () => { st().tutorial = TUT.length; updateTutorial(st()); } } }, '✕'));
+    h('div', { class: 'tut-step' }, `Bước ${step + 1}/${TUT}`),
+    h('div', { class: 'tut-text' }, text),
+    h('button', { class: 'tut-x', type: 'button', title: 'Bỏ qua hướng dẫn', on: { click: () => { st().tutorial = TUT; updateTutorial(st()); } } }, '✕'));
   box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
 }
 
@@ -640,6 +646,7 @@ PANELS.bag = {
       h('span', { class: 'mini' }, `💧 Bình nước ${s.can}/${S.canMax(s)}`),
       h('span', { class: 'mini' }, `🧺 Giỏ ${S.basketCount(s)}/${S.basketCap(s)}`),
       h('span', { class: 'mini' }, `🪙 ${fmt(s.coins)} xu`)));
+    body.append(h('button', { class: 'guide-open', type: 'button', on: { click: () => openPanel('guide') } }, guideIcon(), h('b', {}, 'Sổ tay hướng dẫn'), h('small', {}, 'Thể lực, công cụ, xây dựng, thùng giao hàng, chợ...')));
     body.append(section('Công cụ'));
     const tl = h('div', { class: 'grid' });
     for (const k of Object.keys(D.TOOLS)) {
@@ -674,6 +681,61 @@ PANELS.bag = {
       body.append(list);
     }
     if (!any) body.append(empty('Túi đồ đang trống.'));
+  },
+};
+
+// ---------- Sổ tay hướng dẫn ----------
+// Mỗi trang: tên, lời giải thích, và các sprite có sẵn vẽ vào canvas nhỏ rồi phóng to (pixelated).
+const spr = () => SPR2 ?? {};
+const GUIDE = [
+  { title: 'Thể lực', art: () => [spr().stamina, spr().staminaTired, spr().bed],
+    text: [`Mỗi việc ở ruộng đều tốn thể lực (thanh ⚡ cạnh tên bạn). Hết thể lực thì đi và làm chậm gấp ${D.STAMINA.slow} lần.`,
+      `Cách hồi: ngồi ghế đá (hồi ${D.STAMINA.benchPerMin} mỗi phút), ngủ (từ ${D.STAMINA.sleepHour}h), hoặc đợi 6h sáng tự hồi ${D.STAMINA.morningRegen}.`] },
+  { title: 'Công cụ', art: () => [spr().tools?.hoe[0], spr().tools?.hoe[1], spr().tools?.hoe[2], spr().tools?.can[2], spr().tools?.sickle[2], spr().smithy],
+    text: ['Cuốc, bình tưới, liềm và giỏ có 3 cấp: sắt, đồng, vàng.',
+      'Cấp cao làm cả hàng 3 ô hoặc khối 3×3 một lần, tốn ít thể lực hơn làm từng ô. Bình và giỏ cấp cao chứa nhiều hơn.',
+      'Nâng cấp ở tiệm rèn trong làng. Rèn mất một ngày game, công cụ đó nằm lò rèn tới khi xong.'] },
+  { title: 'Chế độ xây dựng', art: () => [spr().shippingBin, spr().lampPost, spr().bench],
+    text: ['Bấm 🔨 Xây dựng ở thanh dưới để dời nhà, kho, chuồng, ruộng, đồ trang trí.',
+      'Chạm và kéo công trình tới chỗ mới (chỗ đỏ là không đặt được). Cất để cho vào kho, Xong để giữ, Hủy để trả lại như cũ.',
+      'Khay phía dưới có khối ruộng, chuồng và đồ trang trí đã mua.'] },
+  { title: 'Mở đất', art: () => [spr().bushes?.[0], spr().rocks?.[0], spr().stump],
+    text: ['Dải đất mới mua ở mép vườn có bụi cây và đá. Đứng gần rồi bấm dọn là được gỗ, đá.',
+      `Dọn bụi tốn ${D.STAMINA.cost.clearBush} thể lực, đập đá tốn ${D.STAMINA.cost.breakRock}. Dọn xong đặt ruộng, chuồng ở 🔨 Xây dựng.`] },
+  { title: 'Thùng giao hàng', art: () => [spr().shippingBin],
+    text: ['Thùng nằm cạnh nhà kho. Bỏ nông sản và sản phẩm vào thùng cho tiện, không phải ra chợ.',
+      `6h sáng lái buôn lấy hết và trả ${Math.round(D.SHIP_RATE * 100)}% giá chợ. Trước giờ đó vẫn lấy lại được.`] },
+  { title: 'Chợ và giờ mở cửa', art: () => [spr().marketStall, spr().marketClosed],
+    text: [`Chợ Bà Tư ở trong làng, ra cổng vườn là tới. Mở cửa ${D.MARKET.open}h–${D.MARKET.close}h, ngoài giờ đó không mua bán được.`,
+      'Ở chợ có hạt giống, vật tư, thức ăn, đồ trang trí. Bán thẳng ở chợ được giá đủ; thùng giao hàng tiện hơn nhưng trừ một phần.'] },
+];
+let guidePage = 0;
+function guideIcon() {
+  const c = h('canvas', { class: 'guide-ico', width: 12, height: 12 });
+  if (spr().guidebook) c.getContext('2d').drawImage(spr().guidebook, 0, 0);
+  return c;
+}
+// Xếp các sprite thành một hàng trong canvas 160x56, mỗi cái vừa ô của nó
+function guideArt(list) {
+  const W = 160, H = 56, items = list.filter(Boolean);
+  const cv = h('canvas', { class: 'guide-art', width: W, height: H }), g = cv.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const slot = W / Math.max(1, items.length);
+  items.forEach((im, i) => {
+    const k = Math.min((H - 4) / im.height, (slot - 6) / im.width), z = k >= 1 ? Math.floor(k) : k;
+    const w = Math.round(im.width * z), hh = Math.round(im.height * z);
+    g.drawImage(im, Math.round(slot * i + (slot - w) / 2), Math.round((H - hh) / 2), w, hh);
+  });
+  return cv;
+}
+PANELS.guide = {
+  title: '📖 Sổ tay',
+  render(body) {
+    const n = GUIDE.length, p = GUIDE[guidePage], go = d => { guidePage = (guidePage + d + n) % n; sound.play('click'); refreshPanel(); };
+    body.append(
+      h('div', { class: 'guide-dots' }, GUIDE.map((_, i) => h('button', { class: 'guide-dot nosound' + (i === guidePage ? ' on' : ''), type: 'button', title: GUIDE[i].title, 'aria-label': GUIDE[i].title, on: { click: () => { guidePage = i; sound.play('click'); refreshPanel(); } } }))),
+      h('div', { class: 'guide-page' }, guideArt(p.art()), h('h3', {}, p.title), p.text.map(t => h('p', {}, t))),
+      h('div', { class: 'guide-nav' }, btn('◀ Trước', () => go(-1), 'plain sm nosound'), h('span', { class: 'mini' }, `Trang ${guidePage + 1}/${n}`), btn('Sau ▶', () => go(1), 'plain sm nosound')));
   },
 };
 
@@ -964,6 +1026,37 @@ export function closeAway() {
   awayOpen = false;
   const root = $('away');
   root.hidden = true; root.replaceChildren();
+  if (newsWait) showWhatsNew(stOk());
+}
+// ---------- "Bản mới có gì đổi" (chỉ save chuyển từ v1, một lần; đợi màn vắng nhà đóng rồi mới hiện) ----------
+const NEWS = [
+  ['🔨', 'Chế độ xây dựng', 'Dời nhà, kho, chuồng, ruộng tùy ý ở nút 🔨.'],
+  ['🏪', 'Chợ Bà Tư ra làng', 'Mua bán ở chợ trong làng, mở 6h–18h. Sạp hàng trong vườn không còn.'],
+  ['📮', 'Thùng giao hàng', 'Bỏ nông sản vào thùng, 6h sáng lái buôn trả xu.'],
+  ['⚡', 'Thể lực', 'Làm việc tốn thể lực. Ngồi ghế đá hoặc ngủ (từ 18h) để hồi.'],
+  ['⛏️', 'Công cụ 3 cấp', 'Nâng cấp ở tiệm rèn để làm cả hàng, cả khối.'],
+];
+let newsOpen = false, newsWait = false;
+const stOk = () => { try { return st(); } catch { return null; } };
+export function closeNews() {
+  newsOpen = false;
+  const root = $('whatsnew');
+  root.hidden = true; root.replaceChildren();
+}
+export function showWhatsNew(s) {
+  if (newsOpen || creatorOpen || !s || !S.whatsNewDue(s)) return;
+  if (awayOpen) { newsWait = true; return; }
+  newsWait = false; newsOpen = true;
+  S.markWhatsNew(s);
+  const root = $('whatsnew');
+  root.replaceChildren(h('div', { class: 'away-card', role: 'dialog', 'aria-label': 'Bản mới có gì đổi' },
+    h('div', { class: 'away-ico' }, '🎉'),
+    h('h2', {}, 'Bản mới có gì đổi'),
+    h('ul', { class: 'away-list news-list' }, NEWS.map(([i, t, d]) => h('li', {}, h('span', { class: 'ico emo' }, i), h('span', {}, h('b', {}, t + ':'), ' ', d)))),
+    h('p', { class: 'mini' }, 'Xem lại trong 🎒 Túi đồ > Sổ tay hướng dẫn.'),
+    btn('Hiểu rồi!', () => { sound.play('pop'); closeNews(); }, 'orange big')));
+  root.hidden = false;
+  sound.play('levelup');
 }
 export function showAway(away) {
   if (!away || awayOpen || creatorOpen) return;
@@ -1083,6 +1176,7 @@ export function initUI(a) {
   addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (awayOpen) closeAway();
+      else if (newsOpen) closeNews();
       else if (dialogResolve) dialogResolve(false);
       else if (building) api.buildCancel();
       else if (panel) closePanel();
