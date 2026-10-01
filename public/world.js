@@ -276,6 +276,7 @@ export function targetPos(state, t) {
     case 'nest': return coop()?.at ?? null;
     case 'building': return M.buildings.find(b => b.id === t.id)?.at ?? null;
     case 'door': return doorOf(t.to)?.at ?? null;
+    case 'deco': return M.decos.find(d => d.id === t.id) ?? null;
   }
   return null;
 }
@@ -287,7 +288,7 @@ export function exists(state, t) {
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
 }
-const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, nest: 22, building: 22, door: 22 };
+const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, nest: 22, building: 22, door: 22, deco: 22 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -332,6 +333,7 @@ export function findTarget(state, w) {
     consider({ kind: 'nest' });
   }
   for (const { pen } of M.troughs) consider({ kind: 'trough', pen });
+  for (const d of M.decos) if (d.kind === 'deco_bench') consider({ kind: 'deco', id: d.id });
   for (const b of M.buildings) if (b.at && b.id !== 'coop') consider({ kind: 'building', id: b.id });
   if (!atFarm()) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì sang nhà/làng bằng nút của nhà/cổng
   w.curKey = best ? keyOf(best) : null;
@@ -352,6 +354,7 @@ export function nameOf(state, t) {
     case 'nest': return 'Ổ ấp trứng';
     case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
+    case 'deco': return 'Ghế đá';
   }
   return '';
 }
@@ -374,6 +377,7 @@ export function anchorOf(state, t) {
       return { x: b.at.x, top: Math.max(b.y - 2, (b.foot.r + b.foot.h) * TS - 44) };
     }
     case 'door': return { x: pos.x, top: pos.y - 14 };
+    case 'deco': return { x: pos.x, top: pos.y - decoSize(pos.kind).h - 1 };
   }
   return null;
 }
@@ -397,6 +401,7 @@ export function hitTest(state, wx, wy) {
     for (const o of state.poops ?? []) if (Math.hypot(wx - o.x, wy - o.y + 3) < 9) return { kind: 'poop', id: o.id };
     for (const e of state.eggs ?? []) if (Math.hypot(wx - e.x, wy - e.y + 3) < 8) return { kind: 'egg', id: e.id };
   }
+  for (const d of M.decos) if (d.kind === 'deco_bench') { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
   for (const { pen } of M.troughs) { const tr = M.pens[pen].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen }; }
   const cp = coop();
   if (cp && hitRect(cp.x, cp.y, 30, 28, wx, wy, 0) || cp && hitRect(cp.at.x - 9, cp.at.y - 12, 18, 12, wx, wy)) return { kind: 'nest' };
@@ -467,6 +472,7 @@ export function update(state, w, dt) {
   const p = state.player;
   w.stun = Math.max(0, w.stun - dt * 1000);
   w.moving = false;
+  const speed = SPEED / ST.slowFactor(state);   // hết thể lực thì đi chậm
 
   if (w.stun <= 0 && !w.busy) {
     let vx = w.input.x, vy = w.input.y;
@@ -475,14 +481,14 @@ export function update(state, w, dt) {
       w.path = null; w.pending = null;
       if (len > 1) { vx /= len; vy /= len; }
       const ox = p.x, oy = p.y;
-      moveBox(p, vx * SPEED * dt, vy * SPEED * dt);
+      moveBox(p, vx * speed * dt, vy * speed * dt);
       p.dir = dirOf(vx, vy);
       w.moving = Math.hypot(p.x - ox, p.y - oy) > 0.01;
     } else if (w.path?.length) {
       const wp = w.path[0], dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy);
       if (d < 1.5) { w.path.shift(); if (!w.path.length) w.path = null; }
       else {
-        const st = Math.min(d, SPEED * dt), ox = p.x, oy = p.y;
+        const st = Math.min(d, speed * dt), ox = p.x, oy = p.y;
         moveBox(p, dx / d * st, dy / d * st);
         p.dir = dirOf(dx, dy);
         const moved = Math.hypot(p.x - ox, p.y - oy);
@@ -492,7 +498,7 @@ export function update(state, w, dt) {
       }
     }
   }
-  if (w.moving) w.walkT += dt;
+  if (w.moving) { w.walkT += dt; ST.standUp(state); }   // đi là đứng dậy khỏi ghế
 
   // bước vào ô cửa → sang bản đồ khác (phải ra khỏi ô cửa một lần rồi mới tính, khỏi bị đẩy qua lại)
   const door = M.doors.find(d => inDoor(d, p.x, p.y));

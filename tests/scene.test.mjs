@@ -73,7 +73,7 @@ test('trong nhà: tủ đồ mở bảng đổi ngoại hình, giường chưa d
   assert.equal(G.perform(s, ward, 'open').open, 'house');
   const bed = G.actionsFor(s, { kind: 'building', id: 'bed' });
   assert.equal(bed.length, 1);
-  assert.equal(bed[0].disabled, 'Để dành cho tối nay');
+  assert.match(bed[0].disabled, /Để dành cho tối nay/);   // chưa tới 18h
   const door = { kind: 'door', to: 'farm' };
   assert.equal(G.actionsFor(s, door)[0].id, 'go');
   assert.equal(G.perform(s, door, 'go').go, 'farm');

@@ -1,7 +1,7 @@
 // Mô hình dữ liệu + luật chơi. Thuần JS, không DOM (localStorage có bọc try/catch).
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
-  ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET,
+  ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA,
   expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
@@ -99,7 +99,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     v: 2, name, look: lk, owned, coins: START.coins, exp: 0,
     time: 0, speed: 1, day: 1, weather: 'sun', savedAt: Date.now(),
     farm: nf.farm, scene: 'farm',     // scene: bản đồ đang đứng; player.x/y tính theo bản đồ đó
-    player: { x: 0, y: 0, dir: 0 }, can: FARMING.canMax, selectedSeed: 'cai',
+    player: { x: 0, y: 0, dir: 0 }, stamina: STAMINA.max, sit: false, can: FARMING.canMax, selectedSeed: 'cai',
     inv: { ...START.items },
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
@@ -160,6 +160,8 @@ export function loadGame() {
   for (const k of ['owned', 'achievements', 'inv', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
   for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
+  if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
+  s.stamina = clamp(s.stamina, 0, STAMINA.max); s.sit = false;
   evq = [];
   const elapsed = clamp(Date.now() - (s.savedAt || Date.now()), 0, MAX_CATCHUP_MS);
   if (elapsed > 3000) {
@@ -192,6 +194,27 @@ export const marketOpen = s => { const h = hourOf(s); return h >= MARKET.open &&
 const CLOSED = `Chợ Bà Tư đóng cửa rồi, ${MARKET.open} giờ sáng mở lại nhé`;
 const closed = extra => ({ ok: false, msg: CLOSED, reason: 'closed', ...extra });
 
+// ---------- Thể lực & ngủ ----------
+// Hết thể lực thì đi và làm chậm: world chia tốc độ đi, main nhân thời gian hành động với hệ số này.
+export const slowFactor = s => (s.stamina <= 0 ? STAMINA.slow : 1);
+export const standUp = s => { s.sit = false; };
+export const canSleep = s => dayFrac(s) >= (STAMINA.sleepHour - 6) / 24;
+const SLEEP_EARLY = `Để dành cho tối nay, ${STAMINA.sleepHour} giờ chiều mới ngủ được`;
+
+// Ngủ: chạy mô phỏng thật tới 6h sáng hôm sau (cây vẫn lớn; như chạy bù offline thì không có quạ/trộm), hồi đầy thể lực.
+export function sleep(s) {
+  if (!canSleep(s)) return R(false, SLEEP_EARLY, { reason: 'early' });
+  const left = (Math.floor(s.time / DAY_MS) + 1) * DAY_MS - s.time, was = catchUp;
+  s.sit = false; s.threats = [];
+  catchUp = true;
+  let ev;
+  try { ev = tick(s, left); } finally { catchUp = was; }
+  s.threats = [];
+  s.stamina = STAMINA.max;
+  evq.push(...ev);
+  return R(true, 'Chào buổi sáng! Thể lực đã đầy ☀️', { slept: true });
+}
+
 // ---------- Tick ----------
 export function tick(s, dtGame) {
   let left = Math.max(0, dtGame);
@@ -207,7 +230,12 @@ function step(s, d) {
     s.day = day;
     const r = Math.random();
     s.weather = r < 0.45 ? 'sun' : r < 0.75 ? 'cloud' : 'rain';
+    s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.morningRegen);   // mỗi sáng 6h tự hồi một ít
     toast({ sun: 'Trời nắng đẹp ☀️', cloud: 'Trời nhiều mây ⛅', rain: 'Trời mưa rồi, ruộng tự có nước 🌧️' }[s.weather]);
+  }
+  if (s.sit) {   // ngồi ghế đá: hồi chậm, đầy thì tự đứng dậy
+    s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.benchPerMin * d / MIN);
+    if (s.stamina >= STAMINA.max) { s.sit = false; toast('Khỏe re rồi, làm tiếp thôi 💪'); }
   }
   for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d);
   stepAnimals(s, d);
@@ -413,7 +441,7 @@ const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 export function actionsFor(s, t) {
   if (!t) return [];
   const f = { plot: plotActs, lockedPlot: lockedActs, animal: animalActs, egg: () => [mk('collect', '🥚', 'Nhặt trứng')],
-    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs }[t.kind];
+    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs }[t.kind];
   return f ? f(s, t) : [];
 }
 
@@ -507,9 +535,17 @@ function buildingActs(s, t) {
   if (TALK[b.id]) return [mk('talk', TALK[b.id].icon, TALK[b.id].label)];
   if (b.id === 'house') return [mk('enter', '🏠', 'Vào nhà')];
   if (b.id === 'gate') return [mk('enter', '🚪', 'Ra làng')];
-  if (b.id === 'bed') return [mk('sleep', '🛏️', 'Ngủ', 'Để dành cho tối nay')];
+  if (b.id === 'bed') return [mk('sleep', '🛏️', 'Ngủ', canSleep(s) ? null : SLEEP_EARLY)];
+  if (b.id.startsWith('bench')) return benchActs(s);
   if (b.id === 'well') return [mk('refill', '🪣', `Múc nước (bình ${s.can}/${FARMING.canMax})`, s.can >= FARMING.canMax ? 'Bình đầy rồi' : null)];
   return [];
+}
+
+// Ghế đá (đồ trang trí ngoài vườn, ghế ngoài làng): ngồi thì hồi chậm tới khi đứng dậy (đi đâu đó) hoặc đầy
+const benchActs = s => [mk('sit', '🪑', 'Ngồi nghỉ', s.stamina >= STAMINA.max ? 'Bạn còn khỏe lắm, chưa cần nghỉ' : s.sit ? 'Đang ngồi nghỉ rồi' : null)];
+function decoActs(s, t) {
+  const e = s.farm.ents.find(x => x.id === t.id);
+  return e?.item === 'deco_bench' ? benchActs(s) : [];
 }
 
 // Cửa sang bản đồ khác: { kind: 'door', to }
@@ -531,6 +567,7 @@ function posOf(s, t) {
   if (t.kind === 'nest') return m.building('coop')?.at ?? s.player;
   if (t.kind === 'building') return sceneMap(s).building(t.id)?.at ?? s.player;
   if (t.kind === 'door') return doorOf(s, t.to)?.at ?? s.player;
+  if (t.kind === 'deco') return m.decos.find(d => d.id === t.id) ?? s.player;
   if (t.kind === 'dog') return s.dog;
   const list = { animal: s.animals, egg: s.eggs, poop: s.poops, threat: s.threats }[t.kind];
   return list?.find(x => x.id === t.id) ?? s.player;
@@ -547,9 +584,18 @@ export function perform(s, t, id) {
   const act = actionsFor(s, t).find(a => a.id === id);
   if (!act) return bad('Chưa làm được việc này', at);
   if (act.disabled) return bad(act.disabled, at);
+  if (id !== 'sit') s.sit = false;
   const r = DO[t.kind](s, t, id, at);
+  if (t.kind === 'plot' && STAMINA.cost[id]) spend(s, STAMINA.cost[id]);
   checkAch(s);
   return r;
+}
+
+// Trừ thể lực; vừa hết thì báo một lần
+function spend(s, n) {
+  const was = s.stamina;
+  s.stamina = Math.max(0, s.stamina - n);
+  if (was > 0 && s.stamina <= 0) toast('Hết sức rồi, đi và làm sẽ chậm hơn. Ngủ hay ngồi ghế đá cho khỏe lại nhé 😮‍💨');
 }
 
 const say = (at, text, color = COL.good) => ({ text, color, x: at.x, y: at.y });
@@ -668,12 +714,21 @@ const DO = {
     if (id === 'refill') { s.can = FARMING.canMax; return res(true, 'Đã múc đầy bình', [say(at, 'Đầy bình! 💧', '#7ad7ff')], 'water'); }
     if (id === 'enter') return res(true, '', [], 'click', { go: BUILDING_DEFS[t.id].door.to });
     if (id === 'talk') return res(true, TALK[t.id].msg, [], 'click');
+    if (id === 'sit') return sitDown(s, at);
+    if (id === 'sleep') return res(true, '', [], 'click', { sleep: true });   // main mờ màn hình rồi gọi sleep(s)
     return res(true, '', [], 'click', { open: t.id === 'wardrobe' ? 'house' : t.id });
   },
+
+  deco(s, t, id, at) { return sitDown(s, at); },
 
   // Chỉ báo ý định sang bản đồ khác (go); main.js mờ màn hình rồi mới gọi enterScene.
   door(s, t) { return res(true, '', [], 'click', { go: t.to }); },
 };
+
+function sitDown(s, at) {
+  s.sit = true;
+  return res(true, 'Ngồi nghỉ một chút', [say(at, 'Hù... 😌')], 'click');
+}
 
 // ---------- Chuyển bản đồ ----------
 // Đi qua cửa từ bản đồ đang đứng sang bản đồ to: phải có cửa dẫn tới to. Tới nơi thì đứng ở arrive[nơi vừa đi].
@@ -681,7 +736,7 @@ export function enterScene(s, to) {
   if (!doorOf(s, to)) return R(false, 'Không có lối sang đó', { reason: 'no_door' });
   if (!hasScene(to)) return R(false, 'Chỗ này chưa mở', { reason: 'unknown' });
   const from = s.scene || 'farm';
-  s.scene = to;
+  s.scene = to; s.sit = false;
   const m = sceneMap(s), a = m.arrive[from] ?? m.spawn;
   Object.assign(s.player, { x: a.x, y: a.y, dir: a.dir ?? 0 });
   return R(true, '', { scene: to });

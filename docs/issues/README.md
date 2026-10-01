@@ -14,7 +14,7 @@ Trạng thái: ⬜ chưa làm · 🔶 đang làm · ✅ xong
 | 06 | [Nhiều bản đồ: vào nhà](06-nhieu-ban-do-vao-nha.md) | 02 | ✅ |
 | 07 | [Làng và chợ Bà Tư](07-lang-va-cho-ba-tu.md) | 06 | ✅ |
 | 08 | [Thùng giao hàng](08-thung-giao-hang.md) | 02 | ⬜ |
-| 09 | [Thể lực](09-the-luc.md) | 06 | ⬜ |
+| 09 | [Thể lực](09-the-luc.md) | 06 | ✅ |
 | 10 | [Công cụ 3 cấp và tiệm rèn](10-cong-cu-va-tiem-ren.md) | 07, 09 | ⬜ |
 | 11 | [Giỏ có sức chứa](11-gio-co-suc-chua.md) | 02 | ⬜ |
 | 12 | [Thời gian: đóng băng và vắng nhà](12-thoi-gian-dong-bang-vang-nha.md) | 02 | ⬜ |

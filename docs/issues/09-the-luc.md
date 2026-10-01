@@ -21,8 +21,8 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: mỗi loại hành động trừ đúng chi phí. Ở 0 thể lực thì hệ số chậm là 2. Ngủ trước 18h bị từ chối, sau 18h thì hồi đầy và tới 6h. Ghế đá hồi theo thời gian. Có hồi buổi sáng.
-- [ ] E2E: dựng bản lưu có thể lực 0 → nhân vật đi chậm thấy rõ, có hình thở hồng hộc → vào nhà ngủ lúc 19h → sáng ra thanh thể lực đầy.
+- [x] Unit test: mỗi loại hành động trừ đúng chi phí. Ở 0 thể lực thì hệ số chậm là 2. Ngủ trước 18h bị từ chối, sau 18h thì hồi đầy và tới 6h. Ghế đá hồi theo thời gian. Có hồi buổi sáng.
+- [x] E2E: dựng bản lưu có thể lực 0 → nhân vật đi chậm thấy rõ, có hình thở hồng hộc → vào nhà ngủ lúc 19h → sáng ra thanh thể lực đầy.
 
 ## Blocked by
 

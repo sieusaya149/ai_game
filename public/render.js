@@ -120,7 +120,7 @@ const decoFallback = kind => once('deco' + kind, () => {
   }
   return c;
 });
-const decoImg = kind => SPR.deco?.[kind] ?? decoFallback(kind);
+const decoImg = kind => SPR.deco?.[kind] ?? (kind === 'deco_bench' && SPR2?.bench) ?? decoFallback(kind);
 
 // Nội thất dự phòng (khi SPR2 chưa có): khối gỗ đơn giản đúng kích thước sprite thật
 const FURN = { bed: [32, 24, '#e5452f'], wardrobe: [24, 32, '#b07a45'], stove: [24, 24, '#9a9a94'], table: [32, 20, '#c98c4a'],
@@ -436,7 +436,7 @@ export function render(ctx, f) {
   for (const b of m.bushes) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
 
   for (const b of m.buildings) {
-    const img = buildingImg(b);
+    const img = b.id === 'bed' && wd.sleeping && SPR2?.bedSleep ? SPR2.bedSleep : buildingImg(b);   // đang ngủ: giường có người nằm
     if (!img) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
     if (b.npc) {   // người đứng cạnh công trình (Bà Tư), thở nhẹ hai nhịp
@@ -565,7 +565,13 @@ export function render(ctx, f) {
     const fr = wd.moving ? [1, 0, 2, 0][Math.floor(wd.walkT * 8) % 4] : 0;
     const im = frames[dir][dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr];
     const shake = wd.stun > 0 ? (Math.floor(now / 60) % 2 ? 1 : -1) : 0;
-    add(p.y, () => blit(im, p.x - 8 + shake, p.y - 23));
+    if (!wd.sleeping) add(p.y, () => {
+      blit(im, p.x - 8 + shake, p.y - 23);
+      if (state.stamina <= 0) {   // hết thể lực: thở hồng hộc, mồ hôi bên đầu
+        const sw = SPR2?.sweat?.[Math.floor(now / 350) % 2];
+        if (sw) blit(sw, p.x + 4, p.y - 29);
+      }
+    });
   }
 
   items.sort((a, b) => a.y - b.y);
@@ -606,7 +612,7 @@ export function render(ctx, f) {
     }
   }
   if (f.busy != null) {
-    const p = state.player, bx = Math.round(p.x - 10), by = Math.round(p.y - 31);
+    const p = state.player, bx = Math.round(p.x - 10), by = Math.round(p.y - 31 - (state.stamina <= 0 ? 7 : 0));
     rect(ctx, '#3b2412', bx - 1, by - 1, 22, 6);
     rect(ctx, '#7a5a3a', bx, by, 20, 4);
     rect(ctx, '#5fd35f', bx, by, Math.max(1, Math.round(20 * f.busy)), 4);

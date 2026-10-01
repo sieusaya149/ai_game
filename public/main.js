@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  canPlace, canMove, moveEntity, entName, footprint, snapLayout, restoreLayout,
+  canPlace, canMove, moveEntity, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -9,6 +9,7 @@ import * as R from './render.js';
 import * as V from './world.js';
 
 const ACTION_MS = 350;
+const actionMs = () => ACTION_MS * slowFactor(state);   // hết thể lực thì làm chậm
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // ---------- Canvas ----------
@@ -90,6 +91,7 @@ function applyResult(res, target, id) {
   if (res.msg && (!res.ok || !res.fx?.length)) ui.toast(res.msg);
   if (res.open) ui.openPanel(res.open);
   if (res.go) goScene(res.go);
+  if (res.sleep) goSleep();
   if (res.ok && target && /pet|vuot|stroke|love/i.test(id ?? '')) {
     const key = target.kind === 'dog' ? 'dog' : target.kind === 'animal' ? 'a' + target.id : null;
     if (key) world.emotes.set(key, { icon: 'heart', until: now + 1600 });
@@ -184,6 +186,28 @@ function goScene(to) {
     ui.renderHUD(state);
     save();
   }, FADE_MS);
+}
+
+// ---------- Ngủ: mờ dần, chạy mô phỏng tới sáng (luật ở state.sleep), sáng dần ----------
+const SLEEP_MS = 1100;
+function goSleep() {
+  if (!state || fading || world.build) return;
+  fading = true;
+  V.cancelMove(world);
+  world.busy = true; world.input.x = world.input.y = 0; world.sleeping = true;
+  const el = document.getElementById('fade');
+  el.classList.add('on');
+  setTimeout(() => {
+    fading = false; world.busy = false; world.sleeping = false;
+    el.classList.remove('on');
+    if (!state) return;
+    const r = sleep(state);
+    ui.toast(r.msg);
+    if (r.ok) ui.handleEvents([{ type: 'sound', name: 'levelup' }]);
+    world.fx = []; dirty = true;
+    ui.renderHUD(state);
+    save();
+  }, SLEEP_MS);
 }
 
 // ---------- Nhập liệu: bàn phím ----------
@@ -353,7 +377,7 @@ function frame(now) {
   }
   const res = V.update(state, world, dt);
   for (const r of res.results) applyResult(r);
-  if (busy && now - busy.t0 >= ACTION_MS) finishAction();
+  if (busy && now - busy.t0 >= actionMs()) finishAction();
   if (res.arrived && !busy) autoAct(res.arrived);
   if (res.door) goScene(res.door.to);
 
@@ -368,7 +392,7 @@ function frame(now) {
   R.render(ctx, {
     state, w: world, cam, scale, width: canvas.width, height: canvas.height, dpr, now,
     target: curTarget ? { target: curTarget } : null,
-    busy: busy ? clamp((now - busy.t0) / ACTION_MS, 0, 1) : null,
+    busy: busy ? clamp((now - busy.t0) / actionMs(), 0, 1) : null,
     fx: world.fx,
   });
 

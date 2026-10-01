@@ -3,6 +3,7 @@ import * as S from './state.js';
 import * as art from './art.js';
 import * as D from './data.js';
 import * as sound from './sound.js';
+import { SPR2 } from './art2.js';
 
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n || 0).toLocaleString('vi-VN');
@@ -235,6 +236,17 @@ export function renderHUD(s) {
   const bar = $('hud-exp'), pct = Math.min(100, (li.cur / li.need) * 100) + '%';
   if (bar.style.width !== pct) bar.style.width = pct;
   drawAvatar(s.look);
+  const stam = Math.round(s.stamina ?? D.STAMINA.max), tired = stam <= 0;   // thanh thể lực
+  setText('hud-stam-text', String(stam));
+  const sb = $('hud-stam'), sp = (stam / D.STAMINA.max) * 100 + '%';
+  if (sb.style.width !== sp) sb.style.width = sp;
+  if (memo.get('hud-tired') !== tired) {
+    memo.set('hud-tired', tired);
+    $('hud-stamina').classList.toggle('tired', tired);
+    const ic = SPR2?.[tired ? 'staminaTired' : 'stamina'], cx = $('hud-stam-ico').getContext('2d');
+    cx.clearRect(0, 0, 12, 12);
+    if (ic) cx.drawImage(ic, 0, 0);
+  }
   $('bb-build').style.display = s.scene && s.scene !== 'farm' ? 'none' : '';   // chế độ xây dựng chỉ có ở vườn
 
   const coinsTxt = fmt(s.coins);
