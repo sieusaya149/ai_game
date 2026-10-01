@@ -48,10 +48,10 @@ test('cuốc -> gieo -> tưới -> chín -> thu hoạch -> bán', () => {
   assert.equal(a[0].id, 'harvest');
   const h = G.perform(s, T(0), 'harvest');
   assert.ok(h.ok);
-  assert.equal(s.inv.cai, 4 + 0 + (s.inv.cai - 4));
+  assert.equal(s.basket.cai, 4);   // thu hoạch vào giỏ
   assert.equal(s.plots[0].soil, 'untilled');
   assert.equal(s.plots[0].crop, null);
-  const before = s.coins, n = s.inv.cai;
+  const before = s.coins, n = G.haveItem(s, 'cai');
   const sold = G.sell(s, 'cai', 'all');
   assert.equal(sold.coins, n * CROPS.cai.price);
   assert.equal(s.coins, before + sold.coins);
@@ -131,7 +131,7 @@ test('bón phân tăng sản lượng, thuốc tăng trưởng đẩy nhanh', ()
   assert.ok(s.plots[0].crop.progress >= 1);
   assert.equal(G.perform(s, T(0), 'growth').ok, false);
   G.perform(s, T(0), 'harvest');
-  assert.equal(s.inv.cai, Math.round(CROPS.cai.yield * 1.5));
+  assert.equal(s.basket.cai, Math.round(CROPS.cai.yield * 1.5));
 });
 
 test('mở rộng đất theo thứ tự (vườn chuyển từ v1 còn ô khóa)', () => {
@@ -184,7 +184,7 @@ test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () 
   assert.match(G.actionsFor(s, { kind: 'egg', id: egg.id })[0].label, /Nhặt trứng/);
   const r = G.perform(s, { kind: 'egg', id: egg.id }, 'collect');
   assert.ok(r.ok);
-  assert.equal(s.inv.trung, 1);
+  assert.equal(s.basket.trung, 1);
   assert.equal(s.stats.eggs, 1);
   // ổ ấp
   const nest = { kind: 'nest' };
@@ -219,7 +219,7 @@ test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
   assert.equal(s.animals[0].ready, true);
   assert.equal(G.actionsFor(s, { kind: 'animal', id: 50 })[0].id, 'milk');
   G.perform(s, { kind: 'animal', id: 50 }, 'milk');
-  assert.equal(s.inv.sua, 1);
+  assert.equal(s.basket.sua, 1);
   const sellAct = G.actionsFor(s, { kind: 'animal', id: 50 }).find(a => a.id === 'sell');
   assert.match(sellAct.label, /Bán bò \(700 xu\)/);
   const c = s.coins;

@@ -100,6 +100,7 @@ kbd {
 .pill.coins.bump { animation: bump 0.35s; }
 .btn-pill { cursor: pointer; }
 .btn-pill:active { transform: translateY(2px); }
+#hud-basket.full { background: #ffd2c8; }
 #hud-water.empty { background: #ffd2c8; animation: blink 0.9s infinite; }
 @keyframes bump { 40% { transform: scale(1.18); } }
 @keyframes blink { 50% { opacity: 0.6; } }

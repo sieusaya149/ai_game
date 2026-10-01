@@ -64,6 +64,7 @@ export function migrate(raw) {
     s = step(s);
   }
   if (s.v !== SAVE_VERSION || !s.farm) throw new Error('Bản lưu không đúng định dạng');
+  s.basket ??= {};   // bản lưu chưa có giỏ: đồ cũ nằm ở kho (inv), giỏ trống
   // Công trình đã bỏ khỏi game (sạp hàng giờ nằm ở chợ trong làng), cả ở vườn v2 đã lưu từ trước
   if (s.farm.ents.some(e => RETIRED.includes(e.kind))) {
     s.farm.ents = s.farm.ents.filter(e => !RETIRED.includes(e.kind));

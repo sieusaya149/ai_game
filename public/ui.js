@@ -73,7 +73,7 @@ const celebQueue = [];
 const flags = { sold: false, bought: false };
 const st = () => api.getState();
 const level = s => S.levelInfo(s.exp).level;
-const have = (s, k) => s.inv?.[k] ?? 0;
+const have = (s, k) => S.haveItem(s, k);   // giỏ + kho
 
 const typing = el => !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 // Nhãn từ state.js đã kèm icon ở đầu; bỏ đi vì nút đã vẽ icon riêng.
@@ -263,6 +263,8 @@ export function renderHUD(s) {
   try { night = S.isNight(s); } catch {}
   setText('hud-weather', (night ? '🌙' : '') + (night && s.weather !== 'rain' ? '' : WEATHER[s.weather] || '☀️'));
   setText('hud-can', `${s.can}/${S.canMax(s)}`);
+  setText('hud-basket-n', `${S.basketCount(s)}/${S.basketCap(s)}`);
+  $('hud-basket').classList.toggle('full', S.basketCount(s) >= S.basketCap(s));
   if (panel === 'smithy') {   // rèn xong giữa chừng thì vẽ lại bảng; còn không thì chỉ đổi đồng hồ đếm
     if (smithKey !== JSON.stringify([s.smith, s.tools])) refreshPanel(); else if ($('smith-left')) $('smith-left').textContent = smithLeft(s);
   }
@@ -416,7 +418,7 @@ async function buyItem(id, qty) {
     if (yes) res(S.placeDeco(st(), id), 'pop');
   }
 }
-const sellable = s => Object.keys(s.inv || {}).filter(k => (D.CROPS[k] || D.PRODUCTS[k]) && s.inv[k] > 0);
+const sellable = s => [...new Set([...Object.keys(s.basket || {}), ...Object.keys(s.inv || {})])].filter(k => (D.CROPS[k] || D.PRODUCTS[k]) && have(s, k) > 0);
 const sold = r => { if (r?.ok) flags.sold = true; };
 PANELS.market = {
   title: '🏪 Chợ Bà Tư',
@@ -430,12 +432,12 @@ PANELS.market = {
     if (t === 'sell') {
       const keys = sellable(s);
       if (!keys.length) return list.append(empty('Chưa có gì để bán. Thu hoạch nông sản hoặc nhặt trứng rồi mang ra chợ nhé!'));
-      const total = keys.reduce((a, k) => a + s.inv[k] * D.sellPrice(k), 0);
+      const total = keys.reduce((a, k) => a + have(s, k) * D.sellPrice(k), 0);
       body.insertBefore(h('div', { class: 'sell-all' },
         h('div', {}, 'Bán tất cả ', h('b', {}, '+' + fmt(total) + ' xu')),
         btn('Bán tất cả', () => sold(res(S.sellAll(st()), 'coin')), 'orange', { disabled: shut })), list);
       for (const k of keys) {
-        const n = s.inv[k], p = D.sellPrice(k);
+        const n = have(s, k), p = D.sellPrice(k);
         list.append(row({
           icon: ico(k), name: D.itemName(k), desc: `Có ${n} · ${p} xu/cái`,
           right: h('div', { class: 'qtys' },
@@ -496,8 +498,11 @@ PANELS.market = {
 PANELS.shed = {
   title: '📦 Nhà kho',
   render(body, s) {
-    body.append(h('div', { class: 'note' }, 'Đồ cất ở đây. Muốn bán nông sản thì mang ra chợ Bà Tư trong làng (mở 6h–18h) nhé!'));
-    PANELS.bag.render(body, s);
+    body.append(h('div', { class: 'note' }, 'Đồ cất ở đây, kho không giới hạn. Muốn bán nông sản thì mang ra chợ Bà Tư trong làng (mở 6h–18h) nhé!'));
+    body.append(h('div', { class: 'sell-all' },
+      h('div', {}, '🧺 Giỏ ', h('b', {}, `${S.basketCount(s)}/${S.basketCap(s)}`)),
+      btn('Cất hết vào kho', () => res(S.stashAll(st()), 'pop'), 'green', { disabled: !S.basketCount(s) })));
+    PANELS.bag.render(body, s, true);
   },
 };
 // ---------- Tiệm rèn Ông Sáu ----------
@@ -522,7 +527,7 @@ PANELS.smithy = {
     for (const k of Object.keys(D.TOOLS)) {
       const lv = S.toolLv(s, k), cost = S.upgradeCost(s, k), d = D.TOOLS[k], away = S.toolAway(s, k);
       const area = d.area[lv] && { row: 'hàng 3 ô', block: '3×3 ô', one: '1 ô' }[d.area[lv]];
-      const next = k === 'can' ? `chứa ${d.canMax[lv] ?? ''} lần${area ? ', tưới ' + area : ''}` : area ? `làm ${area} một lần` : 'sức chứa mở ở bản sau';
+      const next = k === 'can' ? `chứa ${d.canMax[lv] ?? ''} lần${area ? ', tưới ' + area : ''}` : k === 'basket' ? `chứa ${d.cap[lv]} món` : area ? `làm ${area} một lần` : '';
       list.append(row({
         icon: toolIco(k, lv), name: `${d.name} ${D.TOOL_LEVEL[lv - 1]} (cấp ${lv})`,
         desc: cost == null ? 'Đã là cấp cao nhất' : `Lên cấp ${lv + 1}: ${next}`,
@@ -537,9 +542,10 @@ PANELS.smithy = {
 // ---------- Túi đồ ----------
 PANELS.bag = {
   title: '🎒 Túi đồ',
-  render(body, s) {
+  render(body, s, inShed = false) {
     body.append(h('div', { class: 'chips-line' },
       h('span', { class: 'mini' }, `💧 Bình nước ${s.can}/${S.canMax(s)}`),
+      h('span', { class: 'mini' }, `🧺 Giỏ ${S.basketCount(s)}/${S.basketCap(s)}`),
       h('span', { class: 'mini' }, `🪙 ${fmt(s.coins)} xu`)));
     body.append(section('Công cụ'));
     const tl = h('div', { class: 'grid' });
@@ -548,16 +554,18 @@ PANELS.bag = {
       tl.append(h('div', { class: 'cell' }, toolIco(k, lv), h('div', { class: 'cell-name' }, D.TOOLS[k].name), h('div', { class: 'cell-sub' }, S.toolAway(s, k) ? 'Đang rèn' : `Cấp ${lv} (${D.TOOL_LEVEL[lv - 1]})`)));
     }
     body.append(tl);
+    const isProduce = k => D.CROPS[k] || D.PRODUCTS[k];
     const groups = [
-      ['Hạt giống', k => D.ITEMS[k]?.kind === 'seed'],
-      ['Nông sản & sản phẩm', k => D.CROPS[k] || D.PRODUCTS[k]],
-      ['Vật tư', k => D.ITEMS[k]?.kind === 'supply'],
-      ['Thức ăn', k => D.ITEMS[k]?.kind === 'feed'],
-      ['Đồ trang trí', k => D.ITEMS[k]?.kind === 'deco'],
+      [`🧺 Giỏ (${S.basketCount(s)}/${S.basketCap(s)})`, s.basket, isProduce],
+      ['📦 Kho: nông sản & sản phẩm', s.inv, isProduce],
+      ['Hạt giống', s.inv, k => D.ITEMS[k]?.kind === 'seed'],
+      ['Vật tư', s.inv, k => D.ITEMS[k]?.kind === 'supply'],
+      ['Thức ăn', s.inv, k => D.ITEMS[k]?.kind === 'feed'],
+      ['Đồ trang trí', s.inv, k => D.ITEMS[k]?.kind === 'deco'],
     ];
     let any = false;
-    for (const [title, pred] of groups) {
-      const keys = Object.keys(s.inv || {}).filter(k => s.inv[k] > 0 && pred(k));
+    for (const [title, src, pred] of groups) {
+      const keys = Object.keys(src || {}).filter(k => src[k] > 0 && pred(k));
       if (!keys.length) continue;
       any = true;
       body.append(section(title));
@@ -565,8 +573,9 @@ PANELS.bag = {
       for (const k of keys) {
         const it = D.ITEMS[k];
         const act = it?.kind === 'seed' ? btn(s.selectedSeed === it.crop ? 'Đang chọn' : 'Chọn gieo', () => { S.selectSeed(st(), it.crop); sound.play('pop'); commit(); }, 'plain sm', { disabled: s.selectedSeed === it.crop })
-          : it?.kind === 'deco' ? btn('Đặt xuống', () => res(S.placeDeco(st(), k), 'pop'), 'green sm') : null;
-        list.append(h('div', { class: 'cell' }, ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + s.inv[k]), h('div', { class: 'cell-name' }, itemLabel(k)), act));
+          : it?.kind === 'deco' ? btn('Đặt xuống', () => res(S.placeDeco(st(), k), 'pop'), 'green sm')
+          : inShed && src === s.inv && isProduce(k) ? btn('Lấy ra', () => res(S.withdraw(st(), k, 'all'), 'pop'), 'plain sm', { disabled: S.basketCount(s) >= S.basketCap(s) }) : null;
+        list.append(h('div', { class: 'cell' }, ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + src[k]), h('div', { class: 'cell-name' }, itemLabel(k)), act));
       }
       body.append(list);
     }

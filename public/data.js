@@ -16,7 +16,7 @@ export const TOOLS = {
   hoe:    { name: 'Cuốc',      icon: '⛏️', area: ['one', 'row', 'block'], price: [200, 800], act: ['till'] },
   can:    { name: 'Bình tưới', icon: '💧', area: ['one', 'row', 'block'], price: [200, 800], act: ['water'], canMax: [10, 20, 40] },
   sickle: { name: 'Liềm',      icon: '🌾', area: ['one', 'row', 'block'], price: [250, 900], act: ['harvest', 'weed'] },
-  basket: { name: 'Giỏ',       icon: '🧺', area: [],                      price: [150, 600], act: [] },   // sức chứa của giỏ: issue 11
+  basket: { name: 'Giỏ',       icon: '🧺', area: [],                      price: [150, 600], act: [], cap: [30, 60, 120] },   // cap: sức chứa giỏ (số món nông sản & sản phẩm) theo cấp
 };
 export const TOOL_MAX = 3;
 export const TOOL_LEVEL = ['sắt', 'đồng', 'vàng'];

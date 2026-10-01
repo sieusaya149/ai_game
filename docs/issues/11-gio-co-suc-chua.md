@@ -17,8 +17,8 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: đầy giỏ thì khóa thu hoạch kèm lý do. Hạt giống không tính vào sức chứa. Cất vào kho làm giỏ trống. Bán lấy được đồ từ kho.
-- [ ] E2E: dựng bản lưu có giỏ gần đầy → thu hoạch tới khi bị khóa → về kho cất → thu hoạch tiếp được.
+- [x] Unit test: đầy giỏ thì khóa thu hoạch kèm lý do. Hạt giống không tính vào sức chứa. Cất vào kho làm giỏ trống. Bán lấy được đồ từ kho.
+- [x] E2E: dựng bản lưu có giỏ gần đầy → thu hoạch tới khi bị khóa → về kho cất → thu hoạch tiếp được.
 
 ## Blocked by
 

@@ -30,9 +30,29 @@ const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const chance = (pMin, dt) => Math.random() < 1 - Math.pow(1 - pMin, dt / MIN); // xác suất "mỗi phút" đổi theo dt
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const have = (s, k) => s.inv[k] || 0;
-const give = (s, k, n = 1) => { s.inv[k] = have(s, k) + n; };
-const take = (s, k, n = 1) => { s.inv[k] = have(s, k) - n; if (s.inv[k] <= 0) delete s.inv[k]; };
+// Hai chỗ chứa: giỏ (s.basket, chỉ nông sản & sản phẩm, có sức chứa) và kho (s.inv, mọi thứ, chưa giới hạn).
+// Hạt giống, vật tư, thức ăn, đồ trang trí luôn nằm ở kho, không tính vào giỏ.
+const inBasket = k => !!(CROPS[k] || PRODUCTS[k]);
+const drop = (o, k, n) => { o[k] = (o[k] || 0) - n; if (o[k] <= 0) delete o[k]; };
+export const haveItem = (s, k) => (s.basket?.[k] || 0) + (s.inv[k] || 0);
+// Lấy n món: giỏ trước, thiếu thì lấy tiếp từ kho. Không đủ thì không lấy gì và trả false.
+export function takeItem(s, k, n = 1) {
+  if (haveItem(s, k) < n) return false;
+  const fromBasket = Math.min(n, s.basket?.[k] || 0);
+  if (fromBasket) drop(s.basket, k, fromBasket);
+  if (n > fromBasket) drop(s.inv, k, n - fromBasket);
+  return true;
+}
+export const basketCount = s => Object.values(s.basket || {}).reduce((a, n) => a + n, 0);
+export const basketCap = s => TOOLS.basket.cap[toolLv(s, 'basket') - 1];
+const room = s => basketCap(s) - basketCount(s);
+const FULL = 'Giỏ đầy, về kho cất đồ';
+const have = haveItem;
+const give = (s, k, n = 1) => {
+  const o = inBasket(k) ? (s.basket ||= {}) : s.inv;
+  o[k] = (o[k] || 0) + n;
+};
+const take = takeItem;
 const level = s => levelInfo(s.exp).level;
 const COL = { good: '#5cd65c', bad: '#ff6b6b', coin: '#ffd23f', info: '#ffffff', exp: '#7ad7ff' };
 const SOUND = { ga: 'cluck', heo: 'oink', bo: 'moo', cuu: 'baa' };
@@ -101,7 +121,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     farm: nf.farm, scene: 'farm',     // scene: bản đồ đang đứng; player.x/y tính theo bản đồ đó
     player: { x: 0, y: 0, dir: 0 }, stamina: STAMINA.max, sit: false, can: FARMING.canMax, selectedSeed: 'cai',
     tools: Object.fromEntries(Object.keys(TOOLS).map(k => [k, { lv: 1 }])), smith: null,   // smith: { tool, doneAt } công cụ đang nằm lò rèn
-    inv: { ...START.items },
+    inv: { ...START.items }, basket: {},   // inv = kho, basket = giỏ
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
     dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name },
@@ -158,7 +178,7 @@ export function loadGame() {
   const base = createGame({ name: s.name });
   s.stats = { ...base.stats, ...s.stats };
   s.troughs = { ...base.troughs, ...s.troughs };
-  for (const k of ['owned', 'achievements', 'inv', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
+  for (const k of ['owned', 'achievements', 'inv', 'basket', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
   for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
@@ -473,6 +493,12 @@ export function toolArea(s, tool, idx, id = TOOLS[tool]?.act[0]) {
   return id === 'water' ? out.slice(0, s.can) : out;
 }
 
+// Thu hoạch nhiều ô: lấy theo thứ tự tới khi giỏ không chứa thêm được nữa
+function fitBasket(s, tiles) {
+  let left = room(s);
+  return tiles.filter(i => { const q = harvestQty(s.plots[i].crop); if (q > left) { left = 0; return false; } left -= q; return true; });
+}
+
 // Gắn danh sách ô (tiles) và khóa theo công cụ vào các hành động trên ô ruộng
 function withTools(s, t, A) {
   for (const a of A) {
@@ -480,6 +506,7 @@ function withTools(s, t, A) {
     if (!k) continue;
     if (toolAway(s, k)) { a.disabled = awayMsg(k); continue; }
     a.tiles = toolArea(s, k, t.idx, a.id);
+    if (a.id === 'harvest') a.tiles = fitBasket(s, a.tiles);
     if (a.tiles.length > 1) a.label += ` (${a.tiles.length} ô)`;
   }
   const j = A.findIndex(a => !a.disabled);
@@ -516,7 +543,7 @@ const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 
 export function actionsFor(s, t) {
   if (!t) return [];
-  const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: () => [mk('collect', '🥚', 'Nhặt trứng')],
+  const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: s => [mk('collect', '🥚', 'Nhặt trứng', room(s) < 1 ? FULL : null)],
     poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs }[t.kind];
   return f ? f(s, t) : [];
 }
@@ -535,7 +562,7 @@ function plotActs(s, t) {
     return A;
   }
   if (c.dead || c.rotten) return [mk('clear', '🧹', c.dead ? 'Dọn cây chết' : 'Dọn cây héo')];
-  if (c.progress >= 1) return [mk('harvest', '🧺', `Thu hoạch ${CROPS[c.id].name} (${harvestQty(c)})`)];
+  if (c.progress >= 1) return [mk('harvest', '🧺', `Thu hoạch ${CROPS[c.id].name} (${harvestQty(c)})`, room(s) < harvestQty(c) ? FULL : null)];
   const noPest = have(s, 'pesticide') <= 0 ? noItem('pesticide') : null;
   if (c.sick) A.push(mk('spray', '🧴', 'Phun thuốc chữa bệnh', noPest));
   if (c.bugs) A.push(mk('spray', '🧴', 'Phun thuốc trừ sâu', noPest), mk('catch', '🤏', 'Bắt sâu bằng tay'));
@@ -560,7 +587,7 @@ function animalActs(s, t) {
   const a = s.animals.find(x => x.id === t.id);
   if (!a) return [];
   const def = ANIMALS[a.type], A = {}, n = have(s, def.feed);
-  if (a.ready) A.collect = a.type === 'bo' ? mk('milk', '🥛', 'Vắt sữa') : mk('shear', '✂️', 'Xén lông');
+  if (a.ready) A.collect = a.type === 'bo' ? mk('milk', '🥛', 'Vắt sữa', room(s) < 1 ? FULL : null) : mk('shear', '✂️', 'Xén lông', room(s) < 1 ? FULL : null);
   A.feed = mk('feed', '🌾', `Cho ăn tận tay (còn ${n})`, n <= 0 ? noItem(def.feed) : a.hunger >= 95 ? 'Bụng no căng rồi' : null);
   A.pet = mk('pet', '🤗', 'Vuốt ve');
   if (a.sick) A.medicine = mk('medicine', '💊', `Cho uống thuốc thú y (còn ${have(s, 'medicine')})`, have(s, 'medicine') <= 0 ? noItem('medicine') : null);
@@ -866,8 +893,25 @@ export function sell(s, itemId, qty = 1) {
 export function sellAll(s) {
   if (!marketOpen(s)) return closed({ coins: 0 });
   let coins = 0;
-  for (const k of Object.keys(s.inv)) if (CROPS[k] || PRODUCTS[k]) coins += sell(s, k, 'all').coins;
-  return coins ? R(true, `Bán hết được ${coins} xu`, { coins }) : R(false, 'Kho chưa có gì để bán', { coins: 0 });
+  for (const k of new Set([...Object.keys(s.basket), ...Object.keys(s.inv)])) if (inBasket(k)) coins += sell(s, k, 'all').coins;
+  return coins ? R(true, `Bán hết được ${coins} xu`, { coins }) : R(false, 'Giỏ và kho chưa có gì để bán', { coins: 0 });
+}
+
+// Nhà kho: cất hết nông sản & sản phẩm từ giỏ vào kho
+export function stashAll(s) {
+  const n = basketCount(s);
+  if (!n) return R(false, 'Giỏ đang trống rồi');
+  for (const [k, q] of Object.entries(s.basket)) s.inv[k] = (s.inv[k] || 0) + q;
+  s.basket = {};
+  return R(true, `Đã cất ${n} món vào kho`, { moved: n });
+}
+// Lấy từ kho ra giỏ (qty 'all' = lấy được bao nhiêu thì lấy, tới khi giỏ đầy)
+export function withdraw(s, itemId, qty = 1) {
+  if (!inBasket(itemId)) return R(false, 'Món này không bỏ vào giỏ', { moved: 0 });
+  const inKho = s.inv[itemId] || 0, n = Math.min(qty === 'all' ? inKho : Math.floor(qty), inKho, Math.max(0, room(s)));
+  if (!(n > 0)) return R(false, inKho > 0 ? 'Giỏ đầy rồi' : 'Kho không có món này', { moved: 0 });
+  drop(s.inv, itemId, n); give(s, itemId, n);
+  return R(true, `Lấy ${n} ${itemName(itemId).toLowerCase()} ra giỏ`, { moved: n });
 }
 
 export function buyOutfit(s, slot, index) {
