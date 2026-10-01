@@ -18,10 +18,10 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: mua và bán ở chợ trong giờ thì được, ngoài giờ thì bị từ chối kèm lý do. Vườn chuyển từ v1 không còn sạp hàng.
-- [ ] E2E: ra cổng → tới làng → mua hạt ở chợ → về vườn → gieo được hạt vừa mua.
-- [ ] E2E: dựng bản lưu lúc 20h → chợ hiện "Đóng cửa".
-- [ ] Đang ở làng mà có quạ ăn cây trong vườn thì vẫn thấy thông báo (thông báo 3 mức đầy đủ thuộc issue 13).
+- [x] Unit test: mua và bán ở chợ trong giờ thì được, ngoài giờ thì bị từ chối kèm lý do. Vườn chuyển từ v1 không còn sạp hàng.
+- [x] E2E: ra cổng → tới làng → mua hạt ở chợ → về vườn → gieo được hạt vừa mua.
+- [x] E2E: dựng bản lưu lúc 20h → chợ hiện "Đóng cửa".
+- [x] Đang ở làng mà có quạ ăn cây trong vườn thì vẫn thấy thông báo (thông báo 3 mức đầy đủ thuộc issue 13).
 
 ## Blocked by
 

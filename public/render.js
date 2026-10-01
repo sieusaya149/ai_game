@@ -3,7 +3,7 @@ import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTi
 import { TS, GROUND } from './layout.js';
 import { SPR2 } from './art2.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove } from './state.js';
+import { canMove, marketOpen } from './state.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
@@ -184,8 +184,9 @@ export function crowImg(face, frame) {
 }
 export const eggSize = () => { const e = eggImg(); return { w: e.width, h: e.height }; };
 export const poopSize = () => { const e = poopImg(); return { w: e.width, h: e.height }; };
+const spr2 = key => String(key).split('.').reduce((o, k) => o?.[k], SPR2);   // 'villageHouses.1' = phần tử của mảng
 export function buildingImg(b) {
-  if (b.interior) return SPR2?.[b.sprite] ?? furnFallback(b.sprite);
+  if (b.interior) return spr2(b.sprite) ?? furnFallback(b.sprite);
   if (b.sprite === 'well') return wellImg();
   if (b.sprite === 'board') return boardImg();
   return SPR[b.sprite] ?? null;
@@ -194,10 +195,13 @@ export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h
 
 // ---------- Lớp nền tĩnh ----------
 // Vẽ lại khi bố cục vườn đổi (farm.rev)
-let staticCanvas = null, staticFor = null;
+const layers = new WeakMap();   // mỗi bản đồ một lớp nền, đi qua lại giữa các bản đồ khỏi vẽ lại
 export function staticLayer(m) {
-  if (staticCanvas && staticFor === m) return staticCanvas;
-  if (m.interior) { staticCanvas = interiorLayer(m); staticFor = m; return staticCanvas; }
+  let hit = layers.get(m);
+  if (!hit) layers.set(m, hit = m.interior ? interiorLayer(m) : outdoorLayer(m));
+  return hit;
+}
+function outdoorLayer(m) {
   const { ground, solid, fences, mw: MW, mh: MH, W, H, mud: MUD } = m;
   const gAt = (c, r) => (c < 0 || r < 0 || c >= MW || r >= MH) ? -1 : ground[r * MW + c];
   const isRoad = (c, r) => { const g = gAt(c, r); return g === GROUND.ROAD || g === -1; };
@@ -258,7 +262,7 @@ export function staticLayer(m) {
     return col;
   });
 
-  staticCanvas = mkCanvas(W, H); staticFor = m;
+  const staticCanvas = mkCanvas(W, H);
   const x = staticCanvas.getContext('2d');
   x.imageSmoothingEnabled = false;
   x.drawImage(land, 0, 0);
@@ -385,8 +389,8 @@ export function render(ctx, f) {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  const m = sceneMap(state), farm = !m.interior;   // trong nhà: không vẽ con vật, chó, quạ, trứng, phân ngoài vườn
-  ctx.fillStyle = farm ? '#25491a' : '#1a100a';
+  const m = sceneMap(state), indoor = !!m.interior, farm = m.scene === 'farm';   // ngoài vườn mới vẽ con vật, chó, quạ, trứng, phân
+  ctx.fillStyle = indoor ? '#1a100a' : '#25491a';
   ctx.fillRect(0, 0, width, height);
   ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
   ctx.drawImage(staticLayer(m), 0, 0);
@@ -435,6 +439,11 @@ export function render(ctx, f) {
     const img = buildingImg(b);
     if (!img) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
+    if (b.npc) {   // người đứng cạnh công trình (Bà Tư), thở nhẹ hai nhịp
+      const idle = SPR2?.[b.npc.key + 'Idle'], im = idle?.[Math.floor(now / 700) % idle.length];
+      if (im) add(b.npc.y, () => blit(im, b.npc.x - 8, b.npc.y - 24));
+    }
+    if (b.id === 'market' && SPR2?.marketClosed && !marketOpen(state)) add((b.foot.r + b.foot.h) * TS + 0.5, () => blit(SPR2.marketClosed, b.x + 12, b.y + 22));
   }
   for (const [pen, p] of Object.entries(m.pens)) {
     const tr = p.trough, n = state.troughs?.[pen] ?? 0;
@@ -614,7 +623,7 @@ export function render(ctx, f) {
   // 5) đêm, đèn, mưa
   if (night > 0.01) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = `rgba(12,20,74,${((farm ? 0.52 : 0.3) * night).toFixed(3)})`;   // trong nhà có đèn, tối nhẹ hơn
+    ctx.fillStyle = `rgba(12,20,74,${((indoor ? 0.3 : 0.52) * night).toFixed(3)})`;   // trong nhà có đèn, tối nhẹ hơn
     ctx.fillRect(0, 0, width, height);
     ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
     ctx.globalCompositeOperation = 'lighter';
@@ -628,10 +637,11 @@ export function render(ctx, f) {
     for (const d of m.decos) if (d.kind === 'deco_lamp') { const im = decoImg(d.kind); glow(d.x, d.y - im.height * 0.75, 46, '255,190,90', 0.6); }
     const house = m.building('house');
     if (house) for (const wx of [19, 62]) glow(house.x + wx, house.y + 62, 24, '255,205,110', 0.55);
+    for (const b of m.buildings) if (b.sprite === 'lampPost') glow(b.x + 6, b.y + 8, 44, '255,190,90', 0.6);   // đèn đường trong làng
     ctx.globalCompositeOperation = 'source-over';
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (farm && state.weather === 'rain') {   // trong nhà: không thấy mưa, mây
+  if (!indoor && state.weather === 'rain') {   // trong nhà: không thấy mưa, mây
     ctx.fillStyle = 'rgba(40,60,100,0.13)'; ctx.fillRect(0, 0, width, height);
     ctx.strokeStyle = 'rgba(200,228,255,0.55)'; ctx.lineWidth = Math.max(1, Math.round(dpr));
     const len = 14 * dpr, sp = 750 * dpr, n = Math.min(160, Math.round(width * height / (9000 * dpr * dpr)));
@@ -643,7 +653,7 @@ export function render(ctx, f) {
       ctx.moveTo(x, y); ctx.lineTo(x - len * 0.22, y + len);
     }
     ctx.stroke();
-  } else if (farm && state.weather === 'cloud') {
+  } else if (!indoor && state.weather === 'cloud') {
     ctx.fillStyle = 'rgba(70,80,100,0.07)'; ctx.fillRect(0, 0, width, height);
   }
 
@@ -664,6 +674,22 @@ export function render(ctx, f) {
     while (ctx.measureText(text).width > maxW && size > 6) ctx.font = `800 ${--size}px ${FONT}`;
     ctx.fillStyle = '#3b2412';
     ctx.fillText(text, toSX(gate.x + 20), toSY(gate.y + 7) + size * 0.35);
+  }
+  // chữ trong làng: tên chỗ, biển "Đóng cửa" của chợ, biển cổng bạn bè
+  const fit = (text, x, y, maxW, size, color) => {
+    ctx.font = `800 ${size}px ${FONT}`;
+    while (ctx.measureText(text).width > maxW && size > 4) ctx.font = `800 ${--size}px ${FONT}`;
+    ctx.fillStyle = color; ctx.fillText(text, x, y + size * 0.35);
+  };
+  for (const b of m.buildings) {
+    if (!b.label && !b.sub && b.id !== 'market' && b.id !== 'friendGate') continue;
+    const img = buildingImg(b);
+    if (!img || !vis(b.x + img.width / 2, b.y + img.height / 2, 40)) continue;
+    const cx = b.x + img.width / 2;
+    if (b.label) outlined(b.label, toSX(cx), toSY(b.y) - 3 * scale, Math.round(11 * dpr), '#fff6d8');
+    if (b.sub) outlined(b.sub, toSX(cx), toSY(b.y + img.height) + 11 * scale, Math.round(11 * dpr), '#ffe9a0');
+    if (b.id === 'market' && !marketOpen(state)) fit('Đóng cửa', toSX(b.x + 24), toSY(b.y + 22 + 9), 20 * scale, Math.round(5.5 * scale), '#ffe9a0');
+    if (b.id === 'friendGate') fit('Bạn bè', toSX(b.x + 20), toSY(b.y + 18), 14 * scale, Math.round(4.5 * scale), '#4a2c14');
   }
   // tên người chơi
   {

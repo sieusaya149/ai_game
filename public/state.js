@@ -1,7 +1,7 @@
 // Mô hình dữ liệu + luật chơi. Thuần JS, không DOM (localStorage có bọc try/catch).
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
-  ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START,
+  ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET,
   expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
@@ -186,6 +186,12 @@ export function clockText(s) {
 }
 export const dayText = s => `Ngày ${s.day}`;
 
+// Chợ Bà Tư mở từ MARKET.open tới MARKET.close (giờ trong game). Mua bán đều qua cổng kiểm tra này.
+const hourOf = s => (6 + dayFrac(s) * 24) % 24;
+export const marketOpen = s => { const h = hourOf(s); return h >= MARKET.open && h < MARKET.close; };
+const CLOSED = `Chợ Bà Tư đóng cửa rồi, ${MARKET.open} giờ sáng mở lại nhé`;
+const closed = extra => ({ ok: false, msg: CLOSED, reason: 'closed', ...extra });
+
 // ---------- Tick ----------
 export function tick(s, dtGame) {
   let left = Math.max(0, dtGame);
@@ -341,6 +347,7 @@ function stepThreats(s, d) {
     const x = side === 0 ? v.x0 + 2 : side === 1 ? v.x1 - 2 : rnd(v.x0 + 20, v.x1 - 20), y = side === 2 ? v.y0 + 2 : rnd(v.y0 + 20, (v.y0 + v.y1) / 2);
     s.threats.push({ id: s.nextId++, kind: 'crow', plot: p.idx, x, y, arriveAt: s.time + Math.hypot(c.x - x, c.y - y) / 60 * 1000, state: 'coming', since: s.time });
     spawnEv('crow', x, y); snd('crow');
+    if (s.scene !== 'farm') toast('Có quạ đang bay vào vườn! 🐦');   // đang ở làng/trong nhà thì không thấy
   }
   // thằng Tèo
   if (isNight(s) && ripe.length >= 2 && !s.threats.some(t => t.kind === 'thief') && chance(THREATS.thiefChancePerNightMin * Math.pow(0.6, lamps), d)) {
@@ -366,7 +373,9 @@ function stepThreats(s, d) {
         p.crop = null; t.state = 'leaving'; t.since = s.time; t.loot = !crow;
         const c = plotCenter(s, p.idx);
         fxEv(c.x, c.y, crow ? 'Quạ ăn mất cây! 😢' : 'Bị hái trộm! 😢', COL.bad);
-        log(s, crow ? `Quạ đã ăn mất ${nm}` : `Thằng Tèo hái trộm mất ${nm}`);
+        const lost = crow ? `Quạ đã ăn mất ${nm}` : `Thằng Tèo hái trộm mất ${nm}`;
+        log(s, lost);
+        if (s.scene !== 'farm') toast(`${lost} trong vườn 😢`);
       }
     }
   }
@@ -399,7 +408,7 @@ export const stageOf = c => CROP_STAGES.reduce((st, th, i) => (c.progress >= th 
 const mk = (id, icon, text, disabled) => ({ id, icon, label: `${icon} ${text}`, ...(disabled ? { disabled } : {}) });
 const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const FEED_OF_PEN = { chicken: 'feed_ga', pig: 'feed_heo', pasture: 'hay' };
-const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở sạp nhé`;
+const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 
 export function actionsFor(s, t) {
   if (!t) return [];
@@ -416,7 +425,7 @@ function plotActs(s, t) {
     if (p.soil === 'untilled') A.push(mk('till', '⛏️', 'Cuốc đất'));
     else {
       const def = CROPS[s.selectedSeed], n = have(s, `seed_${s.selectedSeed}`);
-      A.push(mk('plant', '🌱', `Gieo ${def.name} (còn ${n})`, level(s) < def.lv ? `Cần cấp ${def.lv}` : n <= 0 ? 'Hết hạt, mua ở sạp nhé' : null));
+      A.push(mk('plant', '🌱', `Gieo ${def.name} (còn ${n})`, level(s) < def.lv ? `Cần cấp ${def.lv}` : n <= 0 ? 'Hết hạt, mua ở chợ nhé' : null));
     }
     if (p.weeds) A.push(mk('weed', '🌿', 'Nhổ cỏ'));
     return A;
@@ -484,12 +493,20 @@ function threatActs(s, t) {
   return [mk('catch', '🧢', 'Bắt thằng Tèo', th.state === 'leaving' && !th.loot ? 'Nó chuồn mất rồi' : null)];
 }
 
+// Chỗ trong làng chưa mở: chạm vào chỉ có lời nhắn
+const TALK = {
+  smithy: { icon: '🔨', label: 'Hỏi thăm tiệm rèn', msg: 'Ông Sáu đang nhóm lò, ghé sau nhé' },
+  friendGate: { icon: '🚪', label: 'Xem cổng bạn bè', msg: 'Sắp ra mắt: thăm bạn bè' },
+};
 function buildingActs(s, t) {
   const b = sceneMap(s).building(t.id);
   if (!b) return [];
-  const open = { shop: ['🛒', 'Vào sạp hàng'], shed: ['📦', 'Vào nhà kho'], board: ['📋', 'Xem đơn hàng'], gate: ['🚪', 'Ra cổng'], wardrobe: ['👕', 'Mở tủ đồ'] }[b.id];
+  const open = { shed: ['📦', 'Vào nhà kho'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'] }[b.id];
   if (open) return [mk('open', open[0], open[1])];
+  if (b.id === 'market') return [mk('open', '🛒', 'Mua bán ở chợ', marketOpen(s) ? null : CLOSED)];
+  if (TALK[b.id]) return [mk('talk', TALK[b.id].icon, TALK[b.id].label)];
   if (b.id === 'house') return [mk('enter', '🏠', 'Vào nhà')];
+  if (b.id === 'gate') return [mk('enter', '🚪', 'Ra làng')];
   if (b.id === 'bed') return [mk('sleep', '🛏️', 'Ngủ', 'Để dành cho tối nay')];
   if (b.id === 'well') return [mk('refill', '🪣', `Múc nước (bình ${s.can}/${FARMING.canMax})`, s.can >= FARMING.canMax ? 'Bình đầy rồi' : null)];
   return [];
@@ -499,7 +516,7 @@ function buildingActs(s, t) {
 const doorOf = (s, to) => sceneMap(s).doors.find(d => d.to === to) ?? null;
 function doorActs(s, t) {
   const d = doorOf(s, t.to);
-  return d ? [mk('go', '🚪', d.to === 'farm' ? 'Ra vườn' : `Vào ${d.name.toLowerCase()}`)] : [];
+  return d ? [mk('go', '🚪', d.to === 'farm' ? (s.scene === 'village' ? 'Về vườn nhà' : 'Ra vườn') : `Vào ${d.name.toLowerCase()}`)] : [];
 }
 
 // ---------- perform ----------
@@ -650,6 +667,7 @@ const DO = {
   building(s, t, id, at) {
     if (id === 'refill') { s.can = FARMING.canMax; return res(true, 'Đã múc đầy bình', [say(at, 'Đầy bình! 💧', '#7ad7ff')], 'water'); }
     if (id === 'enter') return res(true, '', [], 'click', { go: BUILDING_DEFS[t.id].door.to });
+    if (id === 'talk') return res(true, TALK[t.id].msg, [], 'click');
     return res(true, '', [], 'click', { open: t.id === 'wardrobe' ? 'house' : t.id });
   },
 
@@ -673,6 +691,7 @@ export function enterScene(s, to) {
 const R = (ok, msg, extra) => ({ ok, msg, ...extra });
 
 export function buy(s, itemId, qty = 1) {
+  if (!marketOpen(s)) return closed();
   const it = ITEMS[itemId];
   qty = Math.floor(qty);
   if (!it || !(qty > 0)) return R(false, 'Món này không có bán');
@@ -684,6 +703,7 @@ export function buy(s, itemId, qty = 1) {
 }
 
 export function buyAnimal(s, type) {
+  if (!marketOpen(s)) return closed();
   const def = ANIMALS[type];
   if (!def) return R(false, 'Không có con này');
   if (level(s) < def.lv) return R(false, `Cần cấp ${def.lv} mới mua được`);
@@ -698,6 +718,7 @@ export function buyAnimal(s, type) {
 }
 
 export function sell(s, itemId, qty = 1) {
+  if (!marketOpen(s)) return closed({ coins: 0 });
   if (!CROPS[itemId] && !PRODUCTS[itemId]) return R(false, 'Món này không bán được', { coins: 0 });
   const n = qty === 'all' ? have(s, itemId) : Math.floor(qty);
   if (!(n > 0) || n > have(s, itemId)) return R(false, 'Không đủ hàng để bán', { coins: 0 });
@@ -707,12 +728,14 @@ export function sell(s, itemId, qty = 1) {
 }
 
 export function sellAll(s) {
+  if (!marketOpen(s)) return closed({ coins: 0 });
   let coins = 0;
   for (const k of Object.keys(s.inv)) if (CROPS[k] || PRODUCTS[k]) coins += sell(s, k, 'all').coins;
   return coins ? R(true, `Bán hết được ${coins} xu`, { coins }) : R(false, 'Kho chưa có gì để bán', { coins: 0 });
 }
 
 export function buyOutfit(s, slot, index) {
+  if (!marketOpen(s)) return closed();
   const list = slot === 'hat' ? HATS : slot === 'acc' ? ACCS : null, it = list?.[index];
   if (!it) return R(false, 'Không có món này');
   if (s.owned[slot].includes(index)) return R(false, 'Bạn đã có món này rồi');

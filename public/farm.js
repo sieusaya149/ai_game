@@ -16,6 +16,16 @@ export function mapOf(s) {
 
 const inRect = (o, c, r) => c >= o.c && r >= o.r && c < o.c + o.w && r < o.r + o.h;
 
+// Viền cây quanh một vùng đi được: cây phía trên và hai bên, bụi phía dưới (chừa cột c mà gap(c) báo là lối ra)
+function edge(owned, gap) {
+  const border = [], bushes = [];
+  const top = (owned.r - 1) * TS + 14, left = (owned.c - 1) * TS + 6, right = (owned.c + owned.w) * TS + 10, bottom = (owned.r + owned.h) * TS + 15;
+  for (let x = (owned.c - 1) * TS + 4; x <= (owned.c + owned.w) * TS + 4; x += 32) border.push({ x, y: top });
+  for (let y = owned.r * TS + 14; y < (owned.r + owned.h) * TS; y += 30) { border.push({ x: left, y }); border.push({ x: right, y }); }
+  for (let c = owned.c; c < owned.c + owned.w; c++) if (!gap(c)) bushes.push({ x: c * TS + 8, y: bottom });
+  return { border, bushes };
+}
+
 // Các ô một thực thể chiếm chỗ { c, r, w, h }: chuồng tính cả khung rào, ruộng là khối 3x3, đồ trang trí/cây 1 ô.
 export function footprint(e) {
   if (e.kind === 'field') return { c: e.c, r: e.r, w: FIELD_SIZE, h: FIELD_SIZE };
@@ -93,7 +103,7 @@ function build(f) {
         const o = d.door;
         doors.push({ to: o.to, name: d.name, x: (e.c + o.c) * TS, y: (e.r + o.r) * TS, w: o.w * TS, h: o.h * TS, at: b.at });
         for (let y = 0; y < o.h; y++) for (let x = 0; x < o.w; x++) unblock.push([e.c + o.c + x, e.r + o.r + y]);
-        if (b.at) arrive[o.to] = { x: b.at.x, y: b.at.y, dir: 0 };   // từ trong đó đi ra: đứng trước cửa
+        if (b.at) arrive[o.to] = { x: b.at.x, y: b.at.y, dir: o.dir ?? 0 };   // từ trong đó đi ra: đứng trước cửa
       }
       if (e.kind === 'house') spawn = { x: px + 32, y: py + 78 };
     }
@@ -102,12 +112,7 @@ function build(f) {
   for (const [c, r] of open) if (inside(c, r)) { solid[idx(c, r)] = 0; ground[idx(c, r)] = GROUND.ROAD; }
   for (const [c, r] of unblock) if (inside(c, r)) solid[idx(c, r)] = 0;
 
-  // viền cây quanh đất: cây phía trên và hai bên, bụi phía dưới (chừa lối ra cổng)
-  const border = [], bushes = [];
-  const top = (owned.r - 1) * TS + 14, left = (owned.c - 1) * TS + 6, right = (owned.c + owned.w) * TS + 10, bottom = (owned.r + owned.h) * TS + 15;
-  for (let x = (owned.c - 1) * TS + 4; x <= (owned.c + owned.w) * TS + 4; x += 32) border.push({ x, y: top });
-  for (let y = owned.r * TS + 14; y < (owned.r + owned.h) * TS; y += 30) { border.push({ x: left, y }); border.push({ x: right, y }); }
-  for (let c = owned.c; c < owned.c + owned.w; c++) if (!open.some(([oc, or]) => oc === c && or === owned.r + owned.h)) bushes.push({ x: c * TS + 8, y: bottom });
+  const { border, bushes } = edge(owned, c => open.some(([oc, or]) => oc === c && or === owned.r + owned.h));
 
   const isSolid = (c, r) => !inside(c, r) || solid[idx(c, r)] === 1;
   const pad = 2 * TS;
@@ -138,22 +143,39 @@ function fixedMap(id) {
 }
 function buildFixed(id, d) {
   const { mw, mh } = d, W = mw * TS, H = mh * TS, idx = (c, r) => r * mw + c;
-  const ground = new Uint8Array(mw * mh).fill(GROUND.FLOOR), solid = new Uint8Array(mw * mh);
+  const out = !!d.walk;   // ngoài trời (làng) hay trong nhà
+  const ground = new Uint8Array(mw * mh).fill(out ? GROUND.FOREST : GROUND.FLOOR), solid = new Uint8Array(mw * mh).fill(out ? 1 : 0);
   const inside = (c, r) => c >= 0 && r >= 0 && c < mw && r < mh;
   const block = (c, r, w, h, g) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (inside(x, y)) { solid[idx(x, y)] = 1; if (g != null) ground[idx(x, y)] = g; } };
+  const owned = out ? { ...d.walk } : { c: 0, r: 0, w: mw, h: mh };
+  if (out) {
+    for (let r = owned.r; r < owned.r + owned.h; r++) for (let c = owned.c; c < owned.c + owned.w; c++) { ground[idx(c, r)] = GROUND.GRASS; solid[idx(c, r)] = 0; }
+    for (const [c, r, w, h] of d.paths) for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) ground[idx(x, y)] = GROUND.ROAD;
+  }
   for (const [c, r, w, h] of d.walls) block(c, r, w, h, GROUND.WALL);
+  const trees = (d.trees ?? []).map(([c, r]) => { block(c, r, 1, 1); return { x: c * TS + 8, y: r * TS + 14 }; });
   const buildings = d.furniture.map(o => {
     const f = o.foot, px = f.c * TS, py = f.r * TS;
     block(f.c, f.r, f.w, f.h);
-    return { id: o.kind, kind: o.kind, name: o.name, sprite: o.sprite, interior: true, x: px + o.spr.x, y: py + o.spr.y,
-      foot: { ...f }, at: o.at ? { x: px + o.at.x, y: py + o.at.y } : null };
+    const b = { id: o.kind, kind: o.kind, name: o.name, sprite: o.sprite, interior: true, x: px + o.spr.x, y: py + o.spr.y,
+      foot: { ...f }, at: o.at ? { x: px + o.at.x, y: py + o.at.y } : null, label: o.label, sub: o.sub };
+    if (o.npc) {   // người đứng cạnh: chạm vào cũng như chạm công trình
+      b.npc = { key: o.npc.key, x: b.x + o.npc.x, y: b.y + o.npc.y };
+      b.hit = { x: b.npc.x - 8, y: b.npc.y - 24, w: 16, h: 24 };
+    }
+    return b;
   });
   const doors = d.doors.map(o => ({ to: o.to, name: o.name, x: o.c * TS, y: o.r * TS, w: o.w * TS, h: o.h * TS, at: o.at }));
+  for (const o of d.doors) for (let y = o.r; y < o.r + o.h; y++) for (let x = o.c; x < o.c + o.w; x++) if (inside(x, y)) solid[idx(x, y)] = 0;   // lối bước qua cổng
+  const { border, bushes } = out ? edge(owned, () => false) : { border: [], bushes: [] };
+  const clear = p => (d.clear ?? []).some(o => p.x >= o.x0 && p.x <= o.x1 && p.y >= o.y0 && p.y <= o.y1);
   const isSolid = (c, r) => !inside(c, r) || solid[idx(c, r)] === 1;
-  const owned = { c: 0, r: 0, w: mw, h: mh };
+  const pad = 2 * TS;
+  const view = out ? { x0: Math.max(0, owned.c * TS - pad), y0: Math.max(0, owned.r * TS - pad), x1: Math.min(W, (owned.c + owned.w) * TS + pad), y1: Math.min(H, (owned.r + owned.h) * TS + pad) }
+    : { x0: 0, y0: 0, x1: W, y1: H };
   return {
-    scene: id, interior: true, name: d.name, mw, mh, W, H, owned, view: { x0: 0, y0: 0, x1: W, y1: H }, ground, solid,
-    fences: [], buildings, pens: {}, troughs: [], trees: [], border: [], bushes: [], decos: [], fields: [], mud: null, mudSpot: null,
+    scene: id, interior: !out, outdoor: out, name: d.name, mw, mh, W, H, owned, view, ground, solid,
+    fences: [], buildings, pens: {}, troughs: [], trees, border: border.filter(p => !clear(p)), bushes, decos: [], fields: [], mud: null, mudSpot: null,
     props: d.props, doors, arrive: d.arrive, spawn: Object.values(d.arrive)[0], dogHome: null, gateIn: null,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)), isOwned: (c, r) => inside(c, r),
     building: bid => buildings.find(b => b.id === bid) ?? null,

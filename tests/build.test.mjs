@@ -23,7 +23,7 @@ test('lý do: chồng lên công trình khác', () => {
   const s = game(), w = ent(s, 'well');
   const r = G.canPlace(s, { id: w.id }, 22, 16);   // giữa nhà
   assert.equal(r.ok, false); assert.equal(r.reason, 'overlap'); assert.match(r.msg, /chồng/i);
-  assert.equal(G.canPlace(s, { id: ent(s, 'field').id }, 40, 20).reason, 'overlap');   // khối ruộng đè lên sạp
+  assert.equal(G.canPlace(s, { id: ent(s, 'field').id }, 26, 15).reason, 'overlap');   // khối ruộng đè lên nhà kho
 });
 
 test('lý do: ngoài đất đã mua (kể cả lấn một phần)', () => {

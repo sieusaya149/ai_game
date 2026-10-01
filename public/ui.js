@@ -63,7 +63,8 @@ const itemLabel = k => D.itemName(k);
 // ---------- Trạng thái UI ----------
 let api = null;
 let panel = null;            // id bảng đang mở
-const tabs = { shop: 'seed', house: 'wardrobe' };
+const tabs = { market: 'seed', house: 'wardrobe' };
+let marketWasOpen = true;    // chợ đang mở lúc vẽ bảng lần gần nhất, để vẽ lại khi chợ đóng/mở giữa chừng
 let wardLook = null;         // ngoại hình đang xem thử trong tủ đồ
 let cur = { target: null, actions: [], name: '' };
 let creatorOpen = false, celebOpen = false, dialogResolve = null;
@@ -268,6 +269,7 @@ export function renderHUD(s) {
   $('dot-board').hidden = !(s.orders || []).some(o => Object.entries(o.items).every(([k, q]) => have(s, k) >= q));
 
   updateTutorial(s);
+  if (panel === 'market' && S.marketOpen(s) !== marketWasOpen) refreshPanel();   // chợ vừa đóng/mở cửa khi đang xem
 }
 
 // ---------- Hướng dẫn nhanh ----------
@@ -277,8 +279,8 @@ const TUT = [
   { text: 'Tưới nước cho cây. Hết nước thì ra giếng múc.', done: s => s.plots.some(p => p.crop && p.water > 0) || s.stats.harvests >= 1 },
   { text: 'Đợi cây lớn. Sốt ruột thì bật x5 trong ⚙️ Cài đặt.', done: s => s.stats.harvests >= 1 || s.plots.some(p => p.crop && p.progress >= 1) },
   { text: 'Cây chín rồi! Bấm Thu hoạch.', done: s => s.stats.harvests >= 1 },
-  { text: 'Mang nông sản ra nhà kho để bán lấy xu.', done: s => flags.sold || s.stats.earned > 0 },
-  { text: 'Ghé sạp hàng mua thêm hạt giống.', done: () => flags.bought },
+  { text: 'Ra cổng vườn tới làng, mang nông sản bán ở chợ Bà Tư (mở 6h–18h).', done: s => flags.sold || s.stats.earned > 0 },
+  { text: 'Ghé chợ Bà Tư mua thêm hạt giống.', done: () => flags.bought },
   { text: 'Ra chuồng gà nhặt trứng và đổ cám vào máng.', done: s => s.stats.eggs >= 1 || (s.troughs?.chicken || 0) > 0 },
   { text: 'Coi chừng chó Mực ỉa bậy! Thấy bãi phân thì xúc đi, đừng giẫm nhé.', done: s => s.stats.poops >= 1 || s.stats.slips >= 1 },
 ];
@@ -388,7 +390,7 @@ const empty = text => h('div', { class: 'empty' }, text);
 const section = t => h('h3', { class: 'sec' }, t);
 const coinTag = n => h('span', { class: 'price' }, '🪙 ' + fmt(n));
 
-// ---------- Sạp hàng ----------
+// ---------- Chợ Bà Tư ----------
 const PEN_NAME = { chicken: 'chuồng gà', pig: 'chuồng heo', pasture: 'bãi cỏ' };
 async function buyItem(id, qty) {
   const r = res(S.buy(st(), id, qty), 'coin');
@@ -399,13 +401,35 @@ async function buyItem(id, qty) {
     if (yes) res(S.placeDeco(st(), id), 'pop');
   }
 }
-PANELS.shop = {
-  title: '🏪 Sạp hàng',
+const sellable = s => Object.keys(s.inv || {}).filter(k => (D.CROPS[k] || D.PRODUCTS[k]) && s.inv[k] > 0);
+const sold = r => { if (r?.ok) flags.sold = true; };
+PANELS.market = {
+  title: '🏪 Chợ Bà Tư',
   render(body, s) {
-    const lv = level(s);
-    body.append(tabBar([['seed', '🌱 Hạt giống'], ['supply', '🧴 Vật tư'], ['feed', '🌾 Thức ăn'], ['animal', '🐔 Vật nuôi'], ['deco', '🪴 Trang trí'], ['fashion', '👒 Thời trang']], 'shop'));
-    const t = tabs.shop, list = h('div', { class: 'list' });
+    const lv = level(s), shut = !S.marketOpen(s);
+    marketWasOpen = !shut;
+    if (shut) body.append(h('div', { class: 'note closed' }, `🔒 Đóng cửa. Chợ mở từ ${D.MARKET.open}h tới ${D.MARKET.close}h, sáng mai quay lại nhé!`));
+    body.append(tabBar([['seed', '🌱 Hạt giống'], ['supply', '🧴 Vật tư'], ['feed', '🌾 Thức ăn'], ['animal', '🐔 Vật nuôi'], ['deco', '🪴 Trang trí'], ['fashion', '👒 Thời trang'], ['sell', '💰 Bán hàng']], 'market'));
+    const t = tabs.market, list = h('div', { class: 'list' });
     body.append(list);
+    if (t === 'sell') {
+      const keys = sellable(s);
+      if (!keys.length) return list.append(empty('Chưa có gì để bán. Thu hoạch nông sản hoặc nhặt trứng rồi mang ra chợ nhé!'));
+      const total = keys.reduce((a, k) => a + s.inv[k] * D.sellPrice(k), 0);
+      body.insertBefore(h('div', { class: 'sell-all' },
+        h('div', {}, 'Bán tất cả ', h('b', {}, '+' + fmt(total) + ' xu')),
+        btn('Bán tất cả', () => sold(res(S.sellAll(st()), 'coin')), 'orange', { disabled: shut })), list);
+      for (const k of keys) {
+        const n = s.inv[k], p = D.sellPrice(k);
+        list.append(row({
+          icon: ico(k), name: D.itemName(k), desc: `Có ${n} · ${p} xu/cái`,
+          right: h('div', { class: 'qtys' },
+            btn('Bán 1', () => sold(res(S.sell(st(), k, 1), 'coin')), 'green sm', { disabled: shut }),
+            btn('Bán hết', () => sold(res(S.sell(st(), k, 'all'), 'coin')), 'orange sm', { disabled: shut })),
+        }));
+      }
+      return;
+    }
     if (t === 'animal') {
       for (const [type, a] of Object.entries(D.ANIMALS).sort((x, y) => x[1].lv - y[1].lv)) {
         const n = (s.animals || []).filter(x => D.ANIMALS[x.type].pen === a.pen).length, cap = D.PEN_CAP[a.pen];
@@ -414,7 +438,7 @@ PANELS.shop = {
           icon: ico(type), name: a.baby, locked,
           desc: [`Lớn sau ${a.grow / MIN} phút · ${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`],
           right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + a.lv)
-            : [coinTag(a.price), btn(full ? 'Đầy' : 'Mua', () => res(S.buyAnimal(st(), type), 'coin')?.ok && (flags.bought = true), 'green', { disabled: full || s.coins < a.price })],
+            : [coinTag(a.price), btn(full ? 'Đầy' : 'Mua', () => res(S.buyAnimal(st(), type), 'coin')?.ok && (flags.bought = true), 'green', { disabled: shut || full || s.coins < a.price })],
         }));
       }
       return;
@@ -430,7 +454,7 @@ PANELS.shop = {
             icon: thumb({ ...s.look, [slot]: i }), name: it.name, cls: 'fashion',
             desc: owned ? (worn ? 'Đang mặc' : 'Đã có') : null,
             right: owned ? (worn ? h('span', { class: 'tick' }, '✓') : btn('Mặc', () => res(S.setLook(st(), { ...s.look, [slot]: i }), 'pop') , 'plain sm'))
-              : [coinTag(it.price), btn('Mua', () => res(S.buyOutfit(st(), slot, i), 'coin'), 'green', { disabled: s.coins < it.price })],
+              : [coinTag(it.price), btn('Mua', () => res(S.buyOutfit(st(), slot, i), 'coin'), 'green', { disabled: shut || s.coins < it.price })],
           }));
         });
       }
@@ -446,38 +470,21 @@ PANELS.shop = {
         desc: [desc, h('br'), `Đang có: ${have(s, id)}`],
         right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + it.lv)
           : [coinTag(it.price), h('div', { class: 'qtys' },
-            btn('×1', () => buyItem(id, 1), 'green sm', { disabled: s.coins < it.price }),
-            btn('×5', () => buyItem(id, 5), 'green sm', { disabled: s.coins < it.price * 5 }))],
+            btn('×1', () => buyItem(id, 1), 'green sm', { disabled: shut || s.coins < it.price }),
+            btn('×5', () => buyItem(id, 5), 'green sm', { disabled: shut || s.coins < it.price * 5 }))],
       }));
     }
   },
 };
 
-// ---------- Nhà kho ----------
-const sellable = s => Object.keys(s.inv || {}).filter(k => (D.CROPS[k] || D.PRODUCTS[k]) && s.inv[k] > 0);
+// ---------- Nhà kho: chỗ cất đồ (bán thì ra chợ Bà Tư trong làng) ----------
 PANELS.shed = {
   title: '📦 Nhà kho',
   render(body, s) {
-    const keys = sellable(s);
-    if (!keys.length) return body.append(empty('Kho đang trống. Thu hoạch nông sản hoặc nhặt trứng rồi mang ra đây bán nhé!'));
-    const total = keys.reduce((a, k) => a + s.inv[k] * D.sellPrice(k), 0);
-    body.append(h('div', { class: 'sell-all' },
-      h('div', {}, 'Bán tất cả ', h('b', {}, '+' + fmt(total) + ' xu')),
-      btn('Bán tất cả', () => { const r = res(S.sellAll(st()), 'coin'); if (r?.ok) flags.sold = true; }, 'orange')));
-    const list = h('div', { class: 'list' });
-    for (const k of keys) {
-      const n = s.inv[k], p = D.sellPrice(k);
-      list.append(row({
-        icon: ico(k), name: D.itemName(k), desc: `Có ${n} · ${p} xu/cái`,
-        right: h('div', { class: 'qtys' },
-          btn('Bán 1', () => { const r = res(S.sell(st(), k, 1), 'coin'); if (r?.ok) flags.sold = true; }, 'green sm'),
-          btn('Bán hết', () => { const r = res(S.sell(st(), k, 'all'), 'coin'); if (r?.ok) flags.sold = true; }, 'orange sm')),
-      }));
-    }
-    body.append(list);
+    body.append(h('div', { class: 'note' }, 'Đồ cất ở đây. Muốn bán nông sản thì mang ra chợ Bà Tư trong làng (mở 6h–18h) nhé!'));
+    PANELS.bag.render(body, s);
   },
 };
-
 // ---------- Túi đồ ----------
 PANELS.bag = {
   title: '🎒 Túi đồ',
@@ -516,7 +523,7 @@ PANELS.seeds = {
   title: '🌱 Chọn hạt giống',
   render(body, s) {
     const keys = Object.keys(D.ITEMS).filter(k => D.ITEMS[k].kind === 'seed' && have(s, k) > 0);
-    if (!keys.length) body.append(empty('Bạn hết hạt giống rồi. Ghé sạp mua thêm nhé!'));
+    if (!keys.length) body.append(empty('Bạn hết hạt giống rồi. Ghé chợ Bà Tư trong làng mua thêm nhé!'));
     else {
       const list = h('div', { class: 'grid' });
       for (const k of keys) {
@@ -527,7 +534,7 @@ PANELS.seeds = {
       }
       body.append(list);
     }
-    body.append(h('div', { class: 'center' }, btn('🏪 Mua thêm ở sạp', () => { tabs.shop = 'seed'; openPanel('shop'); }, 'orange')));
+    body.append(h('div', { class: 'note' }, 'Hết hạt thì ra cổng vườn, ghé chợ Bà Tư trong làng mua thêm nhé (mở 6h–18h).'));
   },
 };
 
@@ -594,19 +601,8 @@ PANELS.house = {
       const it = (k === 'hat' ? D.HATS : D.ACCS)[wardLook[k]];
       body.append(h('div', { class: 'note lockednote' },
         `🔒 ${it.name} chưa mua (${fmt(it.price)} xu). Đang xem thử thôi. `,
-        btn('Tới sạp', () => { tabs.shop = 'fashion'; openPanel('shop'); }, 'orange sm')));
+        'Mua ở chợ Bà Tư trong làng nhé.'));
     }
-  },
-};
-
-PANELS.gate = {
-  title: '🚪 Cổng làng',
-  render(body) {
-    body.append(h('div', { class: 'soon' },
-      h('div', { class: 'soon-ico' }, '🚧'),
-      h('h3', {}, 'Sắp ra mắt!'),
-      h('p', {}, 'Đi chợ phiên, thăm nông trại hàng xóm... đang được các bác thợ xây dựng.'),
-      h('p', { class: 'mini' }, 'Quay lại sau nhé 🌻')));
   },
 };
 
@@ -708,7 +704,7 @@ export function showCreator() {
     dice,
     input,
     editor,
-    h('p', { class: 'mini' }, 'Mũ đẹp, kính và khăn quàng mua thêm ở sạp hàng sau nhé!'),
+    h('p', { class: 'mini' }, 'Mũ đẹp, kính và khăn quàng mua thêm ở chợ Bà Tư trong làng sau nhé!'),
     btn('🌾 Vào nông trại', go, 'orange big')));
   root.hidden = false;
   if (matchMedia('(pointer:fine)').matches) input.focus();

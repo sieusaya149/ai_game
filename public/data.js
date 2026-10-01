@@ -3,7 +3,8 @@ const MIN = 60_000;
 
 export const DAY_MS = 20 * MIN;           // 1 ngày trong game = 20 phút ở tốc độ x1
 export const NIGHT_FROM = 0.75;           // từ 3/4 ngày trở đi là ban đêm (tới hết ngày)
-export const SPEEDS = [1, 5, 20];         // nút tốc độ để review nhanh
+export const MARKET = { open: 6, close: 18 }; // chợ Bà Tư mở từ 6h tới 18h (giờ trong game; ngày bắt đầu lúc 6h)
+export const SPEEDS = [1, 5, 20];        // nút tốc độ để review nhanh
 export const MAX_CATCHUP_MS = 8 * 60 * MIN; // tối đa 8 giờ chạy bù khi mở lại game
 
 export const GRID = 6;                    // ruộng tối đa 6x6 ô

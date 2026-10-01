@@ -51,6 +51,7 @@ function v1to2(s) {
 }
 
 const STEPS = { 1: v1to2 };
+const RETIRED = ['shop'];
 
 // Đưa một bản lưu bất kỳ (đã parse) lên SAVE_VERSION. Bản không hợp lệ thì ném lỗi.
 export function migrate(raw) {
@@ -63,5 +64,10 @@ export function migrate(raw) {
     s = step(s);
   }
   if (s.v !== SAVE_VERSION || !s.farm) throw new Error('Bản lưu không đúng định dạng');
+  // Công trình đã bỏ khỏi game (sạp hàng giờ nằm ở chợ trong làng), cả ở vườn v2 đã lưu từ trước
+  if (s.farm.ents.some(e => RETIRED.includes(e.kind))) {
+    s.farm.ents = s.farm.ents.filter(e => !RETIRED.includes(e.kind));
+    s.farm.rev = (s.farm.rev || 0) + 1;
+  }
   return s;
 }

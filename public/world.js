@@ -333,7 +333,7 @@ export function findTarget(state, w) {
   }
   for (const { pen } of M.troughs) consider({ kind: 'trough', pen });
   for (const b of M.buildings) if (b.at && b.id !== 'coop') consider({ kind: 'building', id: b.id });
-  if (M.interior) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì vào nhà bằng nút của nhà
+  if (!atFarm()) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì sang nhà/làng bằng nút của nhà/cổng
   w.curKey = best ? keyOf(best) : null;
   return best;
 }
@@ -382,7 +382,7 @@ export function anchorOf(state, t) {
 const hitRect = (x, y, w, h, wx, wy, pad = 3) => wx >= x - pad && wx <= x + w + pad && wy >= y - pad && wy <= y + h + pad;
 export function hitTest(state, wx, wy) {
   use(state);
-  if (M.interior) for (const d of M.doors) if (hitRect(d.x, d.y - TS, d.w, d.h + TS, wx, wy, 0)) return { kind: 'door', to: d.to };   // ô cửa + thảm chùi chân
+  if (!atFarm()) for (const d of M.doors) if (hitRect(d.x, d.y - TS, d.w, d.h + TS, wx, wy, 0)) return { kind: 'door', to: d.to };   // ô cửa + thảm chùi chân
   for (const t of atFarm() ? state.threats ?? [] : []) {
     if (t.x == null) continue;
     if (t.kind === 'crow' ? Math.hypot(wx - t.x, wy - t.y + 6) < 12 : hitRect(t.x - 8, t.y - 24, 16, 26, wx, wy)) return { kind: 'threat', id: t.id };
@@ -403,7 +403,7 @@ export function hitTest(state, wx, wy) {
   for (const b of M.buildings) {
     if (!b.at || b.id === 'coop') continue;
     const im = buildingImg(b);
-    if (hitRect(b.x, b.y, im?.width ?? 24, im?.height ?? 24, wx, wy, 0)) return { kind: 'building', id: b.id };
+    if (hitRect(b.x, b.y, im?.width ?? 24, im?.height ?? 24, wx, wy, 0) || (b.hit && hitRect(b.hit.x, b.hit.y, b.hit.w, b.hit.h, wx, wy, 0))) return { kind: 'building', id: b.id };
   }
   const idx = M.plotAt(Math.floor(wx / TS), Math.floor(wy / TS));
   if (idx >= 0) {

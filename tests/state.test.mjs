@@ -63,7 +63,7 @@ test('hết hạt -> disabled, không cuốc nhầm; hết nước bình -> disa
   G.perform(s, T(0), 'till');
   delete s.inv.seed_cai;
   const a = G.actionsFor(s, T(0))[0];
-  assert.equal(a.disabled, 'Hết hạt, mua ở sạp nhé');
+  assert.equal(a.disabled, 'Hết hạt, mua ở chợ nhé');
   const r = G.perform(s, T(0), 'plant');
   assert.equal(r.ok, false);
   assert.equal(s.plots[0].crop, null);
@@ -119,8 +119,7 @@ test('bình tưới và giếng', () => {
   const r = G.perform(s, well, 'refill');
   assert.ok(r.ok); assert.equal(r.sound, 'water');
   assert.equal(s.can, FARMING.canMax);
-  assert.equal(G.perform(s, { kind: 'building', id: 'shop' }, 'open').open, 'shop');
-  for (const id of ['shed', 'board', 'gate']) assert.equal(G.perform(s, { kind: 'building', id }, 'open').open, id);
+  for (const id of ['shed', 'board']) assert.equal(G.perform(s, { kind: 'building', id }, 'open').open, id);
 });
 
 test('bón phân tăng sản lượng, thuốc tăng trưởng đẩy nhanh', () => {

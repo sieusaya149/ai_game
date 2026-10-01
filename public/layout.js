@@ -8,7 +8,7 @@ export const FIELD_SIZE = 3;                // ruộng là các khối 3x3
 
 // Công trình: foot là các ô chắn đường (w, h), spr là góc vẽ sprite so với góc trên-trái của foot (điểm ảnh),
 // at là điểm đứng để tương tác (null = không tương tác). fixed: không dời được.
-// door: các ô (so với góc foot) bỏ chắn để bước vào là sang bản đồ to.
+// door: các ô (so với góc foot) bỏ chắn để bước vào là sang bản đồ to; dir là hướng nhìn khi từ đó đi về (mặc định nhìn xuống).
 export const BUILDING_DEFS = {
   house:    { name: 'Nhà',           sprite: 'house',     foot: { w: 4, h: 4 }, spr: { x: -8, y: -22 }, at: { x: 32, y: 74 }, fixed: true,
     door: { c: 1, r: 3, w: 2, h: 1, to: 'house' } },
@@ -16,9 +16,9 @@ export const BUILDING_DEFS = {
   shed:     { name: 'Nhà kho',       sprite: 'shed',      foot: { w: 4, h: 3 }, spr: { x: 0, y: -10 },  at: { x: 32, y: 58 } },
   well:     { name: 'Giếng nước',    sprite: 'well',      foot: { w: 1, h: 1 }, spr: { x: 0, y: -8 },   at: { x: 8, y: 24 } },
   doghouse: { name: 'Chuồng chó',    sprite: 'doghouse',  foot: { w: 1, h: 1 }, spr: { x: -6, y: -8 },  at: null, home: { x: 8, y: 26 } },
-  shop:     { name: 'Sạp hàng',      sprite: 'shop',      foot: { w: 3, h: 3 }, spr: { x: 0, y: -2 },   at: { x: 24, y: 56 } },
-  // Cổng nằm ở hàng cuối của đất; exit là các ô ngay ngoài cổng vẫn đi được (lối ra làng), in là chỗ NPC đi vào.
-  gate:     { name: 'Cổng',          sprite: 'signboard', foot: { w: 3, h: 1 }, spr: { x: 2, y: -6 },   at: { x: -16, y: 10 }, in: { x: -16, y: 24 }, exit: [[-2, 1], [-1, 1]], fixed: true },
+  // Cổng nằm ở hàng cuối của đất; exit là các ô ngay ngoài cổng vẫn đi được, cũng là cửa sang làng; in là chỗ NPC đi vào.
+  gate:     { name: 'Cổng',          sprite: 'signboard', foot: { w: 3, h: 1 }, spr: { x: 2, y: -6 },   at: { x: -16, y: 10 }, in: { x: -16, y: 24 }, exit: [[-2, 1], [-1, 1]], fixed: true,
+    door: { c: -2, r: 1, w: 2, h: 1, to: 'village', dir: 3 } },
 };
 
 // Chuồng: kích thước khung rào (ô); các vị trí bên trong tính so với góc trên-trái khung.
@@ -52,7 +52,6 @@ export const START_FARM = {
     { kind: 'board', c: 31, r: 16 },
     { kind: 'well', c: 33, r: 17 },
     { kind: 'field', c: 37, r: 15 },
-    { kind: 'shop', c: 40, r: 21 },
     { kind: 'doghouse', c: 21, r: 21 },
     { kind: 'pen', pen: 'chicken', c: 21, r: 24 },
     { kind: 'gate', c: 38, r: 33 },
@@ -88,6 +87,33 @@ export const SCENES = {
     doors: [{ c: 5, r: 9, w: 2, h: 1, to: 'farm', name: 'Cửa ra vườn', at: { x: 96, y: 138 } }],
     arrive: { farm: { x: 96, y: 126, dir: 3 } },
   },
+  // Làng ngoài trời: walk là phần đi được (ngoài đó là rừng), paths là đường đất, trees là cây lẻ (c, r),
+  // clear là vùng (điểm ảnh) không mọc cây viền. Nhà dân, lampPost... là furniture không có at (chỉ để ngắm).
+  // npc: người đứng cạnh (key sprite SPR2, x/y = điểm chân so với góc sprite), cũng chạm được như công trình.
+  village: {
+    name: 'Làng', mw: 40, mh: 28,
+    walk: { c: 2, r: 3, w: 36, h: 22 },
+    paths: [[17, 5, 3, 5], [3, 10, 34, 3], [21, 9, 5, 1], [28, 9, 4, 1], [7, 9, 2, 1], [12, 9, 2, 1], [34, 9, 2, 1], [29, 13, 3, 8]],
+    trees: [[4, 4], [9, 5], [15, 5], [21, 4], [26, 5], [32, 4], [37, 5],
+      [4, 15], [6, 17], [3, 19], [8, 20], [5, 22], [10, 22], [12, 18], [15, 21], [18, 17], [20, 20], [23, 22], [26, 18], [34, 17], [36, 20], [33, 23], [25, 16]],
+    clear: [{ x0: 256, x1: 336, y0: 0, y1: 70 }],
+    walls: [],
+    furniture: [
+      { kind: 'homeGate', name: 'Cổng về vườn nhà', sprite: 'homeGate', foot: { c: 17, r: 4, w: 3, h: 1 }, spr: { x: 4, y: -20 }, at: null },
+      { kind: 'market', name: 'Chợ Bà Tư', sprite: 'marketStall', foot: { c: 22, r: 7, w: 4, h: 2 }, spr: { x: 0, y: -8 }, at: { x: 24, y: 40 }, label: 'Chợ Bà Tư',
+        npc: { key: 'npcBaTu', x: 56, y: 36 } },
+      { kind: 'smithy', name: 'Tiệm rèn Ông Sáu', sprite: 'smithy', foot: { c: 28, r: 7, w: 4, h: 2 }, spr: { x: 4, y: -16 }, at: { x: 32, y: 42 }, label: 'Tiệm rèn' },
+      { kind: 'houseA', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 6, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
+      { kind: 'houseB', name: 'Nhà dân', sprite: 'villageHouses.1', foot: { c: 11, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
+      { kind: 'houseC', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 33, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
+      { kind: 'friendGate', name: 'Cổng bạn bè', sprite: 'friendGate', foot: { c: 29, r: 21, w: 3, h: 1 }, spr: { x: 4, y: -20 }, at: { x: 24, y: 28 }, sub: 'Sắp ra mắt: thăm bạn bè' },
+      ...[[8, 13], [16, 13], [22, 13], [28, 13], [35, 13]].map(([c, r], i) => ({ kind: 'lamp' + i, name: 'Đèn đường', sprite: 'lampPost', foot: { c, r, w: 1, h: 1 }, spr: { x: 2, y: -14 }, at: null })),
+      ...[[11, 14], [23, 14]].map(([c, r], i) => ({ kind: 'bench' + i, name: 'Ghế đá', sprite: 'bench', foot: { c, r, w: 2, h: 1 }, spr: { x: 4, y: 2 }, at: null })),
+    ],
+    props: [],
+    doors: [{ c: 18, r: 4, w: 1, h: 1, to: 'farm', name: 'Cổng về vườn nhà', at: { x: 296, y: 88 } }],
+    arrive: { farm: { x: 296, y: 96, dir: 0 } },
+  },
 };
 
 // ---------- Bản v1 (bản đồ cố định 34x27) ----------
@@ -102,7 +128,6 @@ export const V1 = {
     { kind: 'shed', c: 10, r: 4 },
     { kind: 'well', c: 9, r: 10 },
     { kind: 'doghouse', c: 2, r: 10 },
-    { kind: 'shop', c: 29, r: 5 },
     { kind: 'gate', c: 18, r: 25 },
     { kind: 'pen', pen: 'chicken', c: 2, r: 16 },
     { kind: 'pen', pen: 'pig', c: 18, r: 16 },
