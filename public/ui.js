@@ -262,7 +262,10 @@ export function renderHUD(s) {
   let night = false;
   try { night = S.isNight(s); } catch {}
   setText('hud-weather', (night ? '🌙' : '') + (night && s.weather !== 'rain' ? '' : WEATHER[s.weather] || '☀️'));
-  setText('hud-can', `${s.can}/${D.FARMING.canMax}`);
+  setText('hud-can', `${s.can}/${S.canMax(s)}`);
+  if (panel === 'smithy') {   // rèn xong giữa chừng thì vẽ lại bảng; còn không thì chỉ đổi đồng hồ đếm
+    if (smithKey !== JSON.stringify([s.smith, s.tools])) refreshPanel(); else if ($('smith-left')) $('smith-left').textContent = smithLeft(s);
+  }
   $('hud-water').classList.toggle('empty', s.can <= 0);
   setText('hud-speed', `⏩ x${s.speed || 1}`);
 
@@ -497,13 +500,54 @@ PANELS.shed = {
     PANELS.bag.render(body, s);
   },
 };
+// ---------- Tiệm rèn Ông Sáu ----------
+// Icon công cụ theo cấp (SPR2.tools.<tên>[cấp-1], canvas 16x16); chưa có art thì emoji
+function toolIco(k, lv) {
+  const src = SPR2?.tools?.[k]?.[lv - 1];
+  if (!src) return h('span', { class: 'ico emo big' }, D.TOOLS[k].icon);
+  const c = h('canvas', { class: 'ico big tool-ico', width: src.width, height: src.height });
+  c.getContext('2d').drawImage(src, 0, 0);
+  return c;
+}
+const smithLeft = s => s.smith ? `còn ${S.mmss(s.smith.doneAt - s.time)}` : '';
+let smithKey = '';
+PANELS.smithy = {
+  title: '🔨 Tiệm rèn Ông Sáu',
+  render(body, s) {
+    smithKey = JSON.stringify([s.smith, s.tools]);
+    body.append(h('div', { class: 'note' }, 'Gửi công cụ cho Ông Sáu rèn lên cấp: tốn xu và mất 1 ngày game. Lúc đó công cụ nằm lò, chưa dùng được. Mỗi lúc chỉ rèn một món.'));
+    if (s.smith) body.append(h('div', { class: 'note' }, `🔥 Ông Sáu đang rèn ${D.TOOLS[s.smith.tool].name.toLowerCase()} lên cấp ${S.toolLv(s, s.smith.tool) + 1}, `, h('b', { id: 'smith-left' }, smithLeft(s))));
+    const list = h('div', { class: 'list' });
+    body.append(list);
+    for (const k of Object.keys(D.TOOLS)) {
+      const lv = S.toolLv(s, k), cost = S.upgradeCost(s, k), d = D.TOOLS[k], away = S.toolAway(s, k);
+      const area = d.area[lv] && { row: 'hàng 3 ô', block: '3×3 ô', one: '1 ô' }[d.area[lv]];
+      const next = k === 'can' ? `chứa ${d.canMax[lv] ?? ''} lần${area ? ', tưới ' + area : ''}` : area ? `làm ${area} một lần` : 'sức chứa mở ở bản sau';
+      list.append(row({
+        icon: toolIco(k, lv), name: `${d.name} ${D.TOOL_LEVEL[lv - 1]} (cấp ${lv})`,
+        desc: cost == null ? 'Đã là cấp cao nhất' : `Lên cấp ${lv + 1}: ${next}`,
+        right: away ? h('span', { class: 'lock' }, '🔥 Đang rèn')
+          : cost == null ? h('span', { class: 'tick' }, '✓')
+          : [coinTag(cost), btn('Nâng cấp', () => res(S.startUpgrade(st(), k), 'coin'), 'green', { disabled: !!s.smith || s.coins < cost })],
+      }));
+    }
+  },
+};
+
 // ---------- Túi đồ ----------
 PANELS.bag = {
   title: '🎒 Túi đồ',
   render(body, s) {
     body.append(h('div', { class: 'chips-line' },
-      h('span', { class: 'mini' }, `💧 Bình nước ${s.can}/${D.FARMING.canMax}`),
+      h('span', { class: 'mini' }, `💧 Bình nước ${s.can}/${S.canMax(s)}`),
       h('span', { class: 'mini' }, `🪙 ${fmt(s.coins)} xu`)));
+    body.append(section('Công cụ'));
+    const tl = h('div', { class: 'grid' });
+    for (const k of Object.keys(D.TOOLS)) {
+      const lv = S.toolLv(s, k);
+      tl.append(h('div', { class: 'cell' }, toolIco(k, lv), h('div', { class: 'cell-name' }, D.TOOLS[k].name), h('div', { class: 'cell-sub' }, S.toolAway(s, k) ? 'Đang rèn' : `Cấp ${lv} (${D.TOOL_LEVEL[lv - 1]})`)));
+    }
+    body.append(tl);
     const groups = [
       ['Hạt giống', k => D.ITEMS[k]?.kind === 'seed'],
       ['Nông sản & sản phẩm', k => D.CROPS[k] || D.PRODUCTS[k]],

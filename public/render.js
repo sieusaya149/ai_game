@@ -3,7 +3,7 @@ import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTi
 import { TS, GROUND } from './layout.js';
 import { SPR2 } from './art2.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen } from './state.js';
+import { canMove, marketOpen, actionsFor } from './state.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
@@ -598,6 +598,16 @@ export function render(ctx, f) {
         ctx.globalAlpha = 0.7 + 0.3 * Math.sin(now / 150);
         blit(SPR.select, c * TS, r * TS);
         ctx.globalAlpha = 1;
+        // công cụ cấp cao: khung vàng các ô sẽ bị tác động
+        const tiles = tg.target.kind === 'plot' ? actionsFor(state, tg.target)[0]?.tiles : null;
+        if (tiles?.length > 1) {
+          ctx.fillStyle = 'rgba(255,216,74,0.22)'; ctx.strokeStyle = '#ffd84a'; ctx.lineWidth = 1;
+          for (const i of tiles) {
+            const o = m.plotTile(i);
+            ctx.fillRect(o.c * TS, o.r * TS, TS, TS);
+            ctx.strokeRect(o.c * TS + 0.5, o.r * TS + 0.5, TS - 1, TS - 1);
+          }
+        }
       }
       const extra = bubbles.some(b => Math.abs(b.x - a.x) < 9 && Math.abs(b.y - (a.top + 2)) < 6) ? 15 : 0;
       const bob = Math.sin(now / 170) * 2;

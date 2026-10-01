@@ -100,12 +100,12 @@ test('quầy chợ: hành động chính bị khóa có lý do khi đóng cửa'
   assert.equal(r.open, undefined);
 });
 
-test('tiệm rèn và cổng bạn bè chưa mở: chạm thì có lời nhắn', () => {
+test('tiệm rèn mở bảng nâng cấp; cổng bạn bè chưa mở: chạm thì có lời nhắn', () => {
   const s = newGame();
   G.enterScene(s, 'village');
   const smithy = G.perform(s, { kind: 'building', id: 'smithy' }, G.actionsFor(s, { kind: 'building', id: 'smithy' })[0].id);
   assert.ok(smithy.ok);
-  assert.equal(smithy.msg, 'Ông Sáu đang nhóm lò, ghé sau nhé');
+  assert.equal(smithy.open, 'smithy');
   const gate = G.perform(s, { kind: 'building', id: 'friendGate' }, G.actionsFor(s, { kind: 'building', id: 'friendGate' })[0].id);
   assert.match(gate.msg, /Sắp ra mắt: thăm bạn bè/);
 });

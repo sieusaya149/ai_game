@@ -1,7 +1,7 @@
 // Mô hình dữ liệu + luật chơi. Thuần JS, không DOM (localStorage có bọc try/catch).
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
-  ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA,
+  ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
@@ -100,6 +100,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     time: 0, speed: 1, day: 1, weather: 'sun', savedAt: Date.now(),
     farm: nf.farm, scene: 'farm',     // scene: bản đồ đang đứng; player.x/y tính theo bản đồ đó
     player: { x: 0, y: 0, dir: 0 }, stamina: STAMINA.max, sit: false, can: FARMING.canMax, selectedSeed: 'cai',
+    tools: Object.fromEntries(Object.keys(TOOLS).map(k => [k, { lv: 1 }])), smith: null,   // smith: { tool, doneAt } công cụ đang nằm lò rèn
     inv: { ...START.items },
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
@@ -162,6 +163,10 @@ export function loadGame() {
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
   s.stamina = clamp(s.stamina, 0, STAMINA.max); s.sit = false;
+  // bản lưu cũ: mọi công cụ cấp 1, bình tưới giữ số nước đang có (tối đa sức chứa)
+  s.tools = Object.fromEntries(Object.keys(TOOLS).map(k => [k, { lv: clamp(Math.floor(s.tools?.[k]?.lv) || 1, 1, TOOL_MAX) }]));
+  if (!(s.smith?.tool in TOOLS) || !Number.isFinite(s.smith.doneAt)) s.smith = null;
+  s.can = clamp(Number.isFinite(s.can) ? s.can : FARMING.canMax, 0, canMax(s));
   evq = [];
   const elapsed = clamp(Date.now() - (s.savedAt || Date.now()), 0, MAX_CATCHUP_MS);
   if (elapsed > 3000) {
@@ -237,6 +242,7 @@ function step(s, d) {
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.benchPerMin * d / MIN);
     if (s.stamina >= STAMINA.max) { s.sit = false; toast('Khỏe re rồi, làm tiếp thôi 💪'); }
   }
+  if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
   for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d);
   stepAnimals(s, d);
   stepEggs(s);
@@ -432,15 +438,85 @@ export const nextLockedPlot = s => UNLOCK_ORDER.find(i => s.plots[i] && !s.plots
 const unlockedCount = s => s.plots.filter(p => p.unlocked).length;
 export const stageOf = c => CROP_STAGES.reduce((st, th, i) => (c.progress >= th ? i : st), 0);
 
+// ---------- Công cụ & tiệm rèn Ông Sáu ----------
+export const toolLv = (s, k) => s.tools?.[k]?.lv ?? 1;
+export const canMax = s => TOOLS.can.canMax[toolLv(s, 'can') - 1];
+export const toolName = (s, k) => `${TOOLS[k].name} ${TOOL_LEVEL[toolLv(s, k) - 1]}`;
+export const toolAway = (s, k) => s.smith?.tool === k;   // đang nằm lò rèn: chưa dùng được
+const awayMsg = k => `${TOOLS[k].name} đang nằm lò rèn của Ông Sáu, chờ rèn xong nhé`;
+const TOOL_OF = Object.fromEntries(Object.entries(TOOLS).flatMap(([k, d]) => d.act.map(a => [a, k])));
+const DIRV = [[0, 1], [-1, 0], [1, 0], [0, -1]];   // hướng nhìn: xuống, trái, phải, lên
+
+// Ô nào làm được hành động nào (ô khác trong vùng mà không hợp lệ thì bỏ qua)
+const ripeCrop = p => p.crop && !p.crop.dead && !p.crop.rotten && p.crop.progress >= 1;
+const FIT = {
+  till: p => !p.crop && p.soil === 'untilled',
+  water: p => p.crop && !p.crop.dead && !p.crop.rotten && p.crop.progress < 1 && p.water < 95,
+  harvest: ripeCrop,
+  weed: p => p.weeds && !(p.crop && (p.crop.dead || p.crop.rotten || p.crop.progress >= 1)),
+};
+
+// Các ô bị tác động khi dùng công cụ `tool` lên ô ruộng `idx` (mục tiêu đứng đầu). Chỉ lấy ô mở, hợp lệ cho hành động `id`.
+// Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô.
+export function toolArea(s, tool, idx, id = TOOLS[tool]?.act[0]) {
+  const m = mapOf(s), t = m.plotTile(idx), fit = FIT[id];
+  if (!t || !fit) return [];
+  const kind = TOOLS[tool].area[toolLv(s, tool) - 1], [dx, dy] = DIRV[s.player.dir ?? 0];
+  const cells = kind === 'row' ? [0, 1, 2].map(i => [t.c + dx * i, t.r + dy * i])
+    : kind === 'block' ? [-1, 0, 1].flatMap(j => [-1, 0, 1].map(i => [t.c + i, t.r + j])) : [[t.c, t.r]];
+  const out = [];
+  for (const [c, r] of cells) {
+    const i = m.plotAt(c, r), p = s.plots[i];
+    if (p?.unlocked && fit(p) && !out.includes(i)) out.push(i);
+  }
+  out.sort((a, b) => (b === idx) - (a === idx));
+  return id === 'water' ? out.slice(0, s.can) : out;
+}
+
+// Gắn danh sách ô (tiles) và khóa theo công cụ vào các hành động trên ô ruộng
+function withTools(s, t, A) {
+  for (const a of A) {
+    const k = TOOL_OF[a.id];
+    if (!k) continue;
+    if (toolAway(s, k)) { a.disabled = awayMsg(k); continue; }
+    a.tiles = toolArea(s, k, t.idx, a.id);
+    if (a.tiles.length > 1) a.label += ` (${a.tiles.length} ô)`;
+  }
+  const j = A.findIndex(a => !a.disabled);
+  if (j > 0 && A[0].disabled) A.unshift(...A.splice(j, 1));
+  return A;
+}
+
+export const upgradeCost = (s, k) => TOOLS[k].price[toolLv(s, k) - 1] ?? null;   // null = đã cấp cao nhất
+export function startUpgrade(s, k) {
+  const d = TOOLS[k], lv = toolLv(s, k);
+  if (!d) return R(false, 'Không có công cụ này', { reason: 'unknown' });
+  if (s.smith) return R(false, `Ông Sáu đang rèn ${TOOLS[s.smith.tool].name.toLowerCase()} rồi, chờ xong đã nhé`, { reason: 'busy' });
+  if (lv >= TOOL_MAX) return R(false, `${d.name} đã là cấp cao nhất rồi`, { reason: 'max' });
+  const cost = upgradeCost(s, k);
+  if (s.coins < cost) return R(false, 'Chưa đủ xu', { reason: 'coins' });
+  s.coins -= cost;
+  s.smith = { tool: k, doneAt: s.time + DAY_MS };
+  log(s, `Gửi ${d.name.toLowerCase()} cho Ông Sáu rèn lên cấp ${lv + 1} (${cost} xu)`);
+  return R(true, `Ông Sáu nhận rèn ${d.name.toLowerCase()} lên cấp ${lv + 1}, một ngày nữa xong nhé`);
+}
+function finishUpgrade(s) {
+  const k = s.smith.tool;
+  s.smith = null;
+  s.tools[k].lv = Math.min(TOOL_MAX, toolLv(s, k) + 1);
+  log(s, `Ông Sáu rèn xong ${toolName(s, k).toLowerCase()}`);
+  toast(`Ông Sáu rèn xong ${toolName(s, k).toLowerCase()} rồi, dùng thôi! 🔨`);
+}
+
 // ---------- actionsFor ----------
 const mk = (id, icon, text, disabled) => ({ id, icon, label: `${icon} ${text}`, ...(disabled ? { disabled } : {}) });
-const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+export const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const FEED_OF_PEN = { chicken: 'feed_ga', pig: 'feed_heo', pasture: 'hay' };
 const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 
 export function actionsFor(s, t) {
   if (!t) return [];
-  const f = { plot: plotActs, lockedPlot: lockedActs, animal: animalActs, egg: () => [mk('collect', '🥚', 'Nhặt trứng')],
+  const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: () => [mk('collect', '🥚', 'Nhặt trứng')],
     poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs }[t.kind];
   return f ? f(s, t) : [];
 }
@@ -463,7 +539,7 @@ function plotActs(s, t) {
   const noPest = have(s, 'pesticide') <= 0 ? noItem('pesticide') : null;
   if (c.sick) A.push(mk('spray', '🧴', 'Phun thuốc chữa bệnh', noPest));
   if (c.bugs) A.push(mk('spray', '🧴', 'Phun thuốc trừ sâu', noPest), mk('catch', '🤏', 'Bắt sâu bằng tay'));
-  const water = mk('water', '💧', `Tưới nước (bình ${s.can}/${FARMING.canMax})`, s.can <= 0 ? 'Bình hết nước, ra giếng múc nhé' : p.water >= 95 ? 'Đất đang đủ nước rồi' : null);
+  const water = mk('water', '💧', `Tưới nước (bình ${s.can}/${canMax(s)})`, s.can <= 0 ? 'Bình hết nước, ra giếng múc nhé' : p.water >= 95 ? 'Đất đang đủ nước rồi' : null);
   if (p.water < 30) A.push(water);
   if (p.weeds) A.push(mk('weed', '🌿', 'Nhổ cỏ'));
   if (!A.includes(water)) A.push(water);
@@ -523,13 +599,12 @@ function threatActs(s, t) {
 
 // Chỗ trong làng chưa mở: chạm vào chỉ có lời nhắn
 const TALK = {
-  smithy: { icon: '🔨', label: 'Hỏi thăm tiệm rèn', msg: 'Ông Sáu đang nhóm lò, ghé sau nhé' },
   friendGate: { icon: '🚪', label: 'Xem cổng bạn bè', msg: 'Sắp ra mắt: thăm bạn bè' },
 };
 function buildingActs(s, t) {
   const b = sceneMap(s).building(t.id);
   if (!b) return [];
-  const open = { shed: ['📦', 'Vào nhà kho'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'] }[b.id];
+  const open = { shed: ['📦', 'Vào nhà kho'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'], smithy: ['🔨', 'Vào tiệm rèn'] }[b.id];
   if (open) return [mk('open', open[0], open[1])];
   if (b.id === 'market') return [mk('open', '🛒', 'Mua bán ở chợ', marketOpen(s) ? null : CLOSED)];
   if (TALK[b.id]) return [mk('talk', TALK[b.id].icon, TALK[b.id].label)];
@@ -537,7 +612,7 @@ function buildingActs(s, t) {
   if (b.id === 'gate') return [mk('enter', '🚪', 'Ra làng')];
   if (b.id === 'bed') return [mk('sleep', '🛏️', 'Ngủ', canSleep(s) ? null : SLEEP_EARLY)];
   if (b.id.startsWith('bench')) return benchActs(s);
-  if (b.id === 'well') return [mk('refill', '🪣', `Múc nước (bình ${s.can}/${FARMING.canMax})`, s.can >= FARMING.canMax ? 'Bình đầy rồi' : null)];
+  if (b.id === 'well') return [mk('refill', '🪣', `Múc nước (bình ${s.can}/${canMax(s)})`, toolAway(s, 'can') ? awayMsg('can') : s.can >= canMax(s) ? 'Bình đầy rồi' : null)];
   return [];
 }
 
@@ -585,8 +660,9 @@ export function perform(s, t, id) {
   if (!act) return bad('Chưa làm được việc này', at);
   if (act.disabled) return bad(act.disabled, at);
   if (id !== 'sit') s.sit = false;
-  const r = DO[t.kind](s, t, id, at);
-  if (t.kind === 'plot' && STAMINA.cost[id]) spend(s, STAMINA.cost[id]);
+  const n = t.kind === 'plot' && act.tiles?.length > 1 ? act.tiles.length : 1;   // dùng công cụ cấp cao: làm nhiều ô một lần
+  const r = n > 1 ? doArea(s, act.tiles, id) : DO[t.kind](s, t, id, at);
+  if (t.kind === 'plot' && STAMINA.cost[id]) spend(s, Math.round(STAMINA.cost[id] * GROUP_COST[n]));
   checkAch(s);
   return r;
 }
@@ -599,6 +675,11 @@ function spend(s, n) {
 }
 
 const say = (at, text, color = COL.good) => ({ text, color, x: at.x, y: at.y });
+
+function doArea(s, tiles, id) {
+  const rs = tiles.map(idx => { const c = plotCenter(s, idx); return DO.plot(s, { kind: 'plot', idx }, id, { x: c.x, y: c.y }); });
+  return res(true, `Xong ${tiles.length} ô`, rs.flatMap(r => r.fx), rs[0].sound);
+}
 
 const DO = {
   plot(s, t, id, at) {
@@ -711,7 +792,7 @@ const DO = {
   },
 
   building(s, t, id, at) {
-    if (id === 'refill') { s.can = FARMING.canMax; return res(true, 'Đã múc đầy bình', [say(at, 'Đầy bình! 💧', '#7ad7ff')], 'water'); }
+    if (id === 'refill') { s.can = canMax(s); return res(true, 'Đã múc đầy bình', [say(at, 'Đầy bình! 💧', '#7ad7ff')], 'water'); }
     if (id === 'enter') return res(true, '', [], 'click', { go: BUILDING_DEFS[t.id].door.to });
     if (id === 'talk') return res(true, TALK[t.id].msg, [], 'click');
     if (id === 'sit') return sitDown(s, at);

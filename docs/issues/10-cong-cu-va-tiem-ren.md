@@ -20,8 +20,8 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: vùng 1 / 3 / 3×3 theo hướng nhìn. Bỏ qua ô không hợp lệ. Chi phí thể lực giảm giá đúng. Sức chứa bình tưới theo cấp. Nâng cấp mất 1 ngày, trong lúc đó công cụ không dùng được. Chỉ nâng 1 công cụ mỗi lúc.
-- [ ] E2E: ra tiệm rèn nâng cuốc → tua 1 ngày → cuốc 3 ô một lần, thấy khung vàng 3 ô trước khi làm.
+- [x] Unit test: vùng 1 / 3 / 3×3 theo hướng nhìn. Bỏ qua ô không hợp lệ. Chi phí thể lực giảm giá đúng. Sức chứa bình tưới theo cấp. Nâng cấp mất 1 ngày, trong lúc đó công cụ không dùng được. Chỉ nâng 1 công cụ mỗi lúc.
+- [x] E2E: ra tiệm rèn nâng cuốc → tua 1 ngày → cuốc 3 ô một lần, thấy khung vàng 3 ô trước khi làm.
 
 ## Blocked by
 

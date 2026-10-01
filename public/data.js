@@ -10,7 +10,19 @@ export const STAMINA = {
   max: 100, slow: 2, morningRegen: 30, benchPerMin: 15, sleepHour: 18,
   cost: { till: 1, water: 1, plant: 1, harvest: 1, clearBush: 2, breakRock: 3 },
 };
-export const SPEEDS =[1, 5, 20];        // nút tốc độ để review nhanh
+// Công cụ 3 cấp (sắt/đồng/vàng). area: vùng tác động theo cấp (one = 1 ô · row = hàng 3 ô theo hướng nhìn · block = 3×3 tâm ô mục tiêu)
+// price: xu nâng lên cấp 2, cấp 3 (mất DAY_MS ở tiệm rèn) · act: hành động ruộng dùng công cụ này · canMax: sức chứa bình tưới theo cấp
+export const TOOLS = {
+  hoe:    { name: 'Cuốc',      icon: '⛏️', area: ['one', 'row', 'block'], price: [200, 800], act: ['till'] },
+  can:    { name: 'Bình tưới', icon: '💧', area: ['one', 'row', 'block'], price: [200, 800], act: ['water'], canMax: [10, 20, 40] },
+  sickle: { name: 'Liềm',      icon: '🌾', area: ['one', 'row', 'block'], price: [250, 900], act: ['harvest', 'weed'] },
+  basket: { name: 'Giỏ',       icon: '🧺', area: [],                      price: [150, 600], act: [] },   // sức chứa của giỏ: issue 11
+};
+export const TOOL_MAX = 3;
+export const TOOL_LEVEL = ['sắt', 'đồng', 'vàng'];
+// Làm n ô một lần tốn thể lực = cost × GROUP_COST[n] (làm nhiều ô một lần nhẹ hơn làm từng ô: 3×3 tốn 5 thay vì 9)
+export const GROUP_COST = [0, 1, 2, 2, 3, 3, 4, 4, 5, 5];
+export const SPEEDS =[1, 5, 20];       // nút tốc độ để review nhanh
 export const MAX_CATCHUP_MS = 8 * 60 * MIN; // tối đa 8 giờ chạy bù khi mở lại game
 
 export const GRID = 6;                    // ruộng tối đa 6x6 ô
@@ -34,7 +46,7 @@ export const OVERRIPE = 1.5;              // chín quá (grow × 1.5) mà chưa 
 
 export const FARMING = {
   waterDrainPerMin: 25,   // đất mất bao nhiêu % nước mỗi phút (trời nắng ×1.5, trời mưa luôn đầy)
-  canMax: 10,             // bình tưới chứa 10 lần tưới, ra giếng múc lại
+  canMax: 10,             // bình tưới cấp 1 chứa 10 lần tưới, ra giếng múc lại (cấp cao hơn: TOOLS.can.canMax)
   weedChancePerMin: 0.06, // xác suất mọc cỏ mỗi phút trên ô đã cuốc
   weedSlow: 0.5,          // có cỏ thì cây lớn chậm một nửa
   bugChancePerMin: 0.07,  // xác suất có sâu mỗi phút khi cây đang lớn
