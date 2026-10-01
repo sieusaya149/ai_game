@@ -292,7 +292,7 @@ function setupJoystick() {
   if (!touchy) return;
   const st = document.createElement('style');
   st.textContent = `
-    #joy-base{position:fixed;left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));
+    #joy-base{position:fixed;left:calc(14px + var(--sl,0px));bottom:calc(var(--ui-bottom,64px) + 20px);
       width:112px;height:112px;border-radius:50%;background:rgba(255,248,225,.28);border:3px solid rgba(90,58,26,.55);
       box-shadow:inset 0 0 12px rgba(0,0,0,.18);z-index:5;touch-action:none;user-select:none;-webkit-user-select:none}
     #joy-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;

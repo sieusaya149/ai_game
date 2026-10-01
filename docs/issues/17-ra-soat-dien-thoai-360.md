@@ -21,8 +21,8 @@ Yêu cầu:
 
 ## Acceptance criteria
 
-- [ ] E2E ở cỡ 360px mở từng bảng trên và kiểm tra không có cuộn ngang (chiều rộng nội dung ≤ chiều rộng màn hình).
-- [ ] Thử tay trên một điện thoại thật có tai thỏ: HUD và nút không bị che.
+- [x] E2E ở cỡ 360px mở từng bảng trên và kiểm tra không có cuộn ngang (chiều rộng nội dung ≤ chiều rộng màn hình). `e2e/mobile360.spec.mjs` chạy ở 360x740, 320x640, 412x915: không cuộn ngang, nút nằm trong màn hình và >= 40px, các lớp nổi không đè nhau.
+- [x] Thử tay trên một điện thoại thật có tai thỏ: HUD và nút không bị che. **Chỉ giả lập** (không có điện thoại thật): CSS dùng `env(safe-area-inset-*)` qua `--sl/--sr/--st/--sb`, e2e đè các biến này (trên 47px, dưới 34px) rồi kiểm tra mọi nút nằm trong vùng an toàn. Cần thử máy thật khi có.
 
 ## Blocked by
 
