@@ -2,7 +2,7 @@
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
-  expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
+  expandCost, expandLevel, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
@@ -76,7 +76,6 @@ function addExp(s, n) {
   for (let l = before + 1; l <= level(s); l++) {
     s.coins += l * 20;
     emit({ type: 'levelup', level: l });
-    toast(`Lên cấp ${l}! Thưởng ${l * 20} xu 🎉`);
     log(s, `Lên cấp ${l}, thưởng ${l * 20} xu`);
     snd('levelup');
   }
@@ -131,6 +130,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     poops: [], threats: [], orders: [], nextOrderAt: 0,
     stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
+    notify: {},   // loại thông báo 🟡 đã tắt: { ripe: false }; thiếu = bật. Mức 🔴 không tắt được
   };
   const m = mapOf(s);
   Object.assign(s.player, m.spawn);
@@ -195,6 +195,7 @@ export function loadGame() {
   // giờ vườn: bản lưu cũ chưa có thì lấy theo thời gian đã chạy
   s.simMs = Number.isFinite(s.simMs) ? s.simMs : s.time || 0;
   s.frozenTotal = Number.isFinite(s.frozenTotal) ? s.frozenTotal : 0;
+  s.notify = Object.fromEntries(Object.entries(s.notify ?? {}).filter(([k, v]) => k in NOTIFY_CATS && v === false));
   s.frozenMs = 0; delete s.away;
   evq = [];
   const t = now(), gone = Math.max(0, t - (s.savedAt || t)), elapsed = Math.min(gone, MAX_CATCHUP_MS);
@@ -293,6 +294,26 @@ export function sleep(s) {
   s.stamina = STAMINA.max;
   evq.push(...ev);
   return R(true, 'Chào buổi sáng! Thể lực đã đầy ☀️', { slept: true });
+}
+
+// ---------- Thông báo ----------
+export const notifyOn = (s, cat) => s.notify?.[cat] !== false;
+export function setNotify(s, cat, on) {
+  if (!(cat in NOTIFY_CATS)) return false;
+  s.notify = { ...s.notify };
+  if (on) delete s.notify[cat]; else s.notify[cat] = false;
+  return true;
+}
+// Chỗ đang có chuyện gấp 🔴, tính từ trạng thái (không phụ thuộc event nên bản lưu đang có sự cố cũng báo).
+// { key, kind, x, y, text }: x, y theo bản đồ vườn.
+export function urgentSpots(s) {
+  const out = [];
+  for (const t of s.threats ?? []) if (t.state === 'eating' && s.plots[t.plot]) {
+    const c = plotCenter(s, t.plot), crow = t.kind === 'crow';
+    out.push({ key: 'threat:' + t.id, kind: t.kind, x: c.x, y: c.y, text: crow ? 'Quạ đang ăn cây!' : 'Có trộm đang hái cây!' });
+  }
+  for (const a of s.animals ?? []) if (a.sick) out.push({ key: 'sick:' + a.id, kind: 'sick', x: a.x, y: a.y, text: `${ANIMALS[a.type].name} bị bệnh!` });
+  return out;
 }
 
 // ---------- Tick ----------
@@ -458,23 +479,22 @@ function stepThreats(s, d) {
     const x = side === 0 ? v.x0 + 2 : side === 1 ? v.x1 - 2 : rnd(v.x0 + 20, v.x1 - 20), y = side === 2 ? v.y0 + 2 : rnd(v.y0 + 20, (v.y0 + v.y1) / 2);
     s.threats.push({ id: s.nextId++, kind: 'crow', plot: p.idx, x, y, arriveAt: s.time + Math.hypot(c.x - x, c.y - y) / 60 * 1000, state: 'coming', since: s.time });
     spawnEv('crow', x, y); snd('crow');
-    if (s.scene !== 'farm') toast('Có quạ đang bay vào vườn! 🐦');   // đang ở làng/trong nhà thì không thấy
   }
   // thằng Tèo
   if (isNight(s) && ripe.length >= 2 && !s.threats.some(t => t.kind === 'thief') && chance(THREATS.thiefChancePerNightMin * Math.pow(0.6, lamps), d)) {
     const p = pick(ripe), c = plotCenter(s, p.idx);
     s.threats.push({ id: s.nextId++, kind: 'thief', plot: p.idx, x: gateIn.x, y: gateIn.y, arriveAt: s.time + Math.hypot(c.x - gateIn.x, c.y - gateIn.y) / 40 * 1400, state: 'coming', since: s.time, loot: false });
-    spawnEv('thief', gateIn.x, gateIn.y); toast('Có tiếng động ngoài ruộng... 👀');
+    spawnEv('thief', gateIn.x, gateIn.y);
   }
   for (const t of s.threats) {
     const p = s.plots[t.plot], crow = t.kind === 'crow', who = crow ? 'Quạ' : 'Thằng Tèo';
     if (t.state === 'coming') {
       if (!p.crop) { t.state = 'leaving'; t.since = s.time; } // cây đã biến mất
       else if (s.time >= t.arriveAt) {
-        t.state = 'eating'; t.since = s.time;
+        t.state = 'eating'; t.since = s.time; emit({ type: 'eating', kind: t.kind });
         if (guardOn(s) && Math.random() < DOG.guardChance) {
           t.state = 'leaving'; t.since = s.time; s.stats[crow ? 'crows' : 'thieves']++; emit({ type: 'guard', who: crow ? 'crow' : 'thief' });
-          toast(`${s.dog.name} sủa vang, đuổi ${who.toLowerCase()} đi rồi! 🐕`); snd('bark');
+          log(s, `${s.dog.name} sủa vang, đuổi ${who.toLowerCase()} đi rồi`); snd('bark');
         }
       }
     } else if (t.state === 'eating') {
@@ -482,12 +502,11 @@ function stepThreats(s, d) {
       else if (s.time - t.since >= (crow ? THREATS.crowEatMs : THREATS.thiefStealMs)) {
         const nm = CROPS[p.crop.id].name;
         p.crop = null; t.state = 'leaving'; t.since = s.time; t.loot = !crow;
-        emit({ type: crow ? 'crow' : 'thief' });
+        emit({ type: crow ? 'crow' : 'thief', name: nm });
         const c = plotCenter(s, p.idx);
         fxEv(c.x, c.y, crow ? 'Quạ ăn mất cây! 😢' : 'Bị hái trộm! 😢', COL.bad);
         const lost = crow ? `Quạ đã ăn mất ${nm}` : `Thằng Tèo hái trộm mất ${nm}`;
         log(s, lost);
-        if (s.scene !== 'farm') toast(`${lost} trong vườn 😢`);
       }
     }
   }
@@ -499,7 +518,7 @@ function stepOrders(s) {
   if (s.time < s.nextOrderAt) return;
   s.orders.push(makeOrder(s));
   s.nextOrderAt = s.time + ORDERS.newEvery;
-  toast('Hàng xóm có đơn hàng mới 📋');
+  emit({ type: 'order' });
 }
 
 function makeOrder(s) {
@@ -986,7 +1005,6 @@ function settleShip(s) {
   s.shipbin.items = {};
   addCoins(s, coins);
   emit({ type: 'shipped', coins, items, t: s.time });
-  toast(`Lái buôn đã ghé lấy hàng, nhận ${coins} xu 🚚`);
   log(s, `Lái buôn lấy hàng ở thùng giao hàng, trả ${coins} xu`);
   snd('coin');
 }

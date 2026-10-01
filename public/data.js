@@ -201,3 +201,40 @@ export const ACHIEVEMENTS = [
   { id: 'crow10',     name: 'Khắc tinh của quạ', desc: 'Đuổi 10 con quạ',       stat: 'crows',    goal: 10,  coins: 80 },
   { id: 'rich5000',   name: 'Đại gia làng',     desc: 'Kiếm tổng cộng 5.000 xu', stat: 'earned',  goal: 5000, coins: 500 },
 ];
+
+// ---------- Thông báo 3 mức (DESIGN §8c) ----------
+// Mọi loại event luật chơi phát ra đều có ở đây. level:
+//   urgent    gấp: băng rôn đỏ + tiếng + rung + mũi tên (hiện từ state qua urgentSpots, không tắt được)
+//   important quan trọng: toast nhỏ, tự gộp cùng group trong NOTIFY_WINDOW; tắt được theo cat
+//   info      thông tin: chỉ ghi nhật ký, không hiện gì
+//   direct    thông báo thẳng của luật (toast, thành tựu có huy hiệu riêng): hiện nguyên văn, không gộp
+//   none      không phải thông báo (hiệu ứng, âm thanh, sinh vật)
+// group(e): khóa gộp · text(n, e): chữ khi đã gộp n sự kiện · cat: khóa bật/tắt trong cài đặt
+export const NOTIFY_WINDOW = 3000;
+export const NOTIFY_CATS = {
+  ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
+  levelup: 'Lên cấp', order: 'Đơn hàng mới',
+};
+const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
+const animalN = a => String(a).toLowerCase();
+export const EVENT_LEVEL = {
+  sick:      { level: 'urgent', group: e => 'sick:' + e.animal, label: 'Con vật bị bệnh' },
+  eating:    { level: 'urgent', group: e => 'eating:' + e.kind, label: 'Quạ, trộm đang ăn cây' },
+  ripe:      { level: 'important', cat: 'ripe', group: e => 'ripe:' + e.crop, label: 'Cây chín', text: (n, e) => `${n} ô ${cropN(e.crop)} đã chín 🌾` },
+  rotten:    { level: 'important', cat: 'spoil', group: e => 'rotten:' + e.crop, label: 'Cây héo', text: (n, e) => `${n} ô ${cropN(e.crop)} đã héo 🥀` },
+  dead:      { level: 'important', cat: 'spoil', group: e => 'dead:' + e.crop, label: 'Cây chết', text: (n, e) => `${n} ô ${cropN(e.crop)} đã chết 💀` },
+  hungry:    { level: 'important', cat: 'hungry', group: e => 'hungry:' + e.animal, label: 'Con vật đói', text: (n, e) => `${n} con ${animalN(e.animal)} đói lả` },
+  crow:      { level: 'important', cat: 'loss', group: () => 'loss:crow', label: 'Quạ ăn mất cây', text: (n, e) => n > 1 ? `Quạ đã ăn mất ${n} cây 😢` : `Quạ đã ăn mất ${(e.name ?? 'cây').toLowerCase()} 😢` },
+  thief:     { level: 'important', cat: 'loss', group: () => 'loss:thief', label: 'Trộm hái mất cây', text: (n, e) => n > 1 ? `Thằng Tèo đã hái trộm ${n} cây 😢` : `Thằng Tèo đã hái trộm ${(e.name ?? 'cây').toLowerCase()} 😢` },
+  levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
+  order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
+  egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
+  guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
+  shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },
+  log:       { level: 'info', group: () => 'log', label: 'Nhật ký' },
+  toast:     { level: 'direct', group: e => 'toast:' + e.text, label: 'Thông báo của luật chơi' },
+  achievement: { level: 'direct', group: e => 'achievement:' + e.id, label: 'Thành tựu' },
+  fx:        { level: 'none', group: () => 'fx', label: 'Hiệu ứng chữ bay' },
+  sound:     { level: 'none', group: () => 'sound', label: 'Âm thanh' },
+  spawn:     { level: 'none', group: () => 'spawn', label: 'Sinh vật xuất hiện' },
+};

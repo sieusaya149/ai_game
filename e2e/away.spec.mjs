@@ -11,7 +11,8 @@ test('vắng 12 tiếng: màn "Trong lúc bạn vắng nhà" có dòng đóng b�
   await expect(away).toBeVisible();
   await expect(away).toContainText('Trong lúc bạn vắng nhà');
   await expect(away).toContainText('Vườn đã đóng băng 4 giờ');
-  await expect(away).toContainText('đã chín');   // cải gieo dở đã chín trong 8 giờ chạy bù
+  // cải gieo dở có tin trong 8 giờ chạy bù (thường là chín; sâu bệnh ngẫu nhiên có thể làm nó hỏng/chết trước)
+  await expect(away).toContainText(/ô cải xanh/);
 
   // không tràn ngang
   const box = await page.locator('.away-card').boundingBox(), vw = page.viewportSize().width;

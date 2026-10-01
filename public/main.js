@@ -7,6 +7,7 @@ import * as ui from './ui.js';
 import { TS } from './layout.js';
 import * as R from './render.js';
 import * as V from './world.js';
+import { eventMeta } from './notify.js';
 
 const ACTION_MS = 350;
 const actionMs = () => ACTION_MS * slowFactor(state);   // hết thể lực thì làm chậm
@@ -397,8 +398,9 @@ function frame(now) {
   });
 
   // 6) sự kiện cho UI, HUD, lưu
-  const forUI = events.filter(e => e.type === 'toast' || e.type === 'levelup' || e.type === 'achievement' || e.type === 'sound');
+  const forUI = events.filter(e => e.type === 'sound' || ['important', 'direct'].includes(eventMeta(e)?.level));
   if (forUI.length) ui.handleEvents(forUI);
+  ui.updateAlerts(state, (x, y) => ({ x: (x * scale - view.camX) / dpr, y: (y * scale - view.camY) / dpr }), now);
   if (now - lastHud > 250) { lastHud = now; ui.renderHUD(state); }
   if (joy.el) joy.el.style.display = ui.isBlocking() ? 'none' : '';
   if (now - lastSave > 5000) { lastSave = now; save(); }

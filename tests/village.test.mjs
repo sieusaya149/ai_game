@@ -155,9 +155,14 @@ test('đang ở làng: quạ ăn cây trong vườn vẫn có thông báo', () =
   const r = Math.random; Math.random = () => 0.0001;
   try { events.push(...G.tick(s, 1000)); } finally { Math.random = r; }
   assert.equal(s.threats.length, 1, 'quạ đã tới');
-  assert.ok(events.some(e => e.type === 'toast' && /quạ/i.test(e.text)), 'báo quạ tới');
   s.dog.hunger = 100;
+  const mid = quiet(() => G.tick(s, 20_000));
+  assert.ok(mid.some(e => e.type === 'eating'), 'quạ bắt đầu ăn');
+  const spot = G.urgentSpots(s).find(p => p.kind === 'crow');
+  assert.ok(spot, 'ở làng vẫn có điểm gấp để báo');
+  assert.equal(s.scene, 'village');
   const later = quiet(() => G.tick(s, 120_000));
   assert.equal(s.plots[0].crop, null);
-  assert.ok(later.some(e => e.type === 'toast' && /Quạ đã ăn mất/.test(e.text)), 'báo quạ ăn mất cây');
+  assert.ok(later.some(e => e.type === 'crow'), 'báo quạ ăn mất cây');
+  assert.deepEqual(G.urgentSpots(s), []);
 });

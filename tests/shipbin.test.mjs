@@ -61,7 +61,6 @@ test('6h sáng lái buôn lấy hết, trả xu, báo và ghi nhật ký; ngày 
   assert.deepEqual(sh.items, { cai: 5 });
   assert.equal(s.coins, coins + want);
   assert.deepEqual(s.shipbin.items, {});
-  assert.ok(ev.some(e => e.type === 'toast' && /lái buôn/i.test(e.text)));
   assert.ok(s.log[0].text.includes(String(want)));
 });
 

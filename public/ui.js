@@ -4,6 +4,7 @@ import * as art from './art.js';
 import * as D from './data.js';
 import * as sound from './sound.js';
 import { SPR2 } from './art2.js';
+import { createNotifier, arrowTargets, arrowFor } from './notify.js';
 
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n || 0).toLocaleString('vi-VN');
@@ -115,16 +116,27 @@ function res(r, okSound) {
 }
 
 // ---------- Toast ----------
-function pushToast(text, cls = '') {
+// key: toast gộp. Cùng key thì đổi chữ và chạy lại thời gian hiện thay vì thêm toast mới.
+function pushToast(text, cls = '', key = '') {
   const box = $('toasts');
   if (!box || !text) return;
+  const old = key && [...box.children].find(c => c.dataset.key === key);
+  if (old) {
+    old.textContent = text;
+    old.style.animation = 'none'; void old.offsetWidth; old.style.animation = '';
+    clearTimeout(old._t); old._t = setTimeout(() => old.remove(), 2800);
+    return;
+  }
   const dup = [...box.children].find(c => c.textContent === text);
   if (dup) dup.remove();
   const t = h('div', { class: 'toast ' + cls }, text);
+  if (key) t.dataset.key = key;
   box.append(t);
   while (box.children.length > 3) box.firstChild.remove();
-  setTimeout(() => t.remove(), 2800);
+  t._t = setTimeout(() => t.remove(), 2800);
 }
+// 🟡 toast nhỏ, tự gộp cùng khóa; loại nào tắt trong cài đặt (s.notify) thì bỏ qua
+const notifier = createNotifier({ show: (id, text) => pushToast(text, '', 'n' + id), on: cat => !cat || S.notifyOn(st(), cat) });
 export function toast(text) { pushToast(text); }
 
 // ---------- Hộp xác nhận ----------
@@ -749,6 +761,12 @@ PANELS.settings = {
       h('p', { class: 'mini' }, 'x5 và x20 giúp cây lớn nhanh để xem thử. Chơi thoải mái thì để x1.'),
       section('Âm thanh'),
       h('div', { class: 'seg' }, btn(sound.isMuted() ? '🔇 Đang tắt tiếng' : '🔊 Đang bật tiếng', () => { sound.setMuted(!sound.isMuted()); sound.play('pop'); refreshPanel(); }, sound.isMuted() ? 'plain' : 'green nosound')),
+      section('Thông báo'),
+      h('div', { class: 'notify-list' },
+        h('label', { class: 'chk locked' }, h('input', { type: 'checkbox', checked: true, disabled: true }), '🔴 Báo gấp: quạ, trộm, con vật bệnh (luôn bật)'),
+        Object.entries(D.NOTIFY_CATS).map(([cat, label]) => h('label', { class: 'chk' },
+          h('input', { type: 'checkbox', checked: S.notifyOn(s, cat), name: 'notify-' + cat, on: { change: e => { S.setNotify(s, cat, e.target.checked); commit(); } } }), '🟡 ' + label))),
+      h('p', { class: 'mini' }, 'Việc nhỏ như nhặt trứng, bán hàng chỉ ghi vào Nhật ký.'),
       section('Điều khiển'),
       h('ul', { class: 'help' },
         h('li', {}, '🖥️ Máy tính: ', h('kbd', {}, '↑↓←→'), ' hoặc ', h('kbd', {}, 'WASD'), ' để đi.'),
@@ -889,8 +907,57 @@ export function handleEvents(events) {
       case 'levelup': celebQueue.push(e.level); if (!celebOpen) nextCelebration(); break;
       case 'achievement': showBadge(e); break;
     }
+    notifier(e, Date.now());
   }
 }
+
+// ---------- 🔴 Báo gấp: băng rôn đỏ + tiếng + rung + mũi tên ở mép màn hình ----------
+// Lấy chỗ gấp từ state (S.urgentSpots) nên bản lưu đang có sự cố cũng báo; hiện ở mọi bản đồ.
+const BANNER_MS = 8000;
+let seenUrgent = new Set(), bannerUntil = 0, bannerOff = false;
+function arrowEl(key) {
+  const box = $('alert-arrows');
+  let el = [...box.children].find(c => c.dataset.key === key);
+  if (!el) {
+    el = h('canvas', { class: 'alert-arrow', width: 12, height: 12 });
+    el.dataset.key = key;
+    const src = SPR2?.alertArrow;
+    if (src) el.getContext('2d').drawImage(src, 0, 0); else { const c = el.getContext('2d'); c.fillStyle = '#e5452f'; c.fillRect(0, 3, 12, 6); }
+    box.append(el);
+  }
+  return el;
+}
+// toScreen(x, y): toạ độ bản đồ đang đứng → px CSS trên màn hình
+export function updateAlerts(s, toScreen, nowMs = performance.now()) {
+  const spots = S.urgentSpots(s), keys = new Set(spots.map(p => p.key));
+  if (spots.some(p => !seenUrgent.has(p.key))) {
+    sound.play('alarm');
+    try { navigator.vibrate?.([220, 90, 220]); } catch { /* máy không rung */ }
+    bannerUntil = nowMs + BANNER_MS; bannerOff = false;
+  }
+  seenUrgent = keys;
+  const bn = $('alert-banner'), on = spots.length > 0 && !bannerOff && nowMs < bannerUntil;
+  if (on) {
+    const text = (spots.length === 1 ? spots[0].text : `${spots.length} sự cố trong vườn!`) + (s.scene === 'farm' ? '' : ' Về vườn ngay!');
+    if (bn.textContent !== text) bn.textContent = text;
+  }
+  bn.hidden = !on;
+  document.body.classList.toggle('alerting', on);
+  const rootBox = $('alert-arrows');
+  const hud = $('hud').getBoundingClientRect(), bar = $('bottombar').getBoundingClientRect();
+  const box = { l: 0, t: hud.bottom + 4, r: innerWidth, b: bar.top - 4 };
+  const live = new Set();
+  for (const t of arrowTargets(s, spots)) {
+    const a = arrowFor(toScreen(t.x, t.y), box, 22), el = arrowEl(t.key);
+    el.hidden = !a;
+    if (!a) continue;
+    live.add(t.key);
+    el.style.transform = `translate(${(a.x - 18).toFixed(1)}px, ${(a.y - 18).toFixed(1)}px) rotate(${a.ang.toFixed(4)}rad)`;
+    el.dataset.ang = String(Math.round(a.ang * 180 / Math.PI));
+  }
+  for (const el of [...rootBox.children]) if (!live.has(el.dataset.key)) el.remove();
+}
+export function dismissBanner() { bannerOff = true; $('alert-banner').hidden = true; document.body.classList.remove('alerting'); }
 
 // ---------- Khởi tạo ----------
 export function initUI(a) {
@@ -898,6 +965,7 @@ export function initUI(a) {
   for (const b of document.querySelectorAll('.bb-btn[data-panel]')) b.addEventListener('click', () => { sound.play('click'); openPanel(b.dataset.panel); });
   $('bb-seed').addEventListener('click', () => { sound.play('click'); openPanel('seeds'); });
   $('main-action').addEventListener('click', () => runAction(cur.actions[0]));
+  $('alert-banner').addEventListener('click', dismissBanner);
   $('hud-speed').addEventListener('click', () => {
     const s = st(), i = D.SPEEDS.indexOf(s.speed);
     s.speed = D.SPEEDS[(i + 1) % D.SPEEDS.length];

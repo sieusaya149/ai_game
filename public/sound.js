@@ -78,6 +78,7 @@ const SOUNDS = {
   levelup: () => { seq([523, 659, 784, 1047], 0.11, { d: 0.2, type: 'triangle', v: 0.2 }); tone({ f: 1319, t: 0.5, d: 0.5, type: 'triangle', v: 0.2 }); },
   error:   () => { tone({ f: 220, f2: 170, d: 0.13, v: 0.13 }); tone({ f: 190, f2: 140, t: 0.15, d: 0.18, v: 0.13 }); },
   eat:     () => [0, 0.09, 0.18].forEach(t => noise({ t, type: 'bandpass', f: 1200, d: 0.06, v: 0.2, q: 2 })),
+  alarm:   () => { for (let i = 0; i < 3; i++) { tone({ f: 880, t: i * 0.3, d: 0.14, type: 'square', v: 0.13 }); tone({ f: 620, t: i * 0.3 + 0.15, d: 0.14, type: 'square', v: 0.13 }); } },
   crow:    () => { tone({ f: 520, f2: 300, d: 0.18, type: 'sawtooth', v: 0.14, lp: 1800 }); tone({ f: 500, f2: 280, t: 0.24, d: 0.2, type: 'sawtooth', v: 0.14, lp: 1800 }); },
 };
 

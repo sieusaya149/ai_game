@@ -17,9 +17,9 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: mọi loại sự kiện đều có mức và khóa gộp (một test đi qua hết danh sách loại sự kiện).
-- [ ] E2E: dựng bản lưu có quạ đang ăn cây ở ngoài khung nhìn → thấy băng rôn đỏ và mũi tên chỉ đúng hướng.
-- [ ] E2E: thu hoạch 5 ô liền thì chỉ thấy 1 thông báo gộp. Tắt loại "cây chín" trong cài đặt thì không còn thấy thông báo đó.
+- [x] Unit test: mọi loại sự kiện đều có mức và khóa gộp (một test đi qua hết danh sách loại sự kiện).
+- [x] E2E: dựng bản lưu có quạ đang ăn cây ở ngoài khung nhìn → thấy băng rôn đỏ và mũi tên chỉ đúng hướng.
+- [x] E2E: thu hoạch 5 ô liền thì chỉ thấy 1 thông báo gộp. Tắt loại "cây chín" trong cài đặt thì không còn thấy thông báo đó.
 
 ## Blocked by
 
