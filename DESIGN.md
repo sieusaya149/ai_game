@@ -665,9 +665,11 @@ Cây lâu năm, trồng một lần, thu hoạch nhiều lần.
 - **Thời gian online luôn x1.** Nút x5/x20 chỉ còn trong chế độ chơi offline hoặc chế độ thử nghiệm.
 - **Chống gian lận nhẹ:** vì chỉ chơi với bạn bè, server chỉ kiểm tra các con số hợp lý (xu không tăng vọt, không trộm quá giới hạn). Không cần chống gian lận chặt.
 - **Giữ chế độ chơi offline:** không đăng nhập thì chơi bằng `localStorage` như cũ. Đăng nhập thì có thể đưa bản lưu cũ lên server.
-- **Mở cho bạn bè chơi:**
-  - **Trong mạng LAN:** chạy được ngay.
-  - **Qua Internet:** dùng Cloudflare Tunnel, hoặc deploy lên một máy chủ nhỏ.
+- **Hosting (đã chốt):** VPS `image.huninna.com`, chạy sau Caddy của `ai_gateway` tại **https://game.huninna.com**.
+  - Repo `~/project/ai_game`, deploy bằng `git pull && docker compose up -d --build`.
+  - Hiện chỉ phục vụ file tĩnh bằng nginx (bản chơi đơn). Bản online sẽ đổi container sang server Node, dữ liệu lưu trong Docker volume.
+  - Khóa gateway `ai-game` chỉ có quyền với `game.huninna.com`, lưu ở `~/.config/ai-game/gateway-key` trên VPS.
+- **Đối tượng:** nhóm ≤ 20–30 người quen, đăng nhập bằng tên + PIN + mã mời.
 - **`server.js` hiện đang hỏng** (import các hàm không còn trong `data.js`). Bản online sẽ viết lại file này theo kiến trúc trên.
 
 ---
@@ -814,7 +816,7 @@ Nền online làm sớm, vì nó quyết định dữ liệu nằm ở đâu. Th
 | J | Nhân vật người chơi | Thể lực ✅ · công cụ ✅ · quần áo ✅ · nhà + nội thất ✅ · thú cưng cảnh ✅ · (cấp & EXP chuyển sang N) | ✅ |
 | K | NPC & trộm NPC | Tần suất trộm NPC ✅ · cư dân làng ✅ · độ thân với cư dân ✅ · đơn hàng ✅ | ✅ |
 | L | Kinh tế | Hóa đơn tháng ✅ · được mùa mất giá ✅ · hội chợ ✅ · ngưỡng rớt giá ✅ · trò chơi cụ thể ✅ · Tiếng tăm ⭐ ✅ | ✅ |
-| M | Online | Hosting & đối tượng chơi 🔶 · tài khoản · bạn bè · thăm vườn · giúp/trộm · real-time · ai giữ dữ liệu · chế độ offline | 🔶 |
+| M | Online | Hosting & đối tượng chơi ✅ · tài khoản · bạn bè · thăm vườn · giúp/trộm · real-time · ai giữ dữ liệu · chế độ offline | 🔶 |
 | N | Tiến trình & mục tiêu | Đường cong cấp ✅ · mở khóa ✅ · nhiệm vụ ✅ · thành tựu ✅ · lễ hội ✅ · sổ sưu tầm ✅ | ✅ |
 | O | UI/UX & hiệu năng | Bảng mới · quá tải thông báo · điện thoại yếu với nhiều thực thể · hướng dẫn người mới | ⬜ |
 | P | Kỹ thuật & triển khai | Thứ tự phase · chia agent/file · chuyển save cũ · test | ⬜ |
