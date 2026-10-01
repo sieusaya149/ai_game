@@ -5,10 +5,10 @@ Game nông trại pixel art 2D nhìn từ trên xuống, kiểu nông trại Ava
 ## Chạy
 
 ```bash
-npm start            # mở http://localhost:3000
+npm start            # mở http://127.0.0.1:4173 (đổi cổng bằng biến PORT)
 ```
 
-Cần Node.js 22.13 trở lên. `server.js` chỉ dùng để phục vụ các file trong `public/`; phần API nhiều người chơi của nó hiện chưa dùng tới.
+Cần Node.js 22.13 trở lên. `npm start` chạy server tĩnh `scripts/static-server.mjs` phục vụ `public/`. `server.js` cũ đang hỏng và sẽ được viết lại ở Phase 1 (xem `SPEC.md`).
 
 ## Test
 
