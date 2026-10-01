@@ -10,6 +10,14 @@ npm start            # mở http://localhost:3000
 
 Cần Node.js 22.13 trở lên. `server.js` chỉ dùng để phục vụ các file trong `public/`; phần API nhiều người chơi của nó hiện chưa dùng tới.
 
+## Deploy
+
+Trên VPS (`image.huninna.com`), repo nằm ở `~/project/ai_game`, chạy sau Caddy của `ai_gateway`:
+
+```bash
+git pull && docker compose up -d --build   # game.huninna.com → ai-game:80
+```
+
 ## Cách chơi
 
 - **Máy tính:** đi bằng phím mũi tên hoặc WASD. `Space`/`E` làm hành động chính, `1`–`6` làm các hành động phụ, `Esc` đóng bảng.
