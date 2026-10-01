@@ -24,6 +24,6 @@ Trạng thái: ⬜ chưa làm · 🔶 đang làm · ✅ xong
 | 16 | [Hướng dẫn mới và Sổ tay](16-huong-dan-va-so-tay.md) | 07, 08, 09, 10 | ✅ |
 | 17 | [Rà soát giao diện điện thoại 360px](17-ra-soat-dien-thoai-360.md) | 03, 07, 08, 10, 14, 16 | ✅ |
 | 18 | [Cập nhật SPEC.md](18-cap-nhat-spec.md) | 02 | ✅ |
-| 19 | [Phát hành Phase 0](19-phat-hanh-phase-0.md) | tất cả | ⬜ |
+| 19 | [Phát hành Phase 0](19-phat-hanh-phase-0.md) | tất cả | 🔶 |
 
 **Làm song song được sau khi 02 xong:** 03, 05, 06, 08, 11, 12, 13, 18.
