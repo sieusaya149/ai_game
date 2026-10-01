@@ -19,10 +19,10 @@ Mọi lần đặt đều qua cùng hàm kiểm tra của issue 03. Thêm lý do
 
 ## Acceptance criteria
 
-- [ ] Có unit test cho: giới hạn khối theo cấp, giá khối tăng dần, khối đầu miễn phí, vượt giới hạn thì bị từ chối kèm đúng lý do.
-- [ ] Unit test: cất khối ruộng đang có cây thì bị từ chối. Cất đồ trang trí thì đồ quay về túi.
-- [ ] E2E: lên đủ cấp (dùng bản lưu ghi sẵn) → mua và đặt khối ruộng mới → cuốc được ô trong khối đó.
-- [ ] E2E: đặt một chậu hoa từ túi bằng chế độ xây dựng.
+- [x] Có unit test cho: giới hạn khối theo cấp, giá khối tăng dần, khối đầu miễn phí, vượt giới hạn thì bị từ chối kèm đúng lý do.
+- [x] Unit test: cất khối ruộng đang có cây thì bị từ chối. Cất đồ trang trí thì đồ quay về túi.
+- [x] E2E: lên đủ cấp (dùng bản lưu ghi sẵn) → mua và đặt khối ruộng mới → cuốc được ô trong khối đó.
+- [x] E2E: đặt một chậu hoa từ túi bằng chế độ xây dựng.
 
 ## Blocked by
 

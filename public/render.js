@@ -359,6 +359,8 @@ function drawBuild(ctx, state, m, b, now) {
     ctx.strokeRect(ft.c * TS + 0.5, ft.r * TS + 0.5, ft.w * TS - 1, ft.h * TS - 1);
   }
   ctx.setLineDash([]);
+  const se = b.sel != null && state.farm.ents.find(x => x.id === b.sel);   // món đang chọn (để Cất): viền đậm
+  if (se) { const ft = footprint(se); ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2; ctx.strokeRect(ft.c * TS + 1, ft.r * TS + 1, ft.w * TS - 2, ft.h * TS - 2); ctx.lineWidth = 1; }
   const g = b.ghost;
   if (!g) return;
   const e = state.farm.ents.find(x => x.id === g.id);
@@ -373,6 +375,8 @@ function drawBuild(ctx, state, m, b, now) {
   if (im) ctx.drawImage(im, Math.round(bd.x + dx), Math.round(bd.y + dy));
   const dc = m.decos.find(x => x.ent === e), di = dc && decoImg(dc.kind);
   if (di) ctx.drawImage(di, Math.round(dc.x + dx - di.width / 2), Math.round(dc.y + dy - di.height + 1));
+  const ni = g.what?.kind === 'deco' && decoImg(g.what.item);   // món mới đặt: vẽ mờ theo ngón tay
+  if (ni) ctx.drawImage(ni, Math.round(g.c * TS + 8 - ni.width / 2), Math.round(g.r * TS + 13 - ni.height));
   ctx.globalAlpha = 1;
 }
 

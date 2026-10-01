@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  canPlace, canMove, moveEntity, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
+  canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -137,7 +137,7 @@ const api = {
   buildStart() {
     if (!state || world.build || busy || fading || state.scene !== 'farm') return;   // chỉ xây dựng ở vườn
     V.cancelMove(world);
-    world.build = { snap: snapLayout(state), focus: { x: state.player.x, y: state.player.y }, ghost: null, drag: null, pan: null };
+    world.build = { snap: snapLayout(state), focus: { x: state.player.x, y: state.player.y }, ghost: null, drag: null, pan: null, place: null, sel: null };
     ui.showBuild(true);
   },
   buildDone() {
@@ -154,6 +154,26 @@ const api = {
     world.build = null;
     ui.showBuild(false);
     saveGame(state);
+    changed();
+  },
+  // Chọn món để đặt (what = { kind, pen?, item? }) hoặc bỏ chọn (null)
+  buildPick(what) {
+    const b = world.build;
+    if (!b) return;
+    Object.assign(b, { place: what, sel: null, drag: null, ghost: null });
+    ui.buildSel(null);
+    ui.buildTray(state, b);
+    ui.buildMsg(what ? `Kéo ${entName(what).toLowerCase()} ra vườn để đặt` : BUILD_HINT, null);
+  },
+  // Cất món đang chạm về túi (đồ trang trí) hoặc bỏ đi (khối ruộng trống)
+  buildStore() {
+    const b = world.build;
+    if (!b?.sel) return;
+    const r = storeEntity(state, b.sel);
+    b.sel = null; ui.buildSel(null);
+    ui.buildMsg(r.msg, r.ok);
+    ui.handleEvents([{ type: 'sound', name: r.ok ? 'pop' : 'error' }]);
+    ui.buildTray(state, b);
     changed();
   },
   resetGame() {
@@ -268,7 +288,7 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointermove', e => { if (world.build) buildMove(e); });
 canvas.addEventListener('pointercancel', () => {
   down = null;
-  if (world.build) { Object.assign(world.build, { drag: null, pan: null, ghost: null }); ui.buildMsg('Chạm và kéo công trình để dời chỗ', null); }
+  if (world.build) { Object.assign(world.build, { drag: null, pan: null, ghost: null }); ui.buildMsg(BUILD_HINT, null); }
 });
 canvas.addEventListener('pointerup', e => {
   if (world.build) { buildUp(e); return; }
@@ -289,6 +309,7 @@ function onTap(cx, cy) {
 }
 
 // ---------- Chế độ xây dựng: kéo thả công trình, kéo chỗ trống để xem chỗ khác ----------
+const BUILD_HINT = 'Chạm và kéo công trình để dời chỗ';
 const toWorld = (cx, cy) => {
   const r = canvas.getBoundingClientRect();
   return { x: ((cx - r.left) * dpr + view.camX) / scale, y: ((cy - r.top) * dpr + view.camY) / scale };
@@ -297,10 +318,17 @@ function buildDown(e) {
   const b = world.build;
   if (b.drag || b.pan) return;   // ngón thứ hai: bỏ qua
   canvas.setPointerCapture?.(e.pointerId);
-  const p = toWorld(e.clientX, e.clientY), ent = V.pickEntity(state, p.x, p.y);
+  const p = toWorld(e.clientX, e.clientY);
+  b.sel = null; ui.buildSel(null);
+  if (b.place) {   // đang cầm món mới: bóng theo ngón tay ngay từ lúc chạm
+    b.drag = { pid: e.pointerId, place: b.place };
+    placeGhost(b, p);
+    return;
+  }
+  const ent = V.pickEntity(state, p.x, p.y);
   if (ent && canMove(ent)) {
     const ft = footprint(ent);
-    b.drag = { pid: e.pointerId, id: ent.id, oc: clamp(Math.floor(p.x / TS) - ent.c, 0, ft.w - 1), or: clamp(Math.floor(p.y / TS) - ent.r, 0, ft.h - 1) };
+    b.drag = { pid: e.pointerId, id: ent.id, tap: true, oc: clamp(Math.floor(p.x / TS) - ent.c, 0, ft.w - 1), or: clamp(Math.floor(p.y / TS) - ent.r, 0, ft.h - 1) };
     ui.buildMsg(`Kéo ${entName(ent).toLowerCase()} tới chỗ mới`, null);
     return;
   }
@@ -309,7 +337,9 @@ function buildDown(e) {
 }
 function buildMove(e) {
   const b = world.build, d = b.drag;
+  if (d?.place && d.pid === e.pointerId) { placeGhost(b, toWorld(e.clientX, e.clientY)); return; }
   if (d?.pid === e.pointerId) {
+    d.tap = false;
     const ent = state.farm.ents.find(x => x.id === d.id), p = toWorld(e.clientX, e.clientY);
     const c = Math.floor(p.x / TS) - d.oc, r = Math.floor(p.y / TS) - d.or;
     if (!ent || (b.ghost ? b.ghost.c === c && b.ghost.r === r : c === ent.c && r === ent.r)) return;
@@ -327,13 +357,33 @@ function buildUp(e) {
   const b = world.build;
   if (b.pan?.pid === e.pointerId) b.pan = null;
   if (b.drag?.pid !== e.pointerId) return;
-  const g = b.ghost;
+  const g = b.ghost, d = b.drag;
   b.drag = null; b.ghost = null;
-  if (!g) { ui.buildMsg('Chạm và kéo công trình để dời chỗ', null); return; }
-  const r = moveEntity(state, g.id, g.c, g.r);
-  ui.buildMsg(r.msg || 'Chạm và kéo công trình để dời chỗ', r.ok ? true : false);
+  if (d.tap && !g) {   // chạm không kéo: chọn món, hiện nút Cất nếu cất được
+    const ent = state.farm.ents.find(x => x.id === d.id);
+    if (ent && (ent.kind === 'deco' || ent.kind === 'field')) { b.sel = ent.id; ui.buildSel(entName(ent)); }
+    ui.buildMsg(BUILD_HINT, null);
+    return;
+  }
+  if (!g) { ui.buildMsg(b.place ? `Kéo ${entName(b.place).toLowerCase()} ra vườn để đặt` : BUILD_HINT, null); return; }
+  const r = d.place ? placeEntity(state, d.place, g.c, g.r) : moveEntity(state, g.id, g.c, g.r);
+  ui.buildMsg(r.msg || BUILD_HINT, r.ok ? true : false);
   ui.handleEvents([{ type: 'sound', name: r.ok ? 'pop' : 'error' }]);
+  if (d.place) {
+    const w = d.place;   // đặt xong mà không đặt thêm được (hết đồ, đủ khối, đã có chuồng): bỏ chọn
+    if (r.ok && (w.kind === 'pen' || (w.kind === 'deco' && !canAfford(state, w).ok) || (w.kind === 'field' && fieldCount(state) >= fieldLimit(state)))) b.place = null;
+    ui.buildTray(state, b);
+  }
   changed();
+}
+// Bóng của món mới theo con trỏ: tâm khối nằm dưới ngón tay
+function placeGhost(b, p) {
+  const what = b.place, ft = footprint(what);
+  const c = Math.floor(p.x / TS) - Math.floor(ft.w / 2), r = Math.floor(p.y / TS) - Math.floor(ft.h / 2);
+  if (b.ghost?.c === c && b.ghost?.r === r) return;
+  const chk = canPlace(state, what, c, r), aff = chk.ok ? canAfford(state, what) : chk, ok = chk.ok && aff.ok;
+  b.ghost = { id: null, what, c, r, w: ft.w, h: ft.h, ok, reason: aff.reason ?? null };
+  ui.buildMsg(ok ? 'Thả ra để đặt ở đây' : aff.msg, ok);
 }
 
 // Tự làm hành động chính của target (không tự chọn hành động phụ như Bán)

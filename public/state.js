@@ -2,9 +2,9 @@
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
-  expandCost, expandLevel, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
+  expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
 } from './data.js';
-import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
+import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
 import { migrate, newFarm } from './migrate.js';
 import { now } from './clock.js';
@@ -531,7 +531,7 @@ function makeOrder(s) {
 }
 
 // ---------- Ruộng: tiện ích ----------
-export const nextLockedPlot = s => UNLOCK_ORDER.find(i => s.plots[i] && !s.plots[i].unlocked) ?? -1;
+export const nextLockedPlot = s => UNLOCK_ORDER.find(i => s.plots[i] && !s.plots[i].unlocked && !s.plots[i].removed) ?? -1;
 const unlockedCount = s => s.plots.filter(p => p.unlocked).length;
 export const stageOf = c => CROP_STAGES.reduce((st, th, i) => (c.progress >= th ? i : st), 0);
 
@@ -1110,15 +1110,81 @@ export function canPlace(s, what, c, r) {
   const f = s.farm, old = what.id != null ? f.ents.find(e => e.id === what.id) : null;
   if (what.id != null && !old) return no('missing', 'Không thấy công trình này');
   if (old && !canMove(old)) return no('fixed', `${entName(old)} không dời được`);
+  if (!old && what.kind === 'pen' && f.ents.some(x => x.kind === 'pen' && x.pen === what.pen)) return no('exists', `Bạn đã có ${PEN_DEFS[what.pen].name.toLowerCase()} rồi`);
   const e = { ...(old ?? what), c, r }, ft = footprint(e), o = f.owned;
   if (ft.c < o.c || ft.r < o.r || ft.c + ft.w > o.c + o.w || ft.r + ft.h > o.r + o.h) return no('outside', 'Chỗ này ngoài đất của bạn');
   if (f.ents.some(x => x !== old && overlaps(ft, footprint(x)))) return no('overlap', 'Chồng lên công trình khác');
+  if (!old && what.kind === 'field' && fieldCount(s) >= fieldLimit(s)) {
+    const nx = fieldNextLevel(s);
+    return no('max_fields', nx ? `Đã đủ ${fieldLimit(s)} khối ruộng, lên cấp ${nx} để có thêm` : 'Đã đủ số khối ruộng tối đa');
+  }
   // Thử bố cục mới: chỗ nào trước đi tới được từ cổng thì sau vẫn phải tới được (cái mới đặt thì phải tới được).
   const before = new Map(access(mapOf(s)).map(t => [t.key, t.ok]));
   const after = access(buildMap({ ...f, ents: old ? f.ents.map(x => (x === old ? e : x)) : [...f.ents, e] }));
   const lost = after.find(t => !t.ok && (before.get(t.key) ?? true));
   if (lost) return no('blocks_path', lost.key === 'house' ? 'Chặn mất đường từ cổng vào nhà' : `Chặn mất đường tới ${lost.name.toLowerCase()}`);
   return { ok: true };
+}
+
+// ---------- Đặt đồ mới & cất đồ (chế độ xây dựng) ----------
+export const fieldCount = s => s.farm.ents.filter(e => e.kind === 'field').length;
+export const fieldLimit = s => FIELD_LIMITS.reduce((n, [lv, k]) => (level(s) >= lv ? k : n), 0);
+export const fieldNextLevel = s => FIELD_LIMITS.find(([, k]) => k > fieldLimit(s))?.[0] ?? null;   // cấp để có thêm khối; null = đã tối đa
+export const fieldCost = s => (fieldCount(s) < 1 ? 0 : FIELD_PRICES[Math.min(fieldCount(s), FIELD_PRICES.length) - 1]);   // giá khối kế tiếp
+export const penLevel = pen => Math.min(...Object.values(ANIMALS).filter(a => a.pen === pen).map(a => a.lv));
+// Giá và điều kiện (ngoài chỗ đặt) của món định đặt: xu, cấp, đồ trong túi
+export function placeCost(s, what) {
+  if (what.kind === 'field') return fieldCost(s);
+  if (what.kind === 'pen') return PEN_PRICES[what.pen] ?? 0;
+  return 0;
+}
+export function canAfford(s, what) {
+  if (what.kind === 'deco') return have(s, what.item) > 0 ? { ok: true } : no('no_item', 'Bạn chưa có món này');
+  if (what.kind === 'pen') {
+    if (!PEN_DEFS[what.pen]) return no('missing', 'Không có loại chuồng này');
+    if (level(s) < penLevel(what.pen)) return no('level', `Cần cấp ${penLevel(what.pen)} mới xây ${PEN_DEFS[what.pen].name.toLowerCase()} được`);
+  } else if (what.kind !== 'field') return no('missing', 'Không đặt được món này');
+  return s.coins >= placeCost(s, what) ? { ok: true } : no('coins', 'Chưa đủ xu, cố lên nhé');
+}
+
+// Đặt đồ mới ở ô (c, r): khối ruộng/chuồng tốn xu, đồ trang trí lấy từ túi. Qua canPlace nên cùng luật với dời.
+export function placeEntity(s, what, c, r) {
+  if (s.scene && s.scene !== 'farm') return R(false, 'Ra vườn rồi hãy đặt nhé', { reason: 'scene' });
+  if (what.kind === 'deco' && ITEMS[what.item]?.kind !== 'deco') return R(false, 'Món này không đặt được', { reason: 'missing' });
+  const chk = canPlace(s, what, c, r);
+  if (!chk.ok) return R(false, chk.msg, { reason: chk.reason });
+  const aff = canAfford(s, what);
+  if (!aff.ok) return R(false, aff.msg, { reason: aff.reason });
+  const e = { id: s.nextId++, kind: what.kind, c, r };
+  if (what.kind === 'deco') { take(s, what.item); e.item = what.item; }
+  else s.coins -= placeCost(s, what);
+  if (what.kind === 'pen') e.pen = what.pen;
+  if (what.kind === 'field') {
+    e.plots = [];
+    for (let i = 0; i < FIELD_SIZE * FIELD_SIZE; i++) { e.plots.push(s.plots.length); s.plots.push(newPlot(s.plots.length, true)); }
+  }
+  s.farm.ents.push(e);
+  bumpLayout(s);
+  unstick(s);
+  return R(true, `Đã đặt ${entName(e).toLowerCase()}`, { id: e.id });
+}
+
+// Cất đồ đã đặt: đồ trang trí về túi; khối ruộng chỉ khi chưa có cây (đất đã cuốc thì mất), không cất khối cuối.
+// Ô của khối bị gỡ chỉ đánh dấu removed (không xóa khỏi s.plots) để chỉ số ô của các khối còn lại vẫn đúng.
+export function storeEntity(s, id) {
+  const e = s.farm.ents.find(x => x.id === id);
+  if (!e) return R(false, 'Không thấy món này', { reason: 'missing' });
+  if (e.kind === 'deco') {
+    s.inv[e.item] = (s.inv[e.item] || 0) + 1;
+  } else if (e.kind === 'field') {
+    if (e.plots.some(i => s.plots[i]?.crop)) return R(false, 'Ruộng còn cây, thu hoạch xong mới cất được', { reason: 'has_crop' });
+    if (fieldCount(s) <= 1) return R(false, 'Phải giữ lại ít nhất một khối ruộng', { reason: 'last_field' });
+    for (const i of e.plots) s.plots[i] = { idx: i, unlocked: false, removed: true, soil: 'untilled', water: 0, weeds: false, crop: null };
+    s.threats = (s.threats ?? []).filter(t => !e.plots.includes(t.plot));
+  } else return R(false, `${entName(e)} không cất được`, { reason: 'fixed' });
+  s.farm.ents.splice(s.farm.ents.indexOf(e), 1);
+  bumpLayout(s);
+  return R(true, `Đã cất ${entName(e).toLowerCase()}`);
 }
 
 // Ô trống (đi được, trong đất nhà) gần điểm o nhất
@@ -1162,10 +1228,17 @@ export function moveEntity(s, id, c, r) {
 // Chụp lại bố cục + vị trí lúc vào chế độ xây dựng; restoreLayout trả về đúng như cũ (nút Hủy).
 const posMap = list => Object.fromEntries((list ?? []).map(o => [o.id, o.scaredUntil != null ? { x: o.x, y: o.y, scaredUntil: o.scaredUntil } : { x: o.x, y: o.y }]));
 export function snapLayout(s) {
-  return structuredClone({ farm: s.farm, player: { x: s.player.x, y: s.player.y }, dog: { x: s.dog.x, y: s.dog.y }, animals: posMap(s.animals), eggs: posMap(s.eggs) });
+  return structuredClone({ farm: s.farm, player: { x: s.player.x, y: s.player.y }, dog: { x: s.dog.x, y: s.dog.y }, animals: posMap(s.animals), eggs: posMap(s.eggs),
+    // xu, đồ trong túi, ô ruộng: đặt/cất đồ mới đổi cả những thứ này
+    coins: s.coins, deco: Object.fromEntries(Object.entries(s.inv).filter(([k]) => ITEMS[k]?.kind === 'deco')), plots: s.plots });
 }
 export function restoreLayout(s, snap) {
   s.farm = structuredClone(snap.farm);
+  s.coins = snap.coins;
+  for (const k of Object.keys(s.inv)) if (ITEMS[k]?.kind === 'deco') delete s.inv[k];
+  Object.assign(s.inv, snap.deco);
+  s.plots.length = Math.min(s.plots.length, snap.plots.length);   // bỏ ô của khối mới đặt; ô của khối đã cất thì trả lại
+  snap.plots.forEach((p, i) => { if (s.plots[i]?.removed && !p.removed) s.plots[i] = structuredClone(p); });
   Object.assign(s.player, snap.player); Object.assign(s.dog, snap.dog);
   for (const k of ['animals', 'eggs']) for (const o of s[k] ?? []) {
     const p = snap[k][o.id];

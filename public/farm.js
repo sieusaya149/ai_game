@@ -58,7 +58,7 @@ function build(f) {
     if (e.kind === 'field') {
       fill(e.c, e.r, FIELD_SIZE, FIELD_SIZE, GROUND.FIELD);
       fields.push(e);
-      e.plots.forEach((pi, k) => {
+      (e.plots ?? []).forEach((pi, k) => {
         const t = { c: e.c + k % FIELD_SIZE, r: e.r + Math.floor(k / FIELD_SIZE) };
         plotPos.set(pi, t); plotByTile.set(idx(t.c, t.r), pi);
       });

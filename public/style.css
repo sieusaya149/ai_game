@@ -398,6 +398,19 @@ body.alerting #hud { top: calc(50px + var(--st)); }
 #ui #build-msg { pointer-events: none; max-width: 420px; padding: 7px 14px; font-size: 14px; font-weight: 900; text-align: center; }
 #build-msg[data-ok="1"] { background: #dff7d4; border-color: var(--green-d); }
 #build-msg[data-ok="0"] { background: #ffd9d2; border-color: var(--red-d); }
+#build-store { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
+#ui #build-tray { pointer-events: auto; width: 100%; max-width: 560px; padding: 6px; }
+.bt-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+.bt-tab { flex: 1; min-height: 44px; border: 2px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; font-weight: 900; cursor: pointer; }
+.bt-tab.on { border-color: var(--orange); background: #fff0c8; box-shadow: 0 0 0 2px var(--orange); }
+.bt-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.bt-card { flex: 0 0 auto; min-width: 104px; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 5px 8px; border: 2px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); font: inherit; cursor: pointer; text-align: center; }
+.bt-card.on { border-color: var(--orange); background: #fff0c8; box-shadow: 0 0 0 2px var(--orange); }
+.bt-card:disabled { opacity: 0.55; cursor: default; }
+.bt-card .ico { width: 28px; height: 28px; }
+.bt-card b { font-size: 13px; line-height: 1.1; }
+.bt-card small { font-size: 11.5px; font-weight: 800; opacity: 0.85; }
+.bt-empty { padding: 10px 6px; font-size: 13px; font-weight: 800; opacity: 0.8; }
 .build-btns { display: flex; gap: 12px; }
 .build-btns .btn { min-width: 128px; min-height: 52px; }
 body.building #bottombar, body.building #actions, body.building #joy-base, body.building #tutorial { display: none !important; }

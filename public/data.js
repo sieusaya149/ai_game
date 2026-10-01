@@ -170,6 +170,11 @@ export const START = {
 };
 export const expandCost = n => Math.round(60 * 1.2 ** (n - START_PLOTS) / 10) * 10;
 export const expandLevel = n => 1 + Math.floor((n - START_PLOTS) / 3);
+// Khối ruộng 3x3 (chế độ xây dựng): [cấp, số khối tối đa]; giá khối thứ (n+1) khi đã có n khối (khối đầu có sẵn, miễn phí)
+export const FIELD_LIMITS = [[1, 1], [4, 2], [8, 3], [12, 4], [16, 5], [20, 6], [25, 7], [30, 8]];
+export const FIELD_PRICES = [300, 600, 1000, 1500, 2200, 3000, 4000];
+// Giá xây chuồng (mở theo cấp mua được con vật tương ứng trong ANIMALS)
+export const PEN_PRICES = { chicken: 200, pig: 600, pasture: 1500 };
 export const expNeed = level => Math.floor(25 * level ** 1.5);
 export function levelInfo(exp) {
   let level = 1;

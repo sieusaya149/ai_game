@@ -91,7 +91,46 @@ export function showBuild(on) {
   document.body.classList.toggle('building', on);
   $('buildbar').hidden = !on;
   $('bb-build').classList.toggle('on', on);
-  if (on) buildMsg('Chạm và kéo công trình để dời chỗ', null);
+  if (on) { buildMsg('Chạm và kéo công trình để dời chỗ', null); buildSel(null); buildTray(st(), null); }
+}
+// Khay đồ đặt được: tab Khối ruộng / Chuồng / Đồ trang trí. b = world.build (b.place = món đang chọn)
+let trayTab = 'field';
+const samePick = (a, b) => !!a && !!b && a.kind === b.kind && a.pen === b.pen && a.item === b.item;
+export function buildTray(s, b) {
+  if (!building) return;
+  const pick = b?.place ?? null, cards = [];
+  const card = (what, icon, name, sub, off) => h('button', {
+    class: 'bt-card' + (samePick(pick, what) ? ' on' : ''), type: 'button', disabled: !!off,
+    on: { click: () => api.buildPick(samePick(pick, what) ? null : what) },
+  }, icon, h('b', {}, name), h('small', {}, sub));
+  let empty = '';
+  if (trayTab === 'field') {
+    const n = S.fieldCount(s), max = S.fieldLimit(s), nx = S.fieldNextLevel(s), full = n >= max;
+    cards.push(card({ kind: 'field' }, h('span', { class: 'ico emo' }, '🟫'), `Khối ruộng ${n}/${max}`,
+      full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : S.fieldCost(s) ? `🪙 ${fmt(S.fieldCost(s))}` : 'Miễn phí', full));
+  } else if (trayTab === 'pen') {
+    const have = new Set(s.farm.ents.filter(e => e.kind === 'pen').map(e => e.pen));
+    for (const pen of Object.keys(D.PEN_PRICES)) {
+      if (have.has(pen)) continue;
+      const lv = S.penLevel(pen), low = level(s) < lv;
+      cards.push(card({ kind: 'pen', pen }, ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]), PEN_NAME2[pen], low ? `Cần cấp ${lv}` : `🪙 ${fmt(D.PEN_PRICES[pen])}`, low));
+    }
+    empty = 'Bạn đã có đủ các loại chuồng rồi.';
+  } else {
+    for (const k of Object.keys(s.inv || {})) if (s.inv[k] > 0 && D.ITEMS[k]?.kind === 'deco') cards.push(card({ kind: 'deco', item: k }, ico(k), D.ITEMS[k].name, `Có ×${s.inv[k]}`));
+    empty = 'Chưa có đồ trang trí. Mua ở Chợ Bà Tư nhé.';
+  }
+  const tab = (id, label) => h('button', { class: 'bt-tab' + (trayTab === id ? ' on' : ''), type: 'button', on: { click: () => { trayTab = id; api.buildPick(null); } } }, label);
+  $('build-tray').replaceChildren(
+    h('div', { class: 'bt-tabs' }, tab('field', 'Ruộng'), tab('pen', 'Chuồng'), tab('deco', 'Trang trí')),
+    cards.length ? h('div', { class: 'bt-list' }, cards) : h('div', { class: 'bt-empty' }, empty));
+}
+const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu' };
+// Nút Cất cho món đang chạm (label = tên món, null = ẩn)
+export function buildSel(label) {
+  const b = $('build-store');
+  b.hidden = !label;
+  if (label) b.textContent = `Cất ${label.toLowerCase()}`;
 }
 // ok: true = đặt được (xanh), false = không được (đỏ), null = gợi ý
 export function buildMsg(text, ok) {
@@ -434,10 +473,7 @@ async function buyItem(id, qty) {
   const r = res(S.buy(st(), id, qty), 'coin');
   if (!r?.ok) return;
   flags.bought = true;
-  if (D.ITEMS[id]?.kind === 'deco') {
-    const yes = await confirmBox(`Đặt ${D.ITEMS[id].name} ngay dưới chân bạn?`, 'Đặt luôn', 'Để trong túi');
-    if (yes) res(S.placeDeco(st(), id), 'pop');
-  }
+  if (D.ITEMS[id]?.kind === 'deco') pushToast('Vào 🔨 Xây dựng để đặt ra vườn nhé');
 }
 const sellable = s => [...new Set([...Object.keys(s.basket || {}), ...Object.keys(s.inv || {})])].filter(k => (D.CROPS[k] || D.PRODUCTS[k]) && have(s, k) > 0);
 const sold = r => { if (r?.ok) flags.sold = true; };
@@ -625,7 +661,7 @@ PANELS.bag = {
       for (const k of keys) {
         const it = D.ITEMS[k];
         const act = it?.kind === 'seed' ? btn(s.selectedSeed === it.crop ? 'Đang chọn' : 'Chọn gieo', () => { S.selectSeed(st(), it.crop); sound.play('pop'); commit(); }, 'plain sm', { disabled: s.selectedSeed === it.crop })
-          : it?.kind === 'deco' ? btn('Đặt xuống', () => res(S.placeDeco(st(), k), 'pop'), 'green sm')
+          : it?.kind === 'deco' ? btn('Đặt ở 🔨', () => { closePanel(); api.buildStart(); }, 'green sm')
           : inShed && src === s.inv && isProduce(k) ? btn('Lấy ra', () => res(S.withdraw(st(), k, 'all'), 'pop'), 'plain sm', { disabled: S.basketCount(s) >= S.basketCap(s) }) : null;
         list.append(h('div', { class: 'cell' }, ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + src[k]), h('div', { class: 'cell-name' }, itemLabel(k)), act));
       }
@@ -984,6 +1020,7 @@ export function initUI(a) {
   $('bb-build').addEventListener('click', () => { if (!isBlocking()) api.buildStart(); });
   $('build-done').addEventListener('click', () => api.buildDone());
   $('build-cancel').addEventListener('click', () => api.buildCancel());
+  $('build-store').addEventListener('click', () => api.buildStore());
 
   addEventListener('keydown', e => {
     if (e.key === 'Escape') {
