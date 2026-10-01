@@ -1,6 +1,6 @@
 # Nông Trại Vui: thiết kế bản mở rộng (bản nháp)
 
-Tài liệu thiết kế, **chưa code**. Các con số chỉ là gợi ý ban đầu, sẽ cân bằng lại khi chơi thử.
+Tài liệu thiết kế. **Đã grill xong toàn bộ 16 chủ đề (mục 11).** Các con số sẽ cân bằng lại khi chơi thử.
 Những gì đã có sẵn trong game được mô tả ở `SPEC.md`. File này ghi những gì **thêm mới hoặc thay đổi** so với bản đó.
 
 ---
@@ -651,6 +651,17 @@ Cây lâu năm, trồng một lần, thu hoạch nhiều lần.
     - Vườn **không có chó**, hoặc chó đang đói hay đang ngủ: trộm dễ hơn nhiều.
     - Ném xúc xích để dụ chó cũng dùng được với chó của bạn bè.
     - Chủ vườn thấy nhật ký: *"Hùng đã trộm 3 cà chua lúc 2h sáng 😤"*, có thể **qua trộm lại** để trả đũa.
+- **Luật trộm và giúp (đã chốt):**
+  - **Ai vào vườn ai cũng được.** Danh sách bạn bè chỉ để ghim lên đầu và nhận thông báo.
+  - **Trộm được:** cây chín, trứng dưới đất, sữa và lông đang chờ lấy, trái cây.
+  - **Không trộm được:** con vật, trái khổng lồ, đồ trong kho và trong nhà, cá.
+  - **Giới hạn:**
+    - Mỗi ô hay mỗi con tối đa 25% sản lượng.
+    - Mỗi người 1 lần mỗi ô hay mỗi con.
+    - Mỗi vườn mỗi ngày ngoài đời mất tối đa 30% tổng giá trị đồ chín.
+  - **Bảo vệ người mới:** chủ vườn dưới cấp 5 không bị trộm. Phải từ cấp 5 mới đi trộm được.
+  - **Giúp:** tối đa 10 việc mỗi vườn mỗi ngày. Chủ vườn nhận thông báo.
+  - **Nhật ký:** chủ vườn xem ai trộm gì, lúc mấy giờ. Có nút "Sang trộm lại 😤" đi thẳng tới vườn kẻ trộm.
 - **Thành tựu xã hội:** "Hàng xóm tốt bụng" (giúp 50 lần), "Siêu trộm" (trộm 30 lần không bị chó đớp), "Vườn bất khả xâm phạm" (chó đuổi 20 kẻ trộm).
 
 ### 7.2 Kiến trúc đề xuất
@@ -658,13 +669,25 @@ Cây lâu năm, trồng một lần, thu hoạch nhiều lần.
   - SQLite (`node:sqlite`) lưu tài khoản, vườn, nhật ký, bạn bè.
   - HTTP cho các thao tác.
   - **SSE (server-sent events)** để đẩy cập nhật real-time: vị trí người chơi, sự kiện trộm/giúp. Node chưa có sẵn WebSocket server, nên SSE + `fetch` là đủ cho quy mô bạn bè.
+- **Real-time (đã chốt): WebSocket với thư viện `ws`**, ngoại lệ duy nhất cho nguyên tắc "không thư viện", chỉ phía server.
+  - Vị trí gửi 6 lần mỗi giây, trình duyệt nội suy cho mượt. Chỉ gửi cho người ở cùng bản đồ.
+  - Đăng nhập, lưu vườn, mua bán vẫn qua HTTP.
+  - Rớt mạng thì tự kết nối lại, trong lúc đó vẫn chơi được trong vườn mình.
+  - *Dòng "SSE" ở trên không còn dùng.*
+- **Ai giữ dữ liệu (đã chốt: kết hợp)** — chi tiết ở các gạch đầu dòng ngay dưới. Chủ vườn online gửi bản lưu lên server khoảng mỗi 10 giây. Thao tác của khách được đẩy sang trình duyệt chủ vườn ngay lập tức.
 - **Logic game dùng chung:** `state.js` vốn thuần JS, nên chạy được cả trên trình duyệt lẫn trên server.
   - **Chủ vườn đang online:** trình duyệt của chủ chạy mô phỏng và gửi bản lưu lên server định kỳ, như bây giờ chỉ là lưu lên server thay vì `localStorage`.
   - **Khách thao tác** (giúp, trộm): server kiểm tra trên bản lưu mới nhất rồi xếp vào hàng đợi. Trình duyệt của chủ áp dụng ở lần đồng bộ kế tiếp.
   - **Chủ vườn offline:** server tự chạy bù thời gian bằng chính `state.js` rồi áp dụng thao tác của khách.
 - **Thời gian online luôn x1.** Nút x5/x20 chỉ còn trong chế độ chơi offline hoặc chế độ thử nghiệm.
 - **Chống gian lận nhẹ:** vì chỉ chơi với bạn bè, server chỉ kiểm tra các con số hợp lý (xu không tăng vọt, không trộm quá giới hạn). Không cần chống gian lận chặt.
-- **Giữ chế độ chơi offline:** không đăng nhập thì chơi bằng `localStorage` như cũ. Đăng nhập thì có thể đưa bản lưu cũ lên server.
+- **Tài khoản & thiết bị (đã chốt):**
+  - **Đăng ký:** tên nhân vật (duy nhất trong làng) + PIN 6 số + mã mời dùng một lần.
+  - **Quên PIN:** quản trị đặt lại bằng lệnh trên server.
+  - **Mỗi tài khoản chỉ 1 thiết bị chơi tại một thời điểm.** Đăng nhập ở thiết bị mới thì thiết bị cũ tự lưu lần cuối rồi thoát. Server chỉ nhận bản lưu từ thiết bị đang chơi.
+  - Đăng nhập được giữ 30 ngày trên mỗi thiết bị.
+  - **Lần đầu đăng nhập:** hỏi "Mang vườn này lên làng?" để chuyển bản lưu chơi đơn lên server.
+  - **Chế độ offline giữ như cũ** (`localStorage`). Vườn offline và vườn online là hai vườn riêng, không đồng bộ sau lần chuyển đầu.
 - **Hosting (đã chốt):** VPS `image.huninna.com`, chạy sau Caddy của `ai_gateway` tại **https://game.huninna.com**.
   - Repo `~/project/ai_game`, deploy bằng `git pull && docker compose up -d --build`.
   - Hiện chỉ phục vụ file tĩnh bằng nginx (bản chơi đơn). Bản online sẽ đổi container sang server Node, dữ liệu lưu trong Docker volume.
@@ -784,19 +807,82 @@ Một năm trong game chỉ dài khoảng 9 tiếng ngoài đời, nên những 
 
 ---
 
-## 9. Thứ tự làm đề xuất
+## 8c. UI/UX (đã chốt)
 
-Nền online làm sớm, vì nó quyết định dữ liệu nằm ở đâu. Thêm tính năng trước rồi mới làm online thì phải sửa lại nhiều.
+### Thông báo 3 mức
 
-1. **Nền online:** viết lại `server.js`, tài khoản, lưu vườn lên server, bạn bè, đi thăm vườn, thấy nhau real-time.
-2. **Vật nuôi sâu hơn:** 4 giai đoạn đời, già và bệnh có thể mất, lây bệnh, dơ và tắm, chuồng phải xây và có 3 cấp, độ thân.
-3. **Gà vịt thả rông:** thêm vịt, mèo, chuột; lùa vào chuồng bằng chó mèo.
-4. **Trộm online:** trộm vườn bạn bè, chó sủa và đuổi, xúc xích, nhật ký trả đũa. Nâng cấp trộm NPC.
-5. **Cây trồng:** sprite riêng cho từng cây, cấp thành thạo, trái khổng lồ, chất lượng ★.
-6. **Nước và tự động hóa:** dời giếng, nâng cấp giếng, bồn chứa, tưới nhỏ giọt, phun tự động, vòi sen, hố ủ phân, mở đất theo cấp.
-7. **Nhân công.**
-8. **Đất sau nhà:** hồ cá, cây ăn trái, ong, sóc, ếch, câu cá.
-9. **Chiều sâu:** mùa, thời tiết xấu, chợ, chế biến, lễ hội, nhiệm vụ, sổ sưu tầm.
+| Mức | Ví dụ | Cách hiện |
+|---|---|---|
+| 🔴 Gấp | Con vật nguy kịch, có trộm, diều hâu, máy hỏng | Băng rôn đỏ, âm thanh, rung, mũi tên ở mép màn hình chỉ hướng |
+| 🟡 Quan trọng | Cây chín, hóa đơn, thư, lên cấp, đơn mới | Thông báo nhỏ, tự gộp lại ("5 ô cà chua đã chín") |
+| ⚪ Thông tin | Nhặt trứng, bán hàng, giúp xong | Chỉ ghi vào nhật ký |
+
+- **Bảng "Việc cần làm" 📋:** danh sách việc trong vườn xếp theo mức gấp. Chạm vào một dòng thì nhân vật tự đi tới chỗ đó.
+- **Bản đồ nhỏ** ở góc: chấm đỏ là chỗ gấp, chấm vàng là chỗ có việc. Chạm để phóng to.
+- **Cài đặt** cho tắt từng loại thông báo, trừ mức 🔴.
+
+### Hiệu năng (đã chốt)
+- **Mục tiêu:** điện thoại tầm trung 60 khung hình mỗi giây. Điện thoại yếu (~3 năm tuổi) giữ được 30.
+- **Chỉ vẽ những gì trong khung nhìn.** Nền tĩnh vẽ sẵn thành từng mảng, chỉ vẽ lại khi đặt công trình.
+- **Con vật ngoài màn hình** cập nhật AI 2 lần mỗi giây. Logic trong `tick()` vẫn chạy đủ.
+- **Giới hạn:** 30 con thả rông, 8 chuột, 12 người chơi khác hiển thị trong làng. Đông hơn thì chỉ hiện tên mờ.
+- **Hiệu ứng hạt** giảm khi khung hình tụt.
+- **Chế độ tiết kiệm pin:** khóa 30 khung hình, tắt hiệu ứng hạt, giảm ánh sáng đêm. 10 giây đầu chạy dưới 40 khung hình thì gợi ý bật.
+- **Mỗi phase đều thử trên một điện thoại Android tầm thấp thật.**
+
+### Hướng dẫn người mới (đã chốt: mở dần từng hệ thống)
+- **Buổi đầu (cấp 1–5):** chỉ có ruộng, gà, chó Mực, thể lực, thùng giao hàng.
+  - Chưa có hóa đơn, chuột, trộm, ảnh hưởng của mùa.
+  - Con vật được "bảo hộ người mới", không bệnh nặng tới cấp 5.
+  - Hướng dẫn từng bước như hiện tại.
+- **Mỗi hệ thống mở theo cấp có một nhiệm vụ làm quen 2–4 bước** của một cư dân, có thưởng, bỏ qua được:
+  - Cô Út (cấp 3, khi mua heo đầu tiên): tắm, chữa bệnh, vắc-xin.
+  - Ông Sáu (cấp 4): sửa đồ, nâng cấp công cụ.
+  - Bà Tư (đầu mùa thứ 2): mùa.
+  - Chú Ba (cấp 6): giá chợ.
+  - Tèo (cấp 5): lần trộm đầu tiên rất nhẹ, kèm hướng dẫn phòng trộm.
+  - Hóa đơn đầu tiên có thư giải thích, tháng đầu miễn phí.
+- **Sổ tay hướng dẫn** trong túi đồ, có hình minh họa cho từng hệ thống.
+
+## 9. Thứ tự làm (đã chốt)
+
+Làm **nền móng trước, online sau**. Đặt công trình tự do và nhiều bản đồ làm thay đổi cấu trúc bản lưu, nên làm online trên cấu trúc cũ thì phải chuyển bản lưu hai lần. Mỗi phase xong là deploy lên `game.huninna.com`, chơi được ngay.
+
+| Phase | Nội dung |
+|---|---|
+| 0. Nền móng | Bản lưu v2 + tự chuyển bản lưu cũ · đặt công trình tự do + chế độ xây dựng + mở rộng đất · ruộng theo khối · nhiều bản đồ · mô hình thời gian (đồng hồ, đóng băng, lịch ngoài đời) · thể lực + công cụ · thông báo 3 mức + bảng Việc cần làm |
+| 1. Online | Server Node + `ws` + SQLite trong Docker · tài khoản, 1 thiết bị · đồng bộ + server chạy bù · làng (chợ, thấy nhau, chat) · thăm vườn, giúp, trộm + giới hạn · chó phát hiện người chơi |
+| 2. Vật nuôi | Vòng đời, đực/cái, dơ/tắm, bệnh/chết, độ thân, bán theo cân · chuồng 3 cấp + cách ly · thả rông, về chuồng, lùa · kẻ săn mồi, mèo · dạy lệnh |
+| 3. Cây & nước | 16 loại cây với hình riêng · thành thạo, trái khổng lồ, ★ · mùa, thời tiết xấu · nhà kính · giếng, bồn, ống nước, tự động hóa |
+| 4. Kinh tế & làng | Sức mua, sự kiện giá · hóa đơn, hao mòn · kho, đồ hư, kho lạnh · máy chế biến, bếp · cư dân ❤️ · nhân công · hội chợ + loto · Tiếng tăm ⭐ |
+| 5. Nhà | Nội thất, đặt đồ, Nhà đẹp · thú cưng cảnh · quần áo có tác dụng |
+| 6. Loài & khu mới | Hồ cá, cây ăn trái, ong, tằm · thỏ, ngỗng, dê, trâu, ếch, bồ câu, công, ngựa |
+| 7. Mục tiêu dài hạn | Nhiệm vụ hằng ngày · lễ hội · sổ sưu tầm · ~60 thành tựu · nhiệm vụ làm quen |
+
+### Quy trình mỗi phase (đã chốt)
+1. Làm song song bằng **subagent**, chọn model hợp với từng việc.
+2. **Test e2e toàn bộ chức năng** của phase (và các phase trước) cho tới khi pass hết.
+3. **Deploy** lên VPS.
+4. **Test live** trên `https://game.huninna.com` sau khi deploy.
+
+### Test & chia việc (đã chốt)
+- **Unit:** `node --test` cho `state.js`, server và việc chuyển bản lưu cũ.
+- **E2E: Playwright** (chỉ dùng lúc phát triển).
+  - Chạy Chromium ở hai cỡ màn hình: máy tính và điện thoại 360px.
+  - **Chế độ test `?test=1`** (chỉ khi chạy local): tua thời gian ×1000, dịch chuyển nhân vật, phát đồ.
+  - Test online mở 2 trình duyệt cùng lúc (2 người chơi).
+- **Không dùng GitHub Actions. Mọi test chạy trên máy của người phát triển:**
+  - Unit và e2e chạy trước khi deploy, nhắm vào server chạy local.
+  - Smoke test live chạy sau khi deploy, gửi request từ chính máy đó tới `https://game.huninna.com`.
+  - Vì máy dễ thiếu RAM: Chromium chạy headless, mỗi lúc 1 worker. Riêng test online thì 2 trình duyệt.
+- **Test live:** smoke test bằng Playwright nhắm vào `https://game.huninna.com`, dùng tài khoản test riêng, tự dọn sau khi chạy.
+- **Subagent theo model:**
+
+| Việc | Model |
+|---|---|
+| Cấu trúc bản lưu v2, đồng bộ online, hợp đồng API giữa module, review + gộp | Opus |
+| Từng phần theo file (LOGIC, WORLD, UI, SERVER, ART), mỗi agent một worktree | Sonnet |
+| Bảng số liệu, viết test e2e theo kịch bản, chạy test và tóm tắt lỗi | Haiku |
 
 ## 11. Danh sách chủ đề cần grill
 
@@ -816,13 +902,11 @@ Nền online làm sớm, vì nó quyết định dữ liệu nằm ở đâu. Th
 | J | Nhân vật người chơi | Thể lực ✅ · công cụ ✅ · quần áo ✅ · nhà + nội thất ✅ · thú cưng cảnh ✅ · (cấp & EXP chuyển sang N) | ✅ |
 | K | NPC & trộm NPC | Tần suất trộm NPC ✅ · cư dân làng ✅ · độ thân với cư dân ✅ · đơn hàng ✅ | ✅ |
 | L | Kinh tế | Hóa đơn tháng ✅ · được mùa mất giá ✅ · hội chợ ✅ · ngưỡng rớt giá ✅ · trò chơi cụ thể ✅ · Tiếng tăm ⭐ ✅ | ✅ |
-| M | Online | Hosting & đối tượng chơi ✅ · tài khoản · bạn bè · thăm vườn · giúp/trộm · real-time · ai giữ dữ liệu · chế độ offline | 🔶 |
+| M | Online | Hosting & đối tượng chơi ✅ · tài khoản & thiết bị ✅ · bạn bè ✅ · thăm vườn ✅ · giúp/trộm ✅ · WebSocket ✅ · ai giữ dữ liệu ✅ · chế độ offline ✅ | ✅ |
 | N | Tiến trình & mục tiêu | Đường cong cấp ✅ · mở khóa ✅ · nhiệm vụ ✅ · thành tựu ✅ · lễ hội ✅ · sổ sưu tầm ✅ | ✅ |
-| O | UI/UX & hiệu năng | Bảng mới · quá tải thông báo · điện thoại yếu với nhiều thực thể · hướng dẫn người mới | ⬜ |
-| P | Kỹ thuật & triển khai | Thứ tự phase · chia agent/file · chuyển save cũ · test | ⬜ |
+| O | UI/UX & hiệu năng | Thông báo 3 mức ✅ · bảng Việc cần làm ✅ · bản đồ nhỏ ✅ · hiệu năng ✅ · hướng dẫn người mới ✅ | ✅ |
+| P | Kỹ thuật & triển khai | Thứ tự phase ✅ · quy trình mỗi phase ✅ · chia agent/file + model ✅ · chuyển save cũ ✅ (mục 7) · test local + live từ máy local ✅ | ✅ |
 
 ## 10. Câu hỏi còn mở
 
-- **Online:** bao nhiêu người chơi cùng lúc? Chỉ bạn bè trong LAN hay qua Internet? Có cần đăng nhập bằng mã mời không?
-- **Nhân công:** có được thuê bạn bè online làm thợ không?
-- **Trộm online:** có được trộm vật nuôi (dắt heo của bạn về) không, hay chỉ trộm nông sản và trứng?
+Không còn. Ba câu cũ đã chốt: online cho ≤ 20–30 người quen qua Internet, có mã mời (mục 7) · không thuê bạn bè làm thợ (mục 4) · không trộm vật nuôi (mục 7).
