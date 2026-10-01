@@ -20,9 +20,9 @@
 
 ## Acceptance criteria
 
-- [ ] `SPEC.md` không còn chỗ nào mâu thuẫn với PRD 0001 và các ADR.
-- [ ] Một agent mới chỉ đọc `SPEC.md` là biết file nào mình được sửa, gọi API nào, và test ở đâu.
-- [ ] Hợp đồng API trong `SPEC.md` khớp với code sau khi issue 02 xong. Mỗi issue sau thêm hàm mới thì cập nhật lại.
+- [x] `SPEC.md` không còn chỗ nào mâu thuẫn với PRD 0001 và các ADR.
+- [x] Một agent mới chỉ đọc `SPEC.md` là biết file nào mình được sửa, gọi API nào, và test ở đâu.
+- [x] Hợp đồng API trong `SPEC.md` khớp với code sau khi issue 02 xong. Mỗi issue sau thêm hàm mới thì cập nhật lại.
 
 ## Blocked by
 
