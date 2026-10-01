@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
 import { CROPS, FARMING, HUSBANDRY, DOG, THREATS, DAY_MS } from '../public/data.js';
 
@@ -17,7 +18,7 @@ const noBugs = fn => withRandom(0.99, fn); // không xảy ra sự kiện ngẫu
 
 test('createGame: đúng dữ liệu khởi đầu', () => {
   const s = newGame();
-  assert.equal(s.plots.length, 36);
+  assert.equal(s.plots.length, 9);   // vườn mới: 1 khối ruộng 3x3
   assert.equal(s.plots.filter(p => p.unlocked).length, 9);
   assert.deepEqual(G.UNLOCK_ORDER.slice(0, 9).sort((a, b) => a - b), [0, 1, 2, 6, 7, 8, 12, 13, 14]);
   assert.equal(s.coins, 250);
@@ -134,8 +135,12 @@ test('bón phân tăng sản lượng, thuốc tăng trưởng đẩy nhanh', ()
   assert.equal(s.inv.cai, Math.round(CROPS.cai.yield * 1.5));
 });
 
-test('mở rộng đất theo thứ tự', () => {
-  const s = newGame();
+test('mở rộng đất theo thứ tự (vườn chuyển từ v1 còn ô khóa)', () => {
+  const v1 = JSON.parse(readFileSync(new URL('./fixtures/v1-fresh.json', import.meta.url), 'utf8'));
+  v1.savedAt = Date.now();
+  for (const k of Object.keys(store)) delete store[k];
+  store['nongtrai-save-v1'] = JSON.stringify(v1);
+  const s = G.loadGame();
   const next = G.nextLockedPlot(s);
   assert.equal(next, G.UNLOCK_ORDER[9]);
   assert.deepEqual(G.actionsFor(s, { kind: 'lockedPlot', idx: 35 }), []);
@@ -291,7 +296,9 @@ test('quạ đậu ô chín rồi ăn cây; bù nhìn chặn; đuổi quạ', ()
   // bù nhìn chặn
   const s2 = newGame(); s2.animals = [];
   G.perform(s2, T(0), 'till'); G.perform(s2, T(0), 'plant'); s2.plots[0].crop.progress = 1; s2.weather = 'rain';
-  s2.decos.push({ id: 900, kind: 'deco_scarecrow', x: 340, y: 70 });
+  const pc = G.mapOf(s2).plotCenter(0);
+  s2.inv.deco_scarecrow = 1; s2.player.x = pc.x - 16; s2.player.y = pc.y;   // cắm bù nhìn sát ruộng
+  assert.ok(G.placeDeco(s2, 'deco_scarecrow').ok);
   withRandom(LUCKY, () => run(s2, 2000));
   assert.equal(s2.threats.length, 0);
 });
@@ -305,7 +312,7 @@ test('thằng Tèo ban đêm, bắt được thì đền xu', () => {
   withRandom(LUCKY, () => run(s, 1000));
   const th = s.threats.find(t => t.kind === 'thief');
   assert.ok(th);
-  assert.equal(th.x, 272);
+  assert.equal(th.x, G.mapOf(s).gateIn.x);   // đi vào từ cổng
   const c = s.coins;
   const r = withRandom(0.5, () => G.perform(s, { kind: 'threat', id: th.id }, 'catch'));
   assert.ok(r.ok);
@@ -366,12 +373,12 @@ test('lên cấp có thưởng; thành tựu', () => {
 test('đặt đồ trang trí', () => {
   const s = newGame();
   s.inv.deco_flower = 1;
-  s.player.x = 200; s.player.y = 200;
+  Object.assign(s.player, G.mapOf(s).spawn);
   assert.ok(G.placeDeco(s, 'deco_flower').ok);
-  assert.equal(s.decos.length, 1);
+  assert.equal(G.mapOf(s).decos.length, 1);
   assert.equal(G.placeDeco(s, 'deco_flower').ok, false);
   s.inv.deco_flower = 1;
-  s.player.x = 21 * 16 + 8; s.player.y = 4 * 16 + 8; // trên ruộng
+  Object.assign(s.player, G.mapOf(s).plotCenter(0)); // trên ruộng
   assert.equal(G.placeDeco(s, 'deco_flower').ok, false);
 });
 
@@ -405,9 +412,9 @@ test('lưu và tải lại (có chạy bù offline)', () => {
   assert.equal(back.name, 'Hùng');
   assert.equal(back.time, s.time);
   // giả lập nghỉ 30 phút
-  const raw = JSON.parse(store['nongtrai-save-v1']);
+  const raw = JSON.parse(store[G.SAVE_KEY]);
   raw.savedAt = Date.now() - 30 * MIN;
-  store['nongtrai-save-v1'] = JSON.stringify(raw);
+  store[G.SAVE_KEY] = JSON.stringify(raw);
   const later = G.loadGame();
   assert.ok(later.time >= 29 * MIN);
   assert.equal(later.threats.length, 0);

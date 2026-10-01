@@ -1,7 +1,8 @@
 // Vẽ thế giới: lớp nền tĩnh (vẽ một lần) + lớp động mỗi khung hình. Không giữ trạng thái game.
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
-import { TS, MW, MH, W, H, GROUND, PENS, BUILDINGS, TREES, BUSHES, MUD, GRID_DATA, plotTile } from './layout.js';
-import { CROP_STAGES, DAY_MS, NIGHT_FROM, GRID } from './data.js';
+import { TS, GROUND } from './layout.js';
+import { mapOf } from './farm.js';
+import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
 
@@ -159,10 +160,11 @@ export function buildingImg(b) {
 export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h: i.height }; }
 
 // ---------- Lớp nền tĩnh ----------
-let staticCanvas = null;
-export function staticLayer() {
-  if (staticCanvas) return staticCanvas;
-  const { ground, solid, fences } = GRID_DATA;
+// Vẽ lại khi bố cục vườn đổi (farm.rev)
+let staticCanvas = null, staticFor = null;
+export function staticLayer(m) {
+  if (staticCanvas && staticFor === m) return staticCanvas;
+  const { ground, solid, fences, mw: MW, mh: MH, W, H, mud: MUD } = m;
   const gAt = (c, r) => (c < 0 || r < 0 || c >= MW || r >= MH) ? -1 : ground[r * MW + c];
   const isRoad = (c, r) => { const g = gAt(c, r); return g === GROUND.ROAD || g === -1; };
   const land = paint(W, H, (px, py) => {
@@ -186,6 +188,11 @@ export function staticLayer() {
       if (n > 0.96) return '#ecd9a8';
       if (hash(px >> 2, py >> 2) < 0.18) return '#d6bb86';
       return '#dcc490';
+    }
+    if (g === GROUND.FOREST) {
+      const b = hash(px >> 3, py >> 3);
+      if (n < 0.06) return '#1f3d16';
+      return b < 0.3 ? '#2c5520' : b > 0.8 ? '#36662a' : '#305c24';
     }
     if (g === GROUND.FIELD) return n < 0.08 ? '#6a4324' : '#7b512b';
     if (g === GROUND.PEN) {
@@ -217,14 +224,14 @@ export function staticLayer() {
     return col;
   });
 
-  staticCanvas = mkCanvas(W, H);
+  staticCanvas = mkCanvas(W, H); staticFor = m;
   const x = staticCanvas.getContext('2d');
   x.imageSmoothingEnabled = false;
   x.drawImage(land, 0, 0);
 
   // vũng bùn chuồng heo
-  if (SPR.mud) x.drawImage(SPR.mud, MUD.x, MUD.y);
-  else {
+  if (MUD && SPR.mud) x.drawImage(SPR.mud, MUD.x, MUD.y);
+  else if (MUD) {
     x.fillStyle = '#3f2a16'; x.beginPath(); x.ellipse(MUD.x + MUD.w / 2, MUD.y + MUD.h / 2, MUD.w / 2, MUD.h / 2, 0, 0, 7); x.fill();
     x.fillStyle = '#54381d'; x.beginPath(); x.ellipse(MUD.x + MUD.w / 2, MUD.y + MUD.h / 2, MUD.w / 2 - 2, MUD.h / 2 - 2, 0, 0, 7); x.fill();
     x.fillStyle = '#7d5a36'; x.fillRect(MUD.x + 10, MUD.y + 6, 6, 1); x.fillRect(MUD.x + 22, MUD.y + 12, 5, 1);
@@ -308,8 +315,8 @@ export function render(ctx, f) {
   const { state, w: wd, scale, width, height, dpr, now } = f;
   const camX = Math.round(f.cam.x * scale), camY = Math.round(f.cam.y * scale);
   const toSX = wx => wx * scale - camX, toSY = wy => wy * scale - camY;
-  const M = 40;
-  const vl = camX / scale - M, vt = camY / scale - M, vr = (camX + width) / scale + M, vb = (camY + height) / scale + M;
+  const PAD = 40;
+  const vl = camX / scale - PAD, vt = camY / scale - PAD, vr = (camX + width) / scale + PAD, vb = (camY + height) / scale + PAD;
   const vis = (x, y, r = 30) => x > vl - r && x < vr + r && y > vt - r && y < vb + r;
   const night = nightAmount(state);
 
@@ -318,7 +325,8 @@ export function render(ctx, f) {
   ctx.fillStyle = '#25491a';
   ctx.fillRect(0, 0, width, height);
   ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
-  ctx.drawImage(staticLayer(), 0, 0);
+  const m = mapOf(state);
+  ctx.drawImage(staticLayer(m), 0, 0);
 
   const blit = (img, x, y) => { if (img) ctx.drawImage(img, Math.round(x), Math.round(y)); };
   const shadow = (x, y, rx) => {
@@ -329,7 +337,9 @@ export function render(ctx, f) {
   // 1) đất ruộng
   const nextLocked = wd.nextLocked(state);
   for (const p of state.plots) {
-    const { c, r } = plotTile(p.idx), px = c * TS, py = r * TS;
+    const pt = m.plotTile(p.idx);
+    if (!pt) continue;
+    const px = pt.c * TS, py = pt.r * TS;
     if (!vis(px, py, 20)) continue;
     if (!p.unlocked) {
       blit(SPR.wild, px, py);
@@ -354,15 +364,15 @@ export function render(ctx, f) {
   const bubbles = [];
   const bub = (x, y, icon, key) => { if (icon) bubbles.push({ x, y, icon, key }); };
 
-  for (const t of TREES) if (vis(t.x, t.y, 30)) add(t.y, () => blit(SPR.tree, t.x - 16, t.y - 44));
-  for (const b of BUSHES) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
+  for (const t of [...m.trees, ...m.border]) if (vis(t.x, t.y, 30)) add(t.y, () => blit(SPR.tree, t.x - 16, t.y - 44));
+  for (const b of m.bushes) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
 
-  for (const b of BUILDINGS) {
+  for (const b of m.buildings) {
     const img = buildingImg(b);
     if (!img) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
   }
-  for (const [pen, p] of Object.entries(PENS)) {
+  for (const [pen, p] of Object.entries(m.pens)) {
     const tr = p.trough, n = state.troughs?.[pen] ?? 0;
     add(tr.y, () => {
       blit(SPR.trough, tr.x - 13, tr.y - 12);
@@ -371,7 +381,7 @@ export function render(ctx, f) {
     });
   }
   // ổ ấp trứng cạnh chuồng gà nhỏ
-  const coop = BUILDINGS.find(b => b.id === 'coop');
+  const coop = m.building('coop');
   if (coop) add(coop.at.y - 2, () => {
     const im = state.nest?.egg ? SPR.nestEgg : SPR.nestEmpty;
     if (im) blit(im, coop.at.x - im.width / 2, coop.at.y - im.height);
@@ -384,8 +394,9 @@ export function render(ctx, f) {
 
   // cây trồng, cỏ, sâu
   for (const p of state.plots) {
-    if (!p.unlocked) continue;
-    const { c, r } = plotTile(p.idx), px = c * TS, py = r * TS;
+    const pt = p.unlocked && m.plotTile(p.idx);
+    if (!pt) continue;
+    const px = pt.c * TS, py = pt.r * TS;
     if (!vis(px, py, 20)) continue;
     const prob = plotProblem(p);
     add(py + 12, () => {
@@ -421,7 +432,7 @@ export function render(ctx, f) {
     });
   }
   // đồ trang trí
-  for (const d of state.decos ?? []) {
+  for (const d of m.decos) {
     if (!vis(d.x, d.y)) continue;
     const im = decoImg(d.kind);
     add(d.y, () => blit(im, d.x - im.width / 2, d.y - im.height + 1));
@@ -502,7 +513,7 @@ export function render(ctx, f) {
     const a = wd.anchorOf(state, tg.target);
     if (a) {
       if (tg.target.kind === 'plot' || tg.target.kind === 'lockedPlot') {
-        const { c, r } = plotTile(tg.target.idx);
+        const { c, r } = m.plotTile(tg.target.idx);
         ctx.globalAlpha = 0.7 + 0.3 * Math.sin(now / 150);
         blit(SPR.select, c * TS, r * TS);
         ctx.globalAlpha = 1;
@@ -548,8 +559,8 @@ export function render(ctx, f) {
       g.addColorStop(1, `rgba(${rgb},0)`);
       ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
     };
-    for (const d of state.decos ?? []) if (d.kind === 'deco_lamp') { const im = decoImg(d.kind); glow(d.x, d.y - im.height * 0.75, 46, '255,190,90', 0.6); }
-    const house = BUILDINGS.find(b => b.id === 'house');
+    for (const d of m.decos) if (d.kind === 'deco_lamp') { const im = decoImg(d.kind); glow(d.x, d.y - im.height * 0.75, 46, '255,190,90', 0.6); }
+    const house = m.building('house');
     if (house) for (const wx of [19, 62]) glow(house.x + wx, house.y + 62, 24, '255,205,110', 0.55);
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -578,7 +589,7 @@ export function render(ctx, f) {
     ctx.fillStyle = fill; ctx.fillText(text, x, y);
   };
   // bảng tên nông trại ở cổng
-  const gate = BUILDINGS.find(b => b.id === 'gate');
+  const gate = m.building('gate');
   if (gate && vis(gate.x + 20, gate.y + 8, 40)) {
     const text = `Nông trại ${state.name}`;
     let size = Math.round(9 * scale);

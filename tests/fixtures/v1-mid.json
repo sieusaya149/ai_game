@@ -1,0 +1,524 @@
+{
+ "v": 1,
+ "name": "Dở",
+ "look": {
+  "skin": 0,
+  "hair": 0,
+  "hairColor": 0,
+  "shirt": 0,
+  "pants": 0,
+  "hat": 1,
+  "acc": 0
+ },
+ "owned": {
+  "hat": [
+   0,
+   1
+  ],
+  "acc": [
+   0
+  ]
+ },
+ "coins": 4940,
+ "exp": 400,
+ "time": 430000,
+ "speed": 1,
+ "day": 1,
+ "weather": "rain",
+ "savedAt": 1700000000000,
+ "player": {
+  "x": 120,
+  "y": 200,
+  "dir": 0
+ },
+ "can": 7,
+ "selectedSeed": "cai",
+ "inv": {
+  "seed_cai": 3,
+  "seed_carot": 7,
+  "feed_ga": 3,
+  "dogfood": 3,
+  "pesticide": 1,
+  "fertilizer": 1
+ },
+ "plots": [
+  {
+   "idx": 0,
+   "unlocked": true,
+   "soil": "tilled",
+   "water": 100,
+   "weeds": false,
+   "crop": {
+    "id": "cai",
+    "progress": 1,
+    "planted": 0,
+    "bugs": false,
+    "bugSince": 0,
+    "sick": false,
+    "sickSince": 0,
+    "fert": false,
+    "boosts": 0,
+    "dead": false,
+    "rotten": false,
+    "ripeAt": 430000
+   }
+  },
+  {
+   "idx": 1,
+   "unlocked": true,
+   "soil": "tilled",
+   "water": 100,
+   "weeds": false,
+   "crop": {
+    "id": "cai",
+    "progress": 0.5,
+    "planted": 0,
+    "bugs": false,
+    "bugSince": 0,
+    "sick": false,
+    "sickSince": 0,
+    "fert": false,
+    "boosts": 0,
+    "dead": false,
+    "rotten": false,
+    "ripeAt": 0
+   }
+  },
+  {
+   "idx": 2,
+   "unlocked": true,
+   "soil": "tilled",
+   "water": 100,
+   "weeds": false,
+   "crop": {
+    "id": "cai",
+    "progress": 0.2,
+    "planted": 0,
+    "bugs": false,
+    "bugSince": 0,
+    "sick": false,
+    "sickSince": 0,
+    "fert": false,
+    "boosts": 0,
+    "dead": false,
+    "rotten": false,
+    "ripeAt": 0
+   }
+  },
+  {
+   "idx": 3,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 4,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 5,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 6,
+   "unlocked": true,
+   "soil": "tilled",
+   "water": 100,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 7,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 100,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 8,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 100,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 9,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 10,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 11,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 12,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 100,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 13,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 100,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 14,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 100,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 15,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 16,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 17,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 18,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 19,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 20,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 21,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 22,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 23,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 24,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 25,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 26,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 27,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 28,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 29,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 30,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 31,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 32,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 33,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 34,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 35,
+   "unlocked": false,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  }
+ ],
+ "animals": [
+  {
+   "id": 1,
+   "type": "ga",
+   "adult": true,
+   "age": 240000,
+   "hunger": 0,
+   "happy": 38.833333333333606,
+   "sick": false,
+   "starvingSince": 301000,
+   "nextProduct": 300000,
+   "ready": false,
+   "pregnant": false,
+   "dueAt": 0,
+   "x": 152.76410187166684,
+   "y": 341.4273379215169,
+   "name": "Gà"
+  },
+  {
+   "id": 2,
+   "type": "ga",
+   "adult": false,
+   "age": 210000,
+   "hunger": 0,
+   "happy": 38.833333333333606,
+   "sick": false,
+   "starvingSince": 301000,
+   "nextProduct": 150000,
+   "ready": false,
+   "pregnant": false,
+   "dueAt": 0,
+   "x": 208.10931409622913,
+   "y": 358.3710422562744,
+   "name": "Gà"
+  }
+ ],
+ "troughs": {
+  "chicken": 0,
+  "pig": 0,
+  "pasture": 0
+ },
+ "eggs": [
+  {
+   "id": 5,
+   "x": 152.76410187166684,
+   "y": 341.4273379215169,
+   "laidAt": 150000,
+   "check": 750000
+  }
+ ],
+ "nest": {
+  "egg": false,
+  "hatchAt": 0
+ },
+ "dog": {
+  "adult": false,
+  "age": 336000,
+  "hunger": 10.416666666667192,
+  "happy": 52.83333333333374,
+  "x": 40,
+  "y": 186,
+  "nextPoop": 617800,
+  "name": "Mực"
+ },
+ "poops": [
+  {
+   "id": 4,
+   "x": 40,
+   "y": 186,
+   "at": 140000
+  },
+  {
+   "id": 8,
+   "x": 40,
+   "y": 186,
+   "at": 379000
+  }
+ ],
+ "threats": [],
+ "decos": [
+  {
+   "id": 9,
+   "kind": "deco_scarecrow",
+   "x": 120,
+   "y": 200
+  }
+ ],
+ "orders": [
+  {
+   "id": 3,
+   "who": "Dì Năm",
+   "items": {
+    "carot": 5,
+    "cai": 5
+   },
+   "coins": 112,
+   "exp": 24
+  },
+  {
+   "id": 6,
+   "who": "Dì Năm",
+   "items": {
+    "carot": 5,
+    "cai": 5
+   },
+   "coins": 112,
+   "exp": 24
+  },
+  {
+   "id": 7,
+   "who": "Dì Năm",
+   "items": {
+    "carot": 5,
+    "cai": 5
+   },
+   "coins": 112,
+   "exp": 24
+  }
+ ],
+ "nextOrderAt": 610000,
+ "stats": {
+  "harvests": 0,
+  "bugs": 0,
+  "eggs": 0,
+  "poops": 0,
+  "slips": 0,
+  "piglets": 0,
+  "hatches": 0,
+  "orders": 0,
+  "thieves": 0,
+  "crows": 0,
+  "earned": 0,
+  "planted": 3
+ },
+ "achievements": {},
+ "log": [
+  {
+   "t": 136000,
+   "text": "Cải xanh chín quá nên héo mất"
+  },
+  {
+   "t": 136000,
+   "text": "Cải xanh chín quá nên héo mất"
+  },
+  {
+   "t": 136000,
+   "text": "Cải xanh chín quá nên héo mất"
+  }
+ ],
+ "tutorial": 0,
+ "nextId": 10
+}

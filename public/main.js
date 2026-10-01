@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
-import { loadGame, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform } from './state.js';
+import { loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf } from './state.js';
 import * as ui from './ui.js';
-import { W, H, TS } from './layout.js';
+import { TS } from './layout.js';
 import * as R from './render.js';
 import * as V from './world.js';
 
@@ -52,9 +52,11 @@ function updateCamera(dt, snap) {
   const topW = px(document.getElementById('hud')?.getBoundingClientRect().bottom || 0);
   const barTop = document.getElementById('bottombar')?.getBoundingClientRect().top;
   const botW = px(barTop ? innerHeight - barTop : 0);
-  const fit = (t, size, map, lo = 0, hi = 0) => size - lo - hi >= map ? (map - size + hi - lo) / 2 : clamp(t, -lo, map - size + hi);
-  const tx = fit(p.x - vw / 2, vw, W);
-  const ty = fit(p.y - 8 - topW - (vh - topW - botW) / 2, vh, H, topW, botW);
+  // camera không trôi quá đất nhà quá 2 ô (m.view)
+  const v = mapOf(state).view;
+  const fit = (t, size, a, b, lo = 0, hi = 0) => size - lo - hi >= b - a ? a + (b - a - size + hi - lo) / 2 : clamp(t, a - lo, b - size + hi);
+  const tx = fit(p.x - vw / 2, vw, v.x0, v.x1);
+  const ty = fit(p.y - 8 - topW - (vh - topW - botW) / 2, vh, v.y0, v.y1, topW, botW);
   if (snap) { cam.x = tx; cam.y = ty; return; }
   const k = 1 - Math.exp(-dt * 9);
   cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
@@ -267,6 +269,10 @@ resize();
 setupJoystick();
 ui.initUI(api);
 state = loadGame();
-if (state) begin(); else ui.showCreator();
+if (state) begin();
+else {
+  ui.showCreator();
+  if (loadProblem()) ui.toast('Không đọc được bản lưu cũ, bản cũ vẫn được giữ nguyên. Bạn có thể bắt đầu vườn mới.');
+}
 globalThis.__farm = { get state() { return state; }, get world() { return world; }, get scale() { return scale; }, get view() { return view; }, get dpr() { return dpr; } };
 requestAnimationFrame(t => { last = t; lastSave = t; requestAnimationFrame(frame); });

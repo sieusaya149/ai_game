@@ -1,7 +1,6 @@
 // Công cụ dựng tình huống cho e2e. Không đụng vào code game.
 import { expect } from '@playwright/test';
 import { createGame, SAVE_KEY } from '../public/state.js';
-import { plotCenter } from '../public/layout.js';
 
 // Bản lưu hợp lệ lấy thẳng từ createGame của game; mutate(s) để chỉnh thêm.
 export function makeSave(mutate, opts = { name: 'Tester' }) {
@@ -57,16 +56,16 @@ export async function createCharacter(page, name = 'Tester') {
 // Chạm/click vào ô ruộng `idx` trên canvas (nhân vật tự đi tới rồi làm hành động chính).
 // Ô ngoài màn hình thì chạm về phía đó cho nhân vật đi, camera đi theo, lặp tới khi thấy ô.
 export async function tapPlot(page, idx, touch) {
-  const c = plotCenter(idx);
   for (let i = 0; i < 12; i++) {
-    const pt = await page.evaluate(([wx, wy]) => {
-      const f = globalThis.__farm, r = document.getElementById('game-canvas').getBoundingClientRect();
+    const pt = await page.evaluate(async i => {
+      const { mapOf } = await import('/state.js');
+      const f = globalThis.__farm, { x: wx, y: wy } = mapOf(f.state).plotCenter(i), r = document.getElementById('game-canvas').getBoundingClientRect();
       const top = document.getElementById('hud').getBoundingClientRect().bottom + 4;
       const bot = document.getElementById('bottombar').getBoundingClientRect().top - 4;
       const x = (wx * f.scale - f.view.camX) / f.dpr + r.left, y = (wy * f.scale - f.view.camY) / f.dpr + r.top;
       const ok = x > 4 && x < innerWidth - 4 && y > top && y < bot;
       return { x, y, ok, w: innerWidth, top, bot };
-    }, [c.x, c.y]);
+    }, idx);
     if (pt.ok) {
       if (touch) await page.touchscreen.tap(pt.x, pt.y); else await page.mouse.click(pt.x, pt.y);
       return;

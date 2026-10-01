@@ -4,11 +4,16 @@ import {
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START,
   expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice,
 } from './data.js';
-import { PENS, BUILDINGS, SPAWN, DOG_HOME, GATE_IN, W, H, TS, plotCenter, plotAt, isSolidPx } from './layout.js';
+import { TS, PEN_DEFS } from './layout.js';
+import { mapOf, reachable, bumpLayout } from './farm.js';
+import { migrate, newFarm } from './migrate.js';
 
-export { levelInfo };
-export const SAVE_KEY = 'nongtrai-save-v1';
+export { levelInfo, mapOf, reachable };
+export const SAVE_KEY = 'nongtrai-save-v2';
+const OLD_KEYS = ['nongtrai-save-v1'];   // đọc được để chuyển, không bao giờ ghi đè hay xóa
+const MIGRATED_KEY = 'nongtrai-migrated';
 const MIN = 60_000;
+const plotCenter = (s, i) => mapOf(s).plotCenter(i);
 
 // Thứ tự mở ruộng: lan dần từ góc (max(r,c), min(r,c), r).
 export const UNLOCK_ORDER = Array.from({ length: GRID * GRID }, (_, i) => i).sort((a, b) => {
@@ -67,7 +72,7 @@ function checkAch(s) {
   }
 }
 
-const penPoint = pen => { const a = PENS[pen].area; return { x: a.x + rnd(0, a.w), y: a.y + rnd(0, a.h) }; };
+const penPoint = (s, pen) => { const a = mapOf(s).pens[pen].area; return { x: a.x + rnd(0, a.w), y: a.y + rnd(0, a.h) }; };
 const penCount = (s, pen) => s.animals.filter(a => ANIMALS[a.type].pen === pen).length;
 const isRipe = p => p.crop && !p.crop.dead && !p.crop.rotten && p.crop.progress >= 1;
 const nextPoopAt = s => s.time + rnd(...DOG.poopEvery);
@@ -89,21 +94,25 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
   const owned = { hat: HATS.map((h, i) => i).filter(i => HATS[i].price === 0), acc: ACCS.map((h, i) => i).filter(i => ACCS[i].price === 0) };
   if (!owned.hat.includes(lk.hat)) lk.hat = 0;
   if (!owned.acc.includes(lk.acc)) lk.acc = 0;
+  const nf = newFarm(1);
   const s = {
-    v: 1, name, look: lk, owned, coins: START.coins, exp: 0,
+    v: 2, name, look: lk, owned, coins: START.coins, exp: 0,
     time: 0, speed: 1, day: 1, weather: 'sun', savedAt: Date.now(),
-    player: { x: SPAWN.x, y: SPAWN.y, dir: 0 }, can: FARMING.canMax, selectedSeed: 'cai',
+    farm: nf.farm,
+    player: { x: 0, y: 0, dir: 0 }, can: FARMING.canMax, selectedSeed: 'cai',
     inv: { ...START.items },
-    plots: Array.from({ length: GRID * GRID }, (_, i) => newPlot(i, false)),
+    plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
-    dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: DOG_HOME.x, y: DOG_HOME.y, nextPoop: 0, name: DOG.name },
-    poops: [], threats: [], decos: [], orders: [], nextOrderAt: 0,
+    dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name },
+    poops: [], threats: [], orders: [], nextOrderAt: 0,
     stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0 },
-    achievements: {}, log: [], tutorial: 0, nextId: 1,
+    achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
   };
-  UNLOCK_ORDER.slice(0, START_PLOTS).forEach(i => { s.plots[i].unlocked = true; });
+  const m = mapOf(s);
+  Object.assign(s.player, m.spawn);
+  Object.assign(s.dog, m.dogHome);
   s.dog.nextPoop = nextPoopAt(s);
-  for (const a of START.animals) { const p = penPoint(ANIMALS[a.type].pen); mkAnimal(s, a.type, a.adult, p.x, p.y); }
+  for (const a of START.animals) { const p = penPoint(s, ANIMALS[a.type].pen); mkAnimal(s, a.type, a.adult, p.x, p.y); }
   evq = [];
   return s;
 }
@@ -111,19 +120,45 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
 export function saveGame(s) {
   try { s.savedAt = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* không có localStorage */ }
 }
-export function resetGame() { try { localStorage.removeItem(SAVE_KEY); } catch { /* bỏ qua */ } }
+export function resetGame() {
+  try { localStorage.removeItem(SAVE_KEY); localStorage.setItem(MIGRATED_KEY, '1'); } catch { /* bỏ qua */ }
+}
+
+// Lý do lần loadGame gần nhất không đọc được bản lưu (null = không có bản lưu nào, không phải lỗi).
+let problem = null;
+export const loadProblem = () => problem;
+
+function readSave() {
+  problem = null;
+  const read = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  // Đã chuyển bản cũ một lần (hoặc đã chơi lại từ đầu) thì không đọc bản cũ nữa.
+  const keys = read(MIGRATED_KEY) ? [SAVE_KEY] : [SAVE_KEY, ...OLD_KEYS];
+  for (const key of keys) {
+    const raw = read(key);
+    if (raw == null) continue;
+    try {
+      const s = migrate(JSON.parse(raw));
+      if (key !== SAVE_KEY) {
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); localStorage.setItem(MIGRATED_KEY, '1'); } catch { /* bỏ qua */ }
+      }
+      return s;
+    } catch (e) {
+      problem = `Không đọc được bản lưu cũ (${e.message}). Bản lưu vẫn được giữ nguyên.`;
+      return null;
+    }
+  }
+  return null;
+}
 
 export function loadGame() {
-  let s;
-  try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; }
-  if (!s || s.v !== 1 || !Array.isArray(s.plots)) return null;
-  // Bổ sung trường thiếu (save cũ)
+  const s = readSave();
+  if (!s) return null;
+  // Bổ sung trường thiếu
   const base = createGame({ name: s.name });
   s.stats = { ...base.stats, ...s.stats };
   s.troughs = { ...base.troughs, ...s.troughs };
   for (const k of ['owned', 'achievements', 'inv', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
-  for (const k of ['animals', 'eggs', 'poops', 'threats', 'decos', 'orders', 'log']) s[k] ||= [];
-  while (s.plots.length < GRID * GRID) s.plots.push(newPlot(s.plots.length, false));
+  for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
   evq = [];
   const elapsed = clamp(Date.now() - (s.savedAt || Date.now()), 0, MAX_CATCHUP_MS);
   if (elapsed > 3000) {
@@ -182,7 +217,7 @@ function stepPlot(s, p, d) {
   if (!p.weeds && chance(FARMING.weedChancePerMin, d)) p.weeds = true;
   const c = p.crop;
   if (!c || c.dead || c.rotten) return;
-  const def = CROPS[c.id], at = plotCenter(p.idx);
+  const def = CROPS[c.id], at = plotCenter(s, p.idx);
   if (c.progress >= 1) { // chín: tiếp tục già đi, quá OVERRIPE thì héo
     c.progress += d / def.grow;
     if (c.progress >= OVERRIPE) { c.rotten = true; fxEv(at.x, at.y, 'Héo mất rồi 🥀', COL.bad); log(s, `${def.name} chín quá nên héo mất`); }
@@ -267,7 +302,7 @@ function stepEggs(s) {
     } else e.check += HUSBANDRY.eggForgetMs;
   }
   if (s.nest.egg && s.time >= s.nest.hatchAt && chickPen()) {
-    const at = BUILDINGS.find(b => b.id === 'coop').at, p = penPoint('chicken');
+    const at = mapOf(s).building('coop').at, p = penPoint(s, 'chicken');
     s.nest.egg = false; mkAnimal(s, 'ga', false, p.x, p.y); s.stats.hatches++;
     spawnEv('chick', at.x, at.y); snd('cluck'); fxEv(at.x, at.y, 'Trứng nở! 🐣', COL.good); toast('Trứng ở ổ ấp đã nở gà con 🐣'); log(s, 'Ổ ấp nở ra một gà con');
   }
@@ -295,21 +330,22 @@ const guardOn = s => s.dog.adult && s.dog.hunger > 40 && s.dog.happy > 50;
 function stepThreats(s, d) {
   const busy = new Set(s.threats.map(t => t.plot));
   const ripe = s.plots.filter(p => p.unlocked && isRipe(p) && !busy.has(p.idx));
-  const scare = s.decos.filter(o => o.kind === 'deco_scarecrow');
-  const lamps = Math.min(3, s.decos.filter(o => o.kind === 'deco_lamp').length);
+  const m = mapOf(s), v = m.view, gateIn = m.gateIn ?? m.spawn;
+  const scare = m.decos.filter(o => o.kind === 'deco_scarecrow');
+  const lamps = Math.min(3, m.decos.filter(o => o.kind === 'deco_lamp').length);
   // quạ
-  const open = ripe.filter(p => { const c = plotCenter(p.idx); return !scare.some(o => Math.hypot(o.x - c.x, o.y - c.y) <= 5 * TS); });
+  const open = ripe.filter(p => { const c = plotCenter(s, p.idx); return !scare.some(o => Math.hypot(o.x - c.x, o.y - c.y) <= 5 * TS); });
   if (open.length && s.threats.filter(t => t.kind === 'crow').length < 2 && chance(THREATS.crowChancePerMin, d)) {
-    const p = pick(open), c = plotCenter(p.idx), side = rint(0, 2);
-    const x = side === 0 ? 2 : side === 1 ? W - 2 : rnd(20, W - 20), y = side === 2 ? 2 : rnd(20, H / 2);
+    const p = pick(open), c = plotCenter(s, p.idx), side = rint(0, 2);
+    const x = side === 0 ? v.x0 + 2 : side === 1 ? v.x1 - 2 : rnd(v.x0 + 20, v.x1 - 20), y = side === 2 ? v.y0 + 2 : rnd(v.y0 + 20, (v.y0 + v.y1) / 2);
     s.threats.push({ id: s.nextId++, kind: 'crow', plot: p.idx, x, y, arriveAt: s.time + Math.hypot(c.x - x, c.y - y) / 60 * 1000, state: 'coming', since: s.time });
     spawnEv('crow', x, y); snd('crow');
   }
   // thằng Tèo
   if (isNight(s) && ripe.length >= 2 && !s.threats.some(t => t.kind === 'thief') && chance(THREATS.thiefChancePerNightMin * Math.pow(0.6, lamps), d)) {
-    const p = pick(ripe), c = plotCenter(p.idx);
-    s.threats.push({ id: s.nextId++, kind: 'thief', plot: p.idx, x: GATE_IN.x, y: GATE_IN.y, arriveAt: s.time + Math.hypot(c.x - GATE_IN.x, c.y - GATE_IN.y) / 40 * 1400, state: 'coming', since: s.time, loot: false });
-    spawnEv('thief', GATE_IN.x, GATE_IN.y); toast('Có tiếng động ngoài ruộng... 👀');
+    const p = pick(ripe), c = plotCenter(s, p.idx);
+    s.threats.push({ id: s.nextId++, kind: 'thief', plot: p.idx, x: gateIn.x, y: gateIn.y, arriveAt: s.time + Math.hypot(c.x - gateIn.x, c.y - gateIn.y) / 40 * 1400, state: 'coming', since: s.time, loot: false });
+    spawnEv('thief', gateIn.x, gateIn.y); toast('Có tiếng động ngoài ruộng... 👀');
   }
   for (const t of s.threats) {
     const p = s.plots[t.plot], crow = t.kind === 'crow', who = crow ? 'Quạ' : 'Thằng Tèo';
@@ -327,7 +363,7 @@ function stepThreats(s, d) {
       else if (s.time - t.since >= (crow ? THREATS.crowEatMs : THREATS.thiefStealMs)) {
         const nm = CROPS[p.crop.id].name;
         p.crop = null; t.state = 'leaving'; t.since = s.time; t.loot = !crow;
-        const c = plotCenter(p.idx);
+        const c = plotCenter(s, p.idx);
         fxEv(c.x, c.y, crow ? 'Quạ ăn mất cây! 😢' : 'Bị hái trộm! 😢', COL.bad);
         log(s, crow ? `Quạ đã ăn mất ${nm}` : `Thằng Tèo hái trộm mất ${nm}`);
       }
@@ -354,7 +390,7 @@ function makeOrder(s) {
 }
 
 // ---------- Ruộng: tiện ích ----------
-export const nextLockedPlot = s => UNLOCK_ORDER.find(i => !s.plots[i].unlocked) ?? -1;
+export const nextLockedPlot = s => UNLOCK_ORDER.find(i => s.plots[i] && !s.plots[i].unlocked) ?? -1;
 const unlockedCount = s => s.plots.filter(p => p.unlocked).length;
 export const stageOf = c => CROP_STAGES.reduce((st, th, i) => (c.progress >= th ? i : st), 0);
 
@@ -448,7 +484,7 @@ function threatActs(s, t) {
 }
 
 function buildingActs(s, t) {
-  const b = BUILDINGS.find(x => x.id === t.id);
+  const b = mapOf(s).building(t.id);
   if (!b) return [];
   const open = { shop: ['🛒', 'Vào sạp hàng'], shed: ['📦', 'Vào nhà kho'], house: ['🏠', 'Vào nhà'], board: ['📋', 'Xem đơn hàng'], gate: ['🚪', 'Ra cổng'] }[b.id];
   if (open) return [mk('open', open[0], open[1])];
@@ -462,10 +498,11 @@ const res = (ok, msg, fx = [], sound, extra) => ({ ok, msg, fx, ...(sound ? { so
 const bad = (msg, at) => res(false, msg, at ? [{ text: msg, color: COL.bad, x: at.x, y: at.y }] : [], 'error');
 
 function posOf(s, t) {
-  if (t.kind === 'plot' || t.kind === 'lockedPlot') return plotCenter(t.idx);
-  if (t.kind === 'trough') return PENS[t.pen].trough;
-  if (t.kind === 'nest') return BUILDINGS.find(b => b.id === 'coop').at;
-  if (t.kind === 'building') return BUILDINGS.find(b => b.id === t.id)?.at ?? s.player;
+  const m = mapOf(s);
+  if (t.kind === 'plot' || t.kind === 'lockedPlot') return m.plotCenter(t.idx) ?? s.player;
+  if (t.kind === 'trough') return m.pens[t.pen]?.trough ?? s.player;
+  if (t.kind === 'nest') return m.building('coop')?.at ?? s.player;
+  if (t.kind === 'building') return m.building(t.id)?.at ?? s.player;
   if (t.kind === 'dog') return s.dog;
   const list = { animal: s.animals, egg: s.eggs, poop: s.poops, threat: s.threats }[t.kind];
   return list?.find(x => x.id === t.id) ?? s.player;
@@ -623,10 +660,12 @@ export function buyAnimal(s, type) {
   const def = ANIMALS[type];
   if (!def) return R(false, 'Không có con này');
   if (level(s) < def.lv) return R(false, `Cần cấp ${def.lv} mới mua được`);
-  if (penCount(s, def.pen) >= PEN_CAP[def.pen]) return R(false, `${PENS[def.pen].name} đã chật rồi`);
+  const pen = mapOf(s).pens[def.pen];
+  if (!pen) return R(false, `Bạn chưa có ${PEN_DEFS[def.pen].name.toLowerCase()}, xây chuồng trước nhé`);
+  if (penCount(s, def.pen) >= PEN_CAP[def.pen]) return R(false, `${pen.name} đã chật rồi`);
   if (s.coins < def.price) return R(false, 'Chưa đủ xu, cố lên nhé');
   s.coins -= def.price;
-  const p = penPoint(def.pen);
+  const p = penPoint(s, def.pen);
   mkAnimal(s, type, false, p.x, p.y);
   return R(true, `Đã mua ${def.baby.toLowerCase()}`);
 }
@@ -674,11 +713,12 @@ export function fulfillOrder(s, orderId) {
 
 export function placeDeco(s, itemId) {
   if (ITEMS[itemId]?.kind !== 'deco' || have(s, itemId) <= 0) return R(false, 'Bạn chưa có món này');
-  const { x, y } = s.player;
-  if (isSolidPx(x, y) || plotAt(Math.floor(x / TS), Math.floor(y / TS)) >= 0) return R(false, 'Chỗ này không đặt được, thử chỗ khác nhé');
-  if (s.decos.some(o => Math.hypot(o.x - x, o.y - y) < 12)) return R(false, 'Chỗ này có đồ rồi');
+  const m = mapOf(s), c = Math.floor(s.player.x / TS), r = Math.floor(s.player.y / TS);
+  if (m.isSolid(c, r) || m.plotAt(c, r) >= 0) return R(false, 'Chỗ này không đặt được, thử chỗ khác nhé');
+  if (m.decos.some(o => o.ent.c === c && o.ent.r === r)) return R(false, 'Chỗ này có đồ rồi');
   take(s, itemId);
-  s.decos.push({ id: s.nextId++, kind: itemId, x, y });
+  s.farm.ents.push({ id: s.nextId++, kind: 'deco', item: itemId, c, r });
+  bumpLayout(s);
   return R(true, `Đã đặt ${ITEMS[itemId].name.toLowerCase()}`);
 }
 
