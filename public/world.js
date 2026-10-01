@@ -3,6 +3,7 @@ import { TS, GROUND } from './layout.js';
 import { ANIMALS, CROPS, DOG, DIR_NAME } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
+import { aiStep } from './perf.js';
 import { animalImg, dogImg, crowImg, eggSize, poopSize, buildingImg, decoSize } from './render.js';
 
 const SPEED = 70;                 // px/s của người chơi
@@ -113,7 +114,9 @@ export function ensurePositions(state) {
 }
 
 // ---------- Con vật trong chuồng ----------
-function updateAnimals(state, w, dt) {
+// w.view (main.js đặt): khung nhìn của camera theo điểm ảnh bản đồ. Con vật ngoài khung chỉ cập nhật AI 2 lần/giây (gom dt).
+const onScreen = (w, o) => !w.view || (o.x >= w.view.x0 && o.x <= w.view.x1 && o.y >= w.view.y0 && o.y <= w.view.y1);
+function updateAnimals(state, w, dt0) {
   const p = state.player;
   const ms = M.mudSpot;
   const inMudSpot = a => !!ms && Math.abs(a.x - ms.x) < ms.rx && Math.abs(a.y - ms.y) < ms.ry;
@@ -121,6 +124,8 @@ function updateAnimals(state, w, dt) {
     const pen = M.pens[ANIMALS[a.type].pen];
     if (!pen) continue;
     const area = pen.area, rt = rtOf(w, 'a' + a.id);
+    const dt = aiStep(rt, dt0, onScreen(w, a));
+    if (!dt) continue;
     const near = Math.hypot(p.x - a.x, p.y - a.y) < 26;
     const scared = state.time < (a.scaredUntil ?? 0);   // vừa bị dời chuồng: chạy loạn một lúc
     const speed = (A_SPEED[a.type] ?? 14) * (a.adult ? 1 : 1.25) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
@@ -169,8 +174,10 @@ const dogAllowed = (c, r) => {
   return !M.fields.some(f => c >= f.c - 1 && c < f.c + 4 && r >= f.r - 1 && r < f.r + 4);
 };
 const dogCan = (x, y) => dogAllowed(Math.floor(x / TS), Math.floor(y / TS)) && dogAllowed(Math.floor((x - 3) / TS), Math.floor(y / TS)) && dogAllowed(Math.floor((x + 3) / TS), Math.floor(y / TS));
-function updateDog(state, w, dt) {
+function updateDog(state, w, dt0) {
   const d = state.dog, p = state.player, rt = rtOf(w, 'dog');
+  const dt = aiStep(rt, dt0, onScreen(w, d));
+  if (!dt) return;
   if (!dogCan(d.x, d.y)) { d.x = M.dogHome.x; d.y = M.dogHome.y; }
   const dp = dist(d, p);
   rt.walking = false; rt.run = false;
@@ -271,6 +278,13 @@ function stripEdge(state, dir) {
 }
 const findBy = (list, id) => (list ?? []).find(e => e.id === id);
 
+// Bụi/đá theo id (bản đồ vườn lớn có hàng trăm cái, tìm mỗi khung hình thì chậm): bảng tra nhớ theo bản đồ
+const clutterIdx = new WeakMap();
+function clutterOf(id) {
+  let t = clutterIdx.get(M);
+  if (!t) clutterIdx.set(M, t = new Map(M.clutter.map(o => [o.id, o])));
+  return t.get(id);
+}
 export function targetPos(state, t) {
   use(state);
   switch (t.kind) {
@@ -285,7 +299,7 @@ export function targetPos(state, t) {
     case 'building': return M.buildings.find(b => b.id === t.id)?.at ?? null;
     case 'door': return doorOf(t.to)?.at ?? null;
     case 'deco': return M.decos.find(d => d.id === t.id) ?? null;
-    case 'clutter': { const c = M.clutter.find(o => o.id === t.id); return c ? { x: c.x + 8, y: c.y + 8 } : null; }
+    case 'clutter': { const c = clutterOf(t.id); return c ? { x: c.x + 8, y: c.y + 8 } : null; }
     case 'strip': return stripEdge(state, t.dir);
   }
   return null;
@@ -342,7 +356,7 @@ export function findTarget(state, w) {
     for (const t of state.threats ?? []) consider({ kind: 'threat', id: t.id });
     consider({ kind: 'dog' });
     consider({ kind: 'nest' });
-    for (const c of M.clutter) consider({ kind: 'clutter', id: c.id });
+    for (const c of M.clutter) if (Math.abs(c.x + 8 - p.x) <= RANGE.clutter && Math.abs(c.y + 8 - p.y) <= RANGE.clutter) consider({ kind: 'clutter', id: c.id });   // ngoài tầm thì khỏi xét
     for (const dir of ['N', 'S', 'E', 'W']) consider({ kind: 'strip', dir });
   }
   for (const { pen } of M.troughs) consider({ kind: 'trough', pen });

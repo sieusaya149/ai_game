@@ -854,6 +854,10 @@ PANELS.settings = {
         Object.entries(D.NOTIFY_CATS).map(([cat, label]) => h('label', { class: 'chk' },
           h('input', { type: 'checkbox', checked: S.notifyOn(s, cat), name: 'notify-' + cat, on: { change: e => { S.setNotify(s, cat, e.target.checked); commit(); } } }), '🟡 ' + label))),
       h('p', { class: 'mini' }, 'Việc nhỏ như nhặt trứng, bán hàng chỉ ghi vào Nhật ký.'),
+      section('Hiệu năng'),
+      h('label', { class: 'chk' },
+        h('input', { type: 'checkbox', checked: api.getBattery(), name: 'battery', on: { change: e => { api.setBattery(e.target.checked); sound.play('pop'); refreshPanel(); } } }), '🔋 Tiết kiệm pin'),
+      h('p', { class: 'mini' }, 'Giữ 30 khung hình mỗi giây, tắt mưa và lấp lánh, ánh đèn ban đêm nhẹ hơn. Hợp với máy yếu hoặc sắp hết pin.'),
       section('Điều khiển'),
       h('ul', { class: 'help' },
         h('li', {}, '🖥️ Máy tính: ', h('kbd', {}, '↑↓←→'), ' hoặc ', h('kbd', {}, 'WASD'), ' để đi.'),
@@ -1031,6 +1035,7 @@ export function updateAlerts(s, toScreen, nowMs = performance.now()) {
   bn.hidden = !on;
   document.body.classList.toggle('alerting', on);
   const rootBox = $('alert-arrows');
+  if (!urgent.length && !rootBox.firstChild) return;   // không có gì gấp: khỏi đo bố cục mỗi khung hình
   const hud = $('hud').getBoundingClientRect(), bar = $('bottombar').getBoundingClientRect();
   const box = { l: 0, t: hud.bottom + 4, r: innerWidth, b: bar.top - 4 };
   const live = new Set();

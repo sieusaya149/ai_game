@@ -4,6 +4,7 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, actionsFor, nextStrip } from './state.js';
+import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
@@ -194,18 +195,39 @@ export function buildingImg(b) {
 export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h: i.height }; }
 
 // ---------- Lớp nền tĩnh ----------
-// Vẽ lại khi bố cục vườn đổi (farm.rev)
+// Ngoài trời chia mảng 16x16 ô, mỗi mảng một canvas vẽ lười (lúc cần blit lần đầu). Bố cục vườn đổi (farm.rev) thì
+// chỉ bỏ các mảng khác bản trước (perf.dirtyChunks), mảng còn lại dùng lại canvas cũ. Trong nhà nhỏ nên một canvas.
 const layers = new WeakMap();   // mỗi bản đồ một lớp nền, đi qua lại giữa các bản đồ khỏi vẽ lại
-export function staticLayer(m) {
-  let hit = layers.get(m);
-  if (!hit) layers.set(m, hit = m.interior ? interiorLayer(m) : outdoorLayer(m));
-  return hit;
+let lastFarm = null;            // lớp vườn gần nhất, để mượn mảng chưa đổi
+let chunkDraws = 0;             // số lần vẽ một mảng (đếm để kiểm chứng "chỉ vẽ lại mảng liên quan")
+export const chunkStats = () => ({ drawn: chunkDraws });
+function layerOf(m) {
+  let L = layers.get(m);
+  if (L) return L;
+  if (m.interior) L = { m, canvas: null };
+  else {
+    const { cw, ch } = chunkGrid(m.mw, m.mh), prev = m.scene === 'farm' ? lastFarm : null, dirty = dirtyChunks(prev?.m, m);
+    L = { m, cw, cv: Array.from({ length: cw * ch }, (_, i) => (prev && !dirty.has(i) ? prev.cv[i] : null)) };
+    if (m.scene === 'farm') lastFarm = L;
+  }
+  layers.set(m, L);
+  return L;
 }
-function outdoorLayer(m) {
+// Vẽ nền của bản đồ m phần trong hình chữ nhật (x0,y0)-(x1,y1) điểm ảnh bản đồ; ctx đã đặt phép biến đổi camera
+export function drawStatic(ctx, m, x0, y0, x1, y1) {
+  const L = layerOf(m);
+  if (m.interior) { ctx.drawImage(L.canvas ??= interiorLayer(m), 0, 0); return; }
+  for (const i of chunksIn(m.mw, m.mh, x0, y0, x1, y1)) ctx.drawImage(L.cv[i] ??= outdoorChunk(m, i, L.cw), (i % L.cw) * CHUNK_PX, Math.floor(i / L.cw) * CHUNK_PX);
+}
+function outdoorChunk(m, ci, cw) {
+  chunkDraws++;
   const { ground, solid, fences, mw: MW, mh: MH, W, H, mud: MUD } = m;
+  const ox = (ci % cw) * CHUNK_PX, oy = Math.floor(ci / cw) * CHUNK_PX;
   const gAt = (c, r) => (c < 0 || r < 0 || c >= MW || r >= MH) ? -1 : ground[r * MW + c];
   const isRoad = (c, r) => { const g = gAt(c, r); return g === GROUND.ROAD || g === -1; };
-  const land = paint(W, H, (px, py) => {
+  const land = paint(CHUNK_PX, CHUNK_PX, (qx, qy) => {
+    const px = qx + ox, py = qy + oy;
+    if (px >= W || py >= H) return null;
     const tc = px >> 4, tr = py >> 4, lx = px & 15, ly = py & 15;
     const g = ground[tr * MW + tc], n = hash(px, py);
     if (g === GROUND.ROAD) {
@@ -262,28 +284,32 @@ function outdoorLayer(m) {
     return col;
   });
 
-  const staticCanvas = mkCanvas(W, H);
+  const staticCanvas = mkCanvas(CHUNK_PX, CHUNK_PX);
   const x = staticCanvas.getContext('2d');
   x.imageSmoothingEnabled = false;
   x.drawImage(land, 0, 0);
+  x.translate(-ox, -oy);   // từ đây vẽ theo toạ độ bản đồ, phần ngoài mảng tự bị cắt
+  // các ô của mảng này (thêm 1 ô quanh cho hình lố ra ngoài ô)
+  const c0 = Math.max(0, (ox >> 4) - 1), c1 = Math.min(MW - 1, ((ox + CHUNK_PX) >> 4)), r0 = Math.max(0, (oy >> 4) - 1), r1 = Math.min(MH - 1, ((oy + CHUNK_PX) >> 4));
   // rừng ngoài đất: lát ô cây liền nhau, chọn biến thể theo băm toạ độ (chưa có art thì giữ màu xanh phẳng ở trên)
   const fv = SPR2?.forest;
-  if (fv?.length) for (let r = 0; r < MH; r++) for (let c = 0; c < MW; c++) if (ground[r * MW + c] === GROUND.FOREST) x.drawImage(fv[tileHash(c, r) % fv.length], c * TS, r * TS);
+  if (fv?.length) for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (ground[r * MW + c] === GROUND.FOREST) x.drawImage(fv[tileHash(c, r) % fv.length], c * TS, r * TS);
 
   // vũng bùn chuồng heo
-  if (MUD && SPR.mud) x.drawImage(SPR.mud, MUD.x, MUD.y);
-  else if (MUD) {
+  const mudHere = MUD && MUD.x < ox + CHUNK_PX && MUD.x + MUD.w > ox && MUD.y < oy + CHUNK_PX && MUD.y + MUD.h > oy;
+  if (mudHere && SPR.mud) x.drawImage(SPR.mud, MUD.x, MUD.y);
+  else if (mudHere) {
     x.fillStyle = '#3f2a16'; x.beginPath(); x.ellipse(MUD.x + MUD.w / 2, MUD.y + MUD.h / 2, MUD.w / 2, MUD.h / 2, 0, 0, 7); x.fill();
     x.fillStyle = '#54381d'; x.beginPath(); x.ellipse(MUD.x + MUD.w / 2, MUD.y + MUD.h / 2, MUD.w / 2 - 2, MUD.h / 2 - 2, 0, 0, 7); x.fill();
     x.fillStyle = '#7d5a36'; x.fillRect(MUD.x + 10, MUD.y + 6, 6, 1); x.fillRect(MUD.x + 22, MUD.y + 12, 5, 1);
   }
 
   // hàng rào, xếp theo hàng để chồng lớp đúng
-  for (const f of [...fences].sort((a, b) => a.r - b.r || a.c - b.c)) fenceTile(x, f.kind, f.c * TS, f.r * TS);
+  for (const f of fences.filter(f => f.c >= c0 && f.c <= c1 && f.r >= r0 && f.r <= r1).sort((a, b) => a.r - b.r || a.c - b.c)) fenceTile(x, f.kind, f.c * TS, f.r * TS);
 
   // cỏ và hoa lác đác
   const nearRoad = (c, r) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => gAt(c + a, r + b) === GROUND.ROAD);
-  for (let r = 0; r < MH; r++) for (let c = 0; c < MW; c++) {
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
     if (ground[r * MW + c] !== GROUND.GRASS || solid[r * MW + c] || nearRoad(c, r)) continue;
     const h = hash(c * 7 + 3, r * 13 + 5), ox = Math.floor(hash(c, r + 99) * 10) + 1, oy = Math.floor(hash(c + 50, r) * 11) + 2;
     if (h < 0.11) x.drawImage(SPR.tuft, c * TS + ox, r * TS + oy);
@@ -393,6 +419,8 @@ export function render(ctx, f) {
   const vl = camX / scale - PAD, vt = camY / scale - PAD, vr = (camX + width) / scale + PAD, vb = (camY + height) / scale + PAD;
   const vis = (x, y, r = 30) => x > vl - r && x < vr + r && y > vt - r && y < vb + r;
   const night = nightAmount(state);
+  const quality = f.battery ? 0 : f.quality ?? 1;   // lượng hạt: 1 = đủ, thấp hơn khi FPS tụt, 0 = tắt (tiết kiệm pin)
+  const sparkles = quality >= 0.75 ? 2 : quality >= 0.4 ? 1 : 0;
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
@@ -400,7 +428,7 @@ export function render(ctx, f) {
   ctx.fillStyle = indoor ? '#1a100a' : '#25491a';
   ctx.fillRect(0, 0, width, height);
   ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
-  ctx.drawImage(staticLayer(m), 0, 0);
+  drawStatic(ctx, m, camX / scale, camY / scale, (camX + width) / scale, (camY + height) / scale);
 
   const blit = (img, x, y) => { if (img) ctx.drawImage(img, Math.round(x), Math.round(y)); };
   const shadow = (x, y, rx) => {
@@ -430,8 +458,8 @@ export function render(ctx, f) {
   shadow(state.player.x, state.player.y, 6);
   const animals = farm ? state.animals : [], threats = farm ? state.threats ?? [] : [];
   for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : a.adult ? 6 : 4);
-  if (farm && state.dog.x != null) shadow(state.dog.x, state.dog.y, 6);
-  for (const t of threats) if (t.x != null) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
+  if (farm && state.dog.x != null && vis(state.dog.x, state.dog.y)) shadow(state.dog.x, state.dog.y, 6);
+  for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
 
   // 3) các vật nhô lên, sắp theo y chân
   const items = [];
@@ -451,7 +479,7 @@ export function render(ctx, f) {
 
   for (const b of m.buildings) {
     const img = b.id === 'bed' && wd.sleeping && SPR2?.bedSleep ? SPR2.bedSleep : buildingImg(b);   // đang ngủ: giường có người nằm
-    if (!img) continue;
+    if (!img || !vis(b.x + img.width / 2, b.y + img.height / 2, Math.max(img.width, img.height) / 2)) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
     if (b.npc) {   // người đứng cạnh công trình (Bà Tư), thở nhẹ hai nhịp
       const idle = SPR2?.[b.npc.key + 'Idle'], im = idle?.[Math.floor(now / 700) % idle.length];
@@ -461,6 +489,7 @@ export function render(ctx, f) {
   }
   for (const [pen, p] of Object.entries(m.pens)) {
     const tr = p.trough, n = state.troughs?.[pen] ?? 0;
+    if (!vis(tr.x, tr.y, 20)) continue;
     add(tr.y, () => {
       blit(SPR.trough, tr.x - 13, tr.y - 12);
       if (n <= 0) { rect(ctx, '#8a5a2b', tr.x - 12, tr.y - 9, 24, 3); rect(ctx, '#6b4020', tr.x - 12, tr.y - 9, 24, 1); }
@@ -469,7 +498,7 @@ export function render(ctx, f) {
   }
   // ổ ấp trứng cạnh chuồng gà nhỏ
   const coop = m.building('coop');
-  if (coop) add(coop.at.y - 2, () => {
+  if (coop && vis(coop.at.x, coop.at.y, 30)) add(coop.at.y - 2, () => {
     const im = state.nest?.egg ? SPR.nestEgg : SPR.nestEmpty;
     if (im) blit(im, coop.at.x - im.width / 2, coop.at.y - im.height);
     else {
@@ -492,7 +521,7 @@ export function render(ctx, f) {
         blit(im, px + (16 - im.width) / 2, py + 15 - im.height);
         if (p.crop.sick && !p.crop.dead && !p.crop.rotten && !SPR.sick) { /* đã nhuộm vàng */ }
         if (cropStage(p.crop) >= 4 && !p.crop.dead && !p.crop.rotten) {
-          for (let i = 0; i < 2; i++) {
+          for (let i = 0; i < sparkles; i++) {
             const ph = (now / 450 + p.idx * 0.7 + i * 0.5) % 2;
             if (ph < 1) blit(SPR.sparkle, px + 2 + i * 8 + (p.idx % 3), py + 1 + i * 4);
           }
@@ -547,7 +576,7 @@ export function render(ctx, f) {
   }
   // chó
   const dog = state.dog;
-  if (farm && dog.x != null) {
+  if (farm && dog.x != null && vis(dog.x, dog.y)) {
     const rt = wd.rt.get('dog') ?? {};
     const im = dogImg(dog.adult, rt.face ?? 'right', rt.walking ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0);
     if (im) {
@@ -663,12 +692,12 @@ export function render(ctx, f) {
   // 5) đêm, đèn, mưa
   if (night > 0.01) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = `rgba(12,20,74,${((indoor ? 0.3 : 0.52) * night).toFixed(3)})`;   // trong nhà có đèn, tối nhẹ hơn
+    ctx.fillStyle = `rgba(12,20,74,${((indoor ? 0.3 : f.battery ? 0.4 : 0.52) * night).toFixed(3)})`;   // trong nhà có đèn, tối nhẹ hơn; tiết kiệm pin: nhẹ hơn nữa vì bỏ ánh đèn
     ctx.fillRect(0, 0, width, height);
     ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
     ctx.globalCompositeOperation = 'lighter';
     const glow = (x, y, r, rgb, a) => {
-      if (!vis(x, y, r)) return;
+      if (f.battery || !vis(x, y, r)) return;   // tiết kiệm pin: không vẽ gradient đèn
       const g = ctx.createRadialGradient(x, y, 1, x, y, r);
       g.addColorStop(0, `rgba(${rgb},${(a * night).toFixed(3)})`);
       g.addColorStop(1, `rgba(${rgb},0)`);
@@ -684,7 +713,7 @@ export function render(ctx, f) {
   if (!indoor && state.weather === 'rain') {   // trong nhà: không thấy mưa, mây
     ctx.fillStyle = 'rgba(40,60,100,0.13)'; ctx.fillRect(0, 0, width, height);
     ctx.strokeStyle = 'rgba(200,228,255,0.55)'; ctx.lineWidth = Math.max(1, Math.round(dpr));
-    const len = 14 * dpr, sp = 750 * dpr, n = Math.min(160, Math.round(width * height / (9000 * dpr * dpr)));
+    const len = 14 * dpr, sp = 750 * dpr, n = Math.round(Math.min(160, Math.round(width * height / (9000 * dpr * dpr))) * quality);
     ctx.beginPath();
     for (let i = 0; i < n; i++) {
       const x0 = hash(i, 7) * (width + 100), y0 = hash(i, 11) * height;

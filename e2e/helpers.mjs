@@ -1,6 +1,6 @@
 // Công cụ dựng tình huống cho e2e. Không đụng vào code game.
 import { expect } from '@playwright/test';
-import { createGame, SAVE_KEY } from '../public/state.js';
+import { createGame, SAVE_KEY, buyStrip, placeEntity, canPlace, buyAnimal, mapOf } from '../public/state.js';
 
 // Bản lưu hợp lệ lấy thẳng từ createGame của game; mutate(s) để chỉnh thêm.
 export function makeSave(mutate, opts = { name: 'Tester' }) {
@@ -19,10 +19,12 @@ export function plantedCrop(s, idx, progress) {
 }
 
 // Ghi sẵn bản lưu trước khi trang tải. Chỉ ghi khi chưa có save, nên tải lại không ghi đè.
-export async function seedSave(context, save) {
+export async function seedSave(context, save, opts = {}) {
   await context.addInitScript(([key, json]) => {
     try { if (!localStorage.getItem(key)) localStorage.setItem(key, json); } catch {}
   }, [SAVE_KEY, JSON.stringify(save)]);
+  // Đã gợi ý tiết kiệm pin rồi: khỏi hiện hộp gợi ý giữa chừng lúc máy ảo chạy chậm (test riêng cho gợi ý dùng seedSave với { hint: true })
+  if (!opts.hint) await context.addInitScript(() => { try { if (!localStorage.getItem('nongtrai-pref')) localStorage.setItem('nongtrai-pref', JSON.stringify({ battery: false, hinted: true })); } catch {} });
 }
 
 // Tua thời gian: lùi savedAt `ms` rồi tải lại, để loadGame chạy bù offline.
@@ -115,4 +117,24 @@ export async function startDrag(page, touch, from) {
     },
     end: () => touchAt('touchEnd'),
   };
+}
+// Vườn 64x48 mở hết đất, đầy công trình: dựng bằng API công khai (buyStrip, placeEntity, buyAnimal).
+export function bigFarmSave() {
+  return makeSave(s => {
+    s.coins = 1e9; s.exp = 1e9;
+    for (let i = 0; i < 40; i++) for (const d of ['N', 'S', 'E', 'W']) buyStrip(s, d);
+    const o = s.farm.owned;
+    s.inv.deco_scarecrow = s.inv.deco_flower = s.inv.deco_lamp = s.inv.deco_bench = 999;
+    const decos = ['deco_flower', 'deco_lamp', 'deco_bench', 'deco_scarecrow'];
+    // khối ruộng và chuồng ở những chỗ trống tìm được, rồi rải đồ trang trí cách 3 ô khắp vườn
+    const spot = what => { for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) if (canPlace(s, what, c, r).ok) return placeEntity(s, what, c, r).ok; return false; };
+    for (let i = 0; i < 8; i++) spot({ kind: 'field' });
+    spot({ kind: 'pen', pen: 'pig' }); spot({ kind: 'pen', pen: 'pasture' });
+    let k = 0;
+    for (let r = o.r; r < o.r + o.h; r += 3) for (let c = o.c; c < o.c + o.w; c += 3) if (canPlace(s, { kind: 'deco', item: decos[k % 4] }, c, r).ok) placeEntity(s, { kind: 'deco', item: decos[k++ % 4] }, c, r);
+    for (const t of ['ga', 'ga', 'ga', 'ga', 'ga', 'heo', 'heo', 'bo', 'bo', 'cuu', 'cuu']) buyAnimal(s, t);
+    // ruộng trồng cải đã chín: nhiều ô lấp lánh
+    for (const p of s.plots) if (p.unlocked) plantedCrop(s, p.idx, 1e9);
+    mapOf(s);
+  });
 }

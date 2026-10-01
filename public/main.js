@@ -10,6 +10,7 @@ import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
 import { todoList } from './todo.js';
+import * as P from './perf.js';
 
 const ACTION_MS = 350;
 const actionMs = () => ACTION_MS * slowFactor(state);   // hết thể lực thì làm chậm
@@ -36,6 +37,13 @@ let cam = { x: 0, y: 0 }, view = { camX: 0, camY: 0 };
 let curTarget = null, lastTargetKey = '', dirty = true;
 let plan = null;                  // { kind, until }: việc cần làm ngoài vườn đang đi tới từ bản đồ khác (ra cửa/cổng, chuyển cảnh, đi tiếp)
 let lastHud = 0, lastActions = 0, lastSave = 0, last = performance.now();
+// Hiệu năng: cài đặt riêng của máy (tiết kiệm pin), đo FPS, gợi ý bật tiết kiệm pin sau 10 giây đầu nếu máy chậm
+const prefs = P.loadPrefs(), fps = P.createFps();
+let hintDone = false;
+async function suggestBattery() {
+  prefs.hinted = true; P.savePrefs(prefs);
+  if (await ui.confirmBox('Máy đang chạy hơi chậm. Bật chế độ tiết kiệm pin cho mượt hơn? (Đổi lại được trong Cài đặt)', 'Bật', 'Để sau')) { prefs.battery = true; P.savePrefs(prefs); }
+}
 
 function computeScale() {
   const forced = Number(new URLSearchParams(location.search).get('scale'));
@@ -53,14 +61,19 @@ function resize() {
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
 
+let insets = null;
 function updateCamera(dt, snap) {
   // chế độ xây dựng: camera theo điểm nhìn riêng (kéo chỗ trống để xem chỗ khác)
   const vw = canvas.width / scale, vh = canvas.height / scale, p = world.build?.focus ?? state.player;
   // Chừa chỗ cho HUD trên và thanh dưới: nhân vật nằm giữa phần màn hình còn thấy được.
   const px = v => v * dpr / scale;
-  const topW = px(document.getElementById('hud')?.getBoundingClientRect().bottom || 0);
-  const barTop = document.getElementById(world.build ? 'buildbar' : 'bottombar')?.getBoundingClientRect().top;
-  const botW = px(barTop ? innerHeight - barTop : 0);
+  // Đo bố cục HUD tốn (buộc trình duyệt dàn trang), nên nhớ 250ms; đổi chế độ xây dựng hay cỡ màn hình thì đo lại
+  const ik = `${!!world.build}${innerWidth}x${innerHeight}`, t = performance.now();
+  if (!insets || insets.k !== ik || t - insets.t > 250) {
+    const barTop = document.getElementById(world.build ? 'buildbar' : 'bottombar')?.getBoundingClientRect().top;
+    insets = { k: ik, t, top: document.getElementById('hud')?.getBoundingClientRect().bottom || 0, bot: barTop ? innerHeight - barTop : 0 };
+  }
+  const topW = px(insets.top), botW = px(insets.bot);
   // camera không trôi quá đất nhà quá 2 ô (m.view); bản đồ nhỏ hơn màn hình thì nằm giữa
   const v = sceneMap(state).view;
   const fit = (t, size, a, b, lo = 0, hi = 0) => size - lo - hi >= b - a ? a + (b - a - size + hi - lo) / 2 : clamp(t, a - lo, b - size + hi);
@@ -139,6 +152,8 @@ function save() {
 
 const api = {
   getState: () => state,
+  getBattery: () => prefs.battery,
+  setBattery(on) { prefs.battery = !!on; P.savePrefs(prefs); },
   doAction,
   changed,
   newGame({ name, look }) {
@@ -441,9 +456,15 @@ syncTarget.key = '';
 
 function frame(now) {
   requestAnimationFrame(frame);
-  const dtMs = Math.min(100, now - last); last = now;
+  if (prefs.battery && now - last < 1000 / P.BATTERY_FPS - 8) return;   // tiết kiệm pin: khóa 30 khung hình (bỏ qua một nhịp màn 60Hz)
+  const dtMs = Math.min(100, now - last); if (state) fps.push(now - last); last = now;
   if (!state) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#25491a'; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
   const dt = dtMs / 1000;
+  if (!hintDone && fps.elapsed >= P.SUGGEST_AFTER_MS && !ui.isBlocking()) {   // đo đủ 10 giây: chỉ xét một lần
+    hintDone = true;
+    if (P.shouldSuggestBattery(fps, prefs)) suggestBattery();
+  }
+  world.view = { x0: cam.x - 40, y0: cam.y - 40, x1: cam.x + canvas.width / scale + 40, y1: cam.y + canvas.height / scale + 40 };
 
   // 1-2) thời gian game
   const events = tick(state, dtMs * (state.speed || 1)) ?? [];
@@ -473,7 +494,7 @@ function frame(now) {
     state, w: world, cam, scale, width: canvas.width, height: canvas.height, dpr, now,
     target: curTarget ? { target: curTarget } : null,
     busy: busy ? clamp((now - busy.t0) / actionMs(), 0, 1) : null,
-    fx: world.fx,
+    fx: world.fx, battery: prefs.battery, quality: P.particleBudget(fps.fps),
   });
 
   // 6) sự kiện cho UI, HUD, lưu
@@ -501,5 +522,6 @@ if (state) {
   ui.showCreator();
   if (loadProblem()) ui.toast('Không đọc được bản lưu cũ, bản cũ vẫn được giữ nguyên. Bạn có thể bắt đầu vườn mới.');
 }
-globalThis.__farm = { get state() { return state; }, get world() { return world; }, get scale() { return scale; }, get view() { return view; }, get dpr() { return dpr; } };
+globalThis.__farm = { get state() { return state; }, get world() { return world; }, get scale() { return scale; }, get view() { return view; }, get dpr() { return dpr; },
+  get perf() { return { chunksDrawn: R.chunkStats().drawn, fps: fps.avg, fpsNow: fps.fps, measured: fps.elapsed, battery: prefs.battery, hinted: prefs.hinted }; } };
 requestAnimationFrame(t => { last = t; lastSave = t; requestAnimationFrame(frame); });
