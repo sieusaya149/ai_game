@@ -1,0 +1,89 @@
+<!doctype html><meta charset="utf-8"><title>SPR2</title>
+<style>
+  body { margin: 0; padding: 8px; background: #5a9e3a; font: 11px sans-serif; color: #fff; }
+  h2 { margin: 14px 0 4px; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .cell { display: flex; flex-direction: column; gap: 2px; }
+  canvas { image-rendering: pixelated; }
+  .dark { background: #3d6a2a; padding: 4px; }
+</style>
+<body>
+<div id="root"></div>
+<script type="module">
+import { SPR2 } from './art2.js';
+const S = 4, root = document.getElementById('root');
+const section = t => { const h = document.createElement('h2'); h.textContent = t; root.append(h); const r = document.createElement('div'); r.className = 'row'; root.append(r); return r; };
+function put(row, img, label, scale = S) {
+  const cell = document.createElement('div'); cell.className = 'cell';
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  c.getContext('2d').drawImage(img, 0, 0);
+  c.style.width = img.width * scale + 'px'; c.style.height = img.height * scale + 'px';
+  const l = document.createElement('span'); l.textContent = `${label} ${img.width}x${img.height}`;
+  cell.append(l, c); row.append(cell);
+}
+function walk(row, v, label) {
+  if (v instanceof HTMLCanvasElement) return put(row, v, label);
+  if (Array.isArray(v)) return v.forEach((e, i) => walk(row, e, `${label}[${i}]`));
+  for (const k in v) walk(row, v[k], `${label}.${k}`);
+}
+const groups = {
+  'Vườn': ['shippingBin', 'bushes', 'rocks', 'stump', 'forest'],
+  'Trong nhà': ['floors', 'wallInner', 'doorMat', 'bed', 'bedSleep', 'wardrobe', 'table', 'stove', 'rug', 'window', 'pottedPlant'],
+  'Làng': ['marketStall', 'marketClosed', 'smithy', 'villageHouses', 'friendGate', 'homeGate', 'lampPost', 'bench'],
+  'NPC': ['npcBaTu', 'npcBaTuIdle', 'npcOngSau', 'npcOngSauIdle'],
+  'Công cụ & HUD': ['tools', 'stamina', 'staminaTired', 'sweat', 'season', 'wood', 'stone', 'guidebook', 'todo', 'alertArrow'],
+};
+for (const g in groups) { const r = section(g); for (const k of groups[g]) walk(r, SPR2[k], k); }
+
+// Ghép ô: rừng, sàn gỗ, tường
+function tiled(label, w, h, fn, scale = 3) {
+  const r = section(label);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  fn(c.getContext('2d'));
+  c.style.width = w * scale + 'px'; c.style.height = h * scale + 'px';
+  r.append(c);
+}
+tiled('Ghép ô (3x): rừng 8x5 ngẫu nhiên, sàn + tường', 224, 112, x => {
+  for (let j = 0; j < 7; j++) for (let i = 0; i < 6; i++) x.drawImage(SPR2.forest[(i * 7 + j * 3 + i * j) % SPR2.forest.length], i * 16, j * 16);
+  for (let i = 0; i < 7; i++) x.drawImage(SPR2.wallInner, 112 + i * 16, 0);
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 7; i++) x.drawImage(SPR2.floors[(i + j * 3) % 2], 112 + i * 16, 32 + j * 16);
+  x.drawImage(SPR2.window, 128, 6); x.drawImage(SPR2.window, 192, 6);
+  x.drawImage(SPR2.rug, 136, 60); x.drawImage(SPR2.bed, 114, 26); x.drawImage(SPR2.wardrobe, 200, 8);
+  x.drawImage(SPR2.table, 186, 70); x.drawImage(SPR2.stove, 152, 18); x.drawImage(SPR2.pottedPlant, 144, 18);
+  x.drawImage(SPR2.doorMat, 176, 96);
+});
+
+// Cỡ thật trên nền cỏ (1x và 2x)
+function grass(x, w, h) {
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const n = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453 % 1;
+    x.fillStyle = Math.abs(n) < 0.12 ? '#5a9e3a' : '#6cb846'; x.fillRect(i, j, 1, 1);
+  }
+}
+function scene(scale) {
+  const W = 400, H = 150;
+  const r = section(`Cỡ thật trên nền cỏ (${scale}x)`);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'); grass(x, W, H);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) x.drawImage(SPR2.forest[(i + j) % SPR2.forest.length], i * 16, j * 16);
+  x.drawImage(SPR2.shippingBin, 70, 10);
+  SPR2.bushes.forEach((b, i) => x.drawImage(b, 100 + i * 18, 12));
+  SPR2.rocks.forEach((b, i) => x.drawImage(b, 100 + i * 18, 30));
+  x.drawImage(SPR2.stump, 156, 22);
+  x.drawImage(SPR2.marketStall, 180, 4); x.drawImage(SPR2.npcBaTu[0][0], 196, 22);
+  x.drawImage(SPR2.smithy, 236, 0); x.drawImage(SPR2.npcOngSau[0][0], 270, 24);
+  x.drawImage(SPR2.villageHouses[0], 300, 0); x.drawImage(SPR2.villageHouses[1], 350, 0);
+  x.drawImage(SPR2.friendGate, 10, 60); x.drawImage(SPR2.homeGate, 60, 60);
+  x.drawImage(SPR2.lampPost, 110, 66); x.drawImage(SPR2.bench, 130, 82); x.drawImage(SPR2.marketClosed, 160, 80);
+  for (let d = 0; d < 4; d++) { x.drawImage(SPR2.npcBaTu[d][0], 200 + d * 18, 70); x.drawImage(SPR2.npcOngSau[d][0], 200 + d * 18, 96); }
+  x.drawImage(SPR2.sweat[0], 204, 64);
+  let ix = 280;
+  for (const k of ['hoe', 'can', 'sickle', 'basket']) SPR2.tools[k].forEach((t, i) => x.drawImage(t, ix + i * 18, 60 + ['hoe', 'can', 'sickle', 'basket'].indexOf(k) * 18));
+  const hud = [SPR2.stamina, SPR2.staminaTired, ...Object.values(SPR2.season), SPR2.wood, SPR2.stone, SPR2.guidebook, SPR2.todo, SPR2.alertArrow];
+  hud.forEach((h, i) => { x.fillStyle = '#3b2412cc'; x.fillRect(10 + i * 16 - 2, 120, 16, 16); x.drawImage(h, 10 + i * 16, 122); });
+  c.style.width = W * scale + 'px'; c.style.height = H * scale + 'px';
+  r.append(c);
+}
+scene(1); scene(2);
+document.title = 'done';
+</script>
