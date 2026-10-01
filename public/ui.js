@@ -505,6 +505,37 @@ PANELS.shed = {
     PANELS.bag.render(body, s, true);
   },
 };
+// ---------- Thùng giao hàng: lái buôn lấy hết lúc 6h sáng, trả 80% giá chợ ----------
+PANELS.shipbin = {
+  title: '📮 Thùng giao hàng',
+  render(body, s) {
+    const inBin = Object.keys(s.shipbin.items), pct = Math.round(D.SHIP_RATE * 100);
+    body.append(h('div', { class: 'note' }, `Bỏ nông sản vào đây, 6 giờ sáng lái buôn ghé lấy hết và trả ${pct}% giá chợ. Lấy lại được trước lúc đó.`));
+    body.append(h('div', { class: 'sell-all', id: 'ship-total' }, h('div', {}, 'Dự kiến nhận ', h('b', {}, '+' + fmt(S.shipPreview(s)) + ' xu'))));
+    body.append(section(`📮 Trong thùng (${inBin.reduce((a, k) => a + s.shipbin.items[k], 0)})`));
+    const bin = h('div', { class: 'list' });
+    body.append(bin);
+    if (!inBin.length) bin.append(empty('Thùng đang trống.'));
+    for (const k of inBin) {
+      const n = s.shipbin.items[k];
+      bin.append(row({
+        icon: ico(k, 'big'), name: `${itemLabel(k)} ×${n}`, desc: `+${fmt(D.shipValue({ [k]: n }))} xu`,
+        right: h('div', { class: 'qtys' }, btn('Lấy 1', () => res(S.shipTake(st(), k, 1), 'pop'), 'plain sm'), btn('Lấy hết', () => res(S.shipTake(st(), k, 'all'), 'pop'), 'plain sm')),
+      }));
+    }
+    body.append(section('Bỏ vào thùng'));
+    const keys = sellable(s), src = h('div', { class: 'list' });
+    body.append(src);
+    if (!keys.length) src.append(empty('Giỏ và kho chưa có nông sản để bỏ vào.'));
+    for (const k of keys) {
+      const n = have(s, k);
+      src.append(row({
+        icon: ico(k, 'big'), name: `${itemLabel(k)} ×${n}`, desc: `${fmt(D.shipValue({ [k]: 1 }))} xu/cái`,
+        right: h('div', { class: 'qtys' }, btn('Bỏ 1', () => res(S.shipAdd(st(), k, 1), 'pop'), 'green sm'), btn('Bỏ hết', () => res(S.shipAdd(st(), k, 'all'), 'pop'), 'green sm')),
+      }));
+    }
+  },
+};
 // ---------- Tiệm rèn Ông Sáu ----------
 // Icon công cụ theo cấp (SPR2.tools.<tên>[cấp-1], canvas 16x16); chưa có art thì emoji
 function toolIco(k, lv) {

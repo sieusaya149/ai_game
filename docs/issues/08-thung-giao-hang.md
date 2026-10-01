@@ -13,8 +13,8 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test: số xu = 80% giá lúc chốt. Lấy lại đồ trước 6h được. Sau 6h thùng trống và xu đã cộng. Chạy bù offline qua 6h cũng chốt đúng.
-- [ ] E2E: bỏ 5 cải vào thùng → thấy số xu dự kiến → lùi `savedAt` qua 6h → tải lại thì nhận đúng xu.
+- [x] Unit test: số xu = 80% giá lúc chốt. Lấy lại đồ trước 6h được. Sau 6h thùng trống và xu đã cộng. Chạy bù offline qua 6h cũng chốt đúng.
+- [x] E2E: bỏ 5 cải vào thùng → thấy số xu dự kiến → lùi `savedAt` qua 6h → tải lại thì nhận đúng xu.
 
 ## Blocked by
 

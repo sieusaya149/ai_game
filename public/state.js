@@ -2,7 +2,7 @@
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
-  expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice,
+  expandCost, expandLevel, levelInfo, ORDERS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
@@ -122,6 +122,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     player: { x: 0, y: 0, dir: 0 }, stamina: STAMINA.max, sit: false, can: FARMING.canMax, selectedSeed: 'cai',
     tools: Object.fromEntries(Object.keys(TOOLS).map(k => [k, { lv: 1 }])), smith: null,   // smith: { tool, doneAt } công cụ đang nằm lò rèn
     inv: { ...START.items }, basket: {},   // inv = kho, basket = giỏ
+    shipbin: { items: {} },   // thùng giao hàng: lái buôn lấy hết lúc 6h sáng
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
     dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name },
@@ -180,6 +181,8 @@ export function loadGame() {
   s.troughs = { ...base.troughs, ...s.troughs };
   for (const k of ['owned', 'achievements', 'inv', 'basket', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
   for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
+  s.shipbin = { items: Object.fromEntries(Object.entries(s.shipbin?.items ?? {}).filter(([k, n]) => (CROPS[k] || PRODUCTS[k]) && n > 0)) };
+  ensureShipbin(s);   // vườn cũ chưa có thùng: thêm một thùng cạnh nhà kho
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
   s.stamina = clamp(s.stamina, 0, STAMINA.max); s.sit = false;
@@ -256,6 +259,7 @@ function step(s, d) {
     const r = Math.random();
     s.weather = r < 0.45 ? 'sun' : r < 0.75 ? 'cloud' : 'rain';
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.morningRegen);   // mỗi sáng 6h tự hồi một ít
+    settleShip(s);
     toast({ sun: 'Trời nắng đẹp ☀️', cloud: 'Trời nhiều mây ⛅', rain: 'Trời mưa rồi, ruộng tự có nước 🌧️' }[s.weather]);
   }
   if (s.sit) {   // ngồi ghế đá: hồi chậm, đầy thì tự đứng dậy
@@ -631,7 +635,7 @@ const TALK = {
 function buildingActs(s, t) {
   const b = sceneMap(s).building(t.id);
   if (!b) return [];
-  const open = { shed: ['📦', 'Vào nhà kho'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'], smithy: ['🔨', 'Vào tiệm rèn'] }[b.id];
+  const open = { shed: ['📦', 'Vào nhà kho'], shipbin: ['📮', 'Mở thùng giao hàng'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'], smithy: ['🔨', 'Vào tiệm rèn'] }[b.id];
   if (open) return [mk('open', open[0], open[1])];
   if (b.id === 'market') return [mk('open', '🛒', 'Mua bán ở chợ', marketOpen(s) ? null : CLOSED)];
   if (TALK[b.id]) return [mk('talk', TALK[b.id].icon, TALK[b.id].label)];
@@ -895,6 +899,56 @@ export function sellAll(s) {
   let coins = 0;
   for (const k of new Set([...Object.keys(s.basket), ...Object.keys(s.inv)])) if (inBasket(k)) coins += sell(s, k, 'all').coins;
   return coins ? R(true, `Bán hết được ${coins} xu`, { coins }) : R(false, 'Giỏ và kho chưa có gì để bán', { coins: 0 });
+}
+
+// ---------- Thùng giao hàng ----------
+// Bỏ nông sản/sản phẩm vào (lấy giỏ trước, thiếu thì kho); lái buôn chốt lúc 6h sáng, trả SHIP_RATE giá chợ. Lấy lại được tới lúc đó.
+export const shipPreview = s => shipValue(s.shipbin.items);
+export function shipAdd(s, itemId, qty = 1) {
+  if (!inBasket(itemId)) return R(false, 'Món này không bỏ vào thùng được', { moved: 0 });
+  const n = qty === 'all' ? have(s, itemId) : Math.floor(qty);
+  if (!(n > 0) || n > have(s, itemId)) return R(false, 'Không đủ hàng để bỏ vào thùng', { moved: 0 });
+  take(s, itemId, n);
+  const it = s.shipbin.items;
+  it[itemId] = (it[itemId] || 0) + n;
+  return R(true, `Bỏ ${n} ${itemName(itemId).toLowerCase()} vào thùng`, { moved: n });
+}
+// Lấy lại: về giỏ nếu còn chỗ, phần dư về kho
+export function shipTake(s, itemId, qty = 1) {
+  const inBin = s.shipbin.items[itemId] || 0;
+  const n = Math.min(qty === 'all' ? inBin : Math.floor(qty), inBin);
+  if (!(n > 0)) return R(false, 'Thùng không có món này', { moved: 0 });
+  drop(s.shipbin.items, itemId, n);
+  const toBasket = Math.min(n, Math.max(0, room(s)));
+  if (toBasket) give(s, itemId, toBasket);
+  if (n > toBasket) s.inv[itemId] = (s.inv[itemId] || 0) + n - toBasket;
+  return R(true, `Lấy lại ${n} ${itemName(itemId).toLowerCase()}`, { moved: n });
+}
+// 6h sáng: lái buôn lấy hết, trả xu. Event 'shipped' để màn "Trong lúc bạn vắng nhà" dùng.
+function settleShip(s) {
+  const items = s.shipbin?.items;
+  if (!items || !Object.keys(items).length) return;
+  const coins = shipValue(items);
+  s.shipbin.items = {};
+  addCoins(s, coins);
+  emit({ type: 'shipped', coins, items, t: s.time });
+  toast(`Lái buôn đã ghé lấy hàng, nhận ${coins} xu 🚚`);
+  log(s, `Lái buôn lấy hàng ở thùng giao hàng, trả ${coins} xu`);
+  snd('coin');
+}
+// Vườn chưa có thùng: đặt một thùng ở ô hợp lệ gần nhà kho nhất (qua canPlace nên không chặn đường)
+function ensureShipbin(s) {
+  const f = s.farm;
+  if (f.ents.some(e => e.kind === 'shipbin')) return;
+  const ref = f.ents.find(e => e.kind === 'shed') ?? f.ents.find(e => e.kind === 'house');
+  const c0 = ref?.c ?? f.owned.c, r0 = ref?.r ?? f.owned.r, cand = [];
+  for (let r = f.owned.r; r < f.owned.r + f.owned.h; r++) for (let c = f.owned.c; c < f.owned.c + f.owned.w; c++) cand.push({ c, r, d: Math.hypot(c - c0 - 1, r - r0 - 1) });
+  for (const p of cand.sort((a, b) => a.d - b.d || a.r - b.r || a.c - b.c)) {
+    if (!canPlace(s, { kind: 'shipbin' }, p.c, p.r).ok) continue;
+    f.ents.push({ id: s.nextId++, kind: 'shipbin', c: p.c, r: p.r });
+    bumpLayout(s);
+    return;
+  }
 }
 
 // Nhà kho: cất hết nông sản & sản phẩm từ giỏ vào kho

@@ -189,7 +189,7 @@ export function buildingImg(b) {
   if (b.interior) return spr2(b.sprite) ?? furnFallback(b.sprite);
   if (b.sprite === 'well') return wellImg();
   if (b.sprite === 'board') return boardImg();
-  return SPR[b.sprite] ?? null;
+  return SPR[b.sprite] ?? SPR2?.[b.sprite] ?? null;
 }
 export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h: i.height }; }
 

@@ -137,6 +137,9 @@ export const PRODUCTS = {
   len:   { name: 'Lông cừu', price: 60 },
 };
 export const sellPrice = k => CROPS[k]?.price ?? PRODUCTS[k]?.price ?? 0;
+// Thùng giao hàng: lái buôn trả 80% giá chợ cho đồ trong thùng, chốt lúc 6h sáng (làm tròn xuống)
+export const SHIP_RATE = 0.8;
+export const shipValue = items => Math.floor(Object.entries(items).reduce((a, [k, n]) => a + sellPrice(k) * n, 0) * SHIP_RATE);
 export const itemName = k => ITEMS[k]?.name ?? CROPS[k]?.name ?? PRODUCTS[k]?.name ?? k;
 
 // ---------- Ngoại hình (skinset) ----------
