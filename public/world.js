@@ -1,12 +1,12 @@
 // Thế giới: di chuyển, va chạm, tìm đường, AI con vật/chó/quạ/trộm, tìm target. Không vẽ gì.
 import { TS, GROUND } from './layout.js';
-import { ANIMALS, CROPS, DOG, DIR_NAME } from './data.js';
+import { ANIMALS, CROPS, DOG, GUARD, WALK_SPEED, DIR_NAME } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
 import { aiStep } from './perf.js';
 import { animalImg, dogImg, crowImg, eggSize, poopSize, buildingImg, decoSize } from './render.js';
 
-const SPEED = 70;                 // px/s của người chơi
+const SPEED = WALK_SPEED;         // px/s của người chơi (luật chó đuổi tính theo con số này)
 const HW = 5, HH = 3;             // nửa hộp chân 10x6
 const DIRV = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 const TEO_LOOK = { skin: 1, hair: 0, hairColor: 4, shirt: 4, pants: 2, hat: 2, acc: 1 };
@@ -174,9 +174,11 @@ const dogAllowed = (c, r) => {
   return !M.fields.some(f => c >= f.c - 1 && c < f.c + 4 && r >= f.r - 1 && r < f.r + 4);
 };
 const dogCan = (x, y) => dogAllowed(Math.floor(x / TS), Math.floor(y / TS)) && dogAllowed(Math.floor((x - 3) / TS), Math.floor(y / TS)) && dogAllowed(Math.floor((x + 3) / TS), Math.floor(y / TS));
-function updateDog(state, w, dt0) {
+function updateDog(state, w, dt0, out) {
   const d = state.dog, p = state.player, rt = rtOf(w, 'dog');
-  const dt = aiStep(rt, dt0, onScreen(w, d));
+  // đang canh khách lạ thì chó luôn cập nhật, dù chạy ngoài khung nhìn
+  const chasing = state.scene === 'visit' && w.guard?.chasing;
+  const dt = chasing ? dt0 : aiStep(rt, dt0, onScreen(w, d));
   if (!dt) return;
   if (!dogCan(d.x, d.y)) { d.x = M.dogHome.x; d.y = M.dogHome.y; }
   const dp = dist(d, p);
@@ -194,6 +196,7 @@ function updateDog(state, w, dt0) {
     rt.stuck = moved < st * 0.3 ? rt.stuck + dt : 0;
     return false;
   };
+  if (guardStep(state, w, rt, dt, goTo, out)) return;   // canh khách lạ: sủa rồi đuổi
   if (rt.mode === 'follow') {
     rt.run = dp > 70;
     if (dp < 22 || rt.timer <= 0 || rt.stuck > 0.5) { rt.mode = 'idle'; rt.timer = rnd(0.6, 2); rt.stuck = 0; }
@@ -201,16 +204,51 @@ function updateDog(state, w, dt0) {
   } else if (rt.mode === 'wander') {
     if (goTo(rt.tx, rt.ty, 30) || rt.stuck > 0.5) { rt.mode = 'idle'; rt.timer = rnd(1, 3.5); rt.stuck = 0; }
   } else if (rt.timer <= 0) {
-    if (dp > 34 && Math.random() < 0.6) { rt.mode = 'follow'; rt.timer = rnd(3, 7); }
+    // khách lạ (đang thăm vườn người khác): chó không đi theo, chỉ quanh quẩn giữ chuồng
+    const post = state.scene === 'visit' ? M.dogHome : null;
+    if (!post && dp > 34 && Math.random() < 0.6) { rt.mode = 'follow'; rt.timer = rnd(3, 7); }
     else {
+      const far = post ? 22 : 90, c = post ?? d;
       for (let i = 0; i < 8; i++) {
-        const tx = d.x + rnd(-90, 90), ty = d.y + rnd(-70, 70);
+        const tx = c.x + rnd(-far, far), ty = c.y + rnd(-far * 0.8, far * 0.8);
         if (dogCan(tx, ty)) { rt.tx = tx; rt.ty = ty; rt.mode = 'wander'; break; }
       }
       if (rt.mode !== 'wander') rt.timer = 1;
     }
   }
 }
+
+// ---------- Chó canh khách lạ (issue 31) ----------
+// Luật (bán kính, ngủ gật, xích, tốc độ đuổi) nằm trong state.js; ở đây chỉ diễn hoạt và báo cho main.js biết
+// lúc nào gửi thao tác lên server. Chỉ chạy trong vườn người khác: khách mới là người đang di chuyển (ADR 0013).
+// out.bark = chó vừa phát hiện khách · out.bite = chó đuổi kịp và đớp trúng.
+function guardStep(state, w, rt, dt, goTo, out) {
+  if (state.scene !== 'visit') { w.guard = null; return false; }
+  const g = (w.guard ??= { chasing: false, lost: 0 });
+  const d = state.dog, p = state.player;
+  const sees = !state.visit.bitten && ST.dogSees(state, p);
+  if (sees) {
+    g.lost = 0;
+    if (!g.chasing) { g.chasing = true; if (out) out.bark = true; }
+  } else if (g.chasing) {
+    g.lost += dt;
+    if (g.lost > GUARD_LOST) g.chasing = false;
+  }
+  rt.bark = g.chasing;
+  if (!g.chasing) return false;
+  // bị xích thì chỉ chạy tới mép vùng xích, thả rông thì đuổi tới chân khách
+  const area = ST.guardArea(state);
+  let tx = p.x, ty = p.y;
+  if (area) {
+    const dx = p.x - area.x, dy = p.y - area.y, len = Math.hypot(dx, dy) || 1;
+    if (len > area.r) { tx = area.x + dx / len * area.r; ty = area.y + dy / len * area.r; }
+  }
+  goTo(tx, ty, ST.chaseSpeed());
+  rt.run = true;
+  if (out && dist(d, p) <= GUARD.biteRange) out.bite = true;
+  return true;
+}
+const GUARD_LOST = 2;   // mất dấu chừng này giây thì chó thôi đuổi, quay về chơi
 
 // ---------- Quạ & thằng Tèo ----------
 function updateThreats(state, w, dt) {
@@ -577,6 +615,6 @@ function updateFarm(state, w, dt, out) {
   }
 
   updateAnimals(state, w, dt);
-  updateDog(state, w, dt);
+  updateDog(state, w, dt, out);
   updateThreats(state, w, dt);
 }

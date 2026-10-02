@@ -100,6 +100,29 @@ export const DOG = {
   guardChance: 0.7,           // chó no & vui đuổi được trộm/quạ
 };
 
+// ---------- Chó canh khách lạ (issue 31, DESIGN §6.1) ----------
+// Luật bán kính và ngủ gật nằm trong state.js; world.js chỉ diễn hoạt (ADR 0013).
+export const GUARD = {
+  radius: { pup: 4, adult: 6 },   // bán kính phát hiện khách (ô): chó con 4, chó trưởng thành 6
+  sadHappy: 50,               // vui dưới mức này: bán kính còn một nửa
+  hungryStop: 30,             // đói dưới mức này: nằm bẹp, không canh nữa
+  napRadius: 1,               // đang ngủ gật: chỉ thấy khách đứng sát bên
+  chainRadius: 3,             // bị xích: chỉ chạy và canh trong 3 ô quanh chuồng chó
+  napEvery: 60_000,           // ban đêm cứ chừng này (giờ vườn) lại quay xem có ngủ gật không
+  napRate: 0.3,               // ~30% thời gian ban đêm chó ngủ gật
+  napMs: 60_000,              // trúng thì ngủ gật suốt khe đó (napMs = napEvery nên đúng napRate thời gian ban đêm)
+  chaseMul: 1.3,              // chó đuổi nhanh gấp 1.3 lần người đi bộ
+  biteRange: 11,              // đớp được khi cách khách chừng này điểm ảnh
+  biteStunMs: 3000,           // bị đớp: khách đứng hình 3 giây
+  fine: 30,                   // bị đớp: khách nộp phạt chừng này xu cho chủ vườn
+  barkEvery: 20_000,          // một vườn chỉ ghi một dòng "chó sủa" trong chừng này (khỏi spam nhật ký)
+  barkShowMs: 15_000,         // chủ thấy báo gấp 🔴 + mũi tên chó sủa trong chừng này
+  sausageHunger: 50,          // chó no dưới mức này thì chắc chắn ăn xúc xích
+  sausageGreed: 0.3,          // chó đang no vẫn 30% tham ăn
+  quietMs: 60_000,            // ăn xúc xích xong chó im lặng chừng này (giờ ngoài đời)
+};
+export const WALK_SPEED = 70;  // px/s của người đi bộ (world.js dùng; tốc độ chó đuổi tính theo đây)
+
 // ---------- Kẻ phá hoại ----------
 export const THREATS = {
   crowChancePerMin: 0.3,      // có cây chín mà không có bù nhìn: mỗi phút 30% có quạ bay tới
@@ -126,6 +149,7 @@ export const ITEMS = {
   wood:       { name: 'Gỗ',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi dọn bụi cây trên đất mới.' },
   stone:      { name: 'Đá',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi đập đá trên đất mới.' },
   dogfood:    { name: 'Xương cho chó',     kind: 'feed',   price: 8,  lv: 1, desc: 'Cho chó Mực ăn để nó lớn và chịu giữ nhà.' },
+  sausage:    { name: 'Xúc xích',          kind: 'feed',   price: 30, lv: 5, desc: 'Ném cho chó nhà người ta: nó mải ăn thì quên sủa 60 giây.' },
   deco_scarecrow: { name: 'Bù nhìn',       kind: 'deco',   price: 150, lv: 2, desc: 'Cắm gần ruộng, quạ không dám tới.' },
   deco_flower:    { name: 'Chậu hoa',      kind: 'deco',   price: 30,  lv: 1, desc: 'Cho nông trại thêm xinh.' },
   deco_lamp:      { name: 'Đèn lồng',      kind: 'deco',   price: 90,  lv: 3, desc: 'Sáng lung linh ban đêm, trộm ngại vào hơn.' },
@@ -249,6 +273,7 @@ export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
   levelup: 'Lên cấp', order: 'Đơn hàng mới', help: 'Khách giúp vườn', gate: 'Quà và lời nhắn ở cổng',
+  guard: 'Chó canh khách lạ',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -273,6 +298,10 @@ export const EVENT_LEVEL = {
   stolen:    { level: 'urgent', group: e => `stolen:${e.by}:${e.item}`, label: 'Có người sang trộm', text: (n, e) => `${e.by} đã trộm ${e.qty * n} ${itemName(e.item).toLowerCase()} lúc ${hourText(e.at)} 😤` },
   gift:      { level: 'important', cat: 'gate', group: () => 'gate:gift', label: 'Có quà ở cổng', text: (n, e) => n > 1 ? `${n} món quà mới trong hộp quà ở cổng 🎁` : `${e.name} tặng bạn ${e.qty} ${itemName(e.item).toLowerCase()} 🎁` },
   note:      { level: 'important', cat: 'gate', group: () => 'gate:note', label: 'Lời nhắn mới ở sổ lưu bút', text: (n, e) => n > 1 ? `${n} lời nhắn mới trong sổ lưu bút 📖` : `${e.name} vừa ký sổ lưu bút của bạn 📖` },
+  // chó canh khách lạ (issue 31): sủa là báo gấp 🔴 kèm mũi tên; đớp được và bị ném xúc xích thì toast 🟡
+  barked:    { level: 'urgent', group: () => 'barked', label: 'Chó sủa báo có người lạ', text: (n, e) => `${e.dog} đang sủa ở ${e.where}! 🐕` },
+  bitten:    { level: 'important', cat: 'guard', group: e => 'bitten:' + e.by, label: 'Chó đớp được khách lạ', text: (n, e) => `${e.dog} đã đớp được ${e.by}, phạt ${e.fine} xu 🐕` },
+  sausaged:  { level: 'important', cat: 'guard', group: e => 'sausaged:' + e.by, label: 'Khách ném xúc xích cho chó', text: (n, e) => (e.ate ? `${e.by} ném xúc xích, ${e.dog} mải ăn quên sủa 🌭` : `${e.by} ném xúc xích nhưng ${e.dog} không thèm 🌭`) },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },

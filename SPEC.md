@@ -37,7 +37,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`. Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED`. Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
 | `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
 | `public/migrate.js` | `SAVE_VERSION`, `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`). Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
@@ -47,7 +47,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/todo.js` | `todoList(state)`: danh sách Việc cần làm cho bảng, bản đồ nhỏ, mũi tên. Thuần JS |
 | `public/minimap.js` | Vẽ bản đồ nhỏ: `miniView`, `miniDots`, `drawMini`, `DOT` |
 | `public/perf.js` | Hiệu năng: mảng nền `CHUNK`, `dirtyChunks`, `chunksIn`, AI ngoài màn hình `aiStep`, đo FPS `createFps`, tiết kiệm pin (`BATTERY_FPS`, `shouldSuggestBattery`), tùy chọn máy `loadPrefs`/`savePrefs` (khóa `nongtrai-pref`) |
-| `public/art.js`, `public/art2.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...; Phase 1 thêm hộp quà và sổ lưu bút ở cổng, xem thử ở `public/_sprites2.html`). Thêm sprite mới thì giữ nguyên mọi export cũ |
+| `public/art.js`, `public/art2.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...; Phase 1 thêm hộp quà và sổ lưu bút ở cổng, chó canh khách `dogBark`/`dogRun`/`dogNap` (chó con và chó trưởng thành mỗi loại một sprite riêng cho từng tư thế), `barkBubble`, `dogChain`, `stunStars`, `barkArrow`, `sausage`/`sausageGround`; xem thử ở `public/_sprites2.html`). Thêm sprite mới thì giữ nguyên mọi export cũ |
 | `public/render.js`, `public/world.js`, `public/main.js` | Vẽ (theo khung nhìn, nền chia mảng 16x16 ô), di chuyển/tìm đường/AI/chế độ xây dựng/camera, vòng lặp, chuyển cảnh mờ dần, input. **Không tự quyết luật**, chỉ gọi `state.js` |
 | `public/index.html`, `public/style.css`, `public/ui.js`, `public/sound.js` | HUD, nút hành động, các bảng, tạo nhân vật, thông báo, âm thanh |
 | `public/net.js`, `public/sync.js` | Phía trình duyệt của làng: tài khoản (`net.js`, issue 21) và đồng bộ vườn online (`sync.js`, issue 22), xem mục Server |
@@ -110,11 +110,12 @@ state = {
   troughs: { chicken, pig, pasture },
   eggs: [ { id, x, y, laidAt } ],
   nest: { egg, hatchAt },
-  dog: { adult, age, hunger, happy, x, y, nextPoop, name },
+  dog: { adult, age, hunger, happy, x, y, nextPoop, name, chained, nap, napCheck, quiet, barkAt, barkX, barkY },
   poops: [ { id, x, y, at } ],
   threats: [ { id, kind: 'crow'|'thief', plot, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
   orders: [ { id, who, items, coins, exp } ], nextOrderAt,
-  stats: { harvests, bugs, eggs, poops, slips, piglets, hatches, orders, thieves, crows, earned, planted, shipped, bought, slept },
+  stats: { harvests, bugs, eggs, poops, slips, piglets, hatches, orders, thieves, crows, earned, planted, shipped, bought, slept,
+           chased, barks, robStreak },   // issue 31: chó đã đớp bao nhiêu khách, đã sủa mấy lần; chuỗi trộm chưa bị đớp (issue 32 dùng)
   achievements: { id: true },
   log: [ { t, text } ],                       // mới nhất ở đầu, tối đa 50
   tutorial,                                   // số bước hướng dẫn đã qua (>= TUTORIAL.length là xong)
@@ -127,11 +128,13 @@ state = {
   today: { day: 'YYYY-MM-DD', helps, steals, stolen, robs },   // thống kê hôm nay theo ngày ngoài đời (`serverDay`).
                                               //   helps = số việc khách đã giúp vườn này (issue 28) · steals = số vụ vườn này bị trộm ·
                                               //   stolen = tổng giá trị (xu) vườn này đã mất vì trộm · robs = số vụ chính mình đi trộm (issue 30)
-  guests: [{ id, kind, act, by, lv, at, seen, item, qty }],  // nhật ký việc khách làm trong vườn, mới nhất ở đầu, tối đa GUEST.logMax (60).
+  guests: [{ id, kind, act, by, lv, at, seen, item, qty, fine, ate }],  // nhật ký việc khách làm trong vườn, mới nhất ở đầu, tối đa GUEST.logMax (60).
                                               //   `id` = mã thao tác đã áp dụng (áp dụng lại cùng mã thì không làm gì), `seen` = chủ đã được báo,
                                               //   `lv` = cấp của khách lúc đó (nút "Sang trộm lại"), `item`/`qty` chỉ có ở dòng kind 'steal' (issue 28, 30)
   // plots[i].crop.stolen / .robbed: số món khách đã trộm của ô và tên những người đã trộm ô đó (issue 30, chỉ có khi bị trộm)
-  // dog.chained: xích chó (issue 31), mặc định false
+  //   kind: 'help' | 'steal' | 'bark' | 'bite' | 'sausage'; `fine` chỉ có ở dòng 'bite', `ate` chỉ có ở dòng 'sausage' (issue 31)
+  // dog (issue 31): chained = xích chó (mặc định false) · nap = giấc ngủ gật tới lúc nào (giờ vườn) · napCheck = lần quay kế tiếp
+  //   · quiet = mải ăn xúc xích tới lúc nào (giờ NGOÀI ĐỜI) · barkAt/barkX/barkY = lần sủa gần nhất và chỗ thấy khách lạ
 }
 ```
 Vườn online không bao giờ ghi vào `nongtrai-save-v2`: bản chơi đơn và vườn trên làng là hai bản riêng, chỉ chép một lần lúc "Mang vườn này lên làng?".
@@ -291,7 +294,7 @@ HELP_FULL                         // câu "Vườn này hôm nay đã được g
 - **Giao diện:** ở cảnh `visit`, chạm ô ruộng (hay con quạ) hiện các nút 💧 Tưới giúp / 🌿 Nhổ cỏ giúp / 🤏 Bắt sâu giúp / 🪶 Đuổi quạ giúp đúng theo trạng thái (id hành động `help_<act>`); hết lượt thì nút vẫn hiện nhưng **mờ** kèm lý do. Thanh `#visit-bar` có thêm dòng "Còn x lượt giúp hôm nay" (`ui.setVisit(owner, left)`).
 - **Luồng:** `perform` trả thêm `guestOp` (thao tác vừa làm, đã áp dụng lên bản đi dạo để khách thấy liền) → `main.js` gửi `{ t: 'guest', op }` lên server → server kiểm tra trên bản lưu mới nhất của chủ rồi trả `{ t: 'guest', ok, reward }` (khách lúc đó mới được cộng xu/EXP hay nhận đồ trộm được) hoặc lý do từ chối (toast). Chủ đang online nhận `{ t: 'guestop', op }` → `guestOpApply` trên vườn mình → `takeGuestLog` → toast 🟡 gộp "Lan đã tưới 3 ô giúp bạn 🙏" hay băng rôn 🔴 "Bình đã trộm 1 cà chua lúc 3h chiều 😤". Chủ vắng thì server áp dụng thẳng vào bản lưu; lần sau chủ vào làng, `takeGuestLog` báo sau khi đóng màn "Trong lúc bạn vắng nhà" (`ui.afterAway(fn)`).
 
-**Trộm (issue 30, DESIGN §7.1).** Lát này **chưa có chó canh** (issue 31): trộm cứ thành công trong giới hạn.
+**Trộm (issue 30, DESIGN §7.1).** Trong giới hạn thì vụ trộm thành công; chó canh vườn (issue 31) không chặn vụ trộm mà **phạt sau**: bị đớp thì rơi hết đồ vừa trộm.
 - **Trộm được:** cây đã chín (`act: 'crop'`, `idx`), trứng dưới đất (`'egg'`, `egg` = id quả trứng), sữa và lông đang chờ lấy (`'product'`, `animal` = id con vật). **Không trộm được:** con vật (`'animal'`), trái khổng lồ (`'giant'`), đồ trong kho và trong nhà (`'store'`), cá (`'fish'`) — bốn act này luôn trả `cant_steal` kèm lý do riêng.
 - **Giới hạn** (`GUEST` trong data.js): mỗi vụ lấy `max(1, floor(còn lại × GUEST.stealPct=0.25))` món của ô hay con đó; mỗi người **một lần mỗi ô hay mỗi con** (`crop.robbed` giữ tên người đã trộm ô đó, trứng và sữa thì mất luôn mục tiêu); mỗi vườn mỗi **ngày ngoài đời** mất tối đa `GUEST.dayPct` = 30% tổng giá trị đồ chín (`stealLeft`). Chủ hay khách dưới `GUEST.stealLv` = cấp 5 thì không có chuyện trộm. Giỏ khách không đủ chỗ thì từ chối.
 - **Chi phí:** `STAMINA.cost.steal` = 2 thể lực mỗi vụ, trừ ngay lúc khách bấm (cùng cơ chế thể lực Phase 0; hết sức thì đi và làm chậm). Khách **không** được xu hay EXP, chỉ được đồ.
@@ -299,6 +302,36 @@ HELP_FULL                         // câu "Vườn này hôm nay đã được g
 - **Trộm NPC nhường:** đêm nào vườn đã có `stealsToday > 0` thì thằng Tèo không lẻn vào (`stepThreats`).
 - **Giao diện:** ở cảnh `visit`, chạm ô chín / quả trứng / con vật đang chờ lấy hiện nút **😈 Trộm n &lt;món&gt; (còn m)** (id hành động `steal`); bị chặn thì nút vẫn hiện nhưng **mờ** kèm lý do. Chủ xem nhật ký khách trong bảng **📜 Nhật ký** (mục "Khách ghé vườn", `.guest-row[data-by]`): dòng trộm `.stolen` ghi "B đã trộm 1 cà chua lúc 3h chiều 😤" (giờ ngoài đời giờ Việt Nam, `data.js hourText`) và có nút **😤 Sang trộm lại** (`.revenge`) gọi `api.revenge(name)` — đi qua làng rồi vào thẳng vườn kẻ trộm; kẻ trộm dưới cấp 5 hay mình chưa tới cấp 5 thì nút mờ kèm lý do.
 - **Báo gấp 🔴:** event `stolen` là mức `urgent`; `ui.handleEvents` bật băng rôn đỏ + tiếng + rung ngay (`alertNow`), không cần chỗ cố định trong vườn. Đẩy tới mọi bản đồ làm đầy đủ ở issue 32.
+
+### Chó Mực canh khách lạ (issue 31, DESIGN §6.1, ADR 0013)
+Luật nằm trong `state.js` ở mức ô và theo trạng thái bản lưu; `world.js` chỉ **diễn hoạt** (chó sủa, chạy đuổi) và báo cho `main.js` biết lúc nào gửi thao tác lên server. Phần đuổi theo chạy trên **trình duyệt của khách** vì khách mới là người đang di chuyển.
+```js
+guardRadius(state, t?)            // bán kính canh tính theo Ô (0 = không canh): chó con GUARD.radius.pup = 4,
+                                  //   trưởng thành GUARD.radius.adult = 6; vui < GUARD.sadHappy (50) còn một nửa;
+                                  //   đói < GUARD.hungryStop (30) hay đang mải ăn xúc xích thì 0; ngủ gật còn
+                                  //   GUARD.napRadius = 1; bị xích thì tối đa GUARD.chainRadius = 3
+dogSees(state, pos, t?)           // chó có thấy khách đứng ở pos ({ x, y } điểm ảnh bản đồ) không. Tâm vùng canh:
+                                  //   chính con chó khi thả rông, chuồng chó khi bị xích
+guardArea(state)                  // vùng chó chạy được khi bị xích: { x, y, r } (điểm ảnh); null = thả rông, khắp vườn
+dogAsleep(state)                  // đang ngủ gật (ban đêm và state.time < dog.nap)
+dogQuiet(state, t?)               // đang mải ăn xúc xích (t < dog.quiet, giờ ngoài đời)
+walkSpeed() / chaseSpeed()        // px/s người đi bộ (WALK_SPEED = 70) và chó đuổi (× GUARD.chaseMul = 1.3)
+setChained(state, on)             // chủ xích chó / thả rông (hành động `chain` ở target { kind: 'dog' })
+barkOp(state) / biteOp(state)     // chỉ ở cảnh 'visit': kiểm bằng luật, xem trước ngay trên con chó của bản đi dạo
+                                  //   rồi trả { msg, guestOp, ... } cho main.js gửi lên server (biteOp còn trả `stunMs`);
+                                  //   null = chưa làm được. KHÔNG ghi sổ của chủ ở đây: trong bản đi dạo `coins`,
+                                  //   `stats`, `log` là của khách, nên xu phạt và thống kê để server + trình duyệt chủ làm
+keepLoot(state, items)            // ghi đồ khách vừa trộm được trong lượt thăm (gọi khi server xác nhận); bị đớp là rơi hết
+```
+- **Ngủ gật** (`stepDog`): ban đêm cứ `GUARD.napEvery` = 60 giây giờ vườn lại quay một lần, trúng `GUARD.napRate` = 30% thì ngủ `GUARD.napMs` = 60 giây → khoảng **30% thời gian ban đêm**. Ban ngày `dogAsleep` luôn false (không xóa `dog.nap`, vì server chạy bù theo giờ làng thật).
+- **Thao tác mới của khách** (cùng hàng đợi và cùng mã thao tác của ADR 0012, áp dụng hai lần cùng mã chỉ tính một lần):
+  - `{ kind: 'bark', act: 'bark', x, y }` — chó phát hiện khách ở (x, y). Ghi `dog.barkAt/barkX/barkY`, `stats.barks++`, event `barked` (🔴) kèm `where` ("phía Đông vườn"). Một vườn chỉ ghi một dòng trong `GUARD.barkEvery` = 20 giây (`reason: 'barking'`).
+  - `{ kind: 'bite', act: 'bite', loot: { <món>: n } }` — chó đớp trúng. Chủ được `GUARD.fine` = 30 xu, `stats.chased++`, nhật ký "X bị Mực đớp"; khách nhận `reward = { lose: loot, fine, bite: 1 }` → `guestReward` bỏ hết đồ vừa trộm, trừ xu (không âm) và đặt `stats.robStreak = 0`. Chủ **không mất thêm** gì (phần đã bị trộm vẫn tính). Khách đứng hình `GUARD.biteStunMs` = 3 giây.
+  - `{ kind: 'sausage', act: 'sausage' }` — khách ném xúc xích (vật phẩm `sausage`, 30 xu ở chợ Bà Tư, cấp 5). Chó no dưới `GUARD.sausageHunger` = 50 thì **chắc chắn ăn**, chó đang no vẫn `GUARD.sausageGreed` = 30% tham ăn — phần hên xui quay bằng **hạt giống cố định = mã thao tác**, nên server và trình duyệt chủ ra cùng kết quả. Ăn thì `dog.quiet = at + GUARD.quietMs` (im lặng 60 giây). Kết quả trả `{ ate }`, khách mất 1 xúc xích dù chó có ăn hay không.
+  - Cả ba từ chối với `reason: 'no_guard'` khi vườn không có chó đang canh, `'no_item'` khi khách hết xúc xích.
+- **Chủ vườn:** online thì nhận `{ t: 'guestop', op }` → `guestOpApply` → `takeGuestLog` → băng rôn 🔴 "Mực đang sủa ở phía Đông vườn!" kèm **mũi tên** (todo kind `bark`, sprite `SPR2.barkArrow`, tắt sau `GUARD.barkShowMs` = 15 giây) và toast 🟡 khi chó đớp được hay bị ném xúc xích (loại thông báo `guard`). Offline thì server áp dụng thẳng vào bản lưu, chủ về đọc nhật ký.
+- **Chó trong vườn người khác không đi theo khách lạ** (`world.js`): nó quanh quẩn giữ chuồng, chỉ rời chỗ khi đuổi.
+- **Nhật ký chó:** `stats.chased` = đã đớp được bao nhiêu người, `stats.barks` = đã sủa mấy lần (issue 32 dùng cho thành tựu và màn "Trong lúc bạn vắng nhà"). `stats.robStreak` = chuỗi trộm chưa bị đớp của chính mình.
 
 ### Quà và sổ lưu bút ở cổng (issue 29, ADR 0012)
 ```js
@@ -362,7 +395,7 @@ Chợ Bà Tư thay sạp hàng và nhà kho bán hàng cũ (sạp bị bỏ kh�
 
 ### Thông báo, Việc cần làm, cài đặt
 ```js
-notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, gate)
+notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, help, gate, guard)
 urgentSpots(state)                // → [{ key, kind, x, y, text }] chỗ đang có chuyện gấp, tính từ trạng thái (không cần event)
 // notify.js
 eventMeta(event)                  // → { level, cat, group, label } | null (event chưa khai báo mức)
@@ -416,6 +449,9 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `stolen` | `by` (tên kẻ trộm), `item`, `qty`, `at` (giờ ngoài đời) | urgent |
 | `gift` | `name`, `item`, `qty` (tin từ server, không do `tick()` phát) | important (`gate`) |
 | `note` | `name` (tin từ server) | important (`gate`) |
+| `barked` | `by`, `dog`, `where`, `x`, `y`, `at` (chó sủa báo khách lạ, issue 31) | urgent |
+| `bitten` | `by`, `dog`, `fine`, `at` | important (`guard`) |
+| `sausaged` | `by`, `dog`, `ate`, `at` | important (`guard`) |
 | `egg` | — | info |
 | `guard` | `who` | info |
 | `shipped` | `coins`, `items`, `t` | info |
@@ -441,7 +477,7 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - Dời khối ruộng (kể cả đang có cây) giữ nguyên trạng thái ô. Cất khối chỉ khi chưa có cây.
 - Cuốc/tưới/thu hoạch/nhổ cỏ bằng công cụ cấp cao làm nhiều ô một lần (`tiles`); ô không hợp lệ trong vùng thì bỏ qua. Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô. Công cụ đang nâng cấp thì hành động bị khóa với lý do.
 
-**Vật nuôi, chó, quạ/trộm**: như bản cũ. Đói dần; máng còn cám thì tự ăn; con non lớn khi `hunger > growNeedsHunger`; bệnh thì không lớn/đẻ; gà đẻ trứng xuống đất; ổ ấp; bò/cừu `ready` → vắt sữa/xén lông; heo mang bầu đẻ 1–3 con (không vượt `PEN_CAP`). Chó ỉa bậy, giẫm phải thì trượt chân, càng nhiều phân vật nuôi càng mất vui, chó trưởng thành no và vui thì canh nhà. Quạ tới ô chín khi không có bù nhìn trong 5 ô; thằng Tèo vào ban đêm khi có ≥2 ô chín (đèn lồng giảm xác suất). Cổng (`gateIn`) là chỗ thằng Tèo đi vào. **Đóng băng/chạy bù không sinh quạ/trộm** và không làm con vật chết (ADR 0004). Chuồng chỉ dời được, luật không đổi.
+**Vật nuôi, chó, quạ/trộm**: như bản cũ. Đói dần; máng còn cám thì tự ăn; con non lớn khi `hunger > growNeedsHunger`; bệnh thì không lớn/đẻ; gà đẻ trứng xuống đất; ổ ấp; bò/cừu `ready` → vắt sữa/xén lông; heo mang bầu đẻ 1–3 con (không vượt `PEN_CAP`). Chó ỉa bậy, giẫm phải thì trượt chân, càng nhiều phân vật nuôi càng mất vui, chó trưởng thành no và vui thì canh nhà (đuổi quạ và thằng Tèo theo `DOG.guardChance`; canh **khách lạ** là luật riêng, xem mục "Chó Mực canh khách lạ"). Quạ tới ô chín khi không có bù nhìn trong 5 ô; thằng Tèo vào ban đêm khi có ≥2 ô chín (đèn lồng giảm xác suất). Cổng (`gateIn`) là chỗ thằng Tèo đi vào. **Đóng băng/chạy bù không sinh quạ/trộm** và không làm con vật chết (ADR 0004). Chuồng chỉ dời được, luật không đổi.
 
 **Kinh tế**
 - **Chợ Bà Tư** (làng, 6h–18h): hạt, vật tư, thức ăn, con non, đồ trang trí, mũ/phụ kiện (đồ chưa đủ cấp hiện khóa); bán nông sản đủ giá.
@@ -522,7 +558,7 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
 - v2 `accounts(id, name, name_key UNIQUE, pin_hash, pin_salt, created, fails, locked_until)`, `invites(code PK, created, used_by → accounts ON DELETE SET NULL, used_at)`, `sessions(token_hash PK, account_id → accounts ON DELETE CASCADE, created, expires)`. PIN băm `scrypt` (muối 16 byte riêng từng tài khoản); phiên chỉ lưu SHA-256 của mã; `name_key` = tên chữ thường (đã chuẩn hóa NFC).
 - v3 `farms(account_id PK → accounts ON DELETE CASCADE, play, save, saved_at, updated, rev)`: một dòng mỗi tài khoản. `play` = phiên chơi đang giữ quyền ghi (mã ngẫu nhiên 16 byte), `save` = bản lưu v2 JSON (`NULL` = chưa có vườn), `saved_at` = `savedAt` của bản lưu (giờ trình duyệt), `updated` = giờ server lúc nhận, `rev` = số bản đã nhận.
 - v4 `accounts.friend_code` (UNIQUE) + `friends(account_id, friend_id, created)` (issue 26, xem mục Bạn bè).
-- v5 `guest_ops(id TEXT PK, owner_id → accounts ON DELETE CASCADE, guest_id → accounts ON DELETE CASCADE, op, created, applied)` (issue 28): hàng đợi thao tác của khách. `id` = mã thao tác do khách sinh (duy nhất nên gửi lại không nhân đôi), `op` = thao tác JSON (đã có `by`, `level`, `room`, `at` do server điền; `kind` 'help' hay 'steal'), `applied` = giờ server lúc **server** tự áp dụng vào bản lưu chủ (`NULL` = đang chờ trình duyệt chủ áp dụng). Dòng đã áp dụng quá 7 ngày thì xóa.
+- v5 `guest_ops(id TEXT PK, owner_id → accounts ON DELETE CASCADE, guest_id → accounts ON DELETE CASCADE, op, created, applied)` (issue 28): hàng đợi thao tác của khách. `id` = mã thao tác do khách sinh (duy nhất nên gửi lại không nhân đôi), `op` = thao tác JSON (đã có `by`, `level`, `room`, `sausage` và `at` do server điền; `kind` 'help', 'steal', 'bark', 'bite' hay 'sausage'), `applied` = giờ server lúc **server** tự áp dụng vào bản lưu chủ (`NULL` = đang chờ trình duyệt chủ áp dụng). Dòng đã áp dụng quá 7 ngày thì xóa.
 - v6 (issue 29) `gifts(id, owner_id → accounts ON DELETE CASCADE, from_id, from_name, item, qty, op, created, UNIQUE(from_id, op))` = hàng đợi quà ở cổng (`qty` = số còn chờ; nhận hết thì 0 nhưng giữ dòng để mã thao tác `op` vẫn chặn gửi lặp) và `guestbook(id, owner_id, author_id, author_name, text, day, created, seen, UNIQUE(owner_id, author_id, day))` = sổ lưu bút (`day` = ngày ngoài đời giờ Việt Nam, `seen` = chủ đã đọc chưa).
 
 **HTTP:**
@@ -565,7 +601,12 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
   - `{ t: 'pos', x, y, dir }` → người khác nhận `{ t: 'pos', id, x, y, dir }`, **tối đa `LIVE.hz` = 6 lần mỗi giây mỗi người gửi** (các tin cách nhau ≥ 1000/6 ms; gửi dồn thì giữ vị trí mới nhất, phát ở nhịp kế tiếp nên vị trí cuối luôn tới). x, y kẹp trong 0..4096.
   - `{ t: 'chat', text }` (`text` phải nằm trong `QUICK_CHAT` của `data.js`) → `{ t: 'chat', id, text }`; `{ t: 'emote', e }` (`e` trong `EMOTES` 👋 ❤️ 😂 😡) → `{ t: 'emote', id, e }`. Câu/biểu cảm lạ → người gửi nhận `{ t: 'error', code: 'chat_invalid' }`, không ai nhận gì; chưa join → `not_joined`.
 - **Hàng đợi thao tác của khách (issue 28, 30, `server/guests.mjs`, ADR 0012)**, cần cookie phiên và phải đang đứng trong vườn người khác (đã `join` `farm` kèm `owner`).
-  - `{ t: 'guest', op: { id, kind: 'help'|'steal', act: 'water'|'weed'|'catch'|'shoo'|'crop'|'egg'|'product', idx | crow | egg | animal } }` → `{ t: 'guest', id, ok: true, reward }` (`{ coins, exp }` khi giúp, `{ items, steal }` khi trộm) hoặc `{ t: 'guest', id, ok: false, reason, msg }`. Server chỉ nhận đúng các trường trên (`id` 8–64 ký tự `A-Za-z0-9_-`); `by`, `level`, `room` (chỗ trống trong giỏ theo vườn đã lưu của khách) và `at` do server điền, không tin trình duyệt. `reason`: `no_session` · `not_joined` (chưa vào vườn ai) · `self` (vườn của chính mình) · `no_farm` · `op_invalid` · và các lý do của luật (`done`, `help_full`, `nothing`, `cant_steal`, `host_new`, `guest_new`, `robbed`, `full`, `day_full`).
+  - `{ t: 'guest', op }` → `{ t: 'guest', id, ok: true, reward }` hoặc `{ t: 'guest', id, ok: false, reason, msg }`. Các dạng `op` nhận được (`id` 8–64 ký tự `A-Za-z0-9_-`):
+    - `{ id, kind: 'help'|'steal', act: 'water'|'weed'|'catch'|'shoo'|'crop'|'egg'|'product', idx | crow | egg | animal }` → `reward` = `{ coins, exp }` khi giúp, `{ items, steal }` khi trộm;
+    - `{ id, kind: 'bark', act: 'bark', x, y }` (chỗ chó thấy khách, số nguyên trong ±10000) — không có `reward`;
+    - `{ id, kind: 'bite', act: 'bite', loot: { <món>: n } }` (tối đa 20 món, `n` nguyên 1..10000, món phải có trong `ITEMS`/`CROPS`/`PRODUCTS`) → `reward` = `{ lose, fine, bite }`;
+    - `{ id, kind: 'sausage', act: 'sausage' }` → `reward` = `{ lose: { sausage: 1 } }`.
+    Server chỉ nhận đúng các trường trên; `by`, `level`, `room` (chỗ trống trong giỏ theo vườn đã lưu của khách), `sausage` (số xúc xích khách đang có) và `at` do server điền, không tin trình duyệt. `reason`: `no_session` · `not_joined` (chưa vào vườn ai) · `self` (vườn của chính mình) · `no_farm` · `op_invalid` · và các lý do của luật (`done`, `help_full`, `nothing`, `cant_steal`, `host_new`, `guest_new`, `robbed`, `full`, `day_full`, `no_guard`, `no_item`, `barking`).
   - Server lấy bản lưu mới nhất của chủ, áp dụng các thao tác còn chờ trong hàng đợi rồi kiểm tra thao tác mới bằng `guestOpApply` của `state.js`. Bị từ chối thì **không** ghi vào hàng đợi. Nhận thì ghi `guest_ops` và:
     - chủ **đang online** (có WebSocket giữ phiên chơi): `applied = NULL`, đẩy `{ t: 'guestop', op }` tới mọi kết nối của chủ; trình duyệt chủ áp dụng rồi gửi bản lưu lên như thường.
     - chủ **offline**: server chạy bù vườn (issue 24) rồi áp dụng ngay trên bản lưu đó, lưu lại (`saved_at` không đổi) và đánh dấu `applied`.
