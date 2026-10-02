@@ -19,11 +19,11 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): Tí Sún chỉ tới khi có ≥3 trứng dưới đất; chồn hương chỉ tới khi có con ngủ ngoài chuồng; trung bình 1 vụ mỗi 2 đêm (thống kê hạt giống cố định) và không bao giờ quá 1 vụ mỗi đêm; không tới khi đã có bạn online trộm; đèn, hàng rào, chó giảm tần suất.
-- [ ] Unit test: bắt được trộm thì chọn được bắt đền 20–60 xu hoặc phạt thợ không công; phạt thợ chỉ 1 lần mỗi tuần làng; Tèo bị bắt nhiều lần thì đi lặng lẽ hơn (bán kính phát hiện nhỏ đi).
-- [ ] **Unit test riêng cho ADR 0004:** chạy bù offline có trộm NPC → không con nào chết hoặc bị bắt đi; dưới cấp 5 không có Tí Sún và chồn hương.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có 3 trứng dưới đất ở ban đêm → Tí Sún tới lấy trứng, chó sủa → đuổi kịp thì chọn bắt đền; dựng bản lưu có gà ngủ ngoài chuồng → chồn hương tới → đuổi được.
-- [ ] Pixel art Tí Sún và chồn hương có đủ.
+- [x] Unit test (seam 1): Tí Sún chỉ tới khi có ≥3 trứng dưới đất; chồn hương chỉ tới khi có con ngủ ngoài chuồng; trung bình 1 vụ mỗi 2 đêm (thống kê hạt giống cố định) và không bao giờ quá 1 vụ mỗi đêm; không tới khi đã có bạn online trộm; đèn, hàng rào, chó giảm tần suất. — `tests/thief.test.mjs`. Phần "bạn online sang trộm" mới chỉ để sẵn chỗ móc `state.guestRaid = { day, n }` (`guestRaids(s)`): nhánh Phase 2 chưa có phần online của Phase 1, test dựng tay giá trị đó.
+- [x] Unit test: bắt được trộm thì chọn được bắt đền 20–60 xu hoặc phạt thợ không công; phạt thợ chỉ 1 lần mỗi tuần làng; Tèo bị bắt nhiều lần thì đi lặng lẽ hơn (bán kính phát hiện nhỏ đi).
+- [x] **Unit test riêng cho ADR 0004:** chạy bù offline có trộm NPC → không con nào chết hoặc bị bắt đi; dưới cấp 5 không có Tí Sún và chồn hương.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có 3 trứng dưới đất ở ban đêm → Tí Sún tới lấy trứng, chó sủa → đuổi kịp thì chọn bắt đền; dựng bản lưu có gà ngủ ngoài chuồng → chồn hương tới → đuổi được. — `e2e/thief.spec.mjs`. Chỗ "chó sủa" để cho unit test lo: e2e dựng chó con (chưa canh nhà) để vụ trộm không bị `DOG.guardChance` ngẫu nhiên cắt ngang.
+- [x] Pixel art Tí Sún và chồn hương có đủ. — Tí Sún: đi (`npcTiSun`), rón rén (`npcTiSunSneak`), bị bắt (`npcTiSunCaught`); chồn hương: đi đêm (`civet`), chồm bắt (`civetCatch`), bị đuổi (`civetFlee`); thêm `thiefTorch`, `thiefShoes`, `thiefBubble`, `punishIcon`.
 
 ## Blocked by
 

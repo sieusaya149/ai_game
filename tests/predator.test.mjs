@@ -127,7 +127,15 @@ test('băng bó bằng thuốc thú y: con non khỏi, hết báo động', () =
   assert.equal(chick.hurt, false);
   assert.equal(G.hurtAnimals(s).length, 0);
   assert.equal(s.inv.medicine, 1);
-  seeded(7, () => runFed(s, P.rat.hurtDeadMs + MIN, 30_000));
+  // chạy dài hơn hạn vết thương; mỗi vòng dọn kẻ săn mồi và giữ con non trong chuồng để nó không bị
+  // chuột cắn lần nữa hay ngủ ngoài rồi bị chồn hương tha đi — ở đây chỉ kiểm "chữa rồi thì không chết vì vết cũ"
+  seeded(7, () => {
+    for (let t = 0; t < P.rat.hurtDeadMs + MIN; t += 30_000) {
+      s.preds.length = 0; s.threats.length = 0;
+      for (const a of s.animals) { a.hunger = 100; a.sick = 0; a.stray = false; a.tile = null; }
+      G.tick(s, 30_000);
+    }
+  });
   assert.ok(s.animals.some(a => a.id === chick.id), 'chữa rồi thì sống');
 });
 

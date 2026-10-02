@@ -26,7 +26,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`; Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh). Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`; Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC). Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
 | `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `troughOf(map, {pen, id?})`; bản đồ vườn có `pens` (chuồng đầu tiên mỗi loại), `penList`/`penById` (mọi chuồng: `{ id, type, lv, name, rect, gates, trough|null, area, house, ent }`), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
 | `public/migrate.js` | `SAVE_VERSION` (3), `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`: v1→v2, v2→v3); `animalDefaults`/`fillAnimal`: hình dạng con vật v3 và mặc định của nó. Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
@@ -104,8 +104,14 @@ state = {
          tricks: { <lệnh>: số buổi đã đạt }, trainDay, session,   // dạy lệnh (issue 45); session = buổi đang mở
          cmd: null | { id, spot?, until?, list? }, herdDay, scene },   // lệnh đang thi hành · ngày đã tự lùa · bản đồ chó đang đứng
   poops: [ { id, x, y, at } ],
-  threats: [ { id, kind: 'crow'|'thief', plot, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
+  threats: [ { id, kind: 'crow'|'thief'|'tisun'|'civet', plot, at?, target?, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
+                                              // quạ/Tèo nhắm ô ruộng `plot`; Tí Sún và chồn hương nhắm điểm `at` (chồn hương kèm `target` = id con vật)
   preds: [ { id, kind: 'rat'|'hawk'|'weasel', state: 'hunt'|'leaving', since, strikeAt, warned, x, y, tx, ty, tile?, tileAt?, target?, carry? } ],   // kẻ săn mồi (issue 43)
+  raid: null | { day, kind, at, done },       // vụ trộm NPC đã chốt cho đêm nay (issue 46); kind = null là đêm yên
+  caught: null | { kind, name, coins },       // trộm người vừa bắt được, đang chờ chọn kiểu phạt
+  chore: null | { day, name },                // trộm bị phạt sang làm thợ không công vào ngày `day`
+  teoCaught,                                  // số lần thằng Tèo bị bắt (càng nhiều càng đi lặng lẽ)
+  choreWeek,                                  // tuần làng gần nhất đã dùng hình phạt thợ không công (-1 = chưa dùng)
   orders: [ { id, who, items, coins, exp } ], nextOrderAt,
   stats: { harvests, bugs, eggs, poops, slips, piglets, hatches, orders, thieves, crows, rats, preds, earned, planted, shipped, bought, slept },
   achievements: { id: true },
@@ -303,7 +309,7 @@ trainResult(s, id, pass)          // chốt kết quả minigame "đạt/không 
 commandDog(s, id, spot?)          // ra lệnh ('stop' = cho nghỉ); Canh khu nhận ô gác, thiếu thì lấy ô người chơi đứng
 dogPost(s)                        // → { c, r } chỗ đang gác, hay null
 guardRadius(s, dog = s.dog)       // bán kính phát hiện trộm (ô): non 0 · nhỡ 4 · trưởng thành 6 · già 4; ×2 tại chỗ gác
-dogSees(s, x, y)                  // chó có phát hiện kẻ lạ ở điểm đó không (tính từ chỗ gác nếu đang gác)
+dogSees(s, x, y, mul = 1)         // chó có phát hiện kẻ lạ ở điểm đó không (tính từ chỗ gác nếu đang gác); mul < 1 = kẻ lạ đi lặng lẽ
 outOfPen(s)                       // → [animal] các con đang ngoài chuồng (thả rông, lạc, bò/cừu đi lạc)
 ```
 
@@ -311,7 +317,7 @@ outOfPen(s)                       // → [animal] các con đang ngoài chuồng
 - **Dạy lệnh:** mỗi ngày game một buổi, mỗi buổi tốn 1 `treat` (**Bánh thưởng**, vật phẩm `feed` ở chợ Bà Tư, 15 xu). Chó con chưa học được, chó già thôi học. Phải thuộc **Ngồi** trước mọi lệnh khác. Minigame (bấm đúng lúc) **chỉ gửi vào luật `pass` đạt/không đạt**; luật cộng tiến độ: chó vui ≥ `fastHappy` thì một buổi đạt ăn **2 buổi**, không thì 1. Buổi không đạt: tiến độ 0, bánh thưởng vẫn mất. Chó đói (`hunger < quitHunger`) hay buồn (`happy < quitHappy`) thì `quitChance` bỏ giữa chừng — `trainStart` trả `quit: true`, không mở `session`, `trainResult` trả `ok: false` (`reason: 'no_session'`), bánh thưởng vẫn mất.
 - **Tác dụng từng lệnh:** Ngồi (đứng yên) · Đi theo (chó sang cả làng, trong nhà: `dog.scene` theo `enterScene`) · Canh khu (`dog.cmd = { id:'guard', spot }`, bán kính phát hiện ×2 tại chỗ gác) · Lùa (`dog.cmd = { id:'herd', until, list }`: luật chốt ngay danh sách `outOfPen` rồi đưa về dần trong `herdMs`, con về rồi ở yên `stayMs`; `world.js` chỉ diễn hoạt chó chạy vòng, ADR 0013) · Tìm trứng (đánh dấu `e.found = true` cho mọi `hiddenEggs`) · Đuổi chim (bị động: chó đuổi quạ ở bất cứ đâu, không cần trong bán kính).
 - **Tự lùa mỗi tối:** từ `isDusk`, mỗi ngày game một lần, nếu chó thuộc Lùa và `hunger ≥ autoHunger` và `happy ≥ autoHappy` thì tự gọi lùa (event `dogHerd`).
-- **Phát hiện trộm:** `stepThreats` chỉ cho chó đuổi quạ/trộm khi `guardOn` **và** `dogSees(...)` (hoặc là quạ và chó đã thuộc Đuổi chim), rồi mới tới `DOG.guardChance`.
+- **Phát hiện trộm:** `stepThreats` chỉ cho chó đuổi quạ/trộm khi `guardOn` **và** `dogSees(...)` (hoặc là quạ và chó đã thuộc Đuổi chim), rồi mới tới `DOG.guardChance`. Mọi trộm NPC (kể cả Tí Sún và chồn hương) dùng chung đường này; riêng thằng Tèo có `dogSees(..., thiefStealth(s))`.
 - **Giao diện:** hành động trên chó có `train` (mở bảng `dog`), `cmd_<lệnh>` cho từng lệnh đã thuộc, `cmd_stop` khi đang có lệnh. `cmd_guard` trả `pickSpot: 'guard'` — `main.js` chờ chạm một ô rồi gọi `commandDog(s, 'guard', { c, r })`. Bảng `PANELS.dog` (ui.js) liệt kê 6 lệnh và chạy minigame `showTrain(trickId)` (thanh `#train-bar` có vạch `#train-zone`, kim `#train-mark`, nút `#train-hit`).
 - **Pixel art (art3.js):** `SPR3.dogSitBy/dogBegBy/dogHerdBy/dogBarkBy[giai đoạn]` (mỗi giai đoạn một bộ riêng), `trainBar`, `praise`, `trickIcon` (6 lệnh), `cmdBubble`, `guardPost`, `sniffMark`, `items.treat`. `render.dogPoseImg(dog, pose, face, frame)` chọn dáng theo `world` `rt.pose` (`sit|beg|herd|bark`).
 
@@ -333,6 +339,31 @@ PRED_NAME                // { rat: 'Chuột', hawk: 'Diều hâu', weasel: 'Ch�
 - **Bảo hộ người mới:** dưới cấp `PREDATOR.minLevel` (5) không sinh con nào.
 - **ADR 0004 (cứng):** khi chạy bù offline (`catchUp`) **chuột chỉ ăn cám và trộm trứng** — không cắn con non; diều hâu, chồn **không tới** (con đã có sẵn trong bản lưu thì bỏ đi tay không), nên **không con nào chết**. Vết thương đang có bị kẹp ở `rat.hurtCapMs`. Chạy bù cũng không sinh chuột quá 8.
 - Hiển thị: `render.js` vẽ `SPR3.rat`/`ratEat`/`ratFlee`, `SPR3.hawk`/`hawkDive`/`hawkCarry` (+ `hawkShadow` in trên mặt đất), `SPR3.weasel`/`weaselCatch`, băng gạc `SPR3.hurtPatch` trên con non bị cắn, bẫy `SPR3.ratTrap`/`ratTrapShut`/`ratTrapFull`, mái che `SPR3.canopy`; bong bóng cảnh báo `SPR3.status.warn` trên đầu kẻ săn mồi sắp ra tay, `SPR3.status.hurtIcon` trên con bị thương.
+
+### Trộm NPC: Tí Sún, chồn hương, phạt trộm (issue 46)
+
+```js
+raidPool(s)                       // → ['thief'|'tisun'|'civet'] trộm nào có đồ đáng trộm để tới đêm nay
+raidChance(s)                     // → 0..RAID.max xác suất đêm nay có một vụ trộm NPC
+raidTonight(s)                    // → null | { kind, at, done } vụ đã chốt cho đêm nay
+guestRaids(s)                     // → số vụ bạn bè online sang trộm đêm nay (đọc s.guestRaid = { day, n }, chỗ móc cho Phase 1)
+villageWeek(s)                    // → tuần làng (7 ngày game một tuần)
+thiefStealth(s)                   // → hệ số bán kính phát hiện của thằng Tèo (RAID.stealthPerCatch ^ teoCaught, sàn stealthMin)
+thiefGear(s)                      // → { torch, shoes } đồ thằng Tèo đã sắm sau những lần bị bắt
+punishInfo(s)                     // → null | { kind, name, coins, options } cho hộp thoại chọn phạt
+punishOptions(s)                  // → [{ id: 'pay'|'chore', icon, label, disabled }]
+punishThief(s, choice = 'pay')    // chọn kiểu phạt → R { coins } hay R { chore: ngày }; reason: none | unknown | weekly
+```
+
+- **Luật ở mức luật chơi (ADR 0013):** mỗi đêm `planRaid` chốt **đúng một** vụ (hoặc không vụ nào) nên không bao giờ quá 1 vụ mỗi đêm; `world.js` chỉ diễn hoạt kẻ trộm đi từ `gateIn` tới chỗ đã chốt.
+- **Ai tới:** thằng Tèo cần ≥ `RAID.ripeNeed` (3) ô chín · **Tí Sún** cần ≥ `RAID.eggNeed` (3) trứng dưới đất (trứng trong bụi cũng tính) · **chồn hương** cần có con ngủ ngoài chuồng (`stray`). **Bảo hộ người mới:** dưới cấp `RAID.minLevel` (5) chưa gặp Tí Sún và chồn hương. Đêm đã có bạn online sang trộm (`guestRaids(s) > 0`) thì trộm NPC không tới.
+- **Tần suất:** `RAID.nightly` 0.5 = trung bình 1 vụ mỗi 2 đêm; vườn càng giàu (ô chín + trứng + con ngủ ngoài) càng thường, tối đa ×`RAID.richMul` và chặn trên `RAID.max`. Mỗi đèn lồng (tính tối đa `lampMax` 3 cái) ×`lampMul`, có hàng rào thấp ×`fenceMul`, chó đang canh nhà ×`dogMul`.
+- **Ra tay:** Tèo hái một ô chín sau `THREATS.thiefStealMs` · Tí Sún ôm `RAID.eggTake` (2–3) quả sau `RAID.eggStealMs` · chồn hương tha con vật đi sau `RAID.civetCatchMs`.
+- **Bắt được:** target `threat` của trộm người có hành động `catch` → `res.punish = punishInfo(s)`, `main.js` mở `ui.askPunish`. Hai lựa chọn: **bắt đền** `THREATS.thiefCaughtCoins` (20–60 xu) hoặc **phạt làm thợ không công ngày mai** — mỗi tuần làng một lần (`choreWeek`). Sáng hôm sau `doChore` tưới hết cây khô, nhổ cỏ và dọn sạch phân chó. Chồn hương là con thú: hành động `shoo`, đuổi đi là xong, không có hộp thoại phạt.
+- **Trộm tiến bộ dần:** mỗi lần bắt được thằng Tèo thì `teoCaught++`; bán kính chó phát hiện nó ×`RAID.stealthPerCatch` (0.85) mỗi lần, sàn `stealthMin` 0.5. Bị bắt `torchAt` (1) lần thì có đèn pin, `shoesAt` (3) lần thì có giày êm (render vẽ đè lên nhân vật).
+- **Bản lưu:** `raid`/`caught`/`chore`/`teoCaught`/`choreWeek` là trường mới, bản lưu cũ thiếu thì `loadGame` điền mặc định (không cần bước chuyển v3). Thoát game lúc hộp thoại phạt còn mở (`caught` khác null) thì lần mở sau coi như đã chọn **bắt đền**: cộng xu và ghi nhật ký.
+- **Chạy bù offline (ADR 0004):** `stepRaidAway` vẫn cho trộm NPC "đã tới" nhưng **chỉ mất trứng hoặc rau** — chồn hương không nằm trong pool, không con vật nào chết hay bị bắt đi, và không để lại kẻ trộm đứng trong vườn.
+- **Pixel art (art3.js):** `SPR3.npcTiSun` (đi, dùng lại bộ NPC của Tí Sún), `npcTiSunSneak` (rón rén), `npcTiSunCaught` (giơ tay, mếu) · `civet` / `civetCatch` / `civetFlee` (mỗi tư thế một bộ riêng, khác hẳn `weasel`) · `thiefTorch`, `thiefShoes` (đồ thằng Tèo), `thiefBubble` (bong bóng báo trộm), `punishIcon.pay` / `punishIcon.chore`. `render.tisunImg(pose, face, frame, dir)` và `render.civetImg(pose, face, frame)`.
 
 ### Vịt (issue 47)
 
@@ -461,7 +492,7 @@ arrowTargets(state, items)  arrowFor(point, box, margin)
 todoList(state)                   // → [{ kind, level: 'urgent'|'normal', count, scene: 'farm', x, y, target, spots: [{ key, x, y, target }], icon, label }]
                                   //   xếp theo mức gấp rồi số lượng; (x, y, target) là chỗ gần người chơi nhất
 ```
-Loại việc của `todoList`: `crow`, `thief`, `pred` (kẻ săn mồi sắp ra tay), `hurt` (con non bị chuột cắn), `sick` (con Bệnh nặng trở lên — gấp); `tired` (con mệt), `hungry`, `dry`, `bugs`, `weeds`, `ripe`, `egg`, `trough`, `poop` (thường). Bảng Việc cần làm, bản đồ nhỏ và mũi tên đều đọc từ danh sách này (chạm một dòng thì `main.api.todoGo(kind)` cho nhân vật tự đi tới, kể cả khi đang ở bản đồ khác: ra cửa về vườn rồi đi tiếp).
+Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ săn mồi sắp ra tay), `hurt` (con non bị chuột cắn), `sick` (con Bệnh nặng trở lên — gấp); `tired` (con mệt), `hungry`, `dry`, `bugs`, `weeds`, `ripe`, `egg`, `trough`, `poop` (thường). Bảng Việc cần làm, bản đồ nhỏ và mũi tên đều đọc từ danh sách này (chạm một dòng thì `main.api.todoGo(kind)` cho nhân vật tự đi tới, kể cả khi đang ở bản đồ khác: ra cửa về vườn rồi đi tiếp).
 
 **Mức và khóa gộp của event** (`EVENT_LEVEL` trong `data.js`): mỗi event có `level`, `group(e)` (khóa gộp), `label`; mức `important` có thêm `cat` (loại tắt được) và `text(n, e)` (chữ đã gộp, ví dụ "5 ô cà chua đã chín"). Mức: `urgent` 🔴 (băng rôn đỏ, âm thanh, rung, mũi tên; không tắt được) · `important` 🟡 (toast nhỏ, tự gộp) · `info` ⚪ (chỉ ghi nhật ký) · `direct` (hiện ngay không gộp) · `none` (hiệu ứng/âm thanh, không thông báo). **Thêm event mới thì khai báo trong `EVENT_LEVEL`**, thiếu thì `eventMeta` trả `null`.
 
@@ -501,7 +532,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `died` | `animal`, `id`, `kind`, `sex`, `x`, `y` | important (`old`) — mất vì bệnh; main đẩy thiên thần vào `world.angels` |
 | `cured` | `animal`, `id` | info |
 | `grave` | `id` (thực thể mộ) | none |
-| `eating` | `kind` ('crow'/'thief') | urgent |
+| `eating` | `kind` ('crow'/'thief'/'tisun'/'civet') | urgent |
 | `predator` | `kind` ('rat'/'hawk'/'weasel'), `id`, `animal?` | urgent — kẻ săn mồi sắp ra tay, còn ~10 giây để đuổi |
 | `hurt` | `animal`, `id` | urgent — con non vừa bị chuột cắn |
 | `taken` | `animal`, `id`, `pred`, `kind`, `sex`, `x`, `y` | important (`loss`) — diều hâu/chồn bắt mất con vật |
@@ -513,13 +544,15 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `rotten`, `dead` | `crop` | important (`spoil`) |
 | `hungry` | `animal` | important (`hungry`) |
 | `crow`, `thief` | `name` (cây bị mất) | important (`loss`) |
+| `tisun` | `n` (số trứng bị lấy) | important (`loss`) |
+| `civet` | `animal` (tên loài bị tha đi) | important (`loss`) |
 | `levelup` | `level` | important (`levelup`) |
 | `order` | — | important (`order`) |
 | `stray` | `animal` (tên loài), `id` | important (`stray`), gộp theo loài: "N con gà lạc, chưa về chuồng 💤" |
 | `oldSoon` | `animal` (tên loài), `id` | important (`old`), gộp theo loài |
 | `passed` | `animal`, `id`, `kind` (loại), `sex`, `x`, `y` | important (`old`), gộp theo loài; main đẩy thiên thần bay lên vào `world.angels` |
 | `egg` | — | info |
-| `guard` | `who` | info |
+| `guard` | `who` (loại kẻ bị đuổi: 'crow'/'thief'/'tisun'/'civet') | info |
 | `trick` | `trick`, `name` | info — chó vừa học xong một lệnh (kèm `toast`) |
 | `dogHerd` | `n` | info — tối đến chó tự lùa đàn về |
 | `shipped` | `coins`, `items`, `t` | info |
@@ -528,7 +561,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `achievement` | `id`, `name`, `coins` | direct |
 | `fx` | `text`, `color`, `x`, `y` (chữ bay, điểm ảnh) | none |
 | `sound` | `name` | none |
-| `spawn` | `what` ('chick'/'piglet'/'egg'/'poop'/'crow'/'thief'/'angel'/'rat'/'hawk'/'weasel'), `x`, `y` | none |
+| `spawn` | `what` ('chick'/'piglet'/'egg'/'poop'/'crow'/'thief'/'tisun'/'civet'/'angel'/'rat'/'hawk'/'weasel'), `x`, `y` | none |
 
 Tên âm thanh (`sound.js`, `play(name)`, `setMuted(bool)`): `click coin harvest water dig plant spray pop bark oink cluck chirp moo baa slip levelup error eat alarm crow` (`chirp`: gà con kêu, world phát kèm chữ "chiếp").
 
@@ -545,7 +578,7 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - Dời khối ruộng (kể cả đang có cây) giữ nguyên trạng thái ô. Cất khối chỉ khi chưa có cây.
 - Cuốc/tưới/thu hoạch/nhổ cỏ bằng công cụ cấp cao làm nhiều ô một lần (`tiles`); ô không hợp lệ trong vùng thì bỏ qua. Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô. Công cụ đang nâng cấp thì hành động bị khóa với lý do.
 
-**Vật nuôi, chó, quạ/trộm**: đói dần; máng còn cám thì tự ăn; tuổi và giai đoạn theo giờ vườn (mục Vòng đời con vật); bệnh hoặc đói (`hunger <= growNeedsHunger`) thì không lên cân/đẻ; gà đẻ trứng xuống đất; ổ ấp; bò/cừu `ready` → vắt sữa/xén lông; heo mang bầu đẻ 1–3 con (không vượt `PEN_CAP`). Chó ỉa bậy, giẫm phải thì trượt chân, càng nhiều phân vật nuôi càng mất vui, chó trưởng thành no và vui thì canh nhà. Quạ tới ô chín khi không có bù nhìn trong 5 ô; thằng Tèo vào ban đêm khi có ≥2 ô chín (đèn lồng giảm xác suất). Cổng (`gateIn`) là chỗ thằng Tèo đi vào. **Đóng băng/chạy bù không sinh quạ/trộm** và không làm con vật chết, trừ chết vì già (ADR 0004). Chuồng chỉ dời được, luật không đổi.
+**Vật nuôi, chó, quạ/trộm**: đói dần; máng còn cám thì tự ăn; tuổi và giai đoạn theo giờ vườn (mục Vòng đời con vật); bệnh hoặc đói (`hunger <= growNeedsHunger`) thì không lên cân/đẻ; gà đẻ trứng xuống đất; ổ ấp; bò/cừu `ready` → vắt sữa/xén lông; heo mang bầu đẻ 1–3 con (không vượt `PEN_CAP`). Chó ỉa bậy, giẫm phải thì trượt chân, càng nhiều phân vật nuôi càng mất vui, chó trưởng thành no và vui thì canh nhà. Quạ tới ô chín khi không có bù nhìn trong 5 ô; ban đêm luật chốt nhiều lắm một vụ trộm NPC (thằng Tèo ≥3 ô chín · Tí Sún ≥3 trứng dưới đất · chồn hương có con ngủ ngoài chuồng — xem mục "Trộm NPC"). Cổng (`gateIn`) là chỗ trộm đi vào. **Đóng băng/chạy bù không sinh quạ**, trộm NPC chỉ lấy trứng hoặc rau và không làm con vật chết hay bị bắt đi, trừ chết vì già (ADR 0004). Chuồng chỉ dời được, luật không đổi.
 
 **Kinh tế**
 - **Chợ Bà Tư** (làng, 6h–18h): hạt, vật tư, thức ăn, con non, đồ trang trí, mũ/phụ kiện (đồ chưa đủ cấp hiện khóa); bán nông sản đủ giá.

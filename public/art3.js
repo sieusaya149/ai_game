@@ -171,6 +171,8 @@ const P = {
   hawk: ['#3a2010', '#5e3618', '#8a5426', '#b07a40'],
   hawkW: ['#f0e6d0', '#d8c8a8'],
   weasel: ['#4a2a10', '#7a4a1e', '#a46a30', '#c88c4a'],
+  civet: ['#463c30', '#6c5f4c', '#94856c', '#bcac90'],      // chồn hương: nâu xám tro, khác hẳn chồn nâu trơn
+  civetDark: ['#100e0a', '#221d16', '#342c22', '#4a4032'],  // mặt nạ & khoang đuôi đen
   pink: '#f08a9e',
 };
 const EYE = '#1a0e08';
@@ -2521,6 +2523,255 @@ function sicken(c) {
   return c;
 }
 
+// ---------- Issue 46: hai trộm mới — Tí Sún rón rén & chồn hương đi đêm ----------
+
+// Bảng màu Tí Sún mở rộng: thêm quả trứng (E/g) và giọt nước mắt (t). Giữ nguyên TISUN_PAL gốc.
+const TISUN2_PAL = { ...TISUN_PAL, E: '#f6ecd4', g: '#d8c49e', t: '#8ad2f4' };
+
+// Tí Sún rón rén 16x24 (nhìn ngang, quay trái): khom thấp, hai tay chìa trước ôm khư khư quả trứng.
+const SNEAK_TOP = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '....o.o.o.......',
+  '...ohohohoo.....',
+  '..ohhhhhhhho....',
+  '.ohhhhhhhhhho...',
+  '.osshhhhhhhho...',
+  '.ossssshhhhho...',
+  '.oseessshhhho...',
+  '.ossssssshhho...',
+  '.oscsmssshHo....',
+  '..owwwsssso.....',
+  '........oarrrAo.',
+  '.ooo.oooowwwwwo.',
+  'owEgoLLLorrrrro.',
+  'oEEgssssowwwwwo.',
+  '.oggooooorrrrro.',
+  '..oo....orrrrro.',
+];
+// hai khung bước nhón: đầu thấp hẳn xuống, gối gập, mũi chân chạm hàng dưới cùng
+const SNEAK_LEGS = [
+  ['.......opppppo..', '.....ollo.oLLo..', '....ofo....ofo..'],
+  ['.......opppppo..', '...offo...oLLo..', '...oooo....ofo..'],
+];
+const tisunSneak = f => spr([...SNEAK_TOP, ...SNEAK_LEGS[f]], TISUN2_PAL);
+
+// Tí Sún bị bắt 16x24: nhìn chính diện, hai tay giơ lên trời, mặt méo xệch, một giọt nước mắt,
+// giỏ trứng rơi lăn lóc dưới chân.
+const TISUN_CAUGHT = [
+  '................',
+  '.oo..........oo.',
+  'osso........osso',
+  'osso........osso',
+  'oLLo.o.o.o..oLLo',
+  'osLoohohohooosLo',
+  'osLohhhhhhhhosLo',
+  'osLohhHhhHhhosLo',
+  'osLohsssssshosLo',
+  'osLoseesseesosLo',
+  'osLoscsssstsosLo',
+  'osLosmmwmmssosLo',
+  'osLo.osssso.osLo',
+  'osLo..osso..osLo',
+  'ossoarrwwrrAosso',
+  '.ooorrwwwwrrooo.',
+  '...owwrrrrwwo...',
+  '...orrwwwwrro...',
+  '....orrrrrro....',
+  '.....opppppo....',
+  '.ooo.oppoppo....',
+  'obEboollollo.ooo',
+  'oBbBooffoffooEEo',
+  'oBBBoooooooooooo',
+];
+const tisunCaught = () => spr(TISUN_CAUGHT, TISUN2_PAL);
+
+// ---------- chồn hương (civet) ----------
+// Khác hẳn chồn nâu weasel (nhỏ, nâu trơn, đuôi không khoang): thân dài thấp hơn,
+// mặt nạ đen quanh mắt kèm sọc trắng kem sống mũi, mắt vàng ánh đèn đêm, đuôi dài khoang đen–kem.
+
+// khoang đuôi nằm ngang: cứ 2 cột đen lại 2 cột kem
+const civetRing = (off = 0) => (px, py, k) => ((((px + off) >> 1) & 1) ? P.civetDark[Math.min(3, k + 1)] : P.cream[Math.min(3, k + 1)]);
+// khoang đuôi dọc (khi đuôi dựng hoặc cụp theo chiều đứng)
+const civetRingV = (off = 0) => (px, py, k) => ((((py + off) >> 1) & 1) ? P.civetDark[Math.min(3, k + 1)] : P.cream[Math.min(3, k + 1)]);
+
+// đốm sẫm lưa thưa trên lưng chồn
+const civetSpeck = (px, py, k) => (k >= 2 && (px * 2 + py) % 7 === 0 ? P.civetDark[3] : undefined);
+
+// Mặt chồn hương: sọc trắng kem sống mũi, dải mặt nạ đen qua mắt, mắt vàng ánh đèn đêm.
+// Vẽ kiểu source-atop nên chỉ ăn vào trong hình, không văng ra nền.
+function civetFace(x, ex, ey) {
+  const D = P.civetDark, K = P.cream;
+  x.save();
+  x.globalCompositeOperation = 'source-atop';
+  R(x, K[2], ex - 3, ey - 2, 6, 1); R(x, K[3], ex - 2, ey - 2, 3, 1);   // sọc trắng kem sống mũi
+  R(x, D[1], ex - 3, ey - 1, 6, 1);                                     // mặt nạ đen quanh mắt
+  R(x, D[0], ex - 2, ey, 4, 1);
+  R(x, K[2], ex - 3, ey + 1, 3, 1);                                     // má kem dưới mặt nạ
+  R(x, '#ffd23c', ex, ey, 2, 1); R(x, '#fff6c0', ex, ey);               // mắt sáng vàng
+  x.restore();
+}
+
+// Chồn hương đi đêm 20x11, hai khung bước.
+function civet(f) {
+  const C = P.civet, K = P.cream;
+  const c = fig(20, 11, [
+    B(f ? 3 : 5, 7, 2, 3, C, { max: 1, sep: true, noise: 0 }),            // chân trước xa
+    B(f ? 13 : 11, 7, 2, 3, C, { max: 1, sep: true, noise: 0 }),          // chân sau xa
+    E(16, 5.6 - (f ? 0.5 : 0), 4, 1.1, C, { pat: civetRing(f ? 2 : 0), noise: 0 }),  // đuôi dài khoang đen–kem
+    E(8.6, 6.4, 5.2, 1.9, C, { pat: civetSpeck }),                        // thân dài thấp
+    E(4, 4.6, 2.5, 2, C, { sep: true }),                                  // đầu
+    B(0, 4, 3, 2, C, { sep: true, noise: 0, min: 1 }),                    // mõm nhọn
+    B(5, 2, 2, 1, C, { sep: true, noise: 0 }),                            // tai tròn
+    B(f ? 5 : 3, 7, 2, 3, C, { min: 1, sep: true, noise: 0 }),            // chân trước gần
+    B(f ? 11 : 13, 7, 2, 3, C, { min: 1, sep: true, noise: 0 }),          // chân sau gần
+  ]);
+  const x = c.getContext('2d');
+  civetFace(x, 3, 4);
+  R(x, '#2a1a12', 0, 4);                                                  // chóp mũi đen
+  R(x, K[1], 5, 2);                                                       // viền tai sáng
+  return c;
+}
+
+// Chồn hương chồm bắt 18x14: lưng cong vồng, hai chân trước giơ, miệng há lộ răng, lông gáy dựng.
+function civetCatch(f) {
+  const C = P.civet, D = P.civetDark;
+  const c = fig(18, 14, [
+    B(11, 10, 2, 3, C, { max: 1, noise: 0 }),                             // chân sau xa trụ đất
+    E(16.2, 7, 1.3, 4, C, { pat: civetRingV(f ? 2 : 0), noise: 0 }),      // đuôi dựng khoang
+    E(15.2, 2.4, 1.5, 1.4, C, { pat: civetRingV(f ? 1 : 3), noise: 0, sep: true }),  // chóp đuôi vẹo
+    E(13, 10, 3, 2.6, C),                                                 // mông trụ xuống đất
+    E(10.4, 7, 2.4, 2.6, C, { sep: true }),                               // lưng cong vồng dựng đứng
+    E(8.4, 4.4, 2.2, 2.2, C, { sep: true }),                              // ức chồm lên
+    B(14, 10, 2, 3, C, { min: 1, sep: true, noise: 0 }),                  // chân sau gần
+    B(f ? 4 : 5, 5, 3, 2, C, { max: 1, sep: true, noise: 0 }),            // chân trước xa giơ co
+    B(f ? 6 : 5, 7, 4, 2, C, { min: 1, sep: true, noise: 0 }),            // chân trước gần giơ co
+    E(5.6, 2.2, 2.3, 2, C, { sep: true }),                                // đầu ngẩng
+    B(1, 1, 3, 1, C, { sep: true, noise: 0, min: 2 }),                    // hàm trên
+    B(1, 3, 3, 1, C, { sep: true, noise: 0, max: 1 }),                    // hàm dưới há ra
+    B(7, 0, 2, 1, C, { sep: true, noise: 0 }),                            // tai dựng
+  ]);
+  const x = c.getContext('2d');
+  civetFace(x, 5, 2);
+  R(x, '#6e1a14', 1, 2, 3, 1);                                            // trong miệng há đỏ
+  R(x, '#ffffff', 1, 1); R(x, '#ffffff', 3, 1); R(x, '#ffffff', 2, 3);    // răng nanh nhe ra
+  dots(x, OUT, [[9, 1], [11, 3], [13, 6]]);                               // lông gáy dựng ngược
+  dots(x, D[1], [[9, 2], [11, 4], [13, 7]]);
+  dots(x, D[0], [[f ? 4 : 5, 6], [f ? 6 : 5, 8]]);                        // móng vuốt bàn chân trước
+  return c;
+}
+
+// Chồn hương bị đuổi 22x10: tai cụp, đuôi cụp sát đất, thân duỗi dài, chân sải rộng.
+function civetFlee(f) {
+  const C = P.civet;
+  const c = fig(22, 10, [
+    B(f ? 2 : 5, 6, 2, 3, C, { max: 1, sep: true, noise: 0 }),            // chân trước xa
+    B(f ? 16 : 13, 6, 2, 3, C, { max: 1, sep: true, noise: 0 }),          // chân sau xa
+    E(16.8, 5.8, 3, 1, C, { pat: civetRing(f ? 2 : 0), noise: 0 }),       // gốc đuôi quặp xuống
+    E(19.6, 7.6, 1.5, 2.1, C, { pat: civetRingV(f ? 1 : 3), noise: 0, sep: true }),   // chót đuôi cụp sát đất
+    E(9.8, 4.6, 6.2, 1.7, C, { pat: civetSpeck }),                        // thân duỗi dài phóng chạy
+    E(3.8, 4, 2.4, 1.9, C, { sep: true }),                                // đầu rướn tới
+    B(0, 3, 3, 2, C, { sep: true, noise: 0, min: 1 }),                    // mõm nhọn
+    B(4, 1, 4, 1, C, { sep: true, noise: 0, max: 1 }),                    // tai cụp ép ra sau
+    B(f ? 5 : 2, 6, 2, 3, C, { min: 1, sep: true, noise: 0 }),            // chân trước gần sải rộng
+    B(f ? 13 : 16, 6, 2, 3, C, { min: 1, sep: true, noise: 0 }),          // chân sau gần sải rộng
+  ]);
+  const x = c.getContext('2d');
+  civetFace(x, 3, 4);
+  R(x, '#2a1a12', 0, 4);                                                  // chóp mũi đen
+  return c;
+}
+
+// ---------- đồ nghề & bảng báo của thằng Tèo (issue 46) ----------
+
+// Đèn pin 12x8: thân đèn cầm tay + chùm sáng vàng nhạt loe ra phía trước (trái). 2 khung nhấp nháy.
+function thiefTorch(f) {
+  return draw(12, 8, x => {
+    for (let c = 0; c <= 5; c++) {
+      const h = Math.round((5 - c) / 1.5) + 1 + (f ? 1 : 0);
+      R(x, 'rgba(255,230,120,0.34)', c, 4 - h, 1, h * 2);
+      const h2 = Math.max(1, h - 1);
+      R(x, 'rgba(255,244,180,0.52)', c, 4 - h2, 1, h2 * 2);
+      R(x, 'rgba(255,252,224,0.78)', c, 3, 1, 2);                         // lõi chùm sáng
+    }
+    R(x, OUT, 6, 2, 6, 4);
+    R(x, '#9aa0ac', 7, 3, 4, 2);
+    R(x, '#d6dae2', 7, 3, 3, 1);
+    R(x, '#5e646e', 7, 4, 4, 1);
+    R(x, OUT, 5, 2, 1, 4);
+    R(x, '#f2c040', 5, 3, 1, 2); R(x, '#fff0a0', 5, 3);                   // mặt kính
+    R(x, '#e5452f', 10, 3);                                               // nút bấm đỏ
+  });
+}
+
+// Giày êm 10x4: đôi giày vải mềm, vẽ đè lên chân nhân vật (nền trong suốt).
+function thiefShoes() {
+  return draw(10, 4, x => {
+    R(x, OUT, 4, 0, 6, 4); R(x, '#3e4c5e', 5, 1, 4, 2); R(x, '#56687e', 5, 1, 3, 1); R(x, '#232c38', 5, 3, 4, 1);
+    R(x, OUT, 0, 1, 7, 3); R(x, '#4e6076', 1, 2, 5, 1); R(x, '#7288a2', 1, 2, 3, 1); R(x, '#2a3442', 1, 3, 5, 1);
+    R(x, '#c2d0de', 2, 2); R(x, '#c2d0de', 6, 1);                         // mũi khâu vải sáng
+  });
+}
+
+// Bong bóng báo trộm 14x14: nền đỏ cảnh báo, dấu chấm than trắng, đuôi nhọn chúc xuống.
+function thiefBubble() {
+  return draw(14, 14, x => {
+    R(x, OUT, 2, 0, 10, 11); R(x, OUT, 0, 2, 14, 7); R(x, OUT, 1, 1, 12, 9);
+    R(x, OUT, 5, 10, 4, 2); R(x, OUT, 6, 12, 2, 1); R(x, OUT, 6, 13, 1, 1);
+    R(x, '#e5452f', 3, 1, 8, 9); R(x, '#e5452f', 1, 3, 12, 5); R(x, '#e5452f', 2, 2, 10, 7);
+    R(x, '#e5452f', 6, 10, 2, 2); R(x, '#e5452f', 6, 12, 1, 1);
+    R(x, '#ff7a5a', 3, 1, 7, 1); R(x, '#ff7a5a', 2, 2); R(x, '#ff7a5a', 1, 3, 1, 3);
+    R(x, '#9e2416', 3, 9, 8, 1); R(x, '#9e2416', 12, 3, 1, 3); R(x, '#9e2416', 11, 8);
+    R(x, '#ffffff', 6, 2, 2, 5); R(x, '#ffffff', 6, 8, 2, 1);             // dấu chấm than
+    R(x, '#f8c0b4', 7, 2, 1, 4);
+  });
+}
+
+// ---------- icon 16x16 cho hộp thoại chọn phạt (issue 46) ----------
+
+// Phạt tiền: bàn tay chìa ra hứng một đồng xu vàng.
+// bàn tay ngửa 16x7: bốn ngón chìa lên, lòng bàn tay khum hứng
+const HAND_ROWS = [
+  '..o..o..o..o....',
+  '.oaooaooaooao...',
+  '.oaaaaaaaaaao...',
+  'obaaaaaaaaaabo..',
+  'obbbbbbbbbbbbo..',
+  '.occcccccccco...',
+  '.oooooooooooo...',
+];
+function iconPay() {
+  const hand = spr(HAND_ROWS, { o: OUT, a: '#f6c9a4', b: '#e8b088', c: '#c88e66' });
+  return draw(16, 16, x => {
+    // đồng xu vàng đang rơi xuống
+    ell(x, OUT, 8, 4, 3.3, 3.3); ell(x, '#9a5a10', 8, 4, 2.4, 2.4);
+    ell(x, '#f2b432', 8, 4, 1.8, 1.8); ell(x, '#ffdc78', 7, 3, 1, 1);
+    R(x, '#9a5a10', 8, 2, 1, 5); R(x, '#9a5a10', 7, 3, 3, 1); R(x, '#9a5a10', 7, 5, 3, 1);   // chữ "đ"
+    dots(x, '#fff6c0', [[3, 2], [13, 5], [12, 1]]);                       // tia lấp lánh
+    x.drawImage(hand, 0, 9);
+  });
+}
+
+// Phạt làm thợ không công: cây búa bắt chéo cái chổi.
+function iconChore() {
+  return draw(16, 16, x => {
+    line(x, OUT, 2, 15, 15, 2); line(x, OUT, 3, 15, 15, 3); line(x, OUT, 2, 14, 14, 1);   // cán chổi
+    line(x, '#b07a45', 3, 14, 14, 3); line(x, '#e0a868', 3, 13, 13, 2);
+    R(x, OUT, 0, 10, 6, 6); R(x, '#9a7428', 1, 11, 4, 4); R(x, '#c39a42', 1, 11, 3, 3); R(x, '#ddbb62', 1, 11, 2, 1);
+    dots(x, '#6e4e18', [[2, 13], [4, 12], [3, 14], [1, 14]]);             // bó rơm
+    R(x, OUT, 1, 10, 4, 1); R(x, '#8a5a2b', 2, 10, 2, 1);                 // nẹp buộc
+    line(x, OUT, 14, 15, 2, 3); line(x, OUT, 15, 15, 3, 3); line(x, OUT, 13, 15, 2, 4);   // cán búa
+    line(x, '#8a5a2b', 14, 14, 3, 4); line(x, '#b07a45', 13, 14, 3, 5);
+    R(x, OUT, 0, 0, 8, 7); R(x, '#918c94', 1, 1, 6, 5);                                   // đầu búa sắt
+    R(x, '#c4c0c6', 1, 1, 5, 1); R(x, '#dcd8d0', 1, 1, 2, 1);
+    R(x, '#4a4650', 1, 5, 6, 1); R(x, '#6e6a74', 5, 2, 2, 3);
+    R(x, OUT, 0, 2, 1, 3); R(x, '#b4b0b2', 1, 2, 1, 3);                                   // mỏ búa nhô ra
+  });
+}
+
 // ---------- Xuất ----------
 
 const ANIMAL = {
@@ -2587,6 +2838,18 @@ export const SPR3 = {
   weasel: pair(weasel),
   weaselCatch: pair(weaselCatch),
   hurtPatch: hurtPatch(),
+  // issue 46: hai trộm NPC mới — chồn hương đi đêm (đi / chồm bắt / bị đuổi)
+  civet: pair(civet),
+  civetCatch: pair(civetCatch),
+  civetFlee: pair(civetFlee),
+  // issue 46: Tí Sún rón rén & bị bắt
+  npcTiSunSneak: pair(tisunSneak),
+  npcTiSunCaught: tisunCaught(),
+  // issue 46: đồ nghề thằng Tèo + bong bóng báo trộm + icon chọn phạt
+  thiefTorch: pair(thiefTorch),
+  thiefShoes: (s => ({ left: s, right: flip(s) }))(thiefShoes()),
+  thiefBubble: thiefBubble(),
+  punishIcon: { pay: iconPay(), chore: iconChore() },
   pen: {
     coop: [0, 1, 2].map(coopHouse),
     pig: [0, 1, 2].map(pigHouse),

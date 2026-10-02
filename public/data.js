@@ -264,9 +264,31 @@ export const TRAIN = {
 export const THREATS = {
   crowChancePerMin: 0.3,      // có cây chín mà không có bù nhìn: mỗi phút 30% có quạ bay tới
   crowEatMs: 25_000,          // quạ đậu 25 giây không bị đuổi thì ăn mất ô đó
-  thiefChancePerNightMin: 0.15, // ban đêm có ≥2 ô chín: thằng Tèo lẻn vào hái trộm
   thiefStealMs: 15_000,
-  thiefCaughtCoins: [20, 60], // bắt được thằng Tèo: nó xin lỗi, đền xu
+  thiefCaughtCoins: [20, 60], // bắt được trộm người: nó xin lỗi, đền xu
+};
+
+// ---------- Trộm NPC: thằng Tèo, Tí Sún, chồn hương (issue 46) ----------
+// Mỗi đêm luật chốt đúng một vụ (hoặc không vụ nào) nên không bao giờ quá 1 vụ mỗi đêm.
+export const RAID = {
+  minLevel: 5,            // bảo hộ người mới: dưới cấp này chưa có Tí Sún và chồn hương
+  nightly: 0.5,           // vườn vừa đủ đồ đáng trộm: trung bình 1 vụ mỗi 2 đêm
+  lootBase: 3,            // số món đáng trộm của một vườn "thường"
+  lootRich: 9,            // nhiều hơn lootBase chừng này món nữa là vườn giàu nhất
+  richMul: 2,             // vườn giàu nhất: tần suất gấp đôi (vẫn chỉ 1 vụ mỗi đêm)
+  max: 0.9,               // giàu tới mấy thì thỉnh thoảng vẫn có một đêm yên
+  lampMul: 0.8, lampMax: 3,  // mỗi đèn lồng (tính tối đa 3 cái) làm trộm ngại hơn
+  fenceMul: 0.85,         // vườn có hàng rào thấp
+  dogMul: 0.6,            // chó đang canh nhà (trưởng thành, no và vui)
+  ripeNeed: 3,            // thằng Tèo chỉ tới khi có ≥ 3 ô chín
+  eggNeed: 3,             // Tí Sún chỉ tới khi có ≥ 3 trứng dưới đất (trứng trong bụi cũng tính)
+  eggTake: [2, 3],        // mỗi vụ Tí Sún ôm đi mấy quả
+  eggStealMs: 12_000,     // Tí Sún lục chừng này rồi mới ôm trứng chạy
+  civetCatchMs: 18_000,   // chồn hương rình chừng này rồi mới tha con vật đi
+  arriveSpan: 0.6,        // vụ trộm rơi vào khoảng đầu đêm (phần của đêm)
+  stealthPerCatch: 0.85,  // thằng Tèo bị bắt mỗi lần lại sắm thêm đồ: bán kính chó phát hiện ×0.85
+  stealthMin: 0.5,        // lặng lẽ nhất cũng chỉ tới mức này
+  torchAt: 1, shoesAt: 3, // bị bắt 1 lần mua đèn pin, 3 lần mua giày êm
 };
 
 // ---------- Thả rông ban ngày (ADR 0013) ----------
@@ -494,6 +516,8 @@ export const EVENT_LEVEL = {
   hungry:    { level: 'important', cat: 'hungry', group: e => 'hungry:' + e.animal, label: 'Con vật đói', text: (n, e) => `${n} con ${animalN(e.animal)} đói lả` },
   crow:      { level: 'important', cat: 'loss', group: () => 'loss:crow', label: 'Quạ ăn mất cây', text: (n, e) => n > 1 ? `Quạ đã ăn mất ${n} cây 😢` : `Quạ đã ăn mất ${(e.name ?? 'cây').toLowerCase()} 😢` },
   thief:     { level: 'important', cat: 'loss', group: () => 'loss:thief', label: 'Trộm hái mất cây', text: (n, e) => n > 1 ? `Thằng Tèo đã hái trộm ${n} cây 😢` : `Thằng Tèo đã hái trộm ${(e.name ?? 'cây').toLowerCase()} 😢` },
+  tisun:     { level: 'important', cat: 'loss', group: () => 'loss:tisun', label: 'Tí Sún trộm trứng', text: (n, e) => `Tí Sún lấy trộm mất ${e.n ?? n} quả trứng 😢` },
+  civet:     { level: 'important', cat: 'loss', group: () => 'loss:civet', label: 'Chồn hương bắt con vật', text: (n, e) => `Chồn hương tha mất ${n} con ${animalN(e.animal)} 😿` },
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   oldSoon:   { level: 'important', cat: 'old', group: e => 'oldSoon:' + e.animal, label: 'Con vật sắp già', text: (n, e) => `${n} con ${animalN(e.animal)} sắp già, chuẩn bị hoặc bán đi nhé 👵` },
