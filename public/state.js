@@ -5,7 +5,7 @@ import {
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
-  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES,
+  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST,
 } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
@@ -215,6 +215,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, rats: 0, preds: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
     notify: {},   // loại thông báo 🟡 đã tắt: { ripe: false }; thiếu = bật. Mức 🔴 không tắt được
+    coUtQuest: null,   // nhiệm vụ làm quen của Cô Út (issue 48): { step } sau khi mua con heo đầu tiên
   };
   const m = mapOf(s);
   Object.assign(s.player, m.spawn);
@@ -283,6 +284,7 @@ export function loadGame() {
   s.simMs = Number.isFinite(s.simMs) ? s.simMs : s.time || 0;
   s.frozenTotal = Number.isFinite(s.frozenTotal) ? s.frozenTotal : 0;
   s.notify = Object.fromEntries(Object.entries(s.notify ?? {}).filter(([k, v]) => k in NOTIFY_CATS && v === false));
+  s.coUtQuest ??= null;   // bản lưu cũ chưa có nhiệm vụ làm quen của Cô Út (issue 48)
   // trộm NPC (issue 46): bản lưu cũ chưa có thì bắt đầu từ con số không
   s.teoCaught = Math.max(0, Math.floor(s.teoCaught) || 0);
   s.choreWeek = Number.isFinite(s.choreWeek) ? s.choreWeek : -1;
@@ -842,6 +844,7 @@ function cureAnimal(s, a) {
   a.sick = 0; a.sickMs = 0; a.dose = 0; a.sickSince = 0; a.starvingSince = 0; a.hunger = Math.max(a.hunger, 30);
   a.hurt = false; a.hurtMs = 0;   // khỏi bệnh thì vết chuột cắn cũng được băng bó luôn
   emit({ type: 'cured', animal: ANIMALS[a.type].name, id: a.id });
+  advanceCoUtQuest(s, 'cure');
 }
 // Tiến triển bệnh một bước. Trả về false nếu con vật đã mất.
 // ADR 0004: đồng hồ gây chết chỉ chạy khi chủ đang chơi (catchUp = false). Chạy bù: dừng ở Bệnh nặng, Nguy kịch hạ về Bệnh nặng, không chết.
@@ -920,6 +923,8 @@ export function vaccinate(s, id) {
   if (a.sick) return R(false, 'Con đang bệnh, tiêm không kịp, cho uống thuốc nhé', { reason: 'sick' });
   if (!take(s, 'vaccine')) return R(false, noItem('vaccine'), { reason: 'no_item' });
   a.vaccUntil = (s.simMs || 0) + SICK.vaccineMs;
+  emit({ type: 'vaccinated', animal: ANIMALS[a.type].name, id: a.id });
+  advanceCoUtQuest(s, 'vaccinate');
   return R(true, `Đã tiêm vắc-xin cho ${ANIMALS[a.type].name.toLowerCase()}`);
 }
 // Tiêm cả chuồng: mỗi con khỏe một mũi; thiếu vắc-xin thì tiêm được tới đâu hay tới đó
@@ -2293,8 +2298,9 @@ const DO = {
       case 'bath':
         take(s, 'soap'); s.can--;
         a.dirty = 0; a.wallowAt = s.time + DIRT.wallowAfterMs;
-        a.happy = Math.min(100, a.happy + DIRT.bathHappy); 
+        a.happy = Math.min(100, a.happy + DIRT.bathHappy);
         emit({ type: 'bathed', animal: def.name, id: a.id });
+        advanceCoUtQuest(s, 'bathe');
         return res(true, `${def.name} sạch bong, vui hẳn lên`, [say(at, 'Sạch bong! ✨'), ...heartFx(s, a, at, 'bath')], 'water', { bath: a.id });
       case 'medicine': {
         const r = giveMedicine(s, a.id);
@@ -2519,10 +2525,35 @@ export function buyAnimal(s, type, sex = 'm') {
   if (sex !== 'm' && sex !== 'f') return R(false, 'Chọn đực hay cái nhé', { reason: 'sex' });
   const price = animalPrice(type, sex);
   if (s.coins < price) return R(false, 'Chưa đủ xu, cố lên nhé');
+  const firstPig = type === 'heo' && !s.coUtQuest && !s.animals.some(a => a.type === 'heo');
   s.coins -= price;
   const p = penPoint(s, def.pen, pen.id);
   mkAnimal(s, type, 'non', p.x, p.y, { pen: pen.id, sex });
+  if (firstPig) { s.coUtQuest = { step: 0 }; log(s, 'Cô Út: Heo đầu tiên à? Để tôi chỉ bạn tắm, chữa bệnh và tiêm vắc-xin cho heo nhé!'); }
   return R(true, `Đã mua ${def.baby.toLowerCase()} ${sex === 'm' ? 'đực' : 'cái'}`, { price });
+}
+
+// ---------- Nhiệm vụ làm quen của Cô Út: tắm → chữa bệnh → vắc-xin (issue 48) ----------
+// Mở khi mua con heo đầu tiên (buyAnimal ở trên). Tiến độ lưu ở s.coUtQuest = { step }, không chạy lại.
+export function coUtQuestInfo(s) {
+  const q = s.coUtQuest;
+  if (!q) return null;
+  const step = Math.min(q.step, CO_UT_QUEST.length);
+  return { step, total: CO_UT_QUEST.length, id: CO_UT_QUEST[step] ?? null, done: step >= CO_UT_QUEST.length };
+}
+// Gọi khi người chơi vừa làm xong một việc chăm sóc (kind: 'bathe'|'cure'|'vaccinate'); chỉ tính nếu đúng bước đang mở.
+function advanceCoUtQuest(s, kind) {
+  const q = s.coUtQuest;
+  if (!q || q.step >= CO_UT_QUEST.length || CO_UT_QUEST[q.step] !== kind) return;
+  q.step++;
+  if (q.step >= CO_UT_QUEST.length) log(s, 'Cô Út: Giỏi lắm, bạn đã biết chăm heo rồi đó!');
+}
+// Bỏ qua bước đang mở (người chơi đã biết rồi, khỏi phải làm lại)
+export function skipCoUtQuest(s) {
+  const q = s.coUtQuest;
+  if (!q || q.step >= CO_UT_QUEST.length) return R(false, 'Không có nhiệm vụ nào đang mở');
+  q.step++;
+  return R(true, 'Đã bỏ qua bước này');
 }
 
 export function sell(s, itemId, qty = 1) {

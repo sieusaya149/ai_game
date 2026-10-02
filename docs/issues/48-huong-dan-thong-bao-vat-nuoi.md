@@ -20,9 +20,9 @@ Lát này gom mọi thứ giúp người chơi **biết mình cần làm gì** v
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): mọi loại sự kiện vật nuôi mới đều có mức và khóa gộp (một test đi qua hết danh sách loại sự kiện); chuỗi nhiệm vụ Cô Út mở đúng thứ tự khi mua heo đầu tiên ở cấp 3 và không chạy lại; danh sách Việc cần làm trả ra đúng con dơ, con lạc, chuồng bẩn, trứng trong bụi.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu mua heo đầu tiên ở cấp 3 → thấy nhiệm vụ Cô Út, làm xong từng bước (tắm, chữa, vắc-xin); dựng bản lưu có con Nguy kịch ngoài khung nhìn → thấy băng rôn đỏ và mũi tên chỉ đúng hướng; dựng bản lưu có con dơ, con lạc, chuồng bẩn, trứng trong bụi → bảng Việc cần làm hiện đủ bốn loại; mở sổ tay thấy các trang mới.
-- [ ] E2E: nhiều sự kiện cùng khóa (ví dụ 3 con lạc) chỉ thấy một thông báo gộp.
+- [x] Unit test (seam 1): mọi loại sự kiện vật nuôi mới đều có mức và khóa gộp (một test đi qua hết danh sách loại sự kiện); chuỗi nhiệm vụ Cô Út mở đúng thứ tự khi mua heo đầu tiên ở cấp 3 và không chạy lại; danh sách Việc cần làm trả ra đúng con dơ, con lạc, chuồng bẩn, trứng trong bụi.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu mua heo đầu tiên ở cấp 3 → thấy nhiệm vụ Cô Út, làm xong từng bước (tắm, chữa, vắc-xin); dựng bản lưu có con Nguy kịch ngoài khung nhìn → thấy băng rôn đỏ và mũi tên chỉ đúng hướng; dựng bản lưu có con dơ, con lạc, chuồng bẩn, trứng trong bụi → bảng Việc cần làm hiện đủ bốn loại; mở sổ tay thấy các trang mới.
+- [x] E2E: nhiều sự kiện cùng khóa (ví dụ 3 con lạc) chỉ thấy một thông báo gộp.
 
 ## Blocked by
 

@@ -61,6 +61,16 @@ test('gộp: 5 ô cải chín liền nhau chỉ ra một toast, cách xa ra toas
   assert.equal(new Set(shown.map(x => x.id)).size, 3);
 });
 
+test('đẻ con là mức quan trọng 🟡 (gộp theo loài), tắt/bật được; nhặt trứng trong bụi vẫn chỉ mức thông tin', () => {
+  const shown = [];
+  const push = createNotifier({ show: (id, text) => shown.push(text) });
+  assert.equal(push({ type: 'born', kind: 'heo', animal: 'Heo' }, 0), true);
+  assert.match(shown[0], /1 heo con mới chào đời/);
+  assert.equal(EVENT_LEVEL.born.cat, 'birth');
+  assert.ok('birth' in NOTIFY_CATS);
+  assert.equal(eventMeta({ type: 'egg' }).level, 'info');
+});
+
 test('mức thông tin, gấp, thẳng không thành toast gộp', () => {
   const shown = [];
   const push = createNotifier({ show: (id, text) => shown.push(text) });

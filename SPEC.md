@@ -387,6 +387,18 @@ punishThief(s, choice = 'pay')    // chọn kiểu phạt → R { coins } hay R 
 - **Chạy bù offline (ADR 0004):** `stepRaidAway` vẫn cho trộm NPC "đã tới" nhưng **chỉ mất trứng hoặc rau** — chồn hương không nằm trong pool, không con vật nào chết hay bị bắt đi, và không để lại kẻ trộm đứng trong vườn.
 - **Pixel art (art3.js):** `SPR3.npcTiSun` (đi, dùng lại bộ NPC của Tí Sún), `npcTiSunSneak` (rón rén), `npcTiSunCaught` (giơ tay, mếu) · `civet` / `civetCatch` / `civetFlee` (mỗi tư thế một bộ riêng, khác hẳn `weasel`) · `thiefTorch`, `thiefShoes` (đồ thằng Tèo), `thiefBubble` (bong bóng báo trộm), `punishIcon.pay` / `punishIcon.chore`. `render.tisunImg(pose, face, frame, dir)` và `render.civetImg(pose, face, frame)`.
 
+### Hướng dẫn Cô Út, thông báo, Việc cần làm và sổ tay vật nuôi (issue 48)
+
+```js
+coUtQuestInfo(s)         // → null | { step, total: 3, id: 'bathe'|'cure'|'vaccinate'|null, done }
+skipCoUtQuest(s)         // bỏ qua bước đang mở → R; ok:false khi không có bước nào mở
+```
+
+- **Nhiệm vụ Cô Út:** mua **con heo đầu tiên** (`buyAnimal`, chưa có heo và chưa có nhiệm vụ) mở chuỗi `CO_UT_QUEST` = tắm → chữa bệnh → vắc-xin; mỗi bước mở khi bước trước xong (làm sai thứ tự không tính), bỏ qua được. Tiến độ ở `s.coUtQuest = null | { step }` (bản lưu cũ `?? null`), xong hoặc bỏ qua hết thì không chạy lại. Heo chỉ mua được từ cấp `ANIMALS.heo.lv` (3). UI: khung `#coutquest` cạnh khung hướng dẫn, nút ✕ bỏ qua bước.
+- **Thông báo:** mọi loại sự kiện vật nuôi đều có mức và khóa gộp trong `EVENT_LEVEL`. 🔴 `sickSevere`, `sickCritical`, `predator`; 🟡 `stray` (con lạc), `oldSoon`, `passed`, `born` (loại tắt/bật mới `birth`), `taken`, `died`; ⚪ `egg`, `cured`, `bathed`, `vaccinated`, `shooed`. Thông báo trình duyệt cho bệnh nặng đã có từ issue 38.
+- **Việc cần làm** (`todoList`) thêm `stray` (💤 con lạc ngủ ngoài), `dirty` (🧼, không tính heo/bò đầm bùn), `muck` (💩 chuồng bẩn) và `bushEgg` (🌿 trứng trong bụi; `egg` chỉ còn trứng không nằm trong bụi), mỗi dòng có số lượng, chạm thì nhân vật đi tới.
+- **Sổ tay:** thêm trang Vòng đời, Tắm, Bệnh và thú y, Lùa về chuồng, Kẻ săn mồi. Mỗi trang có `lv` tùy chọn; trang chỉ hiện khi cấp người chơi ≥ `lv` (Tắm 2, Bệnh = `ANIMALS.heo.lv`, Lùa = `ANIMALS.vit.lv`, Kẻ săn mồi = `PREDATOR.minLevel`), cấp 1 chỉ thấy 10 trang.
+
 ### Vịt (issue 47)
 
 Vịt là **loài mới** trong `ANIMALS`/`LIFE` (`type: 'vit'`), không có trong bản lưu cũ nên **không cần bước chuyển v3**.
