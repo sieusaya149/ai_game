@@ -44,7 +44,7 @@ Nguồn: [PRD 0002](../prd/0002-phase-1-online.md).
 | 23 | [Đồng hồ làng](23-dong-ho-lang.md) | 22 | ✅ |
 | 24 | [Server chạy bù vườn offline](24-server-chay-bu-vuon-offline.md) | 22 | ✅ |
 | 25 | [Làng real-time](25-lang-real-time.md) | 22 | ✅ |
-| 26 | [Bạn bè và cổng vườn](26-ban-be-va-cong-vuon.md) | 25 | ⬜ |
+| 26 | [Bạn bè và cổng vườn](26-ban-be-va-cong-vuon.md) | 25 | ✅ |
 | 27 | [Thăm vườn bạn](27-tham-vuon-ban.md) | 24, 25 | ⬜ |
 | 28 | [Giúp vườn bạn](28-giup-vuon-ban.md) | 27 | ⬜ |
 | 29 | [Quà và sổ lưu bút](29-qua-va-so-luu-but.md) | 27 | ⬜ |
