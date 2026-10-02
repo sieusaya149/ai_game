@@ -1135,6 +1135,189 @@ function weasel(f) {
   return c;
 }
 
+// Chuột đang gặm mồi (13x7): cúi sát đất, hai chân trước ôm miếng mồi, đuôi cong vểnh lên.
+function ratEat(f) {
+  const r = P.rat, FOOT = ['#c87a8a', '#c87a8a', '#e898a8', '#e898a8'];
+  const ch = f ? 0 : 1;                       // hai khung nhai: đầu nhấp lên xuống 1 điểm ảnh
+  const c = fig(13, 7, [
+    B(7, 5, 1, 1, FOOT, { noise: 0 }), B(9, 5, 1, 1, FOOT, { noise: 0 }),           // chân sau thu dưới mông
+    E(8.8, 2.9, 2.7, 1.9, r),                                                       // lưng gù lên vì cúi
+    E(6.4, 1.4, 0.8, 0.8, ['#c87a8a', '#d88a9a', '#f0a8b8', '#ffc8d4']),            // tai dựng nghe ngóng
+    E(5.2, 4.3 - ch * 0.4, 2, 1.6, r, { sep: true }),                               // đầu chúi hẳn xuống đất
+  ]);
+  const x = c.getContext('2d');
+  const ey = 4 - ch;
+  // miếng mồi tròn vàng nằm dưới mõm
+  ell(x, OUT, 1.2, 4.6, 1.5, 1.4); ell(x, '#f7d547', 1.2, 4.6, 0.9, 0.8);
+  R(x, '#fff0a0', 1, 4); R(x, '#d19a1c', 2, 5);
+  R(x, EYE, 4, ey); R(x, '#ffffff', 4, ey - 1);
+  R(x, '#f08a9e', 3, ey + 1);                                                       // mũi hồng dí sát mồi
+  // hai chân trước ôm miếng mồi
+  R(x, r[3], 3, 5); R(x, r[2], 4, 5); R(x, OUT, 3, 6); R(x, OUT, 4, 6);
+  // đuôi cong vểnh lên sau lưng
+  R(x, '#d88a9a', 11, 2); R(x, '#d88a9a', 12, 1); R(x, '#c87a8a', 12, 0);
+  return c;
+}
+
+// Chuột bị đuổi (18x7): thân duỗi dài, tai cụp, đuôi thẳng căng ra sau, kèm vạch gió.
+function ratFlee(f) {
+  const r = P.rat, FOOT = ['#c87a8a', '#c87a8a', '#e898a8', '#e898a8'];
+  const dy = f ? 0.4 : 0;                     // khung 1 hạ thấp người lao tới
+  const legs = f
+    ? [B(3, 5, 2, 1, FOOT, { noise: 0 }), B(10, 5, 2, 1, FOOT, { noise: 0 })]       // sải hết cỡ
+    : [B(5, 5, 1, 1, FOOT, { noise: 0 }), B(8, 5, 2, 1, FOOT, { noise: 0 })];       // thu chân về
+  const c = fig(18, 7, [
+    ...legs,
+    E(7.8, 3 + dy, 4.6, 1.5, r),                                                    // thân duỗi dài, dẹt xuống
+    E(5.6, 1.6 + dy, 1, 0.5, r, { max: 1 }),                                        // tai cụp ép sát đầu
+    E(3, 3 + dy, 2.2, 1.3, r, { sep: true }),                                       // đầu vươn tới trước
+  ]);
+  const x = c.getContext('2d');
+  const ey = 2 + Math.round(dy);
+  R(x, EYE, 2, ey + 1); R(x, '#ffffff', 2, ey);                                     // mắt trợn hoảng
+  R(x, '#f08a9e', 0, ey + 2);
+  // đuôi thẳng căng ra sau
+  line(x, '#d88a9a', 12, 3 + Math.round(dy), 15, 2); R(x, OUT, 15, 3);
+  // vạch gió phía sau
+  R(x, '#cfd8e0', f ? 15 : 16, 4, 2, 1); R(x, '#aebcc8', f ? 14 : 15, 1, 3, 1);
+  return c;
+}
+
+// Dải lông cánh vuốt thon: tứ giác từ gốc (x0,y0) tới mút (x1,y1), nửa bề ngang w0 → w1.
+function sweep(x0, y0, x1, y1, w0, w1) {
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+  return [[x0 + nx * w0, y0 + ny * w0], [x1 + nx * w1, y1 + ny * w1], [x1 - nx * w1, y1 - ny * w1], [x0 - nx * w0, y0 - ny * w0]];
+}
+// Diều hâu sà xuống (16x14): cánh cụp ép sát sau lưng thành mũi tên, đầu chúc xuống, móng duỗi ra trước.
+function hawkDive(f) {
+  const H = P.hawk, W = 16, Hh = 14;
+  const sw = f ? 0.5 : 0;                                    // khung 1: ép cánh sát thân hơn, lao gấp
+  const far = sweep(6.2, 5.2 + sw, 12.6, 0.5, 1.6, 0.9);     // cánh xa, ép trên lưng
+  const near = sweep(7.8, 8.6 - sw, 15, 3.2, 2, 1.1);        // cánh gần, ép dưới bụng
+  const bodyC = fig(W, Hh, [
+    E(12.4, 2.4, 1.3, 1.1, H, { max: 2 }),                   // đuôi khép lại thành chuôi mũi tên
+    E(10.6, 3.8, 1.5, 1.4, H),
+    E(8.8, 5.4, 1.8, 1.7, H),
+    E(6.8, 7.1, 2.1, 1.9, H),
+    E(4.3, 8.8, 2.2, 1.9, H, { sep: true, lift: 0.2 }),      // đầu chúc thẳng xuống đất
+  ]);
+  const wing = (pts, dark) => pix(W, Hh, (px, py) => {
+    if (!inPoly(pts, px + 0.5, py + 0.5)) return null;
+    if (py <= 2 && px % 2 === (dark ? 1 : 0)) return dark ? H[0] : H[1];   // mút cánh xòe "ngón"
+    const k = dark ? (py < 4 ? 0 : 1) : py < 3 ? 1 : py < 6 ? 2 : 3;
+    return H[k];
+  });
+  const farW = outline(wing(far, true)), nearW = outline(wing(near, false));
+  return draw(W, Hh, x => {
+    x.drawImage(farW, 0, 0);
+    x.drawImage(bodyC, 0, 0);
+    x.drawImage(nearW, 0, 0);
+    // ức trắng sọc, mỏ quặp, mắt dữ nhìn thẳng xuống đất
+    R(x, P.hawkW[0], 6, 8, 2, 1); R(x, P.hawkW[1], 6, 9);
+    R(x, '#ffe070', 4, 8); R(x, EYE, 3, 8); R(x, '#fff6dc', 3, 7);
+    R(x, OUT, 1, 9, 1, 2); R(x, '#f2c040', 2, 9); R(x, '#d89a1c', 2, 10); R(x, OUT, 2, 11);
+    // chân vàng duỗi thẳng ra trước, ba ngón móng xòe
+    const ty = f ? 1 : 0;
+    R(x, '#d89a1c', 7, 9 + ty); R(x, '#f2c040', 6, 10 + ty); R(x, '#f2c040', 5, 11 + ty);
+    dots(x, '#f2c040', [[4, 11 + ty], [6, 12 + ty]]);
+    dots(x, OUT, [[3, 11 + ty], [4, 12 + ty], [7, 12 + ty], [5, 10 + ty]]);
+  });
+}
+
+// Diều hâu cắp mồi bay lên (22x18): móng quặp một con gà con lủng lẳng dưới bụng, 2 khung vỗ cánh.
+function hawkCarry(f) {
+  const H = P.hawk, W = 22, Hh = 18;
+  const upNear = [[8, 7], [13.6, 6.4], [20.6, 1.2], [18.6, 0.6], [16.4, 1.8], [14.2, 1], [11.4, 2.8]];
+  const upFar = [[10, 6], [14.6, 5.8], [20, 2.6], [18, 2]];
+  const dnNear = [[8, 7.2], [13.6, 7], [19.4, 11.4], [17.4, 11.8], [15.8, 10.6], [13.8, 11.4], [10.8, 9.4]];
+  const dnFar = [[10, 7.6], [14.6, 7.4], [18.4, 10], [16.4, 10]];
+  const near = f ? dnNear : upNear, far = f ? dnFar : upFar;
+  const bodyC = fig(W, Hh, [
+    E(17.8, 7.6, 2.1, 1.2, H, { max: 1 }),               // đuôi xòe nhẹ để giữ thăng bằng
+    E(15.2, 7.4, 2.4, 1.5, H, { max: 2 }),
+    E(10.2, 7.6, 4.8, 2.3, H),                           // thân nặng vì mang mồi
+    E(5.2, 6.6, 2, 1.8, H, { sep: true, lift: 0.2 }),
+  ]);
+  const wing = (pts, dark) => pix(W, Hh, (px, py) => {
+    if (!inPoly(pts, px + 0.5, py + 0.5)) return null;
+    const tip = f ? py >= 9 : py <= 2;
+    if (tip && px % 2 === (dark ? 1 : 0)) return dark ? H[0] : H[1];
+    const v = f ? (py - 6) / 6 : (6 - py) / 6;
+    const k = dark ? (v > 0.5 ? 0 : 1) : v > 0.66 ? 1 : v > 0.25 ? 2 : 3;
+    return H[k];
+  });
+  const farW = outline(wing(far, true)), nearW = outline(wing(near, false));
+  // gà con bị cắp: thân nằm ngang mềm oặt, đầu gục xuống trước, hai chân thõng
+  const prey = fig(10, 6, [
+    E(5.4, 2.6, 3.2, 1.7, P.chick),
+    E(7.4, 2.4, 1.3, 1, P.chick, { sep: true, max: 2 }),       // cánh xõa ra sau
+    E(2.1, 3.3, 1.7, 1.5, P.chick, { sep: true }),             // đầu gục thấp
+  ]);
+  const pc = prey.getContext('2d');
+  R(pc, OUT, 1, 3, 2, 1); R(pc, '#d88a14', 0, 4);              // mắt nhắm nghiền + mỏ chúc xuống
+  R(pc, '#d89a1c', 5, 4); R(pc, OUT, 5, 5); R(pc, '#a86a0c', 7, 4); R(pc, OUT, 8, 5);   // chân thõng
+  return draw(W, Hh, x => {
+    x.drawImage(farW, 0, 0);
+    x.drawImage(bodyC, 0, 0);
+    x.drawImage(nearW, 0, 0);
+    // bụng & họng trắng sọc, mỏ quặp vàng, mắt
+    R(x, P.hawkW[0], 7, 8, 3, 1); R(x, P.hawkW[1], 8, 8); R(x, P.hawkW[0], 5, 7, 2, 1);
+    R(x, '#ffe070', 4, 5); R(x, EYE, 4, 5);
+    R(x, OUT, 2, 6); R(x, '#f2c040', 3, 6); R(x, '#d89a1c', 3, 7); R(x, OUT, 2, 7);
+    // con mồi lủng lẳng, đung đưa theo nhịp cánh
+    x.drawImage(prey, f ? 6 : 7, 12);
+    // chân ngắn thò xuống, móng quặp chặt lưng con mồi
+    for (const lx of [9, 12]) { R(x, '#f2c040', lx, 10); R(x, '#d89a1c', lx, 11); R(x, OUT, lx, 12); }
+    R(x, OUT, 10, 12); R(x, OUT, 11, 12);
+  });
+}
+
+// Chồn chồm lên vồ mồi (20x11): lưng cong vồng, hai chân trước duỗi dài về trước, miệng há.
+function weaselCatch(f) {
+  const W = P.weasel;
+  const st = f ? 1 : 0;                       // khung 1 duỗi hết cỡ, khung 0 còn co
+  const c = fig(20, 11, [
+    B(f ? 15 : 16, 7, 2, 3, W, { max: 1 }),                                              // chân sau xa
+    B(1, 9, 5, 1, W, { max: 1 }),                                                        // chân trước xa
+    E(16.4, 2.6 - st * 0.4, 2.3, 0.9, W, { pat: px => (px >= 17 ? W[0] : undefined) }),  // đuôi vút lên sau
+    E(13.6, 5.6, 3.2, 2.1, W),                                                           // mông nhổm cao
+    E(9.6, 3.7 - st * 0.4, 3.5, 1.8, W),                                                 // lưng cong vồng
+    B(f ? 12 : 13, 7, 2, 3, W, { sep: true, min: 1 }),                                   // chân sau gần đạp đất
+    E(5.8, 4.2, 2.5, 1.9, W, { sep: true, pat: (px, py) => (py >= 5 && px <= 6 ? P.cream[2] : undefined) }),
+    E(7, 2.1, 0.8, 0.8, W),                                                              // tai dựng
+    B(0, 7, 6 + st, 2, W, { sep: true, min: 1, pat: px => (px <= 1 ? P.cream[2] : undefined) }),  // chân trước duỗi dài
+  ]);
+  const x = c.getContext('2d');
+  R(x, '#2a1a10', 4, 3, 3, 1); R(x, '#ffe070', 4, 3);                                    // mặt nạ + mắt sáng rực
+  R(x, EYE, 3, 3);
+  // miệng há, răng nanh trắng
+  R(x, '#6a1a20', 3, 5, 3, 1); R(x, '#8a2430', 4, 6, 2, 1);
+  R(x, '#fff6e8', 3, 5); R(x, '#fff6e8', 5, 6);
+  R(x, OUT, 2, 4); R(x, OUT, 2, 6); R(x, OUT, 3, 4);
+  return c;
+}
+
+// Miếng băng gạc dán chéo (12x10): gạc trắng ngà, hai sợi dây buộc, chấm máu thấm.
+function hurtPatch() {
+  const CO = Math.cos(0.5), SI = Math.sin(0.5);
+  const c = pix(12, 10, (px, py) => {
+    const X = px + 0.5 - 6, Y = py + 0.5 - 5;
+    const u = X * CO - Y * SI, v = X * SI + Y * CO;     // xoay ~29° cho miếng gạc nằm chéo
+    if (Math.abs(u) > 4.3 || Math.abs(v) > 2) return null;
+    return v < -1 ? '#fffaf0' : v < 0.7 ? '#f2e6d2' : '#d8c8ac';
+  });
+  outline(c);
+  const x = c.getContext('2d');
+  // hai sợi dây buộc thắt ở hai đầu
+  for (const [tx, ty, sy] of [[10, 3, -1], [1, 7, 1]]) {
+    R(x, '#c8b490', tx, ty); R(x, OUT, tx, ty + sy * 2); R(x, '#e2d4b4', tx + (sy < 0 ? 1 : -1), ty + sy);
+    line(x, '#c8b490', tx, ty, tx + (sy < 0 ? 1 : -1), ty + sy * 2);
+  }
+  // chấm máu thấm ở giữa
+  R(x, '#9e2416', 5, 5, 2, 1); R(x, '#c0302a', 5, 4); R(x, '#e5452f', 6, 5); R(x, '#9e2416', 4, 6);
+  return c;
+}
+
 // ---------- NPC (16x24, frames[hướng][khung] như character()) ----------
 
 const LEGS_F = [
@@ -1813,6 +1996,71 @@ function ratTrap() {
     R(x, OUT, 8, 3, 3, 2); R(x, '#f7d547', 8, 4, 2, 1); R(x, '#d19a1c', 9, 4);
   });
 }
+// Bẫy đã sập, chưa dính con nào (12x8): thanh kẹp đập xuống nằm sát mặt gỗ, lò xo bẹp, mất mồi.
+function ratTrapShut() {
+  return draw(12, 8, x => {
+    shadow(x, 6, 7, 5.6, 1);
+    R(x, OUT, 0, 3, 12, 5); R(x, WOOD[2], 1, 4, 10, 3); R(x, WOOD[3], 1, 4, 10, 1); R(x, WOOD[1], 1, 6, 10, 1);
+    // thanh kẹp thép nằm ngang sát mặt gỗ
+    R(x, OUT, 1, 3, 10, 1);
+    R(x, '#aeaebe', 2, 4, 8, 1); R(x, '#767686', 2, 5, 8, 1); R(x, '#dcdce6', 2, 4, 3, 1);
+    // lò xo bẹp ở đầu trái, chốt gài bật ra ở đầu phải
+    R(x, OUT, 0, 2, 3, 1); R(x, '#8e8e9e', 1, 3); R(x, '#4c4c58', 1, 5);
+    R(x, '#4c4c58', 9, 4, 1, 2); R(x, '#aeaebe', 10, 5);
+  });
+}
+// Bẫy đã sập và dính chuột (12x9): chuột xám nằm dưới thanh kẹp, đuôi hồng thò ra ngoài.
+function ratTrapFull() {
+  return draw(12, 9, x => {
+    shadow(x, 6, 8, 5.6, 1);
+    R(x, OUT, 0, 4, 12, 5); R(x, WOOD[2], 1, 5, 10, 3); R(x, WOOD[3], 1, 5, 10, 1); R(x, WOOD[1], 1, 7, 10, 1);
+    // con chuột xám nằm bẹp trên mặt gỗ, đầu thò ra bên trái
+    const r = fig(10, 5, [E(6, 2.6, 3.2, 1.6, P.rat), E(2.3, 3, 1.7, 1.4, P.rat, { sep: true })]);
+    const rx = r.getContext('2d');
+    R(rx, OUT, 2, 2, 2, 1); R(rx, '#f08a9e', 0, 3);                 // mắt nhắm nghiền + mũi hồng
+    x.drawImage(r, 0, 2);
+    // đuôi hồng thò ra ngoài mép gỗ
+    R(x, '#d88a9a', 9, 5); R(x, '#d88a9a', 10, 6); R(x, '#c87a8a', 11, 6);
+    // thanh kẹp thép đè ngang lưng chuột
+    R(x, OUT, 4, 1, 7, 1); R(x, '#dcdce6', 5, 2, 2, 1); R(x, '#aeaebe', 5, 2, 5, 1); R(x, '#767686', 5, 3, 5, 1);
+    R(x, OUT, 4, 4, 7, 1); R(x, '#4c4c58', 10, 2, 1, 2);
+    // lò xo bẹp ở đầu trái
+    R(x, OUT, 1, 1, 4, 1); R(x, '#8e8e9e', 2, 2); R(x, '#4c4c58', 3, 3); R(x, OUT, 1, 2);
+  });
+}
+// Mái che sân (22x26, neo giữa đáy): bốn cọc tre, mái bạt sọc xanh–kem như mái hiên trạm thú y.
+function canopy() {
+  return draw(22, 26, x => {
+    shadow(x, 11, 24, 9.4, 2.2);
+    const post = (px, y0, y1) => {
+      R(x, OUT, px, y0, 3, y1 - y0);
+      R(x, BAMBOO[2], px + 1, y0 + 1, 1, y1 - y0 - 2); R(x, BAMBOO[3], px + 1, y0 + 1, 1, 2);
+      for (let k = y0 + 4; k < y1 - 1; k += 5) R(x, BAMBOO[1], px + 1, k);     // đốt tre
+    };
+    post(4, 6, 21); post(15, 6, 21);          // hai cọc sau (xa nên ngắn và cao hơn)
+    post(0, 8, 26); post(19, 8, 26);          // hai cọc trước, chân chạm hàng dưới cùng
+    // thanh ngang buộc dây giữa hai cọc trước
+    R(x, OUT, 1, 13, 20, 2); R(x, BAMBOO[2], 1, 13, 20, 1); R(x, BAMBOO[1], 1, 14, 20, 1);
+    R(x, '#8a5a2b', 2, 13, 1, 2); R(x, '#8a5a2b', 19, 13, 1, 2);
+    // mái bạt sọc căng trên khung
+    R(x, OUT, 8, 1, 6, 1);
+    for (let j = 0; j <= 7; j++) {
+      const y = 2 + j, hw = 5.4 + j * 0.8;
+      const x0 = Math.round(11 - hw), x1 = Math.round(11 + hw);
+      R(x, OUT, x0 - 1, y, x1 - x0 + 3, 1);
+      for (let px = x0; px <= x1; px++) {
+        const green = Math.floor((px + 1) / 3) % 2 === 0;
+        R(x, green ? (j < 2 ? '#4aa060' : j > 5 ? '#1e7a3a' : '#2f9a4a') : (j < 2 ? '#fffaec' : j > 5 ? '#ddd4b4' : '#f2eccc'), px, y);
+      }
+    }
+    // diềm răng cưa mép mái
+    for (let i = 0; i < 22; i += 4) {
+      R(x, OUT, i, 10, 4, 1);
+      R(x, Math.floor((i + 1) / 3) % 2 === 0 ? '#1e7a3a' : '#e0d8b4', i + 1, 10, 2, 1);
+      R(x, OUT, i + 1, 11, 2, 1);
+    }
+  });
+}
 function vetClinic() {
   return draw(48, 40, x => {
     shadow(x, 24, 38, 23, 2);
@@ -1979,6 +2227,27 @@ function warn() {
     R(x, '#e5452f', 4, 2, 1, 3); R(x, '#e5452f', 4, 6);
   });
 }
+// Con vật bị thương: miếng gạc trắng có chữ thập đỏ (8x8)
+function hurtIcon() {
+  return draw(8, 8, x => {
+    R(x, OUT, 0, 0, 8, 8);
+    R(x, '#ffffff', 1, 1, 6, 6); R(x, '#e6e2d8', 1, 5, 6, 2); R(x, '#fffdf6', 1, 1, 5, 1);
+    R(x, '#e5452f', 3, 2, 2, 4); R(x, '#e5452f', 2, 3, 4, 2);
+    R(x, '#ff7a5a', 3, 2); R(x, '#ff7a5a', 2, 3); R(x, '#b8202a', 4, 5); R(x, '#b8202a', 5, 4);
+  });
+}
+// Cảnh báo kẻ săn mồi: dấu chân thú đỏ sẫm (8x8), bốn ngón tách rời để đọc được ở cỡ nhỏ
+const PAW_ICON = [
+  '..t..t..',
+  't.T..T.t',
+  'T......T',
+  '..tttt..',
+  '.ttTTtt.',
+  '.TTTTTT.',
+  '..TTTT..',
+  '........',
+];
+const predIcon = () => spr(PAW_ICON, { t: '#c0302a', T: '#8e1e12' });
 
 // ---------- dạy lệnh: thanh bấm đúng lúc, dấu khen, icon lệnh (issue 45) ----------
 
@@ -2229,9 +2498,15 @@ export const SPR3 = {
     sparkleClean: [0, 1, 2].map(sparkleFrame),
   },
   rat: pair(rat),
+  ratEat: pair(ratEat),
+  ratFlee: pair(ratFlee),
   hawk: pair(hawk),
+  hawkDive: pair(hawkDive),
+  hawkCarry: pair(hawkCarry),
   hawkShadow: hawkShadow(),
   weasel: pair(weasel),
+  weaselCatch: pair(weaselCatch),
+  hurtPatch: hurtPatch(),
   pen: {
     coop: [0, 1, 2].map(coopHouse),
     pig: [0, 1, 2].map(pigHouse),
@@ -2254,11 +2529,15 @@ export const SPR3 = {
   strayArrow: strayArrow(),
   lowFence: { h: lowFence('h'), v: lowFence('v') },
   ratTrap: ratTrap(),
+  ratTrapShut: ratTrapShut(),
+  ratTrapFull: ratTrapFull(),
+  canopy: canopy(),
   vetClinic: vetClinic(),
   items: { soapBar: soapBar(), vaccine: vaccine(), medicine: medicine(), treat: treat(), sausage: sausage(), manure: manure(), feedSack: feedSack() },
   status: {
     heart1: heartN(1), heart2: heartN(2), heart3: heartN(3), heart4: heartN(4), heart5: heartN(5),
     dirtyIcon: dirtyIcon(), strayIcon: strayIcon(), warn: warn(),
+    hurtIcon: hurtIcon(), predIcon: predIcon(),
   },
 };
 // giữ nguyên tên cũ: trỏ tới bản giai đoạn trưởng thành

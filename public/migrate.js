@@ -15,6 +15,7 @@ export const animalDefaults = a => ({
   sick: 0, sickSince: 0, starvingSince: 0,   // sick: 0 khỏe · 1 mệt · 2 bệnh nặng · 3 nguy kịch
   sickMs: 0, dose: 0, vaccUntil: 0,     // tiến triển bệnh (giờ vườn) · liều thuốc đã uống ở giai đoạn Bệnh nặng · vắc-xin hết hạn lúc simMs này
   dirty: 0,                             // độ dơ 0..100
+  hurt: false, hurtMs: 0,               // con non bị chuột cắn (issue 43): vết thương theo giờ vườn, chữa bằng thuốc thú y
   bond: 2, bondXp: 0,                   // độ thân ❤️1..5 · điểm ẩn trong tim hiện tại (BOND.perHeart)
   weight: weightAt(a.type, a.stage ?? 'non'),   // kg
   mom: null, dad: null,                 // { id, name } của cha mẹ nếu đẻ trong trại

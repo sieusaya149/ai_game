@@ -145,6 +145,7 @@ test('con đẻ trong trại: giới tính xấp xỉ 50/50', () => {
 
 test('trứng bỏ quên chỉ nở khi có phôi', () => {
   const s = game();
+  s.exp = 0;   // dưới cấp 5: chưa có chuột mò tới trộm trứng (issue 43)
   s.eggs.push({ id: 900, x: 60, y: 300, laidAt: 0, fertile: false }, { id: 901, x: 70, y: 300, laidAt: 0, fertile: true });
   withRandom(0.0001, () => G.tick(s, HUSBANDRY.eggForgetMs + 2000));
   assert.deepEqual(s.eggs.map(e => e.id), [900]);

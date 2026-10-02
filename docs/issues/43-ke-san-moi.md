@@ -20,12 +20,12 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): chuột sinh từ kho/rơm/máng, không quá 8; chuột ăn cám, trộm trứng, cắn con non; diều hâu chỉ cắp con non thả rông ban ngày; chồn chỉ bắt con ngủ ngoài chuồng ban đêm; đuổi trong thời gian cảnh báo thì không có hại; bẫy chuột bắt chuột.
-- [ ] Unit test: mọi tấn công khi online có cảnh báo 🔴 đúng khoảng 10 giây trước; bảo hộ người mới dưới cấp 5 không có kẻ săn mồi.
-- [ ] **Unit test riêng cho ADR 0004:** chạy bù offline nhiều giờ có chuột, diều hâu, chồn → không con nào chết, cám và trứng bị hao nhưng con vật còn đủ.
-- [ ] Giao thức server (seam 3): server chạy bù vườn 8 tiếng có kẻ săn mồi thì không con nào chết, cám và trứng hao theo luật.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có chồn sắp tới → thấy cảnh báo 🔴 và mũi tên chỉ hướng → chạm đuổi chồn kịp; dựng bản lưu có diều hâu và gà con thả rông → đuổi được; đặt bẫy chuột bắt được chuột.
-- [ ] Pixel art chuột, diều hâu, chồn có đủ.
+- [x] Unit test (seam 1): chuột sinh từ kho/rơm/máng, không quá 8; chuột ăn cám, trộm trứng, cắn con non; diều hâu chỉ cắp con non thả rông ban ngày; chồn chỉ bắt con ngủ ngoài chuồng ban đêm; đuổi trong thời gian cảnh báo thì không có hại; bẫy chuột bắt chuột. — `tests/predator.test.mjs`
+- [x] Unit test: mọi tấn công khi online có cảnh báo 🔴 đúng khoảng 10 giây trước; bảo hộ người mới dưới cấp 5 không có kẻ săn mồi.
+- [x] **Unit test riêng cho ADR 0004:** chạy bù offline nhiều giờ có chuột, diều hâu, chồn → không con nào chết, cám và trứng bị hao nhưng con vật còn đủ.
+- [ ] Giao thức server (seam 3): server chạy bù vườn 8 tiếng có kẻ săn mồi thì không con nào chết, cám và trứng hao theo luật. — **bỏ qua**: nhánh `phase2` chưa lưu vườn lên server (`server/api.mjs` mới chỉ có `/api/health`), chưa có chỗ nào để server chạy bù. Hoãn tới sau khi gộp `phase2` vào `main` và server có vườn. Luật chạy bù đã được phủ bằng unit test qua API công khai của `state.js` (`loadGame` với `savedAt` lùi 8 giờ).
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có chồn sắp tới → thấy cảnh báo 🔴 và mũi tên chỉ hướng → chạm đuổi chồn kịp; dựng bản lưu có diều hâu và gà con thả rông → đuổi được; đặt bẫy chuột bắt được chuột. — `e2e/predator.spec.mjs`
+- [x] Pixel art chuột, diều hâu, chồn có đủ.
 
 ## Blocked by
 
