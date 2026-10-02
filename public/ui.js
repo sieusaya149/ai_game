@@ -1175,8 +1175,12 @@ let miniKey = '';
 function renderMini(s) {
   const wrap = $('mini-wrap');
   wrap.hidden = false;
-  const items = todoList(s), hud = $('hud').getBoundingClientRect();
-  wrap.style.top = (innerWidth - hud.right >= 120 ? hud.top : hud.bottom + 8) + 'px';   // màn rộng: ngang HUD; màn hẹp: ngay dưới HUD
+  // đo hết rồi mới ghi: đọc xen kẽ ghi làm trình duyệt phải tính lại bố cục hai lần mỗi nhịp
+  const items = todoList(s), hud = $('hud').getBoundingClientRect(), act = $('actions').getBoundingClientRect();
+  const top = innerWidth - hud.right >= 120 ? hud.top : hud.bottom + 8;   // màn rộng: ngang HUD; màn hẹp: ngay dưới HUD
+  wrap.style.top = top + 'px';
+  // Cột nút hành động cao tới đây thì bản đồ nhỏ thu lại còn nút Việc cần làm (máy nhỏ, nhiều nút)
+  wrap.classList.toggle('compact', act.height > 0 && act.top < top + 108);
   const m = drawMini($('mini-cv'), s, items), mm = $('minimap');
   const key = JSON.stringify(m.dots);
   if (key !== miniKey) { miniKey = key; mm.dataset.dots = key; }
