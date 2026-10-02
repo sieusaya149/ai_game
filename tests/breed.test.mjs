@@ -28,8 +28,9 @@ const put = (s, type, sex, stage = 'truong', extra) => {
   s.animals.push(a);
   return a;
 };
-// no, vui, khỏe và sạch (lát 37: heo, bò lăn bùn thì dơ, dơ thì dễ bệnh gấp đôi; ở đây giữ chưa lăn bùn lại)
-const feed = s => { for (const k of Object.keys(s.troughs)) s.troughs[k] = 20; for (const a of s.animals) { a.hunger = 100; a.happy = 100; a.sick = 0; a.dirty = 0; a.wallowAt = 1e15; } };
+// no, vui, khỏe và sạch (lát 37: heo, bò lăn bùn thì dơ, dơ thì dễ bệnh gấp đôi; ở đây giữ chưa lăn bùn lại),
+// và luôn ở trong chuồng (lát 46: con ngủ ngoài chuồng thì chồn hương bắt mất)
+const feed = s => { for (const k of Object.keys(s.troughs)) s.troughs[k] = 20; for (const a of s.animals) { a.hunger = 100; a.happy = 100; a.sick = 0; a.dirty = 0; a.wallowAt = 1e15; a.tile = null; a.stray = false; } };
 const run = (s, ms, rand = 0.99) => {
   const ev = [];
   for (let t = 0; t < ms; t += MIN) { feed(s); ev.push(...withRandom(rand, () => G.tick(s, Math.min(MIN, ms - t)))); }

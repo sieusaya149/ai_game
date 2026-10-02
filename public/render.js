@@ -4,7 +4,7 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR3, muddy } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost } from './state.js';
+import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
@@ -235,6 +235,30 @@ export function dogPoseImg(dog, pose, face, frame) {
 export function crowImg(face, frame) {
   const set = SPR.crow ?? crowFallback();
   return set[face][frame % set[face].length];
+}
+// Thằng Tèo: nhân vật dựng bằng art.character (world.js vẽ cùng bảng khung hình với người chơi)
+export const TEO_LOOK = { skin: 1, hair: 0, hairColor: 4, shirt: 4, pants: 2, hat: 2, acc: 1 };
+// Tí Sún: đi / rón rén / bị bắt — mỗi tư thế một bộ sprite riêng (issue 46)
+export function tisunImg(pose, face = 'left', frame = 0, dir = 0) {
+  if (pose === 'caught') return SPR3?.npcTiSunCaught ?? null;
+  if (pose === 'sneak') { const a = SPR3?.npcTiSunSneak?.[face]; if (a) return a[frame % a.length]; }
+  const set = SPR3?.npcTiSun;
+  return set ? set[dir][frame % set[dir].length] : null;
+}
+// Chồn hương: đi đêm / bắt / bị đuổi. Chưa có art thì mượn tạm con chồn của kẻ săn mồi.
+export function civetImg(pose = 'walk', face = 'left', frame = 0) {
+  const key = pose === 'catch' ? 'civetCatch' : pose === 'flee' ? 'civetFlee' : 'civet';
+  const a = SPR3?.[key]?.[face] ?? SPR3?.weasel?.[face];
+  return a ? a[frame % a.length] : null;
+}
+const oneOf = v => (Array.isArray(v) ? v[0] : v) ?? null;
+// Đồ thằng Tèo sắm sau mỗi lần bị bắt: đèn pin rồi giày êm (issue 46)
+function teoGear(blit, state, t, face) {
+  const g = thiefGear(state);
+  const sh = g.shoes && oneOf(SPR3?.thiefShoes?.[face]);
+  if (sh) blit(sh, Math.round(t.x - sh.width / 2), t.y - sh.height + 1);
+  const to = g.torch && oneOf(SPR3?.thiefTorch?.[face]);
+  if (to) blit(to, face === 'right' ? t.x + 4 : t.x - 4 - to.width, t.y - 15);
 }
 export const eggSize = () => { const e = eggImg(); return { w: e.width, h: e.height }; };
 export const poopSize = () => { const e = poopImg(); return { w: e.width, h: e.height }; };
@@ -764,20 +788,35 @@ export function render(ctx, f) {
       });
     }
   }
-  // quạ & thằng Tèo
+  // quạ & trộm NPC (thằng Tèo, Tí Sún, chồn hương)
   for (const t of threats) {
     if (t.x == null || !vis(t.x, t.y, 40)) continue;
     const rt = wd.rt.get('t' + t.id) ?? {};
+    const face = rt.dir === 2 ? 'right' : 'left';
     if (t.kind === 'crow') {
       const alt = rt.alt ?? 0, frame = t.state === 'eating' ? Math.floor(now / 350) % 2 : Math.floor(now / 90) % 2;
       const im = crowImg(rt.face ?? 'left', frame);
       add(t.y + alt + 20, () => blit(im, t.x - im.width / 2, t.y - alt - im.height + 1));
+    } else if (t.kind === 'civet') {
+      const pose = t.state === 'eating' ? 'catch' : t.state === 'leaving' ? 'flee' : 'walk';
+      const im = civetImg(pose, face, Math.floor(now / (pose === 'flee' ? 110 : 190)));
+      if (im) add(t.y, () => blit(im, t.x - Math.round(im.width / 2), t.y - im.height + 1));
     } else {
-      const frames = wd.teoFrames();
       const dir = rt.dir ?? 0, fr = rt.walking ? [1, 0, 2, 0][Math.floor(rt.anim * 8) % 4] : 0;
-      const im = frames[dir][dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr];
-      add(t.y, () => blit(im, t.x - 8, t.y - 23));
+      const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
+      // Tí Sún rón rén lúc đang lục trứng; lúc đi thì dùng bộ khung đi riêng của nó
+      const im = t.kind === 'tisun'
+        ? (t.state === 'eating' ? tisunImg('sneak', face, Math.floor(now / 280)) : null) ?? tisunImg('walk', face, k, dir) ?? wd.teoFrames()[dir][k]
+        : wd.teoFrames()[dir][k];
+      add(t.y, () => { blit(im, t.x - 8, t.y - 23); if (t.kind === 'thief') teoGear(blit, state, t, face); });
     }
+    // bong bóng báo trộm: nhấp nháy trên đầu kẻ đang ra tay
+    const bb = t.kind !== 'crow' && t.state === 'eating' && SPR3?.thiefBubble;
+    if (bb) add(t.y + 0.5, () => {
+      ctx.globalAlpha = 0.6 + 0.4 * Math.abs(Math.sin(now / 240));
+      blit(bb, Math.round(t.x - bb.width / 2), Math.round(t.y - (t.kind === 'civet' ? 14 : 28) - bb.height));
+      ctx.globalAlpha = 1;
+    });
   }
   // người chơi
   {

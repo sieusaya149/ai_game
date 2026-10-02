@@ -401,6 +401,13 @@ body.alerting #hud { top: calc(50px + var(--st)); }
 .dialog-btns { display: flex; gap: 10px; }
 .dialog-btns .btn { flex: 1; }
 
+/* ---------- Bắt được trộm: chọn kiểu phạt (issue 46) ---------- */
+.dialog.punish .thumb { display: block; margin: 0 auto 6px; height: 72px; width: auto; image-rendering: pixelated; }
+.punish-opts { display: flex; flex-direction: column; gap: 8px; }
+.punish-opts .btn { width: 100%; justify-content: center; }
+.punish-opts .btn[disabled] { opacity: 0.5; }
+.punish-opts .ico { height: 20px; width: auto; vertical-align: -4px; image-rendering: pixelated; }
+
 /* ---------- Minigame dạy lệnh cho chó ---------- */
 .dialog.train { width: min(360px, 100%); }
 .train-dog { display: block; margin: 0 auto 8px; width: 96px; height: 80px; image-rendering: pixelated; }

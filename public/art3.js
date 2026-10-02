@@ -171,6 +171,8 @@ const P = {
   hawk: ['#3a2010', '#5e3618', '#8a5426', '#b07a40'],
   hawkW: ['#f0e6d0', '#d8c8a8'],
   weasel: ['#4a2a10', '#7a4a1e', '#a46a30', '#c88c4a'],
+  civet: ['#463c30', '#6c5f4c', '#94856c', '#bcac90'],      // chồn hương: nâu xám tro, khác hẳn chồn nâu trơn
+  civetDark: ['#100e0a', '#221d16', '#342c22', '#4a4032'],  // mặt nạ & khoang đuôi đen
   pink: '#f08a9e',
 };
 const EYE = '#1a0e08';

@@ -130,6 +130,7 @@ function applyResult(res, target, id) {
   if (res.bath != null) (world.baths ??= []).push({ id: res.bath, t0: now });
   if (res.grain) (world.grains ??= []).push({ ...res.grain, t0: now });   // nắm thóc vừa rải ở cửa chuồng
   if (res.pickSpot) { world.pick = res.pickSpot; ui.toast('Chạm vào chỗ muốn ' + state.dog.name + ' gác 🛡️'); }   // lệnh Canh khu: chọn ô gác
+  if (res.punish) ui.askPunish(res.punish).then(() => changed());   // bắt được trộm: hộp thoại chọn kiểu phạt
   if (res.buyStrip) askStrip(res.buyStrip);
   if (res.sleep) goSleep();
   if (res.ok && target && (/pet|vuot|stroke|love/i.test(id ?? '') || (target.kind === 'animal' && id === 'feed'))) {

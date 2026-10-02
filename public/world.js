@@ -5,12 +5,13 @@ import { character } from './art.js';
 import * as ST from './state.js';
 import { troughOf } from './farm.js';
 import { aiStep } from './perf.js';
-import { animalImg, dogImg, crowImg, eggSize, poopSize, buildingImg, decoSize } from './render.js';
+import { animalImg, dogImg, crowImg, eggSize, poopSize, buildingImg, decoSize, TEO_LOOK } from './render.js';
 
 const SPEED = 70;                 // px/s của người chơi
 const HW = 5, HH = 3;             // nửa hộp chân 10x6
 const DIRV = [[0, 1], [-1, 0], [1, 0], [0, -1]];
-const TEO_LOOK = { skin: 1, hair: 0, hairColor: 4, shirt: 4, pants: 2, hat: 2, acc: 1 };
+const THREAT_NAME = { crow: 'Con quạ', thief: 'Thằng Tèo', tisun: 'Tí Sún', civet: 'Con chồn hương' };
+const isBeast = t => t.kind === 'crow' || t.kind === 'civet';   // con thú: chạm nhỏ, không có bong bóng cao như người
 const A_SPEED = { ga: 20, vit: 17, heo: 16, bo: 11, cuu: 13 };
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -331,10 +332,10 @@ function updateDog(state, w, dt0, out) {
   }
 }
 
-// ---------- Quạ & thằng Tèo ----------
+// ---------- Quạ & trộm NPC (thằng Tèo, Tí Sún, chồn hương) ----------
 function updateThreats(state, w, dt) {
   for (const t of state.threats ?? []) {
-    const rt = rtOf(w, 't' + t.id), pc = M.plotCenter(t.plot);
+    const rt = rtOf(w, 't' + t.id), pc = t.at ?? M.plotCenter(t.plot);
     rt.walking = false;
     if (t.kind === 'crow') {
       const { x0, y0, x1, y1 } = M.view;
@@ -366,14 +367,17 @@ function updateThreats(state, w, dt) {
       if (t.state !== 'leaving') rt.alt = d < 2 ? Math.max(0, rt.alt - 40 * dt) : Math.min(14, Math.max(rt.alt, d / 4));
     } else {
       if (t.x == null) { t.x = M.gateIn.x; t.y = M.gateIn.y; }
-      const want = t.state === 'leaving' ? 'out' : 'in';
+      // đang ra tay thì đứng yên một chỗ (luật đã chốt vị trí), chưa tới thì đi vào, xong thì chuồn ra cổng
+      const want = t.state === 'leaving' ? 'out' : t.state === 'eating' ? 'stay' : 'in';
+      if (want === 'stay') { rt.pathFor = want; rt.path = null; continue; }
       if (rt.pathFor !== want) {
         rt.pathFor = want;
         rt.path = want === 'in' ? findPath(t.x, t.y, pc.x, pc.y) : [...findPath(t.x, t.y, M.gateIn.x, M.gateIn.y), { x: M.gateIn.x, y: M.view.y1 + 30 }];
       }
       const wp = rt.path?.[0];
       if (wp) {
-        const dx = wp.x - t.x, dy = wp.y - t.y, d = Math.hypot(dx, dy), st = Math.min(d, 44 * dt);
+        const sp = t.kind === 'civet' ? 62 : 44;   // chồn hương chạy nhanh hơn người
+        const dx = wp.x - t.x, dy = wp.y - t.y, d = Math.hypot(dx, dy), st = Math.min(d, sp * dt);
         if (d < 0.8) rt.path.shift();
         else { t.x += dx / d * st; t.y += dy / d * st; rt.dir = dirOf(dx, dy); rt.walking = true; rt.anim += dt; }
       }
@@ -502,7 +506,7 @@ export function nameOf(state, t) {
     case 'animal': { const a = findBy(state.animals, t.id); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}` : 'Vật nuôi'; }
     case 'egg': { const e = findBy(state.eggs, t.id); return e?.candled ? (e.fertile ? 'Trứng có phôi ✨' : 'Trứng trống') : 'Quả trứng'; }
     case 'poop': return 'Phân chó';
-    case 'threat': return findBy(state.threats, t.id)?.kind === 'thief' ? 'Thằng Tèo' : 'Con quạ';
+    case 'threat': return THREAT_NAME[findBy(state.threats, t.id)?.kind] ?? 'Con quạ';
     case 'dog': return state.dog.name || DOG.name;
     case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;
     case 'gate': { const h = ST.penHome(state, t.id); return `Cửa ${M.penById[t.id]?.name?.toLowerCase() ?? 'chuồng'} (${h.home}/${h.total} đã về)`; }
@@ -527,7 +531,7 @@ export function anchorOf(state, t) {
     case 'egg': return { x: pos.x, top: pos.y - eggSize().h - 1 };
     case 'poop': return { x: pos.x, top: pos.y - poopSize().h - 8 };
     case 'dog': { const im = dogImg(state.dog, 'left', 0); return { x: pos.x, top: pos.y - (im?.height ?? 12) - 1 }; }
-    case 'threat': { const th = pos; const alt = 0; return th.kind === 'crow' ? { x: th.x, top: th.y - 16 - alt } : { x: th.x, top: th.y - 26 }; }
+    case 'threat': { const th = pos; return isBeast(th) ? { x: th.x, top: th.y - 16 } : { x: th.x, top: th.y - 26 }; }
     case 'trough': return { x: pos.x, top: pos.y - 12 };
     case 'gate': return { x: pos.x, top: pos.y - 16 };
     case 'scale': return { x: pos.x, top: pos.y - 24 };
@@ -551,7 +555,10 @@ export function hitTest(state, wx, wy) {
   if (!atFarm()) for (const d of M.doors) if (hitRect(d.x, d.y - TS, d.w, d.h + TS, wx, wy, 0)) return { kind: 'door', to: d.to };   // ô cửa + thảm chùi chân
   for (const t of atFarm() ? state.threats ?? [] : []) {
     if (t.x == null) continue;
-    if (t.kind === 'crow' ? Math.hypot(wx - t.x, wy - t.y + 6) < 12 : hitRect(t.x - 8, t.y - 24, 16, 26, wx, wy)) return { kind: 'threat', id: t.id };
+    const hit = t.kind === 'crow' ? Math.hypot(wx - t.x, wy - t.y + 6) < 12
+      : t.kind === 'civet' ? hitRect(t.x - 10, t.y - 11, 20, 13, wx, wy)
+      : hitRect(t.x - 8, t.y - 24, 16, 26, wx, wy);
+    if (hit) return { kind: 'threat', id: t.id };
   }
   if (atFarm()) {
     for (const a of [...state.animals].sort((u, v) => v.y - u.y)) {
