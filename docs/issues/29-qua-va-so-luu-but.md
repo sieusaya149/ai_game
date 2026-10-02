@@ -17,13 +17,13 @@ Khách để lại món quà và lời nhắn ở cổng vườn; chủ về là
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): `gift` trừ đúng món khỏi giỏ khách, cộng đúng vào hộp quà; món khách không có, số lượng vượt giỏ, hay hộp đã đầy đều bị từ chối với đúng lý do; áp dụng hai lần cùng mã chỉ tính một lần.
-- [ ] Unit test (seam 1): chủ nhận quà vào giỏ đúng; giỏ đầy thì phần dư ở lại hộp, không mất đồ.
-- [ ] Unit test (seam 3): ký sổ lưu bút được; dòng quá dài, rỗng, hay ký lần thứ hai trong cùng ngày ngoài đời bị từ chối; đọc sổ trả các dòng theo thứ tự mới nhất trước.
-- [ ] Unit test (seam 3): quà gửi cho chủ offline vẫn vào hộp qua hàng đợi và còn nguyên khi chủ đăng nhập lại.
-- [ ] E2E (Playwright, 2 trình duyệt, desktop + 360px): B tặng một gói hạt giống ở cổng vườn A và ký sổ "Vườn đẹp quá!" → A (đang online) thấy thông báo → A mở hộp quà nhận hạt giống vào giỏ → A đọc sổ thấy dòng của B.
-- [ ] E2E: A offline lúc B tặng quà, A đăng nhập sau đó vẫn nhận được quà và đọc được lời nhắn.
-- [ ] Khung chọn quà và khung viết lưu bút không tràn ngang ở 360px, ô nhập không bị bàn phím che mất nút gửi.
+- [x] Unit test (seam 1): `gift` trừ đúng món khỏi giỏ khách, cộng đúng vào hộp quà; món khách không có, số lượng vượt giỏ, hay hộp đã đầy đều bị từ chối với đúng lý do; áp dụng hai lần cùng mã chỉ tính một lần.
+- [x] Unit test (seam 1): chủ nhận quà vào giỏ đúng; giỏ đầy thì phần dư ở lại hộp, không mất đồ.
+- [x] Unit test (seam 3): ký sổ lưu bút được; dòng quá dài, rỗng, hay ký lần thứ hai trong cùng ngày ngoài đời bị từ chối; đọc sổ trả các dòng theo thứ tự mới nhất trước.
+- [x] Unit test (seam 3): quà gửi cho chủ offline vẫn vào hộp qua hàng đợi và còn nguyên khi chủ đăng nhập lại.
+- [x] E2E (Playwright, 2 trình duyệt, desktop + 360px): B tặng một gói hạt giống ở cổng vườn A và ký sổ "Vườn đẹp quá!" → A (đang online) thấy thông báo → A mở hộp quà nhận hạt giống vào giỏ → A đọc sổ thấy dòng của B.
+- [x] E2E: A offline lúc B tặng quà, A đăng nhập sau đó vẫn nhận được quà và đọc được lời nhắn.
+- [x] Khung chọn quà và khung viết lưu bút không tràn ngang ở 360px, ô nhập không bị bàn phím che mất nút gửi. (bàn phím thật **chỉ giả lập**: e2e 360px kiểm tra khung không tràn ngang và nút ✍️ Ký sổ nằm ngay dưới ô nhập, cùng nhìn thấy trong khung bảng)
 
 ## Blocked by
 

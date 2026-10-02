@@ -37,7 +37,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp vườn `GUEST`/`HELP_JOBS`. Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp vườn `GUEST`/`HELP_JOBS`, quà và sổ lưu bút ở cổng `GIFT`. Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
 | `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
 | `public/migrate.js` | `SAVE_VERSION`, `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`). Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
@@ -47,7 +47,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/todo.js` | `todoList(state)`: danh sách Việc cần làm cho bảng, bản đồ nhỏ, mũi tên. Thuần JS |
 | `public/minimap.js` | Vẽ bản đồ nhỏ: `miniView`, `miniDots`, `drawMini`, `DOT` |
 | `public/perf.js` | Hiệu năng: mảng nền `CHUNK`, `dirtyChunks`, `chunksIn`, AI ngoài màn hình `aiStep`, đo FPS `createFps`, tiết kiệm pin (`BATTERY_FPS`, `shouldSuggestBattery`), tùy chọn máy `loadPrefs`/`savePrefs` (khóa `nongtrai-pref`) |
-| `public/art.js`, `public/art2.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...). Thêm sprite mới thì giữ nguyên mọi export cũ |
+| `public/art.js`, `public/art2.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...; Phase 1 thêm hộp quà và sổ lưu bút ở cổng, xem thử ở `public/_sprites2.html`). Thêm sprite mới thì giữ nguyên mọi export cũ |
 | `public/render.js`, `public/world.js`, `public/main.js` | Vẽ (theo khung nhìn, nền chia mảng 16x16 ô), di chuyển/tìm đường/AI/chế độ xây dựng/camera, vòng lặp, chuyển cảnh mờ dần, input. **Không tự quyết luật**, chỉ gọi `state.js` |
 | `public/index.html`, `public/style.css`, `public/ui.js`, `public/sound.js` | HUD, nút hành động, các bảng, tạo nhân vật, thông báo, âm thanh |
 | `public/net.js`, `public/sync.js` | Phía trình duyệt của làng: tài khoản (`net.js`, issue 21) và đồng bộ vườn online (`sync.js`, issue 22), xem mục Server |
@@ -248,7 +248,7 @@ guestCheck(v, target, actionId)   // → { ok: true } | { ok: false, reason, msg
                                   //   'no_food' (giỏ khách không có dogfood), 'help_full' / 'nothing' (việc giúp, xem mục dưới),
                                   //   'guest' (mọi việc khác, issue 29 trở đi)
 ```
-Ở cảnh `visit`, `actionsFor` chỉ còn: cổng (`enter` → `go: 'village'`), chó (`pet`, `feed` bằng `dogfood` trong **giỏ** của khách; cho ăn rồi thì chó quen tới hết lượt thăm), các việc giúp ở ô ruộng và con quạ (issue 28), công trình riêng (hành động thường nhưng `disabled` = lý do); còn lại `[]`. `todoList` trả `[]`. `main.js`: nút **🚪 Vào** ở mỗi cổng vườn trong bảng `friends` (chạm Cổng bạn bè trong làng khi online, issue 26) gọi `api.visit(name)` (chỉ khi đang đứng ở làng; lỗi hiện trong bảng) → `net.visitFarm(name)` → `startVisit` → mờ màn hình rồi `state` = bản đi dạo, vườn mình giữ ở `home` (vẫn `tick`, vẫn lưu/gửi như thường; bỏ báo gấp 🔴 khi đang thăm). Ra cổng (bước qua ô cổng, nút cổng, hoặc nút **🚪 Về làng** ở `#visit-bar` tự đi ra cổng) → về `home`, đứng ở làng đúng chỗ lúc vào. Vào hay ra đều dựng lại `world` nên thao tác đang dở bị hủy. Chế độ xây dựng ẩn nút; gọi vẫn chỉ hiện lý do.
+Ở cảnh `visit`, `actionsFor` chỉ còn: cổng (`enter` → `go: 'village'`), hộp quà và sổ lưu bút ở cổng (`open`, issue 29), chó (`pet`, `feed` bằng `dogfood` trong **giỏ** của khách; cho ăn rồi thì chó quen tới hết lượt thăm), các việc giúp ở ô ruộng và con quạ (issue 28), công trình riêng (hành động thường nhưng `disabled` = lý do); còn lại `[]`. `todoList` trả `[]`. `main.js`: nút **🚪 Vào** ở mỗi cổng vườn trong bảng `friends` (chạm Cổng bạn bè trong làng khi online, issue 26) gọi `api.visit(name)` (chỉ khi đang đứng ở làng; lỗi hiện trong bảng) → `net.visitFarm(name)` → `startVisit` → mờ màn hình rồi `state` = bản đi dạo, vườn mình giữ ở `home` (vẫn `tick`, vẫn lưu/gửi như thường; bỏ báo gấp 🔴 khi đang thăm). Ra cổng (bước qua ô cổng, nút cổng, hoặc nút **🚪 Về làng** ở `#visit-bar` tự đi ra cổng) → về `home`, đứng ở làng đúng chỗ lúc vào. Vào hay ra đều dựng lại `world` nên thao tác đang dở bị hủy. Chế độ xây dựng ẩn nút; gọi vẫn chỉ hiện lý do.
 
 ### Giúp vườn bạn: thao tác của khách (issue 28, ADR 0012)
 Thao tác của khách là **hàm thuần** trên bản lưu chủ: server kiểm tra rồi xếp hàng bằng chính các hàm này, trình duyệt chủ áp dụng cũng bằng các hàm này. Không có gì ngẫu nhiên (bắt sâu giúp luôn trúng) nên hai nơi ra cùng kết quả.
@@ -272,6 +272,20 @@ HELP_FULL                         // câu "Vườn này hôm nay đã được g
 - **Thưởng khách:** `GUEST.helpCoins` = 3 xu + `GUEST.helpExp` = 2 EXP mỗi việc. **Giới hạn:** mỗi vườn mỗi **ngày ngoài đời** nhận tối đa `GUEST.helpMax` = 10 việc giúp.
 - **Giao diện:** ở cảnh `visit`, chạm ô ruộng (hay con quạ) hiện các nút 💧 Tưới giúp / 🌿 Nhổ cỏ giúp / 🤏 Bắt sâu giúp / 🪶 Đuổi quạ giúp đúng theo trạng thái (id hành động `help_<act>`); hết lượt thì nút vẫn hiện nhưng **mờ** kèm lý do. Thanh `#visit-bar` có thêm dòng "Còn x lượt giúp hôm nay" (`ui.setVisit(owner, left)`).
 - **Luồng:** `perform` trả thêm `guestOp` (thao tác vừa làm, đã áp dụng lên bản đi dạo để khách thấy liền) → `main.js` gửi `{ t: 'guest', op }` lên server → server kiểm tra trên bản lưu mới nhất của chủ rồi trả `{ t: 'guest', ok, reward }` (khách lúc đó mới được cộng xu/EXP) hoặc lý do từ chối (toast). Chủ đang online nhận `{ t: 'guestop', op }` → `guestOpApply` trên vườn mình → `takeGuestLog` → toast 🟡 gộp "Lan đã tưới 3 ô giúp bạn 🙏". Chủ vắng thì server áp dụng thẳng vào bản lưu; lần sau chủ vào làng, `takeGuestLog` cảm ơn sau khi đóng màn "Trong lúc bạn vắng nhà" (`ui.afterAway(fn)`).
+
+### Quà và sổ lưu bút ở cổng (issue 29, ADR 0012)
+```js
+GATE_BOXES                        // ['giftbox', 'guestbook'] — hai vật ở cổng vườn (BUILDING_DEFS, fixed, loadGame tự thêm vào vườn cũ)
+giftable(itemId)                  // tặng được không: hạt giống, nông sản hoặc sản phẩm
+giftBoxCheck(box, item, qty)      // chỉ xét hộp (server dùng): { ok } | { ok: false, reason, msg }
+                                  //   reason: 'bad_item' | 'bad_qty' | 'too_many' (> GIFT.perGift) | 'box_full' (hộp đã có GIFT.boxMax quà chờ)
+giftCheck(state, box, item, qty)  // thêm phần của khách: 'no_item' (không có món) | 'not_enough' (thiếu); box = null thì chưa biết hộp
+giftTo(state, box, item, qty, op) // trừ khỏi giỏ/kho khách rồi đẩy { op, item, qty } vào `box`. op đã có trong box → { ok: true, dup: true }
+splitGifts(box, room)             // thuần: → { taken, rest }. Nông sản chỉ lấy tới khi hết `room` chỗ giỏ, hạt giống lấy hết; phần dư nằm lại
+addGifts(state, taken)            // cho các phần đã lấy vào giỏ/kho, trả tổng số món
+takeGifts(state, box)             // chủ mở hộp: splitGifts theo chỗ trống trong giỏ, sửa `box` tại chỗ, → R { taken, moved }
+```
+`data.js` `GIFT` = `{ perGift: 10, boxMax: 12, noteMax: 80 }`. Hộp quà là **hàng đợi trên server** (bảng `gifts`) nên chủ offline vẫn nhận; `state.js` chỉ giữ luật thuần, server và trình duyệt gọi lại cùng hàm. `state.gate = { gifts, notes, open }` là **tin từ server**, không nằm trong bản lưu (`loadGame` xóa đi): `gifts`/`notes` = số đang chờ / chưa đọc, `open` = id bảng đang mở (render đổi sprite hộp quà, sổ). Khách (`guestCheck`) được chạm hai vật này như cổng; `actionsFor` cho `open` 🎁 "Tặng quà cho chủ vườn" / 📖 "Ký sổ lưu bút" (khách) hoặc "Mở hộp quà" / "Đọc sổ lưu bút" (chủ), `main.js` mở bảng `giftbox` / `guestbook`.
 
 ### Thể lực, ngủ
 ```js
@@ -321,7 +335,7 @@ Chợ Bà Tư thay sạp hàng và nhà kho bán hàng cũ (sạp bị bỏ kh�
 
 ### Thông báo, Việc cần làm, cài đặt
 ```js
-notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order)
+notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, gate)
 urgentSpots(state)                // → [{ key, kind, x, y, text }] chỗ đang có chuyện gấp, tính từ trạng thái (không cần event)
 // notify.js
 eventMeta(event)                  // → { level, cat, group, label } | null (event chưa khai báo mức)
@@ -354,7 +368,7 @@ Loại việc của `todoList`: `crow`, `thief`, `sick` (gấp); `hungry`, `dry`
 { kind: 'clutter', id }        // bụi / đá chưa dọn: Dọn bụi, Đập đá
 { kind: 'strip', dir }         // mép vườn: mua dải đất 'N'|'S'|'E'|'W'
 { kind: 'door', to }           // cửa/cổng sang 'house'|'village'|'farm'
-{ kind: 'building', id }       // theo bản đồ đang đứng. Vườn (cả vườn người khác đang thăm): house, gate, shed, shipbin, board, well, doghouse (không tương tác).
+{ kind: 'building', id }       // theo bản đồ đang đứng. Vườn (cả vườn người khác đang thăm): house, gate, giftbox, guestbook, shed, shipbin, board, well, doghouse (không tương tác).
                                //   Nhà: bed, wardrobe, (stove, table, plant chỉ để ngắm). Làng: market, smithy, friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
 Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill`; ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
@@ -372,6 +386,8 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `levelup` | `level` | important (`levelup`) |
 | `order` | — | important (`order`) |
 | `helped` | `by` (tên khách), `act` ('water'/'weed'/'catch'/'shoo'), `at` | important (`help`) |
+| `gift` | `name`, `item`, `qty` (tin từ server, không do `tick()` phát) | important (`gate`) |
+| `note` | `name` (tin từ server) | important (`gate`) |
 | `egg` | — | info |
 | `guard` | `who` | info |
 | `shipped` | `coins`, `items`, `t` | info |
@@ -468,6 +484,7 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
 | `server/guests.mjs` | Hàng đợi thao tác của khách (issue 28, ADR 0012): `createGuests(ctx, send, pres)` → `{ handlers: { guest } }`, `submitGuestOp(ctx, guest, ownerId, op)`, `runGuestQueue(db, row)`. Luật lấy từ `guestOpApply` của `state.js`, server không có bản luật riêng |
 | `server/static.mjs` | `serveStatic(dir)`: GET/HEAD, MIME theo đuôi, `.html` `no-store`, file khác `no-cache` + ETag (304). `..`, `\`, byte 0, thoát khỏi `dir` → 403 |
 | `server/presence.mjs` | Làng real-time (issue 25): `createPresence(ctx, send)` → `{ handlers: { join, pos, chat, emote }, leave(sock), gardenOf(sock), stop() }` (`gardenOf` = id chủ vườn mà kết nối đang đứng trong, cho issue 28). Mỗi kết nối thuộc một bản đồ (`sock.pres`); `live.mjs` tra `handlers` sau `HANDLERS` và gọi `leave` khi kết nối đóng |
+| `server/gate.mjs` | Quà và sổ lưu bút ở cổng (issue 29): `sendGift`, `readGifts`, `takeGifts`, `signBook`, `readBook`, `gateNews`. Gọi lại luật thuần của `public/state.js` |
 | `server/live.mjs` | `attachLive(server, ctx)` → `{ sendTo(accountId, msg), kick(accountId, play), close() }`. WebSocket ở `/ws` (đường khác bị ngắt), tin tối đa 64 KB. Tài khoản của kết nối lấy từ cookie lúc nâng cấp (`sock.account`), `hello` gắn phiên chơi (`sock.play`). Tin JSON `{ t, ... }` tra trong `HANDLERS(sock, msg, ctx)` rồi tới `presence`, `guests`; tin hỏng/loại lạ bỏ qua, không ngắt. `send(sock, obj)`. Issue sau đẩy tin tới chủ vườn bằng `ctx.live.sendTo` |
 | `server/db.mjs` | `openDb(file)`: WAL, `foreign_keys`, chạy `MIGRATIONS` theo `PRAGMA user_version` (mỗi phần tử một bản, trong transaction; chỉ thêm vào cuối). `backupTo(db, out)` = `VACUUM INTO` |
 | `server/admin.mjs` | Lệnh quản trị: `node server/admin.mjs <lệnh> [--db file]` (mặc định `DB_FILE` rồi `./farm.db`). In kết quả ra stdout, lỗi ra stderr + mã thoát 1. Thêm lệnh vào `COMMANDS` |
@@ -478,6 +495,7 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
 - v3 `farms(account_id PK → accounts ON DELETE CASCADE, play, save, saved_at, updated, rev)`: một dòng mỗi tài khoản. `play` = phiên chơi đang giữ quyền ghi (mã ngẫu nhiên 16 byte), `save` = bản lưu v2 JSON (`NULL` = chưa có vườn), `saved_at` = `savedAt` của bản lưu (giờ trình duyệt), `updated` = giờ server lúc nhận, `rev` = số bản đã nhận.
 - v4 `accounts.friend_code` (UNIQUE) + `friends(account_id, friend_id, created)` (issue 26, xem mục Bạn bè).
 - v5 `guest_ops(id TEXT PK, owner_id → accounts ON DELETE CASCADE, guest_id → accounts ON DELETE CASCADE, op, created, applied)` (issue 28): hàng đợi thao tác của khách. `id` = mã thao tác do khách sinh (duy nhất nên gửi lại không nhân đôi), `op` = thao tác JSON (đã có `by`, `level`, `at` do server điền), `applied` = giờ server lúc **server** tự áp dụng vào bản lưu chủ (`NULL` = đang chờ trình duyệt chủ áp dụng). Dòng đã áp dụng quá 7 ngày thì xóa.
+- v6 (issue 29) `gifts(id, owner_id → accounts ON DELETE CASCADE, from_id, from_name, item, qty, op, created, UNIQUE(from_id, op))` = hàng đợi quà ở cổng (`qty` = số còn chờ; nhận hết thì 0 nhưng giữ dòng để mã thao tác `op` vẫn chặn gửi lặp) và `guestbook(id, owner_id, author_id, author_name, text, day, created, seen, UNIQUE(owner_id, author_id, day))` = sổ lưu bút (`day` = ngày ngoài đời giờ Việt Nam, `seen` = chủ đã đọc chưa).
 
 **HTTP:**
 - `GET /api/health` → `200 { ok: true, now }` (`now` = giờ server ms). Dùng cho Docker HEALTHCHECK, Playwright `webServer`, smoke.
@@ -498,6 +516,15 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
   - `GET /api/gates` → `200 { ok, gates: [{ name, level, friend }] }`: vườn của mọi người chơi khác đã có bản lưu, bạn bè (`friend: true`) ở đầu rồi tới người còn lại, mỗi nhóm theo tên; không có chính mình.
   - Thông báo ghé vườn: `notifyVisit({ db, live }, visitor, ownerId)` trong `friends.mjs` gửi `{ t: 'visit', name }` tới chủ vườn qua WebSocket nếu `visitor` nằm trong danh sách bạn của chủ vườn. `presence.mjs` gọi khi khách join `farm` của chủ (issue 27). Trình duyệt hiện toast 🟡 "<tên> vừa ghé thăm vườn của bạn".
   - Trình duyệt: `net.friends()`, `net.gates()`, `net.addFriend(who)` (nhập mã dạng ABC-DEF thì thử mã trước, không ra thì thử tên), `net.removeFriend(name)`. Nút 👫 trong cột `#live` (`#live-friends`) hoặc chạm "Cổng bạn bè" trong làng (khi online) mở bảng `friends`: ô nhập tên/mã (`#fr-input`), mã của mình (`#fr-code`), danh sách bạn (`.fr-row`: chấm online/offline, cấp, 🍅 🐛, nút ✖ có hỏi lại), danh sách cổng (`.gate-row`, bạn bè `.pinned` ở đầu). Pixel art đọc `SPR2.friendIcons[on|off|ripe|help]` (canvas), chưa có thì emoji/chấm chữ; cổng vườn vẽ trên bản đồ làng và biển hiệu chờ art của agent Opus.
+- **Quà và sổ lưu bút ở cổng (issue 29, `server/gate.mjs`)**, cần cookie phiên. Bảng `gifts` và `guestbook` (migration v6). Luật (món nào tặng được, giới hạn, chia theo sức chứa giỏ) là hàm thuần của `public/state.js`, server chỉ gọi lại. Quà là hàng đợi nên **chủ offline vẫn nhận**; chủ đang online thì được báo thêm qua WebSocket.
+  - `POST /api/gifts` `{ to, item, qty, op }` → `200 { ok }`, hoặc `200 { ok, dup: true }` nếu `op` này đã gửi rồi (mã thao tác tự chứa: gửi lại chỉ tính một lần). Lỗi: `400 bad_op` · `404 no_such_name` · `400 self` · `400 bad_item` / `bad_qty` / `too_many` / `box_full` (theo `giftBoxCheck`).
+  - `GET /api/gifts` → `200 { ok, gifts: [{ id, from, item, qty }] }`: hộp quà của mình, theo thứ tự tới.
+  - `POST /api/gifts/take` `{ room }` → `200 { ok, taken: [{ id, from, item, qty }], left }`: chia theo `splitGifts` với `room` = chỗ trống trong giỏ (nông sản tới khi đầy, hạt giống lấy hết), trừ `qty` trong bảng; `left` = số quà còn nằm lại. Dòng đã nhận hết giữ `qty = 0` để `op` vẫn chặn gửi lặp.
+  - `POST /api/guestbook` `{ to, text }` → `200 { ok }`. Chữ được chuẩn hóa NFC và gộp khoảng trắng. Lỗi: `404 no_such_name` · `400 self` · `400 empty` · `400 too_long` (> `GIFT.noteMax`) · `409 already_signed` (mỗi người mỗi **ngày ngoài đời** (`serverDay`, giờ Việt Nam) một dòng mỗi sổ).
+  - `GET /api/guestbook?name=` → `200 { ok, notes: [{ id, from, text, day }] }`, **mới nhất ở trên**. Không có `name` là sổ của mình, đọc xong thì các dòng hết "mới".
+  - `GET /api/gate` → `200 { ok, gifts, notes }`: số quà đang chờ và số lời nhắn chưa đọc ở cổng vườn mình.
+  - WebSocket tới chủ vườn: `{ t: 'gift', name, item, qty }` và `{ t: 'note', name }`. Trình duyệt biến thành event `gift` / `note` (`ui.netEvent`) nên toast 🟡 **tự gộp** ("3 món quà mới trong hộp quà ở cổng 🎁"), tắt được bằng loại `gate` trong Cài đặt.
+  - Trình duyệt: `net.sendGift(to, item, qty, op)`, `net.myGifts()`, `net.takeGifts(room)`, `net.signBook(to, text)`, `net.readBook(name?)`, `net.gateNews()`; `ui.refreshGate()` đếm lại (lúc vào làng, khi có tin mới, sau khi nhận quà / đọc sổ). Bảng `giftbox`: khách thấy danh sách món tặng được (`.gift-row[data-item]`, nút `.gift-1` / `.gift-many`), chủ thấy quà đang chờ và nút **Nhận hết vào giỏ** (`#gift-take`). Bảng `guestbook`: khách có ô nhập `#note-input` + nút `#note-sign`, ai cũng đọc được các dòng (`.note-row[data-from]`). Pixel art `SPR2.giftBox` / `giftBoxFull` / `giftBoxOpen`, `SPR2.guestBook` / `guestBookOpen` (đổi theo `state.gate`), `SPR2.giftIcon` trên toast.
 - Mọi đường khác ngoài `/api/` là file tĩnh của `public/` (`/` = `index.html`).
 
 **WebSocket `/ws`:** cookie phiên gửi kèm lúc nâng cấp cho biết tài khoản.

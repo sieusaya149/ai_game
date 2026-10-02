@@ -41,7 +41,7 @@ function ownerGarden(s) {
   Object.assign(s.farm.ents.find(e => e.kind === 'house'), { c: 39, r: 27 });   // nhà không dời được bằng tay: bản lưu ghi sẵn
   s.farm.rev++;
   const id = k => s.farm.ents.find(e => e.kind === k).id;
-  for (const [k, c, r] of [['shed', 39, 20], ['shipbin', 33, 22], ['doghouse', 42, 32]]) expect(moveEntity(s, id(k), c, r).ok, k).toBe(true);
+  for (const [k, c, r] of [['shed', 39, 20], ['shipbin', 33, 22], ['doghouse', 43, 31]]) expect(moveEntity(s, id(k), c, r).ok, k).toBe(true);
   Object.assign(s.dog, mapOf(s).dogHome);
   plantedCrop(s, 0, 0.6); s.plots[0].crop.id = 'carot';
   Object.assign(s.player, { x: 600, y: 470, dir: 0 });

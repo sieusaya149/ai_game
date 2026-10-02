@@ -23,6 +23,9 @@ export const BUILDING_DEFS = {
   // Cổng nằm ở hàng cuối của đất; exit là các ô ngay ngoài cổng vẫn đi được, cũng là cửa sang làng; in là chỗ NPC đi vào.
   gate:     { name: 'Cổng',          sprite: 'signboard', foot: { w: 3, h: 1 }, spr: { x: 2, y: -6 },   at: { x: -16, y: 10 }, in: { x: -16, y: 24 }, exit: [[-2, 1], [-1, 1]], fixed: true,
     door: { c: -2, r: 1, w: 2, h: 1, to: 'village', dir: 3 } },
+  // Hai vật ở cổng (issue 29): hộp quà và sổ lưu bút. Khách tặng quà / ký sổ, chủ mở ra nhận / đọc. Không dời được; chỗ đứng là ô phía trên.
+  giftbox:  { name: 'Hộp quà ở cổng', sprite: 'giftBox',   foot: { w: 1, h: 1 }, spr: { x: 0, y: -4 }, at: { x: 8, y: -8 }, fixed: true },
+  guestbook: { name: 'Sổ lưu bút',    sprite: 'guestBook', foot: { w: 1, h: 1 }, spr: { x: 0, y: -6 }, at: { x: 8, y: -8 }, fixed: true },
 };
 
 // Chuồng: kích thước khung rào (ô); các vị trí bên trong tính so với góc trên-trái khung.
@@ -62,6 +65,8 @@ export const START_FARM = {
     { kind: 'gate', c: 38, r: 33 },
     { kind: 'tree', c: 42, r: 28 },
     { kind: 'tree', c: 35, r: 30 },
+    { kind: 'giftbox', c: 41, r: 33 },
+    { kind: 'guestbook', c: 42, r: 33 },
   ],
   // đường đất: các hình chữ nhật (c, r, w, h)
   paths: [[22, 19, 16, 2], [27, 21, 2, 3], [36, 21, 2, 13]],

@@ -2,6 +2,7 @@
 import { SESSION_MS, register, login, accountOf, endSession, tokenOf } from './accounts.mjs';
 import { claimPlay, readFarm, storeFarm, visitFarm } from './farms.mjs';
 import { addFriend, removeFriend, listFriends, listGates } from './friends.mjs';
+import { sendGift, readGifts, takeGifts, signBook, readBook, gateNews } from './gate.mjs';
 import { HttpError } from './router.mjs';
 
 const COOKIE = 'nt_session';
@@ -61,4 +62,16 @@ export function addRoutes(r) {
   r.route('POST', '/api/friends/remove', c => removeFriend(c.db, mustAccount(c), c.body ?? {}));
   // Cổng vườn trong làng: { gates: [{ name, level, friend }] }, bạn bè ở đầu, không có chính mình
   r.route('GET', '/api/gates', c => listGates(c, mustAccount(c)));
+
+  // Quà và sổ lưu bút ở cổng (issue 29). Tặng { to, item, qty, op }: 404 no_such_name · 400 self/bad_item/bad_qty/too_many/box_full · { dup } nếu op đã gửi
+  r.route('POST', '/api/gifts', c => sendGift(c, mustAccount(c), c.body ?? {}));
+  // Hộp quà của mình: { gifts: [{ id, from, item, qty }] }
+  r.route('GET', '/api/gifts', c => readGifts(c, mustAccount(c)));
+  // Nhận quà { room: chỗ trống trong giỏ }: { taken: [{ id, from, item, qty }], left }
+  r.route('POST', '/api/gifts/take', c => takeGifts(c, mustAccount(c), c.body ?? {}));
+  // Ký sổ { to, text }: 400 empty/too_long/self · 409 already_signed. Đọc sổ ?name= (không có là sổ của mình): { notes: [{ id, from, text, day }] }
+  r.route('POST', '/api/guestbook', c => signBook(c, mustAccount(c), c.body ?? {}));
+  r.route('GET', '/api/guestbook', c => readBook(c, mustAccount(c), c.url.searchParams.get('name')));
+  // Tin mới ở cổng của mình: { gifts, notes }
+  r.route('GET', '/api/gate', c => gateNews(c, mustAccount(c)));
 }

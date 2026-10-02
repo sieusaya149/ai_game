@@ -30,8 +30,9 @@ const groups = {
   'Vườn': ['shippingBin', 'bushes', 'rocks', 'stump', 'forest'],
   'Trong nhà': ['floors', 'wallInner', 'doorMat', 'bed', 'bedSleep', 'wardrobe', 'table', 'stove', 'rug', 'window', 'pottedPlant'],
   'Làng': ['marketStall', 'marketClosed', 'smithy', 'villageHouses', 'friendGate', 'homeGate', 'lampPost', 'bench'],
+  'Cổng vườn (issue 29)': ['giftBox', 'giftBoxFull', 'giftBoxOpen', 'guestBook', 'guestBookOpen'],
   'NPC': ['npcBaTu', 'npcBaTuIdle', 'npcOngSau', 'npcOngSauIdle'],
-  'Công cụ & HUD': ['tools', 'stamina', 'staminaTired', 'sweat', 'season', 'wood', 'stone', 'guidebook', 'todo', 'alertArrow'],
+  'Công cụ & HUD': ['tools', 'stamina', 'staminaTired', 'sweat', 'season', 'wood', 'stone', 'guidebook', 'todo', 'alertArrow', 'giftIcon'],
 };
 for (const g in groups) { const r = section(g); for (const k of groups[g]) walk(r, SPR2[k], k); }
 

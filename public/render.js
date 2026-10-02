@@ -187,6 +187,12 @@ export function crowImg(face, frame) {
 export const eggSize = () => { const e = eggImg(); return { w: e.width, h: e.height }; };
 export const poopSize = () => { const e = poopImg(); return { w: e.width, h: e.height }; };
 const spr2 = key => String(key).split('.').reduce((o, k) => o?.[k], SPR2);   // 'villageHouses.1' = phần tử của mảng
+// Hộp quà và sổ lưu bút ở cổng (issue 29): sprite đổi theo trạng thái — đang mở bảng, đang có quà chờ, hay đóng
+export function gateImg(id, s) {
+  const g = s.gate ?? {};
+  if (id === 'giftbox') return (g.open === id && SPR2?.giftBoxOpen) || (g.gifts > 0 && SPR2?.giftBoxFull) || SPR2?.giftBox;
+  return (g.open === id && SPR2?.guestBookOpen) || SPR2?.guestBook;
+}
 export function buildingImg(b) {
   if (b.interior) return spr2(b.sprite) ?? furnFallback(b.sprite);
   if (b.sprite === 'well') return wellImg();
@@ -521,7 +527,9 @@ export function render(ctx, f) {
   });
 
   for (const b of m.buildings) {
-    const img = b.id === 'bed' && wd.sleeping && SPR2?.bedSleep ? SPR2.bedSleep : buildingImg(b);   // đang ngủ: giường có người nằm
+    // đang ngủ: giường có người nằm; hộp quà / sổ lưu bút ở cổng đổi sprite theo trạng thái
+    const img = b.id === 'bed' && wd.sleeping && SPR2?.bedSleep ? SPR2.bedSleep
+      : (b.id === 'giftbox' || b.id === 'guestbook') ? (gateImg(b.id, state) ?? buildingImg(b)) : buildingImg(b);
     if (!img || !vis(b.x + img.width / 2, b.y + img.height / 2, Math.max(img.width, img.height) / 2)) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
     if (b.npc) {   // người đứng cạnh công trình (Bà Tư), thở nhẹ hai nhịp

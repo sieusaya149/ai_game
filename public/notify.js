@@ -10,7 +10,8 @@ export function eventMeta(e) {
   return m ? { level: m.level, cat: m.cat ?? null, group: String(m.group(e)), label: m.label } : null;
 }
 
-// Gộp event 'important' cùng khóa trong NOTIFY_WINDOW thành một toast: show(id, text) được gọi lại cùng id khi có thêm.
+// Gộp event 'important' cùng khóa trong NOTIFY_WINDOW thành một toast: show(id, text, e) được gọi lại cùng id khi có thêm
+// (e = event mới nhất của nhóm, để chọn biểu tượng).
 // on(cat) = loại thông báo đó đang bật.
 export function createNotifier({ show, on = () => true, win = NOTIFY_WINDOW }) {
   const groups = new Map();
@@ -25,7 +26,7 @@ export function createNotifier({ show, on = () => true, win = NOTIFY_WINDOW }) {
       groups.set(m.group, g);
     }
     g.n++; g.last = t;
-    show(g.id, EVENT_LEVEL[e.type].text(g.n, e));
+    show(g.id, EVENT_LEVEL[e.type].text(g.n, e), e);
     return true;
   };
 }

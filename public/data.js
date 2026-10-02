@@ -245,7 +245,7 @@ export const HELP_JOBS = {
 export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
-  levelup: 'Lên cấp', order: 'Đơn hàng mới', help: 'Khách giúp vườn',
+  levelup: 'Lên cấp', order: 'Đơn hàng mới', help: 'Khách giúp vườn', gate: 'Quà và lời nhắn ở cổng',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -262,6 +262,8 @@ export const EVENT_LEVEL = {
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   helped:    { level: 'important', cat: 'help', group: e => `helped:${e.by}:${e.act}`, label: 'Khách giúp vườn', text: (n, e) => `${e.by} đã ${helpN(e.act)} ${n} ${HELP_JOBS[e.act]?.unit ?? 'việc'} giúp bạn 🙏` },
+  gift:      { level: 'important', cat: 'gate', group: () => 'gate:gift', label: 'Có quà ở cổng', text: (n, e) => n > 1 ? `${n} món quà mới trong hộp quà ở cổng 🎁` : `${e.name} tặng bạn ${e.qty} ${itemName(e.item).toLowerCase()} 🎁` },
+  note:      { level: 'important', cat: 'gate', group: () => 'gate:note', label: 'Lời nhắn mới ở sổ lưu bút', text: (n, e) => n > 1 ? `${n} lời nhắn mới trong sổ lưu bút 📖` : `${e.name} vừa ký sổ lưu bút của bạn 📖` },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },
@@ -280,3 +282,6 @@ export const LIVE = { hz: 6, crowd: 12, delayMs: 300, chatMs: 4000, emoteMs: 250
 // Câu chat nhanh có sẵn: server chỉ nhận đúng các câu này
 export const QUICK_CHAT = ['Chào cả làng!', 'Cảm ơn nhé!', 'Hẹn gặp lại!', 'Ghé vườn mình chơi nha!', 'Đi chợ không?', 'Tạm biệt!'];
 export const EMOTES = ['👋', '❤️', '😂', '😡'];
+// Quà và sổ lưu bút ở cổng (issue 29): perGift = số món tối đa mỗi lần tặng · boxMax = số quà đang chờ tối đa ở một cổng
+// (mỗi lần tặng là một quà) · noteMax = số ký tự tối đa một dòng lưu bút
+export const GIFT = { perGift: 10, boxMax: 12, noteMax: 80 };

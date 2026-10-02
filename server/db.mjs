@@ -52,6 +52,23 @@ export const MIGRATIONS = [
         op TEXT NOT NULL, created INTEGER NOT NULL, applied INTEGER);
       CREATE INDEX guest_ops_owner ON guest_ops(owner_id, applied)`);
   },
+  // v6: quà ở cổng và sổ lưu bút (issue 29)
+  // gifts: hàng đợi quà, qty = số còn chờ (nhận hết thì 0, giữ dòng để mã thao tác op vẫn chặn gửi lặp)
+  // guestbook: mỗi người một dòng mỗi ngày ngoài đời mỗi sổ; seen = chủ đã đọc chưa
+  db => {
+    db.exec(`
+      CREATE TABLE gifts (
+        id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        from_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL, from_name TEXT NOT NULL,
+        item TEXT NOT NULL, qty INTEGER NOT NULL, op TEXT NOT NULL, created INTEGER NOT NULL,
+        UNIQUE (from_id, op));
+      CREATE INDEX gifts_owner ON gifts(owner_id, qty);
+      CREATE TABLE guestbook (
+        id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        author_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL, author_name TEXT NOT NULL,
+        text TEXT NOT NULL, day TEXT NOT NULL, created INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (owner_id, author_id, day))`);
+  },
 ];
 
 // Mở (tạo nếu chưa có) file SQLite và đưa schema lên bản mới nhất
