@@ -512,3 +512,12 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 .fr-ico .ico { width: 22px; height: 22px; }
 .fr-del { flex: none; min-width: 44px; min-height: 44px; padding: 0; }
 .gate-row.pinned { background: #fff0c8; border-color: #e0b24a; }
+
+/* ---------- Thăm vườn người khác (issue 27): thanh tên chủ vườn dưới HUD, chừa chỗ bản đồ nhỏ bên phải; bảng chọn vườn ---------- */
+#visit-bar { align-self: flex-start; max-width: calc(100% - 112px); display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; font-size: 13px; font-weight: 800; }
+#visit-bar[hidden], body.building #visit-bar { display: none; }
+.visit-where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#visit-leave { flex: none; min-height: 40px; }
+.visit-form { display: flex; gap: 8px; margin: 10px 0; }
+.visit-form .name-input { flex: 1; min-width: 0; font-size: 17px; }
+.visit-form .btn { flex: none; }

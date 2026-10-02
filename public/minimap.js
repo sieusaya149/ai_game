@@ -17,7 +17,7 @@ export function miniDots(s, items, size) {
   const m = sceneMap(s), v = miniView(m, size), out = [];
   const at = (c, x, y) => out.push({ c, x: Math.round(x * v.k + v.ox), y: Math.round(y * v.k + v.oy) });
   if (!items.length) return out;
-  if (m.scene === 'farm') {
+  if (m.garden) {
     for (const it of items) for (const p of it.spots) at(it.level, p.x, p.y);
   } else {
     const d = m.doors.find(o => o.to === 'farm');

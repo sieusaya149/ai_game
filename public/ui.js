@@ -896,6 +896,15 @@ async function loadFriends() {
   if (!(f.ok && g.ok)) fr.err = f.error || g.error || 'Không tải được danh sách.';
   if (panel === 'friends') refreshPanel();
 }
+// Bước vào vườn của `name` (issue 27): được thì đóng bảng, không thì báo lý do ngay trong bảng
+async function visitGate(name) {
+  const r = await api.visit(name);
+  if (r.ok) { closePanel(); return; }
+  if (!r.error) return;
+  fr.err = r.error; fr.msg = '';
+  sound.play('error');
+  refreshPanel();
+}
 const friendIcon = (cls, text) => h('span', { class: 'fr-ico ' + cls, title: text, 'aria-label': text }, SPR2?.friendIcons?.[cls] ? h('img', { class: 'ico', src: SPR2.friendIcons[cls].toDataURL(), alt: '' }) : { ripe: '🍅', help: '🐛', on: '●', off: '○' }[cls]);
 PANELS.friends = {
   title: '👫 Bạn bè',
@@ -937,9 +946,18 @@ PANELS.friends = {
     if (!fr.gates?.length) return body.append(empty('Chưa có vườn nào khác trong làng.'));
     for (const g of fr.gates) body.append(h('div', { class: 'row gate-row' + (g.friend ? ' pinned' : ''), 'data-name': g.name },
       h('div', { class: 'row-ico' }, g.friend ? '📌' : '🚪'),
-      h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, `Vườn ${g.name}`), h('div', { class: 'row-desc' }, `Cấp ${g.level}${g.friend ? ' · bạn bè' : ''}`))));
+      h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, `Vườn ${g.name}`), h('div', { class: 'row-desc' }, `Cấp ${g.level}${g.friend ? ' · bạn bè' : ''}`)),
+      h('div', { class: 'row-act' }, btn('🚪 Vào', () => visitGate(g.name), 'green sm gate-go', { 'aria-label': `Vào vườn ${g.name}` }))));
   },
 };
+// Thanh "đang ở vườn của X" + nút về làng; owner = null thì ẩn
+export function setVisit(owner) {
+  const e = $('visit-bar');
+  if (!e) return;
+  e.hidden = !owner;
+  if (owner) $('visit-owner').textContent = owner;
+}
+
 PANELS.map = {
   title: '🗺️ Bản đồ',
   render(body, s) {
@@ -1344,6 +1362,7 @@ export function initUI(a) {
   $('live-friends').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('friends'); });
 
   $('bb-build').addEventListener('click', () => { if (!isBlocking()) api.buildStart(); });
+  $('visit-leave').addEventListener('click', () => { if (!isBlocking()) api.leaveVisit(); });
   $('build-done').addEventListener('click', () => api.buildDone());
   $('build-cancel').addEventListener('click', () => api.buildCancel());
   $('build-store').addEventListener('click', () => api.buildStore());

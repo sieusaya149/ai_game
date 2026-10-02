@@ -1,6 +1,8 @@
 // Làng real-time (issue 25, ADR 0007): mỗi kết nối WebSocket thuộc một bản đồ; vị trí, chat nhanh, biểu cảm chỉ phát cho người cùng bản đồ.
-// Làng là bản đồ chung; vườn và nhà là bản đồ riêng của từng người (issue 27 thêm khách vào vườn người khác).
+// Làng là bản đồ chung; vườn và nhà là bản đồ riêng của từng người. Khách thăm vườn (issue 27) vào `farm` kèm `owner` (tên chủ):
+// cùng bản đồ vườn của chủ nên chủ, khách và các khách khác thấy nhau; khách là bạn của chủ thì chủ được báo (friends.notifyVisit).
 // Vị trí của mỗi người gửi được phát tối đa LIVE.hz lần mỗi giây: gửi dồn thì giữ bản mới nhất, phát khi tới nhịp.
+import { notifyVisit } from './friends.mjs';
 import { LIVE, QUICK_CHAT, EMOTES, LOOK, DEFAULT_LOOK, levelInfo } from '../public/data.js';
 
 const GAP = 1000 / LIVE.hz;
@@ -17,7 +19,8 @@ function profile(db, a, m) {
 }
 const pub = p => ({ id: p.id, name: p.name, level: p.level, look: p.look, x: p.x, y: p.y, dir: p.dir });
 
-export function createPresence({ db }, send) {
+export function createPresence(ctx, send) {
+  const { db } = ctx;
   const maps = new Map();   // mã bản đồ → Map(accountId → người)
   const others = p => [...(maps.get(p.map)?.values() ?? [])].filter(o => o !== p);
   const cast = (p, m) => { for (const o of others(p)) send(o.sock, m); };
@@ -49,8 +52,15 @@ export function createPresence({ db }, send) {
     join(sock, m) {
       if (!sock.account) return send(sock, { t: 'error', code: 'no_session' });
       if (!MAPS.includes(m.map)) return send(sock, { t: 'error', code: 'map_invalid' });
+      const a = sock.account;
+      let host = a.id;   // bản đồ vườn/nhà của ai
+      if (m.map === 'farm' && m.owner != null) {
+        const key = String(m.owner).normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
+        host = db.prepare('SELECT id FROM accounts WHERE name_key = ?').get(key)?.id;
+        if (!host) return send(sock, { t: 'error', code: 'no_farm' });
+      }
       leave(sock);
-      const a = sock.account, map = m.map === 'village' ? 'village' : `${m.map}:${a.id}`;
+      const map = m.map === 'village' ? 'village' : `${m.map}:${host}`;
       const old = maps.get(map)?.get(a.id);
       if (old) leave(old.sock);   // cùng tài khoản ở kết nối cũ (máy cũ, kết nối chưa kịp đóng): thay luôn
       const room = maps.get(map) ?? maps.set(map, new Map()).get(map);
@@ -59,6 +69,7 @@ export function createPresence({ db }, send) {
       send(sock, { t: 'joined', map: m.map, me: p.id, people: others(p).map(pub) });
       cast(p, { t: 'enter', p: pub(p) });
       room.set(p.id, p);
+      if (host !== a.id && !old && ctx.live) notifyVisit(ctx, a, host);   // chủ vườn: "X vừa ghé thăm vườn của bạn" (nếu X là bạn của chủ)
     },
     pos(sock, m) {
       const p = sock.pres;

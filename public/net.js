@@ -20,6 +20,7 @@ const MSG = {
   already_friend: 'Đã là bạn rồi.',
   self: 'Đó là chính bạn mà.',
   not_friend: 'Người này chưa là bạn của bạn.',
+  no_farm: 'Không thấy vườn của người này trong làng.',
 };
 export const lockText = sec => (sec >= 90 ? `${Math.ceil(sec / 60)} phút` : `${sec} giây`);
 
@@ -47,6 +48,8 @@ export async function logout() {
   await call('/api/logout', {});
   remember(null);
 }
+// Đọc vườn của người khác để thăm (issue 27, chỉ đọc, server đã chạy bù): { ok, name, farm, savedAt } hoặc { ok: false, error }
+export const visitFarm = name => call('/api/visit?name=' + encodeURIComponent(name));
 // Máy này còn đăng nhập không? Trả tên, hoặc null (hết hạn/chưa vào làng). Mất mạng thì null nhưng giữ ghi nhớ.
 // force: hỏi server kể cả khi máy không nhớ (nút Vào làng: cookie còn hạn thì khỏi nhập PIN)
 export async function whoAmI(force) {

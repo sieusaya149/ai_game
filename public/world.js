@@ -21,7 +21,7 @@ const dirOf = (dx, dy) => Math.abs(dy) > Math.abs(dx) ? (dy > 0 ? 0 : 3) : (dx <
 // Con vật, chó, quạ, trộm, trứng, phân luôn ở vườn: chỉ chạy/vẽ/chạm được khi đang ở vườn (atFarm).
 let M = null;
 const use = s => (M = ST.sceneMap(s));
-const atFarm = () => M.scene === 'farm';
+const atFarm = () => !!M.garden;   // vườn mình hoặc vườn người khác đang thăm
 export const nextLockedIdx = s => ST.nextLockedPlot(s);
 
 export function createWorld() {

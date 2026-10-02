@@ -122,7 +122,7 @@ function build(f) {
   const view = { x0: Math.max(0, owned.c * TS - pad), y0: Math.max(0, owned.r * TS - pad), x1: Math.min(W, (owned.c + owned.w) * TS + pad), y1: Math.min(H, (owned.r + owned.h) * TS + pad) };
   const plotTile = i => plotPos.get(i) ?? null;
   return {
-    scene: 'farm', rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, troughs, trees, border, bushes, decos, fields, clutter, mud, mudSpot,
+    scene: 'farm', garden: true, rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, troughs, trees, border, bushes, decos, fields, clutter, mud, mudSpot,
     doors, arrive,
     spawn: spawn ?? { x: (owned.c + 2) * TS, y: (owned.r + 2) * TS }, dogHome: dogHome ?? spawn, gateIn,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)),
@@ -136,8 +136,32 @@ function build(f) {
 
 // ---------- Bản đồ của cảnh đang đứng (state.scene) ----------
 // Vườn dựng từ state.farm; cảnh khác là bản đồ cố định trong SCENES. Cùng giao diện với mapOf để world/render dùng chung.
-export const sceneMap = s => (!s.scene || s.scene === 'farm' ? mapOf(s) : fixedMap(s.scene));
+// garden = bản đồ có ruộng, con vật, chó (vườn mình hoặc vườn người khác đang thăm).
+export const sceneMap = s => (s.scene === 'visit' ? visitMap(s) : !s.scene || s.scene === 'farm' ? mapOf(s) : fixedMap(s.scene));
 export const hasScene = id => id === 'farm' || !!SCENES[id];
+
+// ---------- Vườn người khác đang thăm (issue 27) ----------
+// Cùng bản đồ dựng từ state.farm (bản lưu của chủ), nhưng cửa nhà bị chắn lại, chỉ còn cổng ra làng; exit là chỗ đứng
+// ngay trong cổng (khách tới và ra ở đây). Công trình riêng của chủ (nhà, kho, thùng giao hàng, bảng đơn) mang lý do `guest`.
+const visits = new WeakMap();
+let visitSeq = 0;
+function visitMap(s) {
+  const m = mapOf(s), hit = visits.get(m);
+  if (hit) return hit;
+  const solid = m.solid.slice(), doors = m.doors.filter(d => d.to === 'village');
+  for (const d of m.doors) if (d.to !== 'village')
+    for (let y = d.y; y < d.y + d.h; y += TS) for (let x = d.x; x < d.x + d.w; x += TS) solid[(y / TS) * m.mw + x / TS] = 1;
+  const isSolid = (c, r) => c < 0 || r < 0 || c >= m.mw || r >= m.mh || solid[r * m.mw + c] === 1;
+  const buildings = m.buildings.map(b => (BUILDING_DEFS[b.id]?.guest ? { ...b, guest: BUILDING_DEFS[b.id].guest } : b));
+  const exit = m.arrive.village ?? m.spawn;
+  const v = {
+    ...m, scene: 'visit', rev: `v${++visitSeq}`, solid, doors, buildings, exit, spawn: exit, arrive: { village: exit },
+    isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)),
+    building: id => buildings.find(b => b.id === id) ?? null,
+  };
+  visits.set(m, v);
+  return v;
+}
 
 const fixed = new Map();
 function fixedMap(id) {

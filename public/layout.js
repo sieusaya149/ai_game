@@ -11,13 +11,14 @@ export const tileHash = (c, r) => (Math.imul(c + 101, 73856093) ^ Math.imul(r + 
 // Công trình: foot là các ô chắn đường (w, h), spr là góc vẽ sprite so với góc trên-trái của foot (điểm ảnh),
 // at là điểm đứng để tương tác (null = không tương tác). fixed: không dời được.
 // door: các ô (so với góc foot) bỏ chắn để bước vào là sang bản đồ to; dir là hướng nhìn khi từ đó đi về (mặc định nhìn xuống).
+// guest: đồ riêng của chủ vườn, khách thăm vườn (issue 27) chạm vào chỉ nhận lý do này.
 export const BUILDING_DEFS = {
   house:    { name: 'Nhà',           sprite: 'house',     foot: { w: 4, h: 4 }, spr: { x: -8, y: -22 }, at: { x: 32, y: 74 }, fixed: true,
-    door: { c: 1, r: 3, w: 2, h: 1, to: 'house' } },
-  board:    { name: 'Bảng đơn hàng', sprite: 'board',     foot: { w: 1, h: 1 }, spr: { x: -4, y: -8 },  at: { x: 8, y: 24 } },
-  shed:     { name: 'Nhà kho',       sprite: 'shed',      foot: { w: 4, h: 3 }, spr: { x: 0, y: -10 },  at: { x: 32, y: 58 } },
+    door: { c: 1, r: 3, w: 2, h: 1, to: 'house' }, guest: 'Đây là nhà riêng của chủ vườn' },
+  board:    { name: 'Bảng đơn hàng', sprite: 'board',     foot: { w: 1, h: 1 }, spr: { x: -4, y: -8 },  at: { x: 8, y: 24 }, guest: 'Đơn hàng này của chủ vườn' },
+  shed:     { name: 'Nhà kho',       sprite: 'shed',      foot: { w: 4, h: 3 }, spr: { x: 0, y: -10 },  at: { x: 32, y: 58 }, guest: 'Kho riêng của chủ vườn, khách không mở được' },
   well:     { name: 'Giếng nước',    sprite: 'well',      foot: { w: 1, h: 1 }, spr: { x: 0, y: -8 },   at: { x: 8, y: 24 } },
-  shipbin:  { name: 'Thùng giao hàng', sprite: 'shippingBin', foot: { w: 2, h: 1 }, spr: { x: 4, y: -4 }, at: { x: 16, y: 24 } },
+  shipbin:  { name: 'Thùng giao hàng', sprite: 'shippingBin', foot: { w: 2, h: 1 }, spr: { x: 4, y: -4 }, at: { x: 16, y: 24 }, guest: 'Thùng giao hàng của chủ vườn, khách không mở được' },
   doghouse: { name: 'Chuồng chó',    sprite: 'doghouse',  foot: { w: 1, h: 1 }, spr: { x: -6, y: -8 },  at: null, home: { x: 8, y: 26 } },
   // Cổng nằm ở hàng cuối của đất; exit là các ô ngay ngoài cổng vẫn đi được, cũng là cửa sang làng; in là chỗ NPC đi vào.
   gate:     { name: 'Cổng',          sprite: 'signboard', foot: { w: 3, h: 1 }, spr: { x: 2, y: -6 },   at: { x: -16, y: 10 }, in: { x: -16, y: 24 }, exit: [[-2, 1], [-1, 1]], fixed: true,

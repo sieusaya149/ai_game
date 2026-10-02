@@ -704,6 +704,7 @@ const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 
 export function actionsFor(s, t) {
   if (!t) return [];
+  if (s.scene === 'visit') return guestActs(s, t);
   const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: s => [mk('collect', '🥚', 'Nhặt trứng', room(s) < 1 ? FULL : null)],
     poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
   return f ? f(s, t) : [];
@@ -860,6 +861,7 @@ export function perform(s, t, id) {
   const act = actionsFor(s, t).find(a => a.id === id);
   if (!act) return bad('Chưa làm được việc này', at);
   if (act.disabled) return bad(act.disabled, at);
+  if (s.scene === 'visit') return guestDo(s, t, id, at);
   if (id !== 'sit') s.sit = false;
   const n = t.kind === 'plot' && act.tiles?.length > 1 ? act.tiles.length : 1;   // dùng công cụ cấp cao: làm nhiều ô một lần
   const r = n > 1 ? doArea(s, act.tiles, id) : DO[t.kind](s, t, id, at);
@@ -1036,6 +1038,57 @@ export function enterScene(s, to) {
   const m = sceneMap(s), a = m.arrive[from] ?? m.spawn;
   Object.assign(s.player, { x: a.x, y: a.y, dir: a.dir ?? 0 });
   return R(true, '', { scene: to });
+}
+
+// ---------- Thăm vườn người khác (issue 27, ADR 0012) ----------
+// Khách `me` bước vào vườn `owner`: dựng bản đi dạo từ bản lưu chủ `raw` (server đã chạy bù). Đất, cây, con vật, chó...
+// là bản sao của chủ, không bao giờ lưu lại hay gửi đi. Phần của khách (tên, ngoại hình, giỏ, kho, đơn hàng...) dùng chung
+// đối tượng với `me`; xu, kinh nghiệm, thể lực, bình nước đọc ghi thẳng vào `me`. Trả null nếu không đọc được bản lưu chủ.
+const VISIT_WORLD = ['farm', 'plots', 'animals', 'troughs', 'eggs', 'nest', 'dog', 'poops', 'shipbin', 'time', 'day', 'weather', 'simMs', 'nextId'];
+const VISIT_LIVE = ['coins', 'exp', 'stamina', 'can', 'selectedSeed'];
+export function startVisit(me, raw, owner) {
+  const h = raw && loadGame(structuredClone(raw));
+  if (!h) return null;
+  const v = { ...me, threats: [], sit: false, scene: 'visit', visit: { owner, fed: false } };
+  for (const k of VISIT_LIVE) Object.defineProperty(v, k, { get: () => me[k], set: x => { me[k] = x; }, enumerable: true });
+  for (const k of VISIT_WORLD) v[k] = h[k];
+  const a = sceneMap(v).exit;
+  v.player = { x: a.x, y: a.y, dir: a.dir ?? 0 };
+  return v;
+}
+
+// Khách được làm `id` với target `t` không (t.kind 'build' = chế độ xây dựng): { ok: true } hoặc { ok: false, reason, msg }.
+// Chỉ ra cổng và làm quen với chó: chó lạ phải được cho ăn (đồ trong giỏ của khách) rồi mới chịu cho vuốt ve.
+export function guestCheck(s, t, id) {
+  if (t?.kind === 'build') return no('build', 'Chỉ chủ vườn mới sửa được vườn này');
+  if (t?.kind === 'building') {
+    const b = sceneMap(s).building(t.id);
+    if (b?.guest) return no('private', b.guest);
+    if (b?.id === 'gate') return { ok: true };
+  }
+  if (t?.kind === 'dog' && id === 'feed') return (s.basket.dogfood || 0) > 0 ? { ok: true } : no('no_food', `Trong giỏ không có ${itemName('dogfood').toLowerCase()}`);
+  if (t?.kind === 'dog' && id === 'pet') return s.visit?.fed ? { ok: true } : no('stranger', `${s.dog.name} chưa quen bạn, cho ăn trước đã 🦴`);
+  return no('guest', 'Khách chỉ đi dạo, chưa làm được việc này');
+}
+function guestActs(s, t) {
+  const why = id => guestCheck(s, t, id).msg ?? null;
+  if (t.kind === 'building') {
+    const b = sceneMap(s).building(t.id);
+    if (b?.id === 'gate') return buildingActs(s, t);
+    return b?.guest ? buildingActs(s, t).map(a => ({ ...a, disabled: b.guest })) : [];
+  }
+  if (t.kind === 'dog') return [mk('pet', '🤗', `Vuốt ve ${s.dog.name}`, why('pet')), mk('feed', '🦴', `Cho ${s.dog.name} ăn (giỏ còn ${s.basket.dogfood || 0})`, why('feed'))];
+  return [];
+}
+function guestDo(s, t, id, at) {
+  if (t.kind === 'building') return DO.building(s, t, id, at);   // cổng: ra làng
+  const g = s.dog;
+  if (id === 'feed') {
+    drop(s.basket, 'dogfood', 1);
+    s.visit.fed = true;
+    return res(true, `${g.name} ăn ngon lành, giờ đã quen bạn rồi`, [say(at, 'Gâu gâu! 🦴')], 'bark');
+  }
+  return res(true, `${g.name} vẫy đuôi rối rít`, [say(at, '❤️')], 'bark');
 }
 
 // ---------- Cửa hàng & kinh tế ----------

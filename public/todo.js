@@ -45,6 +45,7 @@ export function homePoint(s) {
 // [{ kind, level: 'urgent'|'normal', count, scene: 'farm', x, y, target, spots: [{ key, x, y, target }], icon, label }]
 // x, y, target là chỗ gần nhất; spots là mọi chỗ, gần trước xa sau. Xếp theo mức gấp rồi số lượng.
 export function todoList(s) {
+  if (s.scene === 'visit') return [];   // đang thăm vườn người khác: việc của vườn đó không phải việc của mình
   const at = homePoint(s), d = p => Math.hypot(p.x - at.x, p.y - at.y);
   const out = [];
   for (const k of KINDS) {

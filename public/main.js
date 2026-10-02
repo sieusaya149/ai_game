@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
+  startVisit, guestCheck, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -149,6 +149,7 @@ function begin() {
 // Bản để lưu (đã đóng dấu savedAt). Đang trong chế độ xây dựng thì lấy bố cục lúc trước khi vào (chỉ Xong mới lưu bố cục mới).
 function snapshot() {
   if (!state) return null;
+  if (home) { saveGame(home); return home; }   // đang thăm vườn người khác: chỉ lưu vườn mình, bản đi dạo không bao giờ lưu
   const c = world.build ? structuredClone(state) : state;
   if (world.build) restoreLayout(c, world.build.snap);
   saveGame(c);   // chơi đơn: ghi localStorage; vườn online: chỉ đóng dấu giờ, không đụng bản chơi đơn
@@ -163,6 +164,7 @@ function save() {
 // ---------- Vườn online (issue 22) ----------
 let sync = null;       // đồng bộ với server khi đang chơi vườn online
 let pending = null;    // { name, claim }: đã có phiên chơi, đang chờ chọn "mang vườn lên" hoặc tạo vườn mới
+let home = null;       // vườn của mình khi đang thăm vườn người khác (lúc đó state là bản đi dạo của startVisit)
 // Vào làng với tài khoản `name`: xin phiên chơi (máy cũ nếu có sẽ lưu lần cuối rồi thoát), rồi chơi vườn trên server
 async function startOnline(name) {
   ui.showVillage(name);
@@ -209,8 +211,9 @@ function playOnline(s) {
 // Rời vườn đang chơi (không lưu): về trạng thái chưa vào game
 function quit() {
   if (world.build) { world.build = null; ui.showBuild(false); }
-  state = null; busy = null; curTarget = null; lastTargetKey = '';
+  state = null; home = null; busy = null; curTarget = null; lastTargetKey = '';
   ui.setTarget(null, [], '');
+  ui.setVisit(null);
   ui.setOnline(true);
   liveReset();
 }
@@ -230,10 +233,11 @@ function liveMsg(m) {
 function liveFrame(now) {
   if (!sync || !state) return;
   const p = state.player, x = Math.round(p.x), y = Math.round(p.y), dir = p.dir ?? 0, key = `${x},${y},${dir}`;
-  if (liveMap !== state.scene) {
-    if (!sync.send({ t: 'join', map: state.scene, x, y, dir, look: state.look })) return;
+  const owner = state.visit?.owner, map = owner ? 'farm:' + owner : state.scene;   // vườn người khác: bản đồ vườn của chủ
+  if (liveMap !== map) {
+    if (!sync.send({ t: 'join', map: owner ? 'farm' : state.scene, owner, x, y, dir, look: state.look })) return;
     peers.clear(); ui.setLive(true, 0);
-    liveMap = state.scene; livePos = key; livePosAt = now;
+    liveMap = map; livePos = key; livePosAt = now;
     return;
   }
   if (key === livePos || now - livePosAt < 1000 / LIVE.hz) return;
@@ -261,6 +265,7 @@ const api = {
     begin();
   },
   buildStart() {
+    if (state?.visit) { ui.toast(guestCheck(state, { kind: 'build' }).msg); return; }
     if (!state || world.build || busy || fading || state.scene !== 'farm') return;   // chỉ xây dựng ở vườn
     V.cancelMove(world);
     world.build = { snap: snapLayout(state), focus: { x: state.player.x, y: state.player.y }, ghost: null, drag: null, pan: null, place: null, sel: null };
@@ -316,6 +321,13 @@ const api = {
   startSolo: () => startSolo(false),
   say, emote,
   people: () => peers.roster(),
+  visit,
+  // Nút "Về làng" lúc thăm vườn: tự đi ra cổng, tới nơi là ra làng như đi bộ ra
+  leaveVisit() {
+    if (!state?.visit || busy || fading || world.stun > 0) return;
+    plan = null;
+    V.goToTarget(state, world, { kind: 'building', id: 'gate' });
+  },
   startOnline,
   // Về màn chọn chế độ (Cài đặt → Vào làng / Đăng xuất): lưu vườn (online thì gửi bản cuối lên làng) rồi rời vườn
   async leaveToMode() {
@@ -348,6 +360,7 @@ function goScene(to) {
     fading = false; world.busy = false;
     el.classList.remove('on');
     if (!state) return;
+    if (home) { leaveVisit(); return; }   // vườn người khác chỉ có cổng ra làng
     const r = enterScene(state, to);
     if (!r.ok) { ui.toast(r.msg); return; }
     world.fx = []; world.marker = null;
@@ -361,6 +374,40 @@ function goScene(to) {
     ui.renderHUD(state);
     save();
   }, FADE_MS);
+}
+
+// ---------- Thăm vườn người khác (issue 27): đọc vườn chủ (server đã chạy bù) rồi mờ màn hình bước vào; ra cổng là về làng ----------
+// Bản đi dạo (state.js startVisit) thay chỗ state; vườn mình (home) vẫn chạy tiếp và được lưu như thường.
+// Vào hay ra đều dựng lại world (begin): thao tác đang dở, đường đi, kế hoạch đều hủy.
+async function visit(name) {
+  const bad = error => ({ ok: false, error });
+  if (!state || !sync || home || state.scene !== 'village') return bad('Ra làng rồi mới sang vườn người khác được');
+  const r = await net.visitFarm(name);
+  if (!r.ok) return bad(r.error);
+  if (!state || home || fading || world.build || state.scene !== 'village') return bad('');
+  if (r.name.toLocaleLowerCase('vi') === String(state.account).toLocaleLowerCase('vi')) return bad('Đây là vườn của bạn: về bằng cổng về vườn nhà nhé');
+  const v = startVisit(state, r.farm, r.name);
+  if (!v) return bad('Không đọc được vườn này');
+  fading = true; plan = null;
+  V.cancelMove(world);
+  world.busy = true; world.input.x = world.input.y = 0;
+  const el = document.getElementById('fade');
+  el.classList.add('on');
+  setTimeout(() => {
+    fading = false; world.busy = false;
+    el.classList.remove('on');
+    if (!state || home || state.scene !== 'village') return;
+    home = state; state = v;
+    begin();
+    ui.setVisit(r.name);
+  }, FADE_MS);
+  return { ok: true };
+}
+// Ra cổng vườn người khác: về lại vườn mình, nhân vật vẫn đứng ở làng đúng chỗ lúc bước vào
+function leaveVisit() {
+  state = home; home = null; plan = null;
+  begin();
+  ui.setVisit(null);
 }
 
 // ---------- Ngủ: mờ dần, chạy mô phỏng tới sáng (luật ở state.sleep), sáng dần ----------
@@ -579,7 +626,7 @@ function frame(now) {
   world.view = { x0: cam.x - 40, y0: cam.y - 40, x1: cam.x + canvas.width / scale + 40, y1: cam.y + canvas.height / scale + 40 };
 
   // 1-2) thời gian game
-  const events = tick(state, dtMs * speedOf(state)) ?? [];
+  const events = tick(home ?? state, dtMs * speedOf(state)) ?? [];   // đang thăm vườn người khác: vườn mình vẫn chạy
 
   // 3) nhập liệu → di chuyển, AI
   if (ui.isBlocking()) { keys.clear(); world.input.x = world.input.y = 0; }
@@ -614,7 +661,7 @@ function frame(now) {
   // 6) sự kiện cho UI, HUD, lưu
   const forUI = events.filter(e => e.type === 'sound' || ['important', 'direct'].includes(eventMeta(e)?.level));
   if (forUI.length) ui.handleEvents(forUI);
-  ui.updateAlerts(state, (x, y) => ({ x: (x * scale - view.camX) / dpr, y: (y * scale - view.camY) / dpr }), now);
+  if (!home) ui.updateAlerts(state, (x, y) => ({ x: (x * scale - view.camX) / dpr, y: (y * scale - view.camY) / dpr }), now);
   if (now - lastHud > 250) { lastHud = now; ui.renderHUD(state); }
   if (joy.el) joy.el.style.display = ui.isBlocking() ? 'none' : '';
   if (now - lastSave > 5000) { lastSave = now; save(); }

@@ -467,7 +467,7 @@ export function render(ctx, f) {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  const m = sceneMap(state), indoor = !!m.interior, farm = m.scene === 'farm';   // ngoài vườn mới vẽ con vật, chó, quạ, trứng, phân
+  const m = sceneMap(state), indoor = !!m.interior, farm = !!m.garden;   // ngoài vườn mới vẽ con vật, chó, quạ, trứng, phân
   ctx.fillStyle = indoor ? '#1a100a' : '#25491a';
   ctx.fillRect(0, 0, width, height);
   ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
@@ -788,7 +788,7 @@ export function render(ctx, f) {
   // bảng tên nông trại ở cổng
   const gate = m.building('gate');
   if (gate && vis(gate.x + 20, gate.y + 8, 40)) {
-    const text = `Nông trại ${state.name}`;
+    const text = `Nông trại ${state.visit?.owner ?? state.name}`;
     let size = Math.round(9 * scale);
     ctx.font = `800 ${size}px ${FONT}`;
     const maxW = 35 * scale;
@@ -808,7 +808,7 @@ export function render(ctx, f) {
     if (!img || !vis(b.x + img.width / 2, b.y + img.height / 2, 40)) continue;
     const cx = b.x + img.width / 2;
     if (b.label) outlined(b.label, toSX(cx), toSY(b.y) - 3 * scale, Math.round(11 * dpr), '#fff6d8');
-    if (b.sub) outlined(b.sub, toSX(cx), toSY(b.y + img.height) + 11 * scale, Math.round(11 * dpr), '#ffe9a0');
+    if (b.sub && !(b.id === 'friendGate' && state.mode === 'online')) outlined(b.sub, toSX(cx), toSY(b.y + img.height) + 11 * scale, Math.round(11 * dpr), '#ffe9a0');
     if (b.id === 'market' && !marketOpen(state)) fit('Đóng cửa', toSX(b.x + 24), toSY(b.y + 22 + 9), 20 * scale, Math.round(5.5 * scale), '#ffe9a0');
     if (b.id === 'friendGate') fit('Bạn bè', toSX(b.x + 20), toSY(b.y + 18), 14 * scale, Math.round(4.5 * scale), '#4a2c14');
   }

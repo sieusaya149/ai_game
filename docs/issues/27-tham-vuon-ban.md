@@ -19,14 +19,14 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): dựng bản đồ khách từ một bản lưu chủ cho đúng các thực thể, chỗ đứng của cổng ra, và lưới va chạm; các vật chặn (cửa nhà, kho, thùng giao hàng) được đánh dấu là không cho khách tương tác.
-- [ ] Unit test (seam 1): hàm luật trả lý do từ chối đúng khi khách thử mở nhà, kho, thùng giao hàng, chế độ xây dựng; vuốt ve chó lạ khi chưa cho ăn bị từ chối, cho ăn rồi thì được.
-- [ ] Unit test (seam 3): hai kết nối cùng vào bản đồ vườn của A nhận vị trí của nhau; kết nối ở làng thì không. Chủ A nhận sự kiện "khách ghé" khi B vào.
-- [ ] Unit test (seam 3): đọc vườn người khác không đổi dữ liệu của chủ (ngoài việc chạy bù đã có từ issue 24); khách không ghi được vào vườn qua lối đọc này.
-- [ ] E2E (Playwright, 2 trình duyệt, desktop + 360px): A và B ở làng → B đi tới cổng vườn A rồi vào → B thấy đúng vườn A (cây, con vật dựng sẵn bằng bản lưu ghi sẵn), A đang ở vườn thì thấy B đi lại, A nhận thông báo B ghé → B đi ra cổng về lại làng.
-- [ ] E2E: B vào vườn A thử chạm cửa nhà, kho, thùng giao hàng đều bị chặn và có lý do; không vào được chế độ xây dựng.
-- [ ] E2E: B vuốt ve chó của A: chưa cho ăn thì chó không cho, sau khi cho ăn thì vuốt được.
-- [ ] Mọi nút trong vườn khách (cổng ra, lý do bị chặn) dùng được trên 360px và không đè bản đồ nhỏ.
+- [x] Unit test (seam 1): dựng bản đồ khách từ một bản lưu chủ cho đúng các thực thể, chỗ đứng của cổng ra, và lưới va chạm; các vật chặn (cửa nhà, kho, thùng giao hàng) được đánh dấu là không cho khách tương tác.
+- [x] Unit test (seam 1): hàm luật trả lý do từ chối đúng khi khách thử mở nhà, kho, thùng giao hàng, chế độ xây dựng; vuốt ve chó lạ khi chưa cho ăn bị từ chối, cho ăn rồi thì được.
+- [x] Unit test (seam 3): hai kết nối cùng vào bản đồ vườn của A nhận vị trí của nhau; kết nối ở làng thì không. Chủ A nhận sự kiện "khách ghé" khi B vào (B là bạn của A: dùng `notifyVisit` của issue 26, khách lạ không báo).
+- [x] Unit test (seam 3): đọc vườn người khác không đổi dữ liệu của chủ (ngoài việc chạy bù đã có từ issue 24); khách không ghi được vào vườn qua lối đọc này.
+- [x] E2E (Playwright, 2 trình duyệt, desktop + 360px): A và B ở làng → B đi tới cổng vườn A rồi vào → B thấy đúng vườn A (cây, con vật dựng sẵn bằng bản lưu ghi sẵn), A đang ở vườn thì thấy B đi lại, A nhận thông báo B ghé → B đi ra cổng về lại làng.
+- [x] E2E: B vào vườn A thử chạm cửa nhà, kho, thùng giao hàng đều bị chặn và có lý do; không vào được chế độ xây dựng.
+- [x] E2E: B vuốt ve chó của A: chưa cho ăn thì chó không cho, sau khi cho ăn thì vuốt được.
+- [x] Mọi nút trong vườn khách (cổng ra, lý do bị chặn) dùng được trên 360px và không đè bản đồ nhỏ.
 
 ## Blocked by
 
