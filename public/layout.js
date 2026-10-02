@@ -13,12 +13,13 @@ export const tileHash = (c, r) => (Math.imul(c + 101, 73856093) ^ Math.imul(r + 
 // door: các ô (so với góc foot) bỏ chắn để bước vào là sang bản đồ to; dir là hướng nhìn khi từ đó đi về (mặc định nhìn xuống).
 export const BUILDING_DEFS = {
   house:    { name: 'Nhà',           sprite: 'house',     foot: { w: 4, h: 4 }, spr: { x: -8, y: -22 }, at: { x: 32, y: 74 }, fixed: true,
-    door: { c: 1, r: 3, w: 2, h: 1, to: 'house' } },
+    door: { c: 1, r: 3, w: 2, h: 1, to: 'house' }, catDoor: { x: 50, y: 58 } },
   board:    { name: 'Bảng đơn hàng', sprite: 'board',     foot: { w: 1, h: 1 }, spr: { x: -4, y: -8 },  at: { x: 8, y: 24 } },
   shed:     { name: 'Nhà kho',       sprite: 'shed',      foot: { w: 4, h: 3 }, spr: { x: 0, y: -10 },  at: { x: 32, y: 58 } },
   well:     { name: 'Giếng nước',    sprite: 'well',      foot: { w: 1, h: 1 }, spr: { x: 0, y: -8 },   at: { x: 8, y: 24 } },
   shipbin:  { name: 'Thùng giao hàng', sprite: 'shippingBin', foot: { w: 2, h: 1 }, spr: { x: 4, y: -4 }, at: { x: 16, y: 24 } },
   doghouse: { name: 'Chuồng chó',    sprite: 'doghouse',  foot: { w: 1, h: 1 }, spr: { x: -6, y: -8 },  at: null, home: { x: 8, y: 26 } },
+  cathouse: { name: 'Nhà mèo',       sprite: 'cathouse',  foot: { w: 1, h: 1 }, spr: { x: -5, y: -8 },  at: null, catHome: { x: 8, y: 24 } },
   // Cổng nằm ở hàng cuối của đất; exit là các ô ngay ngoài cổng vẫn đi được, cũng là cửa sang làng; in là chỗ NPC đi vào.
   gate:     { name: 'Cổng',          sprite: 'signboard', foot: { w: 3, h: 1 }, spr: { x: 2, y: -6 },   at: { x: -16, y: 10 }, in: { x: -16, y: 24 }, exit: [[-2, 1], [-1, 1]], fixed: true,
     door: { c: -2, r: 1, w: 2, h: 1, to: 'village', dir: 3 } },

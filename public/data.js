@@ -67,6 +67,8 @@ export const ANIMALS = {
   heo: { name: 'Heo', baby: 'Heo con', lv: 3, price: 120, feed: 'feed_heo', pen: 'pig',     product: null,    every: 0,         sell: 380, exp: 12 },
   bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
   cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
+  // Mèo là thú cưng (issue 44): ở nhà mèo chứ không ở chuồng có rào, không cho sản phẩm, không bán được, không dơ
+  meo: { name: 'Mèo', baby: 'Mèo con', lv: 4, price: 180, feed: 'catfood', pen: 'cathouse', product: null,    every: 0,         sell: 0,   exp: 6, pet: true },
 };
 // Dơ và tắm (lát 37). Độ dơ 0..100 theo giờ vườn; từ sạch tới dơ hẳn mất fullMs, mưa hoặc chuồng bẩn thì nhanh gấp đôi.
 export const DIRT = {
@@ -115,6 +117,7 @@ export const LIFE = {
   bo:  { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
   cuu: { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
   cho: { non: 30 * MIN, nho: HOUR,     truong: 40 * HOUR, gia: Infinity },   // chó có tuổi già nhưng không bao giờ ra đi
+  meo: { non: 20 * MIN, nho: 40 * MIN, truong: 40 * HOUR, gia: Infinity },   // mèo cũng vậy: già thì lười chứ không chết vì già
 };
 // Tuổi lúc bắt đầu một giai đoạn · giai đoạn ở tuổi `age` · tuổi ra đi (Infinity = không bao giờ)
 export const stageStart = (kind, stage) => STAGES.slice(0, STAGES.indexOf(stage)).reduce((t, k) => t + LIFE[kind][k], 0);
@@ -165,7 +168,7 @@ export const STAGE_CAN = {
   vitamin: { all: ['non', 'nho'] },
 };
 // Cân nặng (kg): lúc mới sinh, lúc lớn hẳn. Con non, nhỡ ăn no thì lên cân dần trong hai giai đoạn đầu.
-export const WEIGHT = { ga: [0.2, 2.5], vit: [0.2, 3], heo: [3, 100], bo: [30, 450], cuu: [4, 60] };
+export const WEIGHT = { ga: [0.2, 2.5], vit: [0.2, 3], heo: [3, 100], bo: [30, 450], cuu: [4, 60], meo: [0.3, 4] };
 export const weightAt = (type, stage) => {
   const [w0, w1] = WEIGHT[type] ?? [1, 1];
   return stage === 'non' ? w0 : stage === 'nho' ? (w0 + w1) / 2 : w1;
@@ -201,6 +204,34 @@ export const DOG = {
   guardChance: 0.7,           // chó no & vui đuổi được trộm/quạ
   guardRadius: { non: 0, nho: 4, truong: 6, gia: 4 },   // bán kính phát hiện trộm (ô): chó con chưa canh, chó già mắt kém lại
   guardPostMul: 2,            // đang gác một chỗ (lệnh Canh khu): bán kính ×2 tại chỗ gác
+};
+
+// ---------- Mèo (issue 44) ----------
+// Mèo sống ở nhà mèo, ra vào tự do qua cửa mèo, tối ngủ trong bản đồ nhà. Không dạy được lệnh, không dơ, không bán.
+// Săn chuột là luật trừu tượng theo ô và xác suất (ADR 0013): mỗi huntEvery một lượt rình, nhắm con chuột gần nhất
+// theo ô, trúng với xác suất catchChance[giai đoạn] × hệ số theo mức đói. Chạy bù offline ra đúng kết quả đó.
+export const CAT = {
+  hungerMs: 12 * MIN,         // từ no (100) xuống đói hẳn (0)
+  happyDecayPerMin: 3,
+  sickMul: 0.25,              // thú cưng khỏe hơn vật nuôi: nguy cơ mắc bệnh chỉ bằng chừng này
+  petHappy: 25,
+  lazyFull: 85,               // no hơn mức này: mèo lười, nằm phơi nắng, không săn
+  bestHunger: [15, 75],       // "đói vừa phải": săn tốt nhất trong khoảng này
+  offBand: 0.5,               // ngoài khoảng đó (mà chưa no quá) thì chỉ còn chừng này
+  oldHungry: 40,              // mèo già lười, chỉ chịu săn khi đói dưới mức này
+  huntEvery: 2 * MIN,         // mỗi lượt rình cách nhau chừng này giờ vườn
+  catchChance: { non: 0, nho: 0.1, truong: 0.2, gia: 0.2 },   // trưởng thành: 0.2 mỗi 2 phút ≈ 1 con chuột mỗi 10 phút
+  catchExp: 3,
+  trophyMs: 60_000,           // mang chuột tới khoe người chơi trong chừng này
+  praiseHappy: 15, praiseExp: 2,
+  herdHappy: 60,              // vui từ mức này mèo mới chịu lùa (mỏng hơn chó: chỉ 1 con gần nhất)
+  herdStages: ['nho', 'truong', 'gia'],
+  spatPerMin: 0.05,           // thỉnh thoảng cãi nhau với chó: vui thôi, không hại gì, không đổi chỉ số
+  spatMs: 5000,
+  spatRadius: 4,              // ô: phải đứng gần chó mới cãi nhau được
+  moveMs: [5000, 12000],      // đổi ô sau khoảng này
+  roamRadius: 6,              // ô kế tiếp cách ô hiện tại tối đa chừng này
+  houseSpot: { x: 44, y: 62 },   // chỗ mèo nằm ngủ trong bản đồ nhà (cạnh giường)
 };
 
 // ---------- Dạy lệnh cho chó (issue 45) ----------
@@ -307,6 +338,7 @@ export const ITEMS = {
   stone:      { name: 'Đá',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi đập đá trên đất mới.' },
   dogfood:    { name: 'Xương cho chó',     kind: 'feed',   price: 8,  lv: 1, desc: 'Cho chó Mực ăn để nó lớn và chịu giữ nhà.' },
   treat:      { name: 'Bánh thưởng',       kind: 'feed',   price: 15, lv: 1, desc: 'Bánh quy hình xương để dạy lệnh cho chó. Mỗi buổi dạy tốn 1 cái.' },
+  catfood:    { name: 'Cá khô cho mèo',    kind: 'feed',   price: 9,  lv: 4, desc: 'Cho mèo ăn. Đừng cho no quá: mèo no là nằm phơi nắng, không thèm săn chuột đâu.' },
   deco_scarecrow: { name: 'Bù nhìn',       kind: 'deco',   price: 150, lv: 2, desc: 'Cắm gần ruộng, quạ không dám tới.' },
   deco_flower:    { name: 'Chậu hoa',      kind: 'deco',   price: 30,  lv: 1, desc: 'Cho nông trại thêm xinh.' },
   deco_lamp:      { name: 'Đèn lồng',      kind: 'deco',   price: 90,  lv: 3, desc: 'Sáng lung linh ban đêm, trộm ngại vào hơn.' },
@@ -400,7 +432,10 @@ export const PEN_TABLE = {
   pasture:    { cap: [3, 6, 9],   lv: 5, limit: [[5, 1], [8, 2], [12, 3]], up: [2000, 4500], upLv: [6, 8], extra3: ['autoGrass'] },
   quarantine: { cap: [1, 2, 3],   lv: 3, limit: [[3, 1], [7, 2]],         up: [500, 1200],  upLv: [5, 7], extra3: [] },
   doghouse:   { cap: [1, 1, 1],   lv: 1, limit: [[1, 1]],                 up: [150, 400],   upLv: [2, 4], extra3: ['bed', 'toy'] },
+  cathouse:   { cap: [1, 2, 3],   lv: 4, limit: [[4, 1], [9, 2]],         up: [250, 600],   upLv: [5, 7], extra3: ['bed', 'toy'] },
 };
+// Công trình đặt được ở chế độ xây dựng mà không phải chuồng có rào (nhà mèo): giá xây
+export const BUILD_PRICES = { cathouse: 350 };
 export const PEN_LEVELS = 3;
 export const expNeed = level => Math.floor(25 * level ** 1.5);
 export function levelInfo(exp) {
@@ -470,6 +505,10 @@ export const EVENT_LEVEL = {
   ratFeed:   { level: 'important', cat: 'pest', group: () => 'ratFeed', label: 'Chuột ăn cám', text: n => `Chuột đã ăn mất ${n} phần cám 🐀` },
   ratEgg:    { level: 'important', cat: 'pest', group: () => 'ratEgg', label: 'Chuột trộm trứng', text: n => `Chuột đã trộm mất ${n} quả trứng 🐀` },
   trapped:   { level: 'info', group: () => 'trapped', label: 'Bẫy chuột sập' },
+  catRat:    { level: 'info', group: () => 'catRat', label: 'Mèo bắt được chuột' },
+  catTrophy: { level: 'info', group: e => 'catTrophy:' + e.id, label: 'Mèo mang chuột tới khoe' },
+  catSpat:   { level: 'info', group: () => 'catSpat', label: 'Mèo với chó cãi nhau' },
+  catHerd:   { level: 'info', group: () => 'catHerd', label: 'Mèo lùa một con về chuồng' },
   shooed:    { level: 'info', group: e => 'shooed:' + e.pred, label: 'Đã đuổi kẻ săn mồi' },
   sickSevere:   { level: 'urgent', group: e => 'sick2:' + e.animal, label: 'Con vật bệnh nặng' },
   sickCritical: { level: 'urgent', group: e => 'sick3:' + e.animal, label: 'Con vật nguy kịch' },

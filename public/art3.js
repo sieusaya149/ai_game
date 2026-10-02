@@ -994,59 +994,72 @@ function dogBarkPose(stage, f) {
   return c;
 }
 
-// Gom theo giai đoạn: {non, nho, truong, gia} → pair(2 khung)
-const dogPoses = fn => Object.fromEntries(STAGES.map(st => [st, pair(f => fn(st, f))]));
+// Gom theo giai đoạn: {non, nho, truong, gia} → pair(2 khung). Dùng cho dáng lệnh của chó và dáng của mèo.
+const byStage = fn => Object.fromEntries(STAGES.map(st => [st, pair(f => fn(st, f))]));
 
-function catPounce(f) {
-  const C = P.cat, W = P.cream, STR = '#9a4410';
-  const stripes = (px, py, k) => (k < 3 && (px + Math.round(py * 0.4)) % 3 === 0 ? STR : undefined);
-  const c = f
-    ? fig(18, 12, [ // bay vồ, duỗi thẳng
-      B(1, 6, 3, 2, C, { sep: true, min: 1, pat: (px) => (px === 1 ? W[2] : undefined) }),
-      B(13, 6, 3, 2, C, { max: 1 }),
-      E(16, 3.4, 1.1, 0.8, C, { pat: (px) => (px % 2 ? STR : undefined) }),
-      E(9.4, 5.4, 5, 2, C, { pat: stripes }),
-      B(3, 1, 2, 2, C, { noise: 0 }), B(6, 1, 2, 2, C, { noise: 0, max: 1 }),
-      E(5, 4.2, 2.6, 2.2, C, { sep: true, pat: (px, py, k) => (py >= 5 && px <= 5 ? W[Math.min(3, k + 1)] : undefined) }),
+// Mèo: mỗi giai đoạn một bộ hình riêng cho từng dáng (vồ, phơi nắng, ngậm chuột) — hình nhỏ hơn
+// được dựng lại từ đầu theo hệ số CAT_K chứ không phóng to dùng chung ảnh của giai đoạn khác.
+const CAT_K = { non: 0.62, nho: 0.8, truong: 1, gia: 1 };
+const catPal = stage => (stage === 'gia'
+  ? { C: fade(P.cat, 0.3, '#e0c8a8'), STR: '#b07a48', W: fade(P.cream, 0.25, '#e8e0d4') }
+  : { C: P.cat, STR: '#9a4410', W: P.cream });
+
+function catPounce(stage, f) {
+  const k = CAT_K[stage], old = stage === 'gia', { C, W, STR } = catPal(stage);
+  const z = v => v * k, Z = v => Math.round(v * k);
+  const stripes = (px, py, kk) => (kk < 3 && (px + Math.round(py * 0.4)) % 3 === 0 ? STR : undefined);
+  // mèo già không bay vồ nữa, chỉ chồm nửa vời; mèo con vồ hụt nhưng hăng
+  const fly = f && !old;
+  const c = fly
+    ? fig(Z(18), Z(12), [ // bay vồ, duỗi thẳng
+      B(Z(1), Z(6), Math.max(2, Z(3)), Math.max(1, Z(2)), C, { sep: true, min: 1, pat: px => (px === Z(1) ? W[2] : undefined) }),
+      B(Z(13), Z(6), Math.max(2, Z(3)), Math.max(1, Z(2)), C, { max: 1 }),
+      E(z(16), z(3.4), z(1.1), z(0.8), C, { pat: (px, py) => (py % 2 ? STR : undefined) }),
+      E(z(9.4), z(5.4), z(5), z(2), C, { pat: stripes }),
+      B(Z(3), Z(1), 2, 2, C, { noise: 0 }), B(Z(6), Z(1), 2, 2, C, { noise: 0, max: 1 }),
+      E(z(5), z(4.2), z(2.6), z(2.2), C, { sep: true, pat: (px, py, kk) => (py >= Z(5) && px <= Z(5) ? W[Math.min(3, kk + 1)] : undefined) }),
     ])
-    : fig(16, 12, [ // rình, mông nhổm
-      B(4, 9, 3, 2, C, { min: 1 }), B(11, 8, 2, 3, C, { max: 1 }),
-      E(14, 4.6, 0.8, 2.4, C, { pat: (px, py) => (py % 2 ? STR : undefined) }),
-      E(9.6, 7.4, 4.4, 2.4, C, { pat: stripes }),
-      B(2, 4, 2, 2, C, { noise: 0 }), B(5, 4, 2, 2, C, { noise: 0, max: 1 }),
-      E(4.2, 7.6, 2.6, 2.1, C, { sep: true, pat: (px, py, k) => (py >= 8 && px <= 4 ? W[Math.min(3, k + 1)] : undefined) }),
+    : fig(Z(16), Z(12), [ // rình, mông nhổm
+      B(Z(4), Z(9), Math.max(2, Z(3)), Math.max(1, Z(2)), C, { min: 1 }), B(Z(11), Z(8), 2, Math.max(2, Z(3)), C, { max: 1 }),
+      E(z(14), z(4.6), z(0.8), z(2.4), C, { pat: (px, py) => (py % 2 ? STR : undefined) }),
+      E(z(9.6), z(7.4), z(4.4), z(2.4), C, { pat: stripes }),
+      B(Z(2), Z(4), 2, 2, C, { noise: 0 }), B(Z(5), Z(4), 2, 2, C, { noise: 0, max: 1 }),
+      E(z(4.2), z(7.6), z(2.6), z(2.1), C, { sep: true, pat: (px, py, kk) => (py >= Z(8) && px <= Z(4) ? W[Math.min(3, kk + 1)] : undefined) }),
     ]);
   const x = c.getContext('2d');
-  const ey = f ? 4 : 7;
-  for (const ex of f ? [3, 6] : [2, 5]) { R(x, '#9ae05a', ex, ey); }
-  R(x, EYE, f ? 3 : 2, ey); R(x, EYE, f ? 6 : 5, ey);
-  R(x, P.pink, f ? 4 : 3, ey + 1);
+  const ey = fly ? Z(4) : Z(7), eyes = fly ? [Z(3), Z(6)] : [Z(2), Z(5)];
+  for (const ex of eyes) { R(x, old ? '#a8b860' : '#9ae05a', ex, ey); R(x, EYE, ex, ey); }
+  R(x, P.pink, eyes[0] + 1, ey + 1);
   return c;
 }
-function catNap(f) {
+function catNap(stage, f) {
   // nằm cuộn tròn phơi nắng, bụng phập phồng
-  const C = P.cat, STR = '#9a4410', W = P.cream;
-  const c = fig(16, 10, [
-    E(8.6, 5.6 + (f ? 0.2 : 0), 6.2, 3.2 + (f ? 0.3 : 0), C, { pat: (px, py, k) => (k < 3 && (px + Math.round(py * 0.5)) % 3 === 0 ? STR : undefined) }),
-    E(10, 8.2, 4.6, 0.9, C, { sep: true, pat: (px) => (px % 2 ? STR : undefined) }),
-    B(3, 2, 2, 2, C, { noise: 0 }), B(6, 2, 2, 2, C, { noise: 0, max: 1 }), B(3, 1, 1, 1, C, { noise: 0, min: 2 }),
-    E(4.8, 5.4, 2.8, 2.4, C, { sep: true, pat: (px, py, k) => (py >= 6 && px <= 5 ? W[Math.min(3, k + 1)] : undefined) }),
-    E(3.6, 8.2, 1.8, 0.8, W, { sep: true }),
+  const k = CAT_K[stage], { C, W, STR } = catPal(stage);
+  const z = v => v * k, Z = v => Math.round(v * k);
+  const c = fig(Z(16), Z(10), [
+    E(z(8.6), z(5.6) + (f ? 0.2 : 0), z(6.2), z(3.2) + (f ? 0.3 : 0), C, { pat: (px, py, kk) => (kk < 3 && (px + Math.round(py * 0.5)) % 3 === 0 ? STR : undefined) }),
+    E(z(10), z(8.2), z(4.6), z(0.9), C, { sep: true, pat: px => (px % 2 ? STR : undefined) }),
+    B(Z(3), Z(2), 2, 2, C, { noise: 0 }), B(Z(6), Z(2), 2, 2, C, { noise: 0, max: 1 }), B(Z(3), Z(1), 1, 1, C, { noise: 0, min: 2 }),
+    E(z(4.8), z(5.4), z(2.8), z(2.4), C, { sep: true, pat: (px, py, kk) => (py >= Z(6) && px <= Z(5) ? W[Math.min(3, kk + 1)] : undefined) }),
+    E(z(3.6), z(8.2), z(1.8), z(0.8), W, { sep: true }),
   ]);
   const x = c.getContext('2d');
-  R(x, '#7a3a14', 3, 5); R(x, '#7a3a14', 6, 5); R(x, P.pink, 4, 6);
+  R(x, '#7a3a14', Z(3), Z(5)); R(x, '#7a3a14', Z(6), Z(5)); R(x, P.pink, Z(4), Z(6));
+  if (stage === 'gia' && f) R(x, '#cfe8ff', Z(8), Z(1));   // mèo già ngáy một cái bong bóng
   return c;
 }
-function catMouse(f) {
-  const base = cat('truong', 0, 'stand');
+function catMouse(stage, f) {
+  const base = cat(stage, 0, 'stand'), k = CAT_K[stage];
+  const mw = Math.max(4, Math.round(6 * k)), mh = Math.max(3, Math.round(5 * k));
   return draw(base.width, base.height, x => {
     x.drawImage(base, 0, 0);
     // chuột xám ngậm trong miệng, đuôi lủng lẳng
-    const m = fig(6, 5, [E(2.6, 2.4, 1.8, 1.3, P.rat), E(1.6, 1.2, 0.6, 0.6, P.rat, { lift: 0.3 })]);
-    x.drawImage(m, 0, 5);
-    R(x, P.pink, 0, 7 + (f ? 1 : 0)); R(x, P.pink, 0, 8 + (f ? 1 : 0)); R(x, '#d87a8a', 1, 9);
-    R(x, EYE, 2, 6);
-    if (f) { R(x, '#fff3a0', 6, 1); R(x, '#fff3a0', 7, 0); R(x, '#fff3a0', 8, 1); } // tự hào
+    const m = fig(mw, mh, [E(mw * 0.45, mh * 0.5, mw * 0.3, mh * 0.26, P.rat), E(mw * 0.27, mh * 0.24, 0.6, 0.6, P.rat, { lift: 0.3 })]);
+    const my = Math.max(0, base.height - mh - 1);
+    x.drawImage(m, 0, my);
+    R(x, P.pink, 0, my + 2 + (f ? 1 : 0)); R(x, P.pink, 0, my + 3 + (f ? 1 : 0)); R(x, '#d87a8a', 1, Math.min(base.height - 1, my + 4));
+    R(x, EYE, 2, my + 1);
+    if (f) { R(x, '#fff3a0', mw, 1); R(x, '#fff3a0', mw + 1, 0); R(x, '#fff3a0', mw + 2, 1); } // tự hào
   });
 }
 
@@ -1845,6 +1858,69 @@ function doghouseT(t) {
   });
 }
 
+// Nhà mèo 3 cấp: thùng gỗ có cửa tròn → nhà mái ngói có đệm → nhà gỗ sơn có đệm, bát sứ và cuộn len
+function cathouseT(t) {
+  if (t === 0) return draw(18, 16, x => {
+    shadow(x, 9, 14, 8, 2);
+    planks(x, 2, 6, 14, 9, WOOD);
+    ell(x, OUT, 9, 12, 3.2, 3.2); ell(x, '#2a1a0e', 9, 12, 2.4, 2.4);   // cửa tròn
+    for (let i = 0; i < 5; i++) { R(x, OUT, 9 - i - 1, i + 1, i * 2 + 3, 1); R(x, i % 2 ? WOOD[1] : WOOD[2], 9 - i, i + 1, i * 2 + 1, 1); }
+    R(x, OUT, 0, 6, 18, 1); R(x, WOOD[3], 8, 1);
+    R(x, OUT, 7, 0, 1, 1); R(x, OUT, 10, 0, 1, 1);   // hai tai mèo gỗ trên nóc
+  });
+  if (t === 1) return draw(20, 18, x => {
+    shadow(x, 10, 16, 9, 2);
+    planks(x, 2, 7, 16, 10, ['#8a6a3a', '#b08a52', '#d0aa6a', '#f0d090']);
+    ell(x, OUT, 10, 13, 3.4, 3.4); ell(x, '#2a1a0e', 10, 13, 2.6, 2.6);
+    ell(x, '#c44434', 10, 16, 3.4, 0.9); ell(x, '#e06a52', 9, 16, 2.2, 0.5);   // đệm đỏ thò ra cửa
+    for (let i = 0; i < 7; i++) { R(x, OUT, 10 - i - 1, i + 1, i * 2 + 3, 1); R(x, i % 3 === 0 ? TILE[3] : i % 3 === 2 ? TILE[1] : TILE[2], 10 - i, i + 1, i * 2 + 1, 1); }
+    R(x, OUT, 0, 7, 20, 1); R(x, TILE[0], 1, 6, 18, 1);
+    R(x, OUT, 6, 8, 4, 3); R(x, '#fff8ea', 7, 9, 2, 1);   // bảng tên hình cá
+  });
+  return draw(24, 20, x => {
+    shadow(x, 12, 18, 11, 2);
+    planks(x, 3, 8, 18, 11, ['#2e5a4a', '#3e8a6a', '#5ab48e', '#8ae0b8']);
+    ell(x, OUT, 10, 14, 3.6, 3.6); ell(x, '#20140a', 10, 14, 2.8, 2.8);
+    ell(x, '#c44434', 10, 17, 3.6, 1); ell(x, '#e06a52', 9, 17, 2.4, 0.6);   // đệm dày
+    tiles(x, 1, 9, 10, 12, -1, 22, ['#6e2016', '#9e3024', '#c44434', '#e06a52']);
+    R(x, OUT, 0, 8, 24, 1);
+    // bát sứ + cuộn len đồ chơi
+    R(x, OUT, 18, 15, 5, 3); R(x, '#aeaebe', 19, 15, 3, 1); R(x, '#e8e8f0', 19, 16, 3, 1); R(x, '#767686', 19, 17, 3, 1);
+    ell(x, OUT, 3, 17, 2.2, 2.2); ell(x, '#e85a8a', 3, 17, 1.5, 1.5); R(x, '#ffb0c8', 2, 16); R(x, '#a83a62', 2, 18, 3, 1);
+    R(x, OUT, 9, 6, 4, 3); R(x, '#f7d547', 10, 7, 2, 1);   // biển vàng
+  });
+}
+// Cuộn len mèo con vờn (2 khung: lăn qua lăn lại)
+function catYarn(f) {
+  return draw(7, 7, x => {
+    shadow(x, 3, 6, 3, 1);
+    ell(x, OUT, 3, 3, 3, 3); ell(x, '#c0407a', 3, 3, 2.2, 2.2); ell(x, '#e87aa8', 3 - (f ? 1 : 0), 2, 1.3, 1.1);
+    line(x, '#a0305e', 1, 4 + (f ? 0 : 1), 5, 2 + (f ? 1 : 0));
+    R(x, '#ffc0d8', f ? 2 : 4, 2);
+    R(x, '#e87aa8', 6, f ? 5 : 4); R(x, '#e87aa8', 6, 6);   // sợi len thò ra
+  });
+}
+// Bong bóng mèo chó cãi nhau: dấu chấm than, sao, khói bụi (2 khung)
+function spatBubble(f) {
+  return draw(14, 11, x => {
+    for (const [cx, cy, r] of [[4, 5, 2.6], [9, 4, 2.2], [7, 7, 2]]) ell(x, f ? '#fff0c0' : '#ffe08a', cx + (f ? 1 : 0), cy, r, r * 0.8);
+    outline(x.canvas, '#8a5a2b');
+    R(x, '#e5452f', 4, 3, 1, 3); R(x, '#e5452f', 4, 7);                 // dấu !
+    R(x, '#f7d547', 9, 2); R(x, '#f7d547', 8, 3, 3, 1); R(x, '#f7d547', 9, 4);   // ngôi sao
+    R(x, '#3b2412', f ? 11 : 2, f ? 8 : 9); R(x, '#3b2412', f ? 12 : 1, f ? 9 : 8);
+  });
+}
+// Chiến lợi phẩm: con chuột nhỏ mèo đặt dưới chân người chơi
+function ratTrophy() {
+  return draw(9, 6, x => {
+    shadow(x, 4, 5, 4, 1);
+    const c = fig(8, 5, [E(4.4, 2.8, 2.6, 1.6, P.rat), E(1.8, 1.8, 1, 1, P.rat, { lift: 0.3 })]);
+    x.drawImage(c, 0, 0);
+    R(x, '#d88a9a', 1, 1); R(x, EYE, 2, 2);
+    R(x, P.pink, 7, 3); R(x, P.pink, 8, 2);   // đuôi
+  });
+}
+
 function catDoor() {
   return draw(8, 8, x => {
     R(x, OUT, 0, 1, 8, 7); R(x, WOOD[2], 1, 2, 6, 5);
@@ -2468,7 +2544,7 @@ export const SPR3 = {
   // ngủ & bệnh theo dáng từng loài, giai đoạn trưởng thành (bản 'left'); xem sleepBy/sickBy để có đủ giai đoạn
   sleep: {
     ga: hen('truong', 0, 'sleep'), gaTrong: rooster('truong', 0, 'sleep'), vit: duck('truong', 0, 'sleep'), vitDuc: drake('truong', 0, 'sleep'), heo: pig('truong', 0, 'sleep'),
-    bo: cow('truong', 0, 'sleep'), boDuc: cow('truong', 0, 'sleep', true), cuu: sheep('truong', 0, 'sleep'), cho: dog('truong', 0, 'sleep'), meo: catNap(0),
+    bo: cow('truong', 0, 'sleep'), boDuc: cow('truong', 0, 'sleep', true), cuu: sheep('truong', 0, 'sleep'), cho: dog('truong', 0, 'sleep'), meo: cat('truong', 0, 'sleep'),
   },
   sick: {},
   // theo giai đoạn: sleepBy.heo.non ...
@@ -2476,10 +2552,10 @@ export const SPR3 = {
   sickBy: {},
   heoMud: [heoMud(0), heoMud(1)],
   // chó: 4 tư thế lệnh, mỗi giai đoạn một bộ hình riêng (issue 45)
-  dogSitBy: dogPoses((st, f) => dogSeat(st, f, false)),
-  dogBegBy: dogPoses((st, f) => dogSeat(st, f, true)),
-  dogHerdBy: dogPoses(dogGallop),
-  dogBarkBy: dogPoses(dogBarkPose),
+  dogSitBy: byStage((st, f) => dogSeat(st, f, false)),
+  dogBegBy: byStage((st, f) => dogSeat(st, f, true)),
+  dogHerdBy: byStage(dogGallop),
+  dogBarkBy: byStage(dogBarkPose),
   // đồ hoạ dạy lệnh
   trainBar: { track: trainTrack(), zone: trainZone(), mark: trainMark() },
   praise: pair(praiseFrame),
@@ -2487,9 +2563,13 @@ export const SPR3 = {
   cmdBubble: cmdBubble(),
   guardPost: guardPost(),
   sniffMark: pair(sniffFrame),
-  catPounce: pair(catPounce),
-  catNap: pair(catNap),
-  catMouse: pair(catMouse),
+  // mèo (issue 44): mỗi giai đoạn một bộ hình riêng cho từng dáng
+  catPounceBy: byStage(catPounce),
+  catNapBy: byStage(catNap),
+  catMouseBy: byStage(catMouse),
+  catYarn: pair(catYarn),
+  spatBubble: pair(spatBubble),
+  ratTrophy: ratTrophy(),
   fx: {
     dirt: { s: dirtOverlay(10, 6, 5, 1), m: dirtOverlay(16, 8, 8, 2), l: dirtOverlay(22, 10, 12, 3) },
     flies: [0, 1, 2].map(fliesFrame),
@@ -2514,6 +2594,7 @@ export const SPR3 = {
   },
   quarantine: quarantine(),
   doghouse: [0, 1, 2].map(doghouseT),
+  cathouse: [0, 1, 2].map(cathouseT),
   catDoor: catDoor(),
   scale: scale(),
   grave: grave(false),
