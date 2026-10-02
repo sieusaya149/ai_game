@@ -205,10 +205,10 @@ test('đang rèn mà đóng game, mở lại sau hơn 1 ngày thì chạy bù xo
   const s = newGame(); s.coins = 1000;
   G.startUpgrade(s, 'hoe');
   G.saveGame(s);
-  const saved = JSON.parse(store['nongtrai-save-v2']);
+  const saved = JSON.parse(store[G.SAVE_KEY]);
   saved.savedAt = Date.now() - 8 * 60 * 60 * 1000;
   saved.smith.doneAt = saved.time + 60_000;   // gần xong lúc đóng game
-  store['nongtrai-save-v2'] = JSON.stringify(saved);
+  store[G.SAVE_KEY] = JSON.stringify(saved);
   const l = G.loadGame();
   assert.equal(G.toolLv(l, 'hoe'), 2);
   assert.equal(l.smith, null);

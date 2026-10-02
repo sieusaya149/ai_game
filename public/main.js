@@ -490,6 +490,9 @@ function frame(now) {
   view = { camX: Math.round(cam.x * scale), camY: Math.round(cam.y * scale) };
   world.fx = world.fx.filter(f => now - f.t0 < 1500);
   if (state.scene === 'farm') for (const e of events) if (e.type === 'fx') world.fx.push({ text: e.text, color: e.color, x: e.x, y: e.y, t0: now });
+  // con vật già ra đi: thiên thần bay lên
+  world.angels = (world.angels ?? []).filter(g => now - g.t0 < R.ANGEL_MS);
+  if (state.scene === 'farm') for (const e of events) if (e.type === 'passed' && e.x != null) world.angels.push({ x: e.x, y: e.y, t0: now });
   R.render(ctx, {
     state, w: world, cam, scale, width: canvas.width, height: canvas.height, dpr, now,
     target: curTarget ? { target: curTarget } : null,

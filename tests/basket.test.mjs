@@ -47,7 +47,7 @@ test('giỏ đầy thì khóa thu hoạch, nhặt trứng, vắt sữa kèm lý 
   assert.ok(s.plots[0].crop, 'cây vẫn còn');
   s.eggs.push({ id: 900, x: 10, y: 10 });
   assert.equal(act(s, { kind: 'egg', id: 900 }, 'collect').disabled, FULL);
-  s.animals.push({ id: 901, type: 'bo', adult: true, ready: true, hunger: 100, happy: 60, sick: false, x: 0, y: 0 });
+  s.animals.push({ id: 901, type: 'bo', stage: 'truong', ready: true, hunger: 100, happy: 60, sick: false, x: 0, y: 0 });
   assert.equal(act(s, { kind: 'animal', id: 901 }, 'milk').disabled, FULL);
   assert.equal(act(s, { kind: 'animal', id: 901 }, 'collect'), undefined);
 });
@@ -132,7 +132,7 @@ test('bản lưu cũ chưa có giỏ: đồ cũ vào kho, giỏ trống', () => 
   const s = newGame();
   const old = JSON.parse(JSON.stringify(s));
   delete old.basket; old.inv.cai = 9; old.inv.trung = 3;
-  store['nongtrai-save-v2'] = JSON.stringify(old);
+  store[G.SAVE_KEY] = JSON.stringify(old);
   const l = G.loadGame();
   assert.deepEqual(l.basket, {});
   assert.equal(l.inv.cai, 9);

@@ -116,20 +116,29 @@ export function ensurePositions(state) {
 // ---------- Con vật trong chuồng ----------
 // w.view (main.js đặt): khung nhìn của camera theo điểm ảnh bản đồ. Con vật ngoài khung chỉ cập nhật AI 2 lần/giây (gom dt).
 const onScreen = (w, o) => !w.view || (o.x >= w.view.x0 && o.x <= w.view.x1 && o.y >= w.view.y0 && o.y <= w.view.y1);
-function updateAnimals(state, w, dt0) {
+// Tốc độ theo giai đoạn: con non lon ton, con già chậm chạp
+const STAGE_SPEED = { non: 1.25, nho: 1.1, truong: 1, gia: 0.6 };
+// Gà mẹ gần nhất cùng chuồng cho gà con chạy theo
+const henOf = (state, a) => a.type === 'ga' && a.stage === 'non'
+  ? state.animals.filter(h => h.type === 'ga' && h.sex === 'f' && (h.stage === 'truong' || h.stage === 'gia') && h.x != null).sort((u, v) => dist(u, a) - dist(v, a))[0] : null;
+function updateAnimals(state, w, dt0, out) {
   const p = state.player;
   const ms = M.mudSpot;
   const inMudSpot = a => !!ms && Math.abs(a.x - ms.x) < ms.rx && Math.abs(a.y - ms.y) < ms.ry;
   for (const a of state.animals) {
     const pen = M.pens[ANIMALS[a.type].pen];
     if (!pen) continue;
-    const area = pen.area, rt = rtOf(w, 'a' + a.id);
-    const dt = aiStep(rt, dt0, onScreen(w, a));
+    const area = pen.area, rt = rtOf(w, 'a' + a.id), seen = onScreen(w, a);
+    const dt = aiStep(rt, dt0, seen);
     if (!dt) continue;
     const near = Math.hypot(p.x - a.x, p.y - a.y) < 26;
     const scared = state.time < (a.scaredUntil ?? 0);   // vừa bị dời chuồng: chạy loạn một lúc
-    const speed = (A_SPEED[a.type] ?? 14) * (a.adult ? 1 : 1.25) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
+    const speed = (A_SPEED[a.type] ?? 14) * (STAGE_SPEED[a.stage] ?? 1) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
     rt.walking = false; rt.peck = false;
+    // gà con kêu chiếp (thỉnh thoảng, khi đang ở trên màn hình)
+    if (a.type === 'ga' && a.stage === 'non' && seen && out && state.scene === 'farm' && Math.random() < dt * 0.06) {
+      out.results.push({ ok: true, sound: 'chirp', fx: [{ text: 'chiếp', color: '#fff6a0', x: a.x, y: a.y + 14 }] });
+    }
     if (scared && rt.mode !== 'walk') { const t = inArea(area, 2); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk'; }
     if (rt.mode === 'walk') {
       if (near && !scared) { rt.mode = 'idle'; rt.timer = 0.8; }
@@ -147,14 +156,21 @@ function updateAnimals(state, w, dt0) {
     } else {
       rt.timer -= dt;
       if (rt.mode === 'peck') { rt.peck = true; rt.anim += dt; if (rt.timer <= 0) rt.mode = 'idle'; }
+      if (rt.mode === 'nap' && (rt.timer <= 0 || scared)) { rt.mode = 'idle'; rt.nap = false; }
       if (rt.timer <= 0 && !near) {
+        rt.nap = false;
         const inMud = a.type === 'heo' && inMudSpot(a);
         const trough = state.troughs?.[ANIMALS[a.type].pen] ?? 0;
-        if (a.hunger < 60 && trough > 0 && Math.random() < 0.6) {
+        const hen = henOf(state, a);
+        if (hen && Math.random() < 0.75) {   // gà con lon ton theo gà mẹ
+          rt.tx = clamp(hen.x + rnd(-9, 9), area.x, area.x + area.w); rt.ty = clamp(hen.y + rnd(2, 7), area.y, area.y + area.h); rt.mode = 'walk';
+        } else if (a.stage === 'gia' && Math.random() < 0.45) {   // con già hay ngủ gật
+          rt.mode = 'nap'; rt.nap = true; rt.timer = rnd(4, 9);
+        } else if (a.hunger < 60 && trough > 0 && Math.random() < 0.6) {
           rt.tx = clamp(pen.trough.x + rnd(-14, 14), area.x, area.x + area.w); rt.ty = area.y + rnd(1, 8); rt.mode = 'walk';
         } else if (a.type === 'heo' && ms && !inMud && Math.random() < 0.45) {
           rt.tx = rnd(ms.x0, ms.x1); rt.ty = rnd(ms.y0, ms.y1); rt.mode = 'walk';
-        } else if (a.type === 'ga' && Math.random() < 0.4) {
+        } else if (a.type === 'ga' && Math.random() < (a.stage === 'nho' ? 0.7 : 0.4)) {   // gà nhỡ bới đất nhiều
           rt.mode = 'peck'; rt.timer = rnd(0.8, 1.8);
         } else {
           const t = inArea(area, 2); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk';
@@ -372,7 +388,7 @@ export function nameOf(state, t) {
   switch (t.kind) {
     case 'plot': { const c = state.plots[t.idx]?.crop; return c ? (CROPS[c.id]?.name ?? 'Cây trồng') : `Ô ruộng ${t.idx + 1}`; }
     case 'lockedPlot': return 'Đất hoang';
-    case 'animal': { const a = findBy(state.animals, t.id); return a ? (a.name || (a.adult ? ANIMALS[a.type].name : ANIMALS[a.type].baby)) : 'Vật nuôi'; }
+    case 'animal': { const a = findBy(state.animals, t.id); return a ? ST.animalLabel(a) : 'Vật nuôi'; }
     case 'egg': return 'Quả trứng';
     case 'poop': return 'Phân chó';
     case 'threat': return findBy(state.threats, t.id)?.kind === 'thief' ? 'Thằng Tèo' : 'Con quạ';
@@ -394,10 +410,10 @@ export function anchorOf(state, t) {
   if (!pos || pos.x == null) return null;
   switch (t.kind) {
     case 'plot': case 'lockedPlot': return { x: pos.x, top: M.plotTile(t.idx).r * TS + 1 };
-    case 'animal': { const a = findBy(state.animals, t.id); const im = animalImg(a.type, a.adult, 'left', 0); return { x: a.x, top: a.y - (im?.height ?? 12) - 1 }; }
+    case 'animal': { const a = findBy(state.animals, t.id); const im = animalImg(a, 'left', 0); return { x: a.x, top: a.y - (im?.height ?? 12) - 1 }; }
     case 'egg': return { x: pos.x, top: pos.y - eggSize().h - 1 };
     case 'poop': return { x: pos.x, top: pos.y - poopSize().h - 8 };
-    case 'dog': { const im = dogImg(state.dog.adult, 'left', 0); return { x: pos.x, top: pos.y - (im?.height ?? 12) - 1 }; }
+    case 'dog': { const im = dogImg(state.dog, 'left', 0); return { x: pos.x, top: pos.y - (im?.height ?? 12) - 1 }; }
     case 'threat': { const th = pos; const alt = 0; return th.kind === 'crow' ? { x: th.x, top: th.y - 16 - alt } : { x: th.x, top: th.y - 26 }; }
     case 'trough': return { x: pos.x, top: pos.y - 12 };
     case 'nest': return { x: pos.x, top: pos.y - 14 };
@@ -424,10 +440,10 @@ export function hitTest(state, wx, wy) {
   }
   if (atFarm()) {
     for (const a of [...state.animals].sort((u, v) => v.y - u.y)) {
-      const im = animalImg(a.type, a.adult, 'left', 0);
+      const im = animalImg(a, 'left', 0);
       if (im && hitRect(a.x - im.width / 2, a.y - im.height, im.width, im.height, wx, wy)) return { kind: 'animal', id: a.id };
     }
-    const dog = state.dog, di = dogImg(dog.adult, 'left', 0);
+    const dog = state.dog, di = dogImg(dog, 'left', 0);
     if (di && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
     for (const o of state.poops ?? []) if (Math.hypot(wx - o.x, wy - o.y + 3) < 9) return { kind: 'poop', id: o.id };
     for (const e of state.eggs ?? []) if (Math.hypot(wx - e.x, wy - e.y + 3) < 8) return { kind: 'egg', id: e.id };
@@ -576,7 +592,7 @@ function updateFarm(state, w, dt, out) {
     }
   }
 
-  updateAnimals(state, w, dt);
+  updateAnimals(state, w, dt, out);
   updateDog(state, w, dt);
   updateThreats(state, w, dt);
 }

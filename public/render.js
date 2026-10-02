@@ -2,6 +2,7 @@
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
 import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
+import { SPR3 } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, actionsFor, nextStrip } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -170,15 +171,31 @@ function statusIcon(name) {
 }
 
 // ---------- Chọn sprite theo thực thể (world.js cũng dùng để tính vùng bấm) ----------
-export function animalImg(type, adult, face, frame) {
-  const set = adult ? SPR.animal?.[type] : SPR.baby?.[type];
-  if (set) return set[face][frame % set[face].length];
-  const ad = SPR.animal?.[type] ?? (type === 'heo' ? pigFallback() : null);
+// a = { type, stage, sex }. Hình theo giai đoạn ở SPR3 (art3.js): con đực có bộ riêng (gà trống, bò đực).
+// Thiếu art thì dự phòng bằng sprite cũ: non = SPR.baby, nhỡ = bản thu nhỏ, già = bản nhạt màu.
+const SP3 = { dog: 'cho' }, MALE = { ga: 'gaTrong', bo: 'boDuc' };
+const sp3Key = a => (a.sex === 'm' && MALE[a.type] && SPR3?.animal?.[MALE[a.type]]) ? MALE[a.type] : SP3[a.type] ?? a.type;
+export function animalImg(a, face, frame, sleep) {
+  const stage = a.stage ?? 'truong', key = sp3Key(a);
+  if (sleep) { const z = SPR3?.sleepBy?.[key]?.[stage]; if (z) return face === 'right' ? derived(z, 'flip', () => flip(z)) : z; }
+  const set3 = SPR3?.animal?.[key]?.[stage];
+  if (set3) return set3[face][frame % set3[face].length];
+  const baby = SPR.baby?.[a.type];
+  if (stage === 'non' && baby) return baby[face][frame % baby[face].length];
+  const ad = SPR.animal?.[a.type] ?? (a.type === 'heo' ? pigFallback() : null);
   if (!ad) return null;
   const im = ad[face][frame % ad[face].length];
-  return adult ? im : scaled(im, 0.62);
+  if (stage === 'non') return scaled(im, 0.62);
+  if (stage === 'nho') return scaled(im, 0.8);
+  return stage === 'gia' ? tinted(im, '#d8d0c0', 0.35) : im;
 }
-export const dogImg = (adult, face, frame) => animalImg('dog', adult, face, frame);
+export const ANGEL_MS = 2600;   // thiên thần bay lên trong chừng này ms
+const angelFallback = () => once('angel', () => {
+  const c = mkCanvas(10, 11), x = c.getContext('2d');
+  rect(x, '#f7d547', 3, 0, 4, 1); rect(x, '#ffffff', 0, 4, 3, 2); rect(x, '#ffffff', 7, 4, 3, 2); rect(x, '#fff3e0', 3, 2, 4, 8);
+  return c;
+});
+export const dogImg = (dog, face, frame, sleep) => animalImg({ type: 'dog', stage: dog.stage, sex: 'm' }, face, frame, sleep);
 export function crowImg(face, frame) {
   const set = SPR.crow ?? crowFallback();
   return set[face][frame % set[face].length];
@@ -457,7 +474,8 @@ export function render(ctx, f) {
   // 2) bóng dưới chân
   shadow(state.player.x, state.player.y, 6);
   const animals = farm ? state.animals : [], threats = farm ? state.threats ?? [] : [];
-  for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : a.adult ? 6 : 4);
+  const small = { non: 0.6, nho: 0.8 };
+  for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, Math.round((a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : 6) * (small[a.stage] ?? 1)));
   if (farm && state.dog.x != null && vis(state.dog.x, state.dog.y)) shadow(state.dog.x, state.dog.y, 6);
   for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
 
@@ -559,7 +577,8 @@ export function render(ctx, f) {
     if (a.x == null || !vis(a.x, a.y)) continue;
     const rt = wd.rt.get('a' + a.id) ?? {};
     const frame = rt.walking ? Math.floor(rt.anim * 7) % 2 : rt.peck ? Math.floor(rt.anim * 6) % 2 : 0;
-    const im = animalImg(a.type, a.adult, rt.face ?? 'left', frame);
+    const sleeping = !rt.walking && (night > 0.6 || rt.nap);   // ban đêm, hoặc con già ngủ gật
+    const im = animalImg(a, rt.face ?? 'left', frame, sleeping);
     if (!im) continue;
     const dy = rt.peck && frame ? 1 : 0;
     add(a.y, () => blit(im, a.x - im.width / 2, a.y - im.height + 1 + dy));
@@ -571,14 +590,25 @@ export function render(ctx, f) {
     else if (a.hunger < 35) icon = statusIcon('hungry');
     else if (a.ready) icon = statusIcon(a.type === 'cuu' ? 'wool' : 'milk');
     else if (a.pregnant) icon = statusIcon('pregnant');
-    else if (night > 0.6 && !rt.walking) icon = statusIcon('zzz');
+    else if (sleeping) icon = statusIcon('zzz');
     bub(a.x, a.y - im.height - 1, icon, 'a' + a.id);
+  }
+  // con vật già ra đi: thiên thần bay lên rồi mờ dần (main.js đẩy vào wd.angels khi có event 'passed')
+  for (const g of wd.angels ?? []) {
+    const t = (now - g.t0) / ANGEL_MS;
+    if (t < 0 || t > 1 || !vis(g.x, g.y, 60)) continue;
+    const im = SPR3?.angel?.[Math.floor(now / 250) % 2] ?? angelFallback();
+    add(g.y + 100, () => {
+      ctx.globalAlpha = t < 0.7 ? 1 : (1 - t) / 0.3;
+      blit(im, g.x - im.width / 2 + Math.round(Math.sin(t * 9) * 2), g.y - im.height - t * 46);
+      ctx.globalAlpha = 1;
+    });
   }
   // chó
   const dog = state.dog;
   if (farm && dog.x != null && vis(dog.x, dog.y)) {
     const rt = wd.rt.get('dog') ?? {};
-    const im = dogImg(dog.adult, rt.face ?? 'right', rt.walking ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0);
+    const im = dogImg(dog, rt.face ?? 'right', rt.walking ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0, !rt.walking && rt.nap);
     if (im) {
       add(dog.y, () => blit(im, dog.x - im.width / 2, dog.y - im.height + 1));
       const emote = wd.emotes.get('dog');

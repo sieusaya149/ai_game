@@ -521,7 +521,7 @@ PANELS.market = {
         const locked = a.lv > lv, full = n >= cap;
         list.append(row({
           icon: ico(type), name: a.baby, locked,
-          desc: [`Lớn sau ${a.grow / MIN} phút · ${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`],
+          desc: [`Trưởng thành sau ${D.stageStart(type, 'truong') / MIN} phút ·${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`],
           right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + a.lv)
             : [coinTag(a.price), btn(full ? 'Đầy' : 'Mua', () => res(S.buyAnimal(st(), type), 'coin')?.ok && (flags.bought = true), 'green', { disabled: shut || full || s.coins < a.price })],
         }));

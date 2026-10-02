@@ -72,6 +72,7 @@ const SOUNDS = {
   bark:    () => { tone({ f: 430, f2: 200, d: 0.1, type: 'sawtooth', v: 0.18, lp: 1500 }); tone({ f: 460, f2: 210, t: 0.16, d: 0.1, type: 'sawtooth', v: 0.18, lp: 1500 }); },
   oink:    () => { tone({ f: 210, f2: 130, d: 0.16, type: 'sawtooth', v: 0.17, lp: 900 }); tone({ f: 190, f2: 120, t: 0.17, d: 0.2, type: 'sawtooth', v: 0.15, lp: 900 }); },
   cluck:   () => [0, 0.1, 0.2].forEach(t => tone({ f: 700, f2: 420, t, d: 0.07, type: 'square', v: 0.1, lp: 2200 })),
+  chirp:   () => [0, 0.12].forEach(t => tone({ f: 2400, f2: 3100, t, d: 0.05, type: 'sine', v: 0.06 })),
   moo:     () => tone({ f: 150, f2: 105, d: 0.75, type: 'sawtooth', v: 0.2, lp: 500 }),
   baa:     () => tone({ f: 380, f2: 320, d: 0.5, type: 'sawtooth', v: 0.15, lp: 1400, vib: 60 }),
   slip:    () => { tone({ f: 1000, f2: 200, d: 0.35, type: 'sine', v: 0.2 }); tone({ f: 90, f2: 50, t: 0.36, d: 0.15, type: 'sawtooth', v: 0.25, lp: 400 }); },

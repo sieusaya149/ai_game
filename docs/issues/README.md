@@ -61,7 +61,7 @@ Nguồn: [PRD 0003](../prd/0003-phase-2-vat-nuoi.md).
 
 | # | Issue | Bị chặn bởi | Trạng thái |
 |---|---|---|---|
-| 34 | [Bản lưu v3 và vòng đời](34-ban-luu-v3-vong-doi.md) | 33 | ⬜ |
+| 34 | [Bản lưu v3 và vòng đời](34-ban-luu-v3-vong-doi.md) | 33 | ✅ |
 | 35 | [Chuồng 3 cấp và cách ly](35-chuong-3-cap-va-cach-ly.md) | 34 | ⬜ |
 | 36 | [Đực/cái và sinh sản](36-duc-cai-va-sinh-san.md) | 35 | ⬜ |
 | 37 | [Dơ và tắm](37-do-va-tam.md) | 34 | ⬜ |

@@ -60,12 +60,12 @@ export const FARMING = {
 };
 
 // ---------- Vật nuôi ----------
-// price: giá mua con non · grow: thời gian lớn (chỉ lớn khi no) · every: chu kỳ ra sản phẩm khi trưởng thành · sell: giá bán con trưởng thành
+// price: giá mua con non · every: chu kỳ ra sản phẩm khi trưởng thành (thời gian lớn: bảng LIFE) · sell: giá bán con trưởng thành
 export const ANIMALS = {
-  ga:  { name: 'Gà',  baby: 'Gà con',  lv: 1, price: 40,  grow: 4 * MIN,  feed: 'feed_ga',  pen: 'chicken', product: 'trung', every: 2.5 * MIN, sell: 90,  exp: 3 },
-  heo: { name: 'Heo', baby: 'Heo con', lv: 3, price: 120, grow: 8 * MIN,  feed: 'feed_heo', pen: 'pig',     product: null,    every: 0,         sell: 380, exp: 12 },
-  bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, grow: 10 * MIN, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
-  cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, grow: 10 * MIN, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
+  ga:  { name: 'Gà',  baby: 'Gà con',  lv: 1, price: 40,  feed: 'feed_ga',  pen: 'chicken', product: 'trung', every: 2.5 * MIN, sell: 90,  exp: 3 },
+  heo: { name: 'Heo', baby: 'Heo con', lv: 3, price: 120, feed: 'feed_heo', pen: 'pig',     product: null,    every: 0,         sell: 380, exp: 12 },
+  bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
+  cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
 };
 export const PEN_CAP = { chicken: 10, pig: 6, pasture: 5 };
 export const HUSBANDRY = {
@@ -84,13 +84,51 @@ export const HUSBANDRY = {
   pigBreedChancePerMin: 0.25, // có ≥2 heo trưởng thành no & vui: mỗi phút 25% có heo nái mang bầu
   pigGestation: 6 * MIN,
   pigLitter: [1, 3],          // đẻ 1–3 heo con
-  vitaminBoost: 0.5,          // vitamin: cộng ngay 50% thời gian lớn cho con non
+  vitaminBoost: 0.5,          // vitamin: cộng ngay nửa giai đoạn đang ở cho con non, con nhỡ
+};
+
+// ---------- Vòng đời 4 giai đoạn (Phase 2) ----------
+// Tuổi tính bằng GIỜ VƯỜN đã chạy (simMs, ADR 0003): vườn đóng băng thì con vật không già đi.
+// LIFE[loài][giai đoạn] = thời lượng giai đoạn đó. Infinity = ở mãi giai đoạn đó (chó, mèo không già, không chết vì già).
+// Hết giai đoạn già thì con vật ra đi (hóa thiên thần); chết vì già được phép cả lúc chạy bù (ADR 0004).
+const HOUR = 60 * MIN;
+export const STAGES = ['non', 'nho', 'truong', 'gia'];
+export const STAGE_NAME = { non: 'Non', nho: 'Nhỡ', truong: 'Trưởng thành', gia: 'Già' };
+export const LIFE = {
+  ga:  { non: 5 * MIN,  nho: 10 * MIN, truong: 20 * HOUR, gia: 4 * HOUR },
+  heo: { non: 10 * MIN, nho: 20 * MIN, truong: 30 * HOUR, gia: 6 * HOUR },
+  bo:  { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
+  cuu: { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
+  cho: { non: 30 * MIN, nho: HOUR,     truong: Infinity,  gia: Infinity },
+};
+// Tuổi lúc bắt đầu một giai đoạn · giai đoạn ở tuổi `age` · tuổi ra đi (Infinity = không bao giờ)
+export const stageStart = (kind, stage) => STAGES.slice(0, STAGES.indexOf(stage)).reduce((t, k) => t + LIFE[kind][k], 0);
+export const stageAt = (kind, age) => STAGES.findLast(k => age >= stageStart(kind, k)) ?? 'non';
+export const lifeEnd = kind => stageStart(kind, 'gia') + LIFE[kind].gia;
+export const AGING = {
+  warnMs: HOUR,       // báo trước 🟡 khi còn chừng này giờ vườn nữa là vào giai đoạn già
+  oldEvery: 2,        // con già: chu kỳ ra sản phẩm dài gấp đôi (đẻ thưa, ít sữa, lông mỏng)
+  pigHungry: 1.5,     // heo nhỡ ăn khỏe: đói nhanh ×1.5 ...
+  pigGain: 2,         // ... và tăng cân nhanh ×2
+};
+// Việc từng giai đoạn làm được: theo loài, thiếu loài thì lấy `all`.
+// product: đẻ trứng / cho sữa / cho lông · plow: kéo cày (bò tơ kéo được cả hàng ruộng) · sell: bán được · vitamin: còn lớn được
+export const STAGE_CAN = {
+  product: { all: ['truong', 'gia'] },
+  plow:    { bo: ['nho', 'truong'] },
+  sell:    { all: ['nho', 'truong', 'gia'] },
+  vitamin: { all: ['non', 'nho'] },
+};
+// Cân nặng (kg): lúc mới sinh, lúc lớn hẳn. Con non, nhỡ ăn no thì lên cân dần trong hai giai đoạn đầu.
+export const WEIGHT = { ga: [0.2, 2.5], heo: [3, 100], bo: [30, 450], cuu: [4, 60] };
+export const weightAt = (type, stage) => {
+  const [w0, w1] = WEIGHT[type] ?? [1, 1];
+  return stage === 'non' ? w0 : stage === 'nho' ? (w0 + w1) / 2 : w1;
 };
 
 // ---------- Chó ----------
 export const DOG = {
   name: 'Mực',
-  growMs: 8 * MIN,            // chó con lớn thành chó trưởng thành (khi no)
   hungerMs: 8 * MIN,
   poopEvery: [2 * MIN, 4 * MIN], // chó ỉa bậy ngẫu nhiên trong khoảng này
   maxPoops: 8,
@@ -119,7 +157,7 @@ export const ITEMS = {
   growth:     { name: 'Thuốc tăng trưởng', kind: 'supply', price: 30, lv: 2, desc: 'Cây lớn vọt thêm 50% thời gian. Tối đa 2 lần mỗi cây.' },
   fertilizer: { name: 'Phân bón',          kind: 'supply', price: 12, lv: 1, desc: 'Bón trước khi chín: +50% sản lượng, lớn nhanh hơn.' },
   medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 3, desc: 'Chữa khỏi vật nuôi bị bệnh.' },
-  vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non lớn vọt thêm 50% thời gian.' },
+  vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
   feed_ga:    { name: 'Cám gà',            kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
   feed_heo:   { name: 'Cám heo',           kind: 'feed',   price: 10, lv: 3, desc: 'Thức ăn cho heo.' },
   hay:        { name: 'Cỏ khô',            kind: 'feed',   price: 8,  lv: 5, desc: 'Thức ăn cho bò và cừu.' },
@@ -180,8 +218,8 @@ export const DEFAULT_LOOK = { skin: 0, hair: 0, hairColor: 0, shirt: 0, pants: 0
 export const START = {
   coins: 250,
   items: { seed_cai: 6, seed_carot: 3, feed_ga: 3, dogfood: 3, pesticide: 1, fertilizer: 1 },
-  animals: [{ type: 'ga', adult: true }, { type: 'ga', adult: false }],
-  dogAdult: false,
+  animals: [{ type: 'ga', stage: 'truong', sex: 'f' }, { type: 'ga', stage: 'non', sex: 'm' }],
+  dogStage: 'non',
 };
 export const expandCost = n => Math.round(60 * 1.2 ** (n - START_PLOTS) / 10) * 10;
 export const expandLevel = n => 1 + Math.floor((n - START_PLOTS) / 3);
@@ -233,7 +271,7 @@ export const ACHIEVEMENTS = [
 export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
-  levelup: 'Lên cấp', order: 'Đơn hàng mới',
+  levelup: 'Lên cấp', order: 'Đơn hàng mới', old: 'Con vật sắp già, ra đi',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -248,6 +286,8 @@ export const EVENT_LEVEL = {
   thief:     { level: 'important', cat: 'loss', group: () => 'loss:thief', label: 'Trộm hái mất cây', text: (n, e) => n > 1 ? `Thằng Tèo đã hái trộm ${n} cây 😢` : `Thằng Tèo đã hái trộm ${(e.name ?? 'cây').toLowerCase()} 😢` },
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
+  oldSoon:   { level: 'important', cat: 'old', group: e => 'oldSoon:' + e.animal, label: 'Con vật sắp già', text: (n, e) => `${n} con ${animalN(e.animal)} sắp già, chuẩn bị hoặc bán đi nhé 👵` },
+  passed:    { level: 'important', cat: 'old', group: e => 'passed:' + e.animal, label: 'Con vật già ra đi', text: (n, e) => `${n} con ${animalN(e.animal)} đã già và ra đi thanh thản 😇` },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },

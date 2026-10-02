@@ -156,7 +156,7 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
   s.animals = [];
   const troughOk = () => { s.troughs.pig = 20; };
   for (let i = 0; i < 2; i++) {
-    const a = { id: s.nextId++, type: 'heo', adult: true, age: 1e9, hunger: 100, happy: 100, sick: false, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 330, y: 320, name: 'Heo' };
+    const a = { id: s.nextId++, type: 'heo', stage: 'truong', age: G.stageStart('heo', 'truong'), hunger: 100, happy: 100, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 330, y: 320, name: 'Heo' };
     s.animals.push(a);
   }
   let events = [];
@@ -165,7 +165,7 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
   const sow = s.animals.find(a => a.pregnant);
   sow.dueAt = s.time + 1000;
   withRandom(0.5, () => { for (let i = 0; i < 3; i++) { troughOk(); s.animals.forEach(a => { a.hunger = 100; a.happy = 100; }); events.push(...run(s, 1000)); } });
-  const piglets = s.animals.filter(a => !a.adult);
+  const piglets = s.animals.filter(a => a.stage === 'non');
   assert.ok(piglets.length >= 1 && piglets.length <= 3);
   assert.equal(s.stats.piglets, piglets.length);
   assert.ok(events.some(e => e.type === 'spawn' && e.what === 'piglet'));
@@ -174,7 +174,7 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
 
 test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () => {
   const s = newGame();
-  const hen = s.animals.find(a => a.type === 'ga' && a.adult);
+  const hen = s.animals.find(a => a.type === 'ga' && a.stage === 'truong');
   hen.x = 100; hen.y = 320; s.troughs.chicken = 20;
   const ev = noBugs(() => run(s, 3 * MIN));
   assert.ok(s.eggs.length >= 1);
@@ -205,7 +205,7 @@ test('trứng bỏ quên tự nở', () => {
   withRandom(LUCKY, () => run(s, HUSBANDRY.eggForgetMs + 2000));
   assert.equal(s.eggs.length, 0);
   assert.equal(s.animals.length, 1);
-  assert.equal(s.animals[0].adult, false);
+  assert.equal(s.animals[0].stage, 'non');
 });
 
 test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
@@ -213,7 +213,7 @@ test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
   s.level = 1;
   s.exp = 1e6;
   s.animals = [];
-  s.animals.push({ id: 50, type: 'bo', adult: true, age: 1e9, hunger: 100, happy: 60, sick: false, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 440, y: 320, name: 'Bò' });
+  s.animals.push({ id: 50, type: 'bo', stage: 'truong', age: G.stageStart('bo', 'truong'), hunger: 100, happy: 60, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 440, y: 320, name: 'Bò' });
   s.troughs.pasture = 20;
   noBugs(() => run(s, 1000));
   assert.equal(s.animals[0].ready, true);
@@ -236,11 +236,11 @@ test('vật nuôi: tự ăn ở máng, đói -> bệnh -> thuốc thú y', () =>
   assert.equal(s.troughs.chicken, 0);
   // đói lả
   noBugs(() => run(s, 10 * MIN));
-  assert.equal(hen.sick, true);
+  assert.equal(hen.sick, 1);   // mức Mệt
   s.inv.medicine = 1;
   assert.equal(G.actionsFor(s, { kind: 'animal', id: hen.id })[0].id, 'medicine');
   G.perform(s, { kind: 'animal', id: hen.id }, 'medicine');
-  assert.equal(hen.sick, false);
+  assert.equal(hen.sick, 0);
 });
 
 test('chó ỉa bậy -> xúc phân -> phân bón; giẫm phân trượt chân', () => {
@@ -262,11 +262,11 @@ test('chó ỉa bậy -> xúc phân -> phân bón; giẫm phân trượt chân',
   assert.equal(s.stats.slips, 1);
 });
 
-test('chó con lớn thành chó trưởng thành', () => {
+test('chó con lớn thành chó trưởng thành theo giờ vườn', () => {
   const s = newGame();
   s.dog.hunger = 100;
-  for (let i = 0; i < 9; i++) { s.dog.hunger = 100; noBugs(() => run(s, MIN)); }
-  assert.equal(s.dog.adult, true);
+  for (let i = 0; i < 91; i++) { s.dog.hunger = 100; noBugs(() => run(s, MIN)); }
+  assert.equal(s.dog.stage, 'truong');
 });
 
 test('quạ đậu ô chín rồi ăn cây; bù nhìn chặn; đuổi quạ', () => {
@@ -288,7 +288,7 @@ test('quạ đậu ô chín rồi ăn cây; bù nhìn chặn; đuổi quạ', ()
   // để nó ăn
   withRandom(LUCKY, () => run(s, 1000));
   assert.equal(s.threats.length, 1);
-  s.dog.adult = false;
+  s.dog.stage = 'non';
   s.dog.hunger = 100;
   noBugs(() => run(s, THREATS.crowEatMs + 90_000));
   assert.equal(s.plots[0].crop, null);

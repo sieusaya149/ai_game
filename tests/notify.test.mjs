@@ -35,7 +35,7 @@ test('mọi loại event luật chơi phát ra đều có mức và khóa gộp'
 
 test('event thật khi chạy game đều có mức', () => {
   const s = newGame();
-  s.dog.adult = false; s.speed = 1;
+  s.dog.stage = 'non'; s.speed = 1;
   for (const p of s.plots.slice(0, 3)) { p.soil = 'tilled'; p.water = 100; p.crop = { id: 'cai', progress: 0.99, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 }; }
   const seen = new Set(), r = Math.random;
   try {

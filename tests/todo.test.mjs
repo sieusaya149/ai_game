@@ -42,7 +42,7 @@ test('ô đã chín không tính là khô; ô chưa trồng gì không tính là
 
 test('con vật bệnh là gấp, con vật đói là thường; mỗi loại ghi số lượng', () => {
   const s = newGame();
-  const mk = (o) => ({ id: s.nextId++, type: 'ga', adult: true, hunger: 100, happy: 60, sick: false, x: 100, y: 100, ...o });
+  const mk = (o) => ({ id: s.nextId++, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: false, x: 100, y: 100, ...o });
   s.animals.push(mk({ sick: true }), mk({ sick: true, hunger: 0 }), mk({ hunger: 10 }), mk({ hunger: 80 }));
   const sick = get(s, 'sick'), hungry = get(s, 'hungry');
   assert.equal(sick.level, 'urgent'); assert.equal(sick.count, 2);
@@ -56,7 +56,7 @@ test('trứng dưới đất, phân chó, máng hết cám', () => {
   assert.equal(get(s, 'egg').count, 2);
   assert.equal(get(s, 'poop').count, 1);
   assert.equal(get(s, 'trough'), undefined, 'chuồng chưa có con nào thì máng trống không tính');
-  s.animals.push({ id: s.nextId++, type: 'ga', adult: true, hunger: 100, happy: 60, sick: false, x: 1, y: 1 });
+  s.animals.push({ id: s.nextId++, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: false, x: 1, y: 1 });
   const tr = get(s, 'trough');
   assert.equal(tr.count, 1); assert.equal(tr.level, 'normal');
   s.troughs.chicken = 5;
@@ -77,7 +77,7 @@ test('xếp theo mức gấp rồi số lượng', () => {
   const s = newGame();
   for (const i of [0, 1, 2, 3]) crop(s, i, { progress: 1 });                    // 4 ô chín
   crop(s, 4); s.plots[4].water = 0;                                              // 1 ô khô
-  s.animals.push({ id: s.nextId++, type: 'ga', adult: true, hunger: 100, happy: 60, sick: true, x: 1, y: 1 });
+  s.animals.push({ id: s.nextId++, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: true, x: 1, y: 1 });
   assert.deepEqual(kinds(s), ['sick', 'ripe', 'dry', 'trough']);   // máng gà trống cũng là 1 việc thường
 });
 
@@ -111,7 +111,7 @@ test('mũi tên chỉ hướng lấy chỗ từ danh sách việc gấp', () => 
   const s = newGame();
   crop(s, 0, { progress: 1 });
   s.threats = [{ id: 7, kind: 'crow', plot: 0, x: 0, y: 0, state: 'eating' }];
-  s.animals.push({ id: 5, type: 'ga', adult: true, hunger: 100, happy: 60, sick: true, x: 40, y: 50 });
+  s.animals.push({ id: 5, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: true, x: 40, y: 50 });
   const urgent = todoList(s).filter(i => i.level === 'urgent');
   const t = arrowTargets(s, urgent), c = G.mapOf(s).plotCenter(0);
   assert.equal(t.length, 2);
