@@ -203,6 +203,43 @@ export function confirmBox(text, yes = 'Đồng ý', no = 'Thôi', danger = fals
   });
 }
 
+// ---------- Bắt được trộm: chọn kiểu phạt (issue 46) ----------
+// info = S.punishInfo(state). Đóng hộp mà không chọn thì mặc định bắt đền xu, khỏi mất công.
+export function askPunish(info) {
+  if (!info) return Promise.resolve(null);
+  return new Promise(resolve => {
+    const root = $('dialog-root');
+    const done = id => {
+      root.hidden = true; root.replaceChildren(); dialogResolve = null;
+      const r = S.punishThief(st(), id || 'pay');
+      if (r.msg) toast(r.msg);
+      sound.play(r.ok ? (id === 'chore' ? 'pop' : 'coin') : 'error');
+      resolve(r);
+    };
+    dialogResolve = () => done('pay');
+    // ảnh kẻ bị bắt: Tí Sún có dáng "bị bắt" riêng, thằng Tèo dùng nhân vật dựng sẵn
+    const face = info.kind === 'tisun' ? R.tisunImg('caught') : art.character(R.TEO_LOOK)?.[0]?.[0];
+    const pic = face && h('canvas', { class: 'thumb', width: face.width, height: face.height });
+    if (pic) pic.getContext('2d').drawImage(face, 0, 0);
+    const line = o => btn([spriteIcon(SPR3?.punishIcon?.[o.id]) ?? o.icon, ' ', o.label],
+      () => { if (!o.disabled) done(o.id); }, o.id === 'pay' ? 'green' : 'plain',
+      o.disabled ? { disabled: true, title: o.disabled } : {});
+    root.replaceChildren(h('div', { class: 'dialog punish' },
+      pic,
+      h('div', { class: 'dialog-text' }, `Bắt được ${info.name} trong vườn! Phạt thế nào đây?`),
+      h('div', { class: 'punish-opts' }, ...info.options.map(line)),
+      h('div', { class: 'dialog-err' }, info.options.find(o => o.disabled)?.disabled ?? '')));
+    root.hidden = false;
+  });
+}
+// Sprite 16x16 thành <canvas> nhỏ cho nút bấm; chưa có art thì trả null để dùng emoji
+function spriteIcon(im) {
+  if (!im) return null;
+  const c = h('canvas', { class: 'ico', width: im.width, height: im.height });
+  c.getContext('2d').drawImage(im, 0, 0);
+  return c;
+}
+
 // ---------- Đặt tên con vật ----------
 // Trả về true nếu đã đổi tên. Tên rỗng hoặc dài quá thì báo lỗi ngay trong hộp, không đóng.
 export function askRename(id) {

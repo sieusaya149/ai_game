@@ -307,9 +307,9 @@ test('quạ đậu ô chín rồi ăn cây; bù nhìn chặn; đuổi quạ', ()
   assert.equal(s2.threats.length, 0);
 });
 
-test('thằng Tèo ban đêm, bắt được thì đền xu', () => {
+test('thằng Tèo ban đêm khi có từ 3 ô chín, bắt được thì chọn phạt và đền xu', () => {
   const s = newGame(); s.animals = [];
-  for (const i of [0, 1]) { G.perform(s, T(i), 'till'); G.perform(s, T(i), 'plant'); s.plots[i].crop.progress = 1; }
+  for (const i of [0, 1, 2]) { G.perform(s, T(i), 'till'); G.perform(s, T(i), 'plant'); s.plots[i].crop.progress = 1; }
   s.weather = 'rain';
   s.time = DAY_MS * 0.8; s.day = 1;
   assert.equal(G.isNight(s), true);
@@ -320,6 +320,8 @@ test('thằng Tèo ban đêm, bắt được thì đền xu', () => {
   const c = s.coins;
   const r = withRandom(0.5, () => G.perform(s, { kind: 'threat', id: th.id }, 'catch'));
   assert.ok(r.ok);
+  assert.ok(r.punish, 'hiện hộp thoại chọn kiểu phạt');
+  assert.ok(withRandom(0.5, () => G.punishThief(s, 'pay')).ok);
   assert.ok(s.coins >= c + 20 && s.coins <= c + 60);
   assert.equal(s.stats.thieves, 1);
 });

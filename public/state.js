@@ -1,7 +1,7 @@
 // Mô hình dữ liệu + luật chơi. Thuần JS, không DOM (localStorage có bọc try/catch).
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
-  ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
+  ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, THREATS, RAID, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
@@ -29,7 +29,7 @@ export const UNLOCK_ORDER = Array.from({ length: GRID * GRID }, (_, i) => i).sor
 
 // ---------- Tiện ích ----------
 let evq = [];            // hàng đợi event; tick() trả ra và xóa
-let catchUp = false;     // đang chạy bù offline: không sinh quạ/trộm
+let catchUp = false;     // đang chạy bù offline: không sinh quạ, trộm NPC chỉ lấy trứng hay rau (ADR 0004)
 const emit = e => evq.push(e);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -203,6 +203,8 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
       tricks: {}, trainDay: 0, session: null, cmd: null, herdDay: 0, scene: 'farm',   // dạy lệnh và lệnh đang thi hành (issue 45)
     },
     poops: [], threats: [], preds: [], orders: [], nextOrderAt: 0,
+    // Trộm NPC (issue 46): kế hoạch trộm đêm nay · trộm vừa bắt được, đang chờ chọn phạt · buổi làm thợ không công
+    raid: null, caught: null, chore: null, teoCaught: 0, choreWeek: -1,
     stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, rats: 0, preds: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
     notify: {},   // loại thông báo 🟡 đã tắt: { ripe: false }; thiếu = bật. Mức 🔴 không tắt được
@@ -274,6 +276,12 @@ export function loadGame() {
   s.simMs = Number.isFinite(s.simMs) ? s.simMs : s.time || 0;
   s.frozenTotal = Number.isFinite(s.frozenTotal) ? s.frozenTotal : 0;
   s.notify = Object.fromEntries(Object.entries(s.notify ?? {}).filter(([k, v]) => k in NOTIFY_CATS && v === false));
+  // trộm NPC (issue 46): bản lưu cũ chưa có thì bắt đầu từ con số không
+  s.teoCaught = Math.max(0, Math.floor(s.teoCaught) || 0);
+  s.choreWeek = Number.isFinite(s.choreWeek) ? s.choreWeek : -1;
+  s.raid ??= null; s.caught ??= null; s.chore ??= null;
+  // thoát game lúc hộp thoại phạt còn mở: coi như đã chọn bắt đền, khỏi treo lơ lửng
+  if (s.caught) { const c = s.caught; s.caught = null; addCoins(s, c.coins); log(s, `${c.name} xin lỗi và đền ${c.coins} xu`); }
   s.frozenMs = 0; delete s.away;
   evq = [];
   const t = now(), gone = Math.max(0, t - (s.savedAt || t)), elapsed = Math.min(gone, MAX_CATCHUP_MS);
@@ -324,6 +332,8 @@ export function awaySummary(events, frozenMs = 0) {
   if (n('thief')) out.push(`Thằng Tèo đã hái trộm ${n('thief')} cây`);
   if (n('ratFeed')) out.push(`Chuột đã ăn mất ${n('ratFeed')} phần cám`);
   if (n('ratEgg')) out.push(`Chuột đã trộm mất ${n('ratEgg')} quả trứng`);
+  const stolenEggs = events.reduce((a, e) => a + (e.type === 'tisun' ? e.n : 0), 0);
+  if (stolenEggs) out.push(`Tí Sún đã lấy trộm ${stolenEggs} quả trứng`);
   const guard = n('guard');
   if (guard) out.push(`Chó đã đuổi quạ và trộm ${guard} lần`);
   const coins = events.reduce((a, e) => a + (e.type === 'shipped' ? e.coins : 0), 0);
@@ -419,9 +429,11 @@ export function setNotify(s, cat, on) {
 // { key, kind, x, y, text }: x, y theo bản đồ vườn.
 export function urgentSpots(s) {
   const out = [];
-  for (const t of s.threats ?? []) if (t.state === 'eating' && s.plots[t.plot]) {
-    const c = plotCenter(s, t.plot), crow = t.kind === 'crow';
-    out.push({ key: 'threat:' + t.id, kind: t.kind, x: c.x, y: c.y, text: crow ? 'Quạ đang ăn cây!' : 'Có trộm đang hái cây!' });
+  for (const t of s.threats ?? []) {
+    if (t.state !== 'eating' || (t.plot >= 0 && !s.plots[t.plot])) continue;
+    const c = raidAt(s, t);
+    const text = { crow: 'Quạ đang ăn cây!', thief: 'Có trộm đang hái cây!', tisun: 'Tí Sún đang lấy trứng!', civet: 'Chồn hương đang rình gà!' }[t.kind];
+    out.push({ key: 'threat:' + t.id, kind: t.kind, x: c.x, y: c.y, text });
   }
   for (const a of s.animals ?? []) if (a.sick >= 2) out.push({ key: 'sick:' + a.id, kind: 'sick', x: a.x, y: a.y, text: `${ANIMALS[a.type].name} ${a.sick >= 3 ? 'nguy kịch' : 'bệnh nặng'}!` });
   // kẻ săn mồi sắp ra tay: luật báo trước PREDATOR.warnMs (10 giây), đuổi kịp thì không ai bị hại
@@ -448,6 +460,7 @@ function step(s, d) {
     s.weather = r < 0.45 ? 'sun' : r < 0.75 ? 'cloud' : 'rain';
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.morningRegen);   // mỗi sáng 6h tự hồi một ít
     settleShip(s);
+    if (s.chore?.day === s.day) doChore(s);   // trộm bị phạt sang làm thợ không công (issue 46)
     if (!catchUp) cockCrow(s);
     toast({ sun: 'Trời nắng đẹp ☀️', cloud: 'Trời nhiều mây ⛅', rain: 'Trời mưa rồi, ruộng tự có nước 🌧️' }[s.weather]);
   }
@@ -463,7 +476,7 @@ function step(s, d) {
   stepEggs(s);
   stepDog(s, d);
   stepPreds(s, d);
-  if (!catchUp) stepThreats(s, d);
+  if (catchUp) stepRaidAway(s); else stepThreats(s, d);
   stepOrders(s);
   checkAch(s);
 }
@@ -1130,8 +1143,9 @@ export const dogPost = s => (s.dog.cmd?.id === 'guard' && s.dog.cmd.spot ? s.dog
 // Bán kính phát hiện trộm (ô): nhỡ 4, trưởng thành 6, già 4; ×2 tại chỗ đang gác
 export const guardRadius = (s, dog = s.dog) => (DOG.guardRadius[dog.stage] ?? 0) * (dogPost(s) ? DOG.guardPostMul : 1);
 // Chó có phát hiện kẻ lạ ở điểm (x, y) không? Đang gác thì tính từ chỗ gác.
-export function dogSees(s, x, y) {
-  const r = guardRadius(s);
+// mul < 1: kẻ lạ đi lặng lẽ (thằng Tèo có giày êm, issue 46) nên bán kính thu lại.
+export function dogSees(s, x, y, mul = 1) {
+  const r = guardRadius(s) * mul;
   if (!r) return false;
   const post = dogPost(s), at = post ? { x: post.c * TS + 8, y: post.r * TS + 8 } : s.dog;
   if (at.x == null) return false;
@@ -1212,12 +1226,169 @@ export function commandDog(s, id, spot) {
   return R(true, id === 'sit' ? `${g.name} ngồi im thin thít 🪑` : `${g.name} lon ton đi theo bạn 🚶`);
 }
 
+// ---------- Trộm NPC: thằng Tèo, Tí Sún, chồn hương (issue 46) ----------
+// Luật thuần ở mức ô (ADR 0013): mỗi đêm chốt đúng một vụ, world.js chỉ diễn hoạt kẻ trộm đi tới chỗ đã chọn.
+const THIEF_NAME = { crow: 'Quạ', thief: 'Thằng Tèo', tisun: 'Tí Sún', civet: 'Chồn hương' };
+// tên dùng giữa câu ("đuổi thằng Tèo đi rồi")
+const THIEF_LC = { crow: 'quạ', thief: 'thằng Tèo', tisun: 'Tí Sún', civet: 'chồn hương' };
+// Chỗ kẻ trộm nhắm tới
+const raidAt = (s, t) => t.at ?? plotCenter(s, t.plot);
+// Tuần làng: 7 ngày game một tuần, như mùa
+export const villageWeek = s => Math.floor(Math.max(0, (s.day || 1) - 1) / 7);
+// Số vụ bạn bè online sang trộm đêm nay. Phần online của Phase 1 ghi vào s.guestRaid = { day, n };
+// chưa có thì mặc định 0, nhưng đêm nào đã có khách trộm thì trộm NPC không tới nữa.
+export const guestRaids = s => (s.guestRaid?.day === s.day ? s.guestRaid.n || 0 : 0);
+
+// Đêm nay trộm nào có đồ đáng trộm để tới? ['thief' | 'tisun' | 'civet']
+export function raidPool(s) {
+  if (guestRaids(s) > 0) return [];
+  const out = [];
+  if (s.plots.filter(p => p.unlocked && isRipe(p)).length >= RAID.ripeNeed) out.push('thief');
+  if (level(s) >= RAID.minLevel) {   // bảo hộ người mới: cấp thấp chưa gặp hai trộm mới
+    if ((s.eggs?.length ?? 0) >= RAID.eggNeed) out.push('tisun');
+    if (strays(s).length) out.push('civet');
+  }
+  return out;
+}
+// Số món đáng trộm trong vườn: ô chín + trứng dưới đất + con ngủ ngoài
+const raidLoot = s => s.plots.filter(p => p.unlocked && isRipe(p)).length + (s.eggs?.length ?? 0) + strays(s).length;
+// Xác suất đêm nay có một vụ trộm NPC: vườn thường 1 vụ mỗi 2 đêm, vườn giàu thường hơn (chặn trên 1 vụ mỗi đêm);
+// đèn lồng, hàng rào thấp và chó canh nhà đều làm trộm ngại.
+export function raidChance(s) {
+  if (!raidPool(s).length) return 0;
+  const m = mapOf(s);
+  const lamps = Math.min(RAID.lampMax, m.decos.filter(o => o.kind === 'deco_lamp').length);
+  const fence = m.decos.some(o => o.kind === 'deco_lowfence');
+  const rich = 1 + (RAID.richMul - 1) * Math.min(1, Math.max(0, raidLoot(s) - RAID.lootBase) / RAID.lootRich);
+  return clamp(RAID.nightly * rich * Math.pow(RAID.lampMul, lamps) * (fence ? RAID.fenceMul : 1) * (guardOn(s) ? RAID.dogMul : 1), 0, RAID.max);
+}
+// Vụ trộm NPC đã chốt cho đêm nay: { kind, at, done } hay null
+export const raidTonight = s => (s.raid?.day === s.day && s.raid.kind ? { kind: s.raid.kind, at: s.raid.at, done: !!s.raid.done } : null);
+
+// Khoảng ban đêm của ngày đang chạy (nửa đêm → 6h sáng)
+function nightSpan(s) {
+  const d0 = Math.floor(s.time / DAY_MS) * DAY_MS;
+  return { from: d0 + DAY_MS * NIGHT_FROM, to: d0 + DAY_MS };
+}
+// Chốt kế hoạch trộm của đêm nay (chỉ một lần mỗi đêm nên không bao giờ quá 1 vụ mỗi đêm)
+function planRaid(s) {
+  if (s.raid?.day === s.day) return;
+  const pool = raidPool(s).filter(k => !(catchUp && k === 'civet'));   // chạy bù: chồn hương không tới (ADR 0004)
+  const kind = pool.length && Math.random() < raidChance(s) ? pick(pool) : null;
+  const w = nightSpan(s);
+  s.raid = { day: s.day, kind, at: kind ? Math.max(s.time, w.from + Math.random() * RAID.arriveSpan * (w.to - w.from)) : 0, done: !kind };
+}
+// Tới giờ thì kẻ trộm lẻn vào từ cổng
+function spawnRaid(s) {
+  const r = s.raid;
+  if (!r?.kind || r.done || s.time < r.at) return;
+  r.done = true;
+  const t = makeRaider(s, r.kind);
+  if (!t) return;   // đồ đáng trộm vừa biến mất
+  s.threats.push(t);
+  spawnEv(r.kind, t.x, t.y);
+}
+function makeRaider(s, kind) {
+  const m = mapOf(s), gateIn = m.gateIn ?? m.spawn;
+  let at = null, target = null, plot = -1;
+  if (kind === 'thief') {
+    const p = pick(s.plots.filter(x => x.unlocked && isRipe(x)));
+    if (!p) return null;
+    plot = p.idx; at = plotCenter(s, p.idx);
+  } else if (kind === 'tisun') {
+    const e = pick(s.eggs);
+    if (!e) return null;
+    at = { x: e.x, y: e.y };
+  } else {
+    const a = pick(strays(s));
+    if (!a) return null;
+    target = a.id; at = { x: a.tile.c * TS + 8, y: a.tile.r * TS + 8 };
+  }
+  const ms = Math.hypot(at.x - gateIn.x, at.y - gateIn.y) / 40 * (kind === 'civet' ? 900 : 1400);
+  return { id: s.nextId++, kind, plot, target, at, x: gateIn.x, y: gateIn.y, arriveAt: s.time + ms, state: 'coming', since: s.time, loot: false };
+}
+
+// Thằng Tèo bị bắt càng nhiều càng sắm đồ (đèn pin, giày êm) và đi lặng lẽ hơn: chó phát hiện ở bán kính nhỏ hơn
+export const thiefStealth = s => Math.max(RAID.stealthMin, Math.pow(RAID.stealthPerCatch, s.teoCaught || 0));
+export const thiefGear = s => ({ torch: (s.teoCaught || 0) >= RAID.torchAt, shoes: (s.teoCaught || 0) >= RAID.shoesAt });
+
+// Bắt được trộm rồi: hai kiểu phạt. [] nếu chưa bắt được ai.
+export function punishOptions(s) {
+  const c = s.caught;
+  if (!c) return [];
+  const used = s.choreWeek === villageWeek(s);
+  return [
+    { id: 'pay', icon: '🪙', label: `Bắt đền ${c.coins} xu`, disabled: null },
+    { id: 'chore', icon: '🛠️', label: 'Phạt làm thợ không công ngày mai', disabled: used ? 'Tuần này làng phạt một lần rồi' : null },
+  ];
+}
+export const punishInfo = s => (s.caught ? { kind: s.caught.kind, name: s.caught.name, coins: s.caught.coins, options: punishOptions(s) } : null);
+// Chọn kiểu phạt cho kẻ vừa bắt được
+export function punishThief(s, choice = 'pay') {
+  const c = s.caught;
+  if (!c) return R(false, 'Chưa bắt được ai cả', { reason: 'none' });
+  const opt = punishOptions(s).find(o => o.id === choice);
+  if (!opt) return R(false, 'Không có kiểu phạt này', { reason: 'unknown' });
+  if (opt.disabled) return R(false, opt.disabled, { reason: 'weekly' });
+  s.caught = null;
+  if (choice === 'chore') {
+    s.choreWeek = villageWeek(s);
+    s.chore = { day: s.day + 1, name: c.name };
+    log(s, `${c.name} phải làm thợ không công cho vườn ngày mai`);
+    return R(true, `${c.name} cúi gằm mặt, mai sang làm thợ không công 🛠️`, { chore: s.chore.day });
+  }
+  addCoins(s, c.coins);
+  log(s, `${c.name} xin lỗi và đền ${c.coins} xu`);
+  return R(true, `${c.name} xin lỗi và đền ${c.coins} xu`, { coins: c.coins });
+}
+// Sáng hôm sau: kẻ bị phạt sang tưới cây, nhổ cỏ và dọn phân không công
+function doChore(s) {
+  const who = s.chore?.name ?? 'Thằng Tèo';
+  s.chore = null;
+  let n = 0;
+  for (const p of s.plots) {
+    if (!p.unlocked) continue;
+    if (p.crop && p.water < 100) { p.water = 100; n++; }
+    if (p.weeds) { p.weeds = false; n++; }
+  }
+  n += s.poops.length; s.poops = [];
+  log(s, `${who} làm thợ không công: tưới cây, nhổ cỏ và dọn phân giúp ${n} chỗ`);
+  toast(`${who} sang làm thợ không công, vườn sạch tinh tươm 🛠️`);
+}
+
+// Chạy bù offline (ADR 0004): vẫn có trộm NPC, nhưng chỉ mất trứng hay rau — không con nào bị bắt đi.
+function stepRaidAway(s) {
+  if (!isNight(s)) return;
+  planRaid(s);
+  const r = s.raid;
+  if (!r.kind || r.done || s.time < r.at) return;
+  r.done = true;
+  if (guardOn(s) && Math.random() < DOG.guardChance) {
+    s.stats.thieves++; emit({ type: 'guard', who: r.kind });
+    log(s, `${s.dog.name} sủa vang, đuổi ${THIEF_LC[r.kind]} đi rồi`);
+    return;
+  }
+  if (r.kind === 'thief') {
+    const p = pick(s.plots.filter(x => x.unlocked && isRipe(x)));
+    if (!p) return;
+    const nm = CROPS[p.crop.id].name;
+    p.crop = null;
+    emit({ type: 'thief', name: nm });
+    log(s, `Thằng Tèo hái trộm mất ${nm}`);
+  } else if (r.kind === 'tisun') {
+    const n = Math.min(s.eggs.length, rint(...RAID.eggTake));
+    if (!n) return;
+    for (let i = 0; i < n; i++) s.eggs.splice(rint(0, s.eggs.length - 1), 1);
+    emit({ type: 'tisun', n });
+    log(s, `Tí Sún lấy trộm mất ${n} quả trứng`);
+  }
+}
+
 function stepThreats(s, d) {
   const busy = new Set(s.threats.map(t => t.plot));
   const ripe = s.plots.filter(p => p.unlocked && isRipe(p) && !busy.has(p.idx));
-  const m = mapOf(s), v = m.view, gateIn = m.gateIn ?? m.spawn;
+  const m = mapOf(s), v = m.view;
   const scare = m.decos.filter(o => o.kind === 'deco_scarecrow');
-  const lamps = Math.min(3, m.decos.filter(o => o.kind === 'deco_lamp').length);
   // quạ
   const open = ripe.filter(p => { const c = plotCenter(s, p.idx); return !scare.some(o => Math.hypot(o.x - c.x, o.y - c.y) <= 5 * TS); });
   if (open.length && s.threats.filter(t => t.kind === 'crow').length < 2 && chance(THREATS.crowChancePerMin, d)) {
@@ -1226,37 +1397,12 @@ function stepThreats(s, d) {
     s.threats.push({ id: s.nextId++, kind: 'crow', plot: p.idx, x, y, arriveAt: s.time + Math.hypot(c.x - x, c.y - y) / 60 * 1000, state: 'coming', since: s.time });
     spawnEv('crow', x, y); snd('crow');
   }
-  // thằng Tèo
-  if (isNight(s) && ripe.length >= 2 && !s.threats.some(t => t.kind === 'thief') && chance(THREATS.thiefChancePerNightMin * Math.pow(0.6, lamps), d)) {
-    const p = pick(ripe), c = plotCenter(s, p.idx);
-    s.threats.push({ id: s.nextId++, kind: 'thief', plot: p.idx, x: gateIn.x, y: gateIn.y, arriveAt: s.time + Math.hypot(c.x - gateIn.x, c.y - gateIn.y) / 40 * 1400, state: 'coming', since: s.time, loot: false });
-    spawnEv('thief', gateIn.x, gateIn.y);
-  }
+  // trộm NPC: mỗi đêm luật chốt đúng một vụ (issue 46)
+  if (isNight(s)) { planRaid(s); spawnRaid(s); }
   for (const t of s.threats) {
-    const p = s.plots[t.plot], crow = t.kind === 'crow', who = crow ? 'Quạ' : 'Thằng Tèo';
-    if (t.state === 'coming') {
-      if (!p.crop) { t.state = 'leaving'; t.since = s.time; } // cây đã biến mất
-      else if (s.time >= t.arriveAt) {
-        t.state = 'eating'; t.since = s.time; emit({ type: 'eating', kind: t.kind });
-        // chó phải nhìn thấy mới đuổi được (bán kính theo giai đoạn, ×2 tại chỗ gác); học Đuổi chim thì tự tìm quạ ở bất cứ đâu
-        const at = plotCenter(s, t.plot);
-        if (guardOn(s) && (dogSees(s, at.x, at.y) || (crow && knowsTrick(s, 'bird'))) && Math.random() < DOG.guardChance) {
-          t.state = 'leaving'; t.since = s.time; s.stats[crow ? 'crows' : 'thieves']++; emit({ type: 'guard', who: crow ? 'crow' : 'thief' });
-          log(s, `${s.dog.name} sủa vang, đuổi ${who.toLowerCase()} đi rồi`); snd('bark');
-        }
-      }
-    } else if (t.state === 'eating') {
-      if (!p.crop) { t.state = 'leaving'; t.since = s.time; }
-      else if (s.time - t.since >= (crow ? THREATS.crowEatMs : THREATS.thiefStealMs)) {
-        const nm = CROPS[p.crop.id].name;
-        p.crop = null; t.state = 'leaving'; t.since = s.time; t.loot = !crow;
-        emit({ type: crow ? 'crow' : 'thief', name: nm });
-        const c = plotCenter(s, p.idx);
-        fxEv(c.x, c.y, crow ? 'Quạ ăn mất cây! 😢' : 'Bị hái trộm! 😢', COL.bad);
-        const lost = crow ? `Quạ đã ăn mất ${nm}` : `Thằng Tèo hái trộm mất ${nm}`;
-        log(s, lost);
-      }
-    }
+    if (t.kind === 'tisun') stepEggThief(s, t);
+    else if (t.kind === 'civet') stepCivet(s, t);
+    else stepCropThreat(s, t);
   }
   s.threats = s.threats.filter(t => t.state !== 'leaving' || s.time - t.since < (t.kind === 'crow' ? 4000 : 20000));
 }
@@ -1441,6 +1587,83 @@ function stepHurt(s, a, d, def) {
   log(s, `${a.name || def.name} không qua khỏi vết chuột cắn 😇`);
   leaveGrave(s, a);
   return false;
+}
+
+// Quạ và thằng Tèo: nhắm một ô ruộng chín
+function stepCropThreat(s, t) {
+  const p = s.plots[t.plot], crow = t.kind === 'crow', who = THIEF_NAME[t.kind];
+  if (t.state === 'coming') {
+    if (!p.crop) { t.state = 'leaving'; t.since = s.time; } // cây đã biến mất
+    else if (s.time >= t.arriveAt) {
+      arrive(s, t);
+    }
+  } else if (t.state === 'eating') {
+    if (!p.crop) { t.state = 'leaving'; t.since = s.time; }
+    else if (s.time - t.since >= (crow ? THREATS.crowEatMs : THREATS.thiefStealMs)) {
+      const nm = CROPS[p.crop.id].name;
+      p.crop = null; t.state = 'leaving'; t.since = s.time; t.loot = !crow;
+      emit({ type: crow ? 'crow' : 'thief', name: nm });
+      const c = plotCenter(s, p.idx);
+      fxEv(c.x, c.y, crow ? 'Quạ ăn mất cây! 😢' : 'Bị hái trộm! 😢', COL.bad);
+      log(s, crow ? `Quạ đã ăn mất ${nm}` : `${who} hái trộm mất ${nm}`);
+    }
+  }
+}
+
+// Tí Sún: lục chỗ trứng dưới đất rồi ôm vài quả chạy
+function stepEggThief(s, t) {
+  if (!s.eggs.length) { leave(s, t); return; }
+  if (t.state === 'coming') {
+    if (s.time < t.arriveAt) return;
+    arrive(s, t);
+  } else if (t.state === 'eating' && s.time - t.since >= RAID.eggStealMs) {
+    const n = Math.min(s.eggs.length, rint(...RAID.eggTake));
+    for (let i = 0; i < n; i++) s.eggs.splice(rint(0, s.eggs.length - 1), 1);
+    t.state = 'leaving'; t.since = s.time; t.loot = true;
+    emit({ type: 'tisun', n });
+    fxEv(t.at.x, t.at.y, `Mất ${n} quả trứng! 😢`, COL.bad);
+    log(s, `Tí Sún lấy trộm mất ${n} quả trứng`);
+  }
+}
+
+// Chồn hương: rình con ngủ ngoài chuồng rồi tha đi (chỉ khi chủ vườn đang chơi, ADR 0004)
+function stepCivet(s, t) {
+  const a = s.animals.find(x => x.id === t.target);
+  if (!a || !a.stray) { leave(s, t); return; }
+  if (t.state === 'coming') {
+    if (s.time < t.arriveAt) return;
+    arrive(s, t);
+  } else if (t.state === 'eating' && s.time - t.since >= RAID.civetCatchMs) {
+    const nm = ANIMALS[a.type].name;
+    s.animals.splice(s.animals.indexOf(a), 1);
+    t.state = 'leaving'; t.since = s.time; t.loot = true;
+    emit({ type: 'civet', animal: nm });
+    fxEv(t.at.x, t.at.y, `Chồn hương tha mất ${nm.toLowerCase()}! 😿`, COL.bad);
+    log(s, `Chồn hương tha mất một con ${nm.toLowerCase()} ngủ ngoài chuồng`);
+  }
+}
+const leave = (s, t) => { if (t.state !== 'leaving') { t.state = 'leaving'; t.since = s.time; } };
+// Tới nơi và bắt đầu ra tay. Kẻ trộm đứng đúng chỗ nó nhắm: world.js thường đã đưa tới nơi rồi,
+// nhưng khi vườn chạy nhanh (tua giờ) thì luật chốt lại cho khớp (ADR 0013).
+function arrive(s, t) {
+  t.state = 'eating'; t.since = s.time;
+  if (t.kind !== 'crow') { const a = raidAt(s, t); t.x = a.x; t.y = a.y; }
+  emit({ type: 'eating', kind: t.kind });
+  caughtByDog(s, t);
+}
+
+// Chó phát hiện kẻ vừa tới nơi và đuổi đi? (bán kính theo giai đoạn, ×2 tại chỗ gác;
+// học Đuổi chim thì tự tìm quạ ở bất cứ đâu; thằng Tèo có giày êm thì bán kính thu lại)
+function caughtByDog(s, t) {
+  const crow = t.kind === 'crow', at = raidAt(s, t);
+  if (!guardOn(s)) return false;
+  const seen = dogSees(s, at.x, at.y, t.kind === 'thief' ? thiefStealth(s) : 1) || (crow && knowsTrick(s, 'bird'));
+  if (!seen || Math.random() >= DOG.guardChance) return false;
+  leave(s, t);
+  s.stats[crow ? 'crows' : 'thieves']++;
+  emit({ type: 'guard', who: t.kind });
+  log(s, `${s.dog.name} sủa vang, đuổi ${THIEF_LC[t.kind]} đi rồi`); snd('bark');
+  return true;
 }
 
 function stepOrders(s) {
@@ -1661,8 +1884,10 @@ function dogActs(s) {
 function threatActs(s, t) {
   const th = s.threats.find(x => x.id === t.id);
   if (!th) return [];
+  const gone = th.state === 'leaving' && !th.loot ? 'Nó chuồn mất rồi' : null;
   if (th.kind === 'crow') return [mk('shoo', '🪶', 'Đuổi quạ', th.state === 'leaving' ? 'Nó bay mất rồi' : null)];
-  return [mk('catch', '🧢', 'Bắt thằng Tèo', th.state === 'leaving' && !th.loot ? 'Nó chuồn mất rồi' : null)];
+  if (th.kind === 'civet') return [mk('shoo', '🦝', 'Đuổi chồn hương', gone)];
+  return [mk('catch', '🧢', `Bắt ${THIEF_LC[th.kind]}`, gone)];
 }
 
 // Chạm vào chuột, diều hâu, chồn để đuổi: kịp trong 10 giây cảnh báo thì con vật không bị hại
@@ -1979,9 +2204,17 @@ const DO = {
       s.stats.crows++; addExp(s, 1);
       return res(true, 'Quạ hoảng hốt bay đi', [say(at, 'Xù xù! 🪶')], 'crow');
     }
-    const coins = rint(...THREATS.thiefCaughtCoins);
-    s.stats.thieves++; addCoins(s, coins);
-    return res(true, `Bắt được thằng Tèo! Nó xin lỗi và đền ${coins} xu`, [say(at, 'Bắt được! 🧢'), say({ x: at.x, y: at.y - 10 }, `+${coins} xu`, COL.coin)], 'coin');
+    if (th.kind === 'civet') {   // chồn hương là con thú: đuổi đi là xong, không phạt vạ gì
+      s.stats.thieves++; addExp(s, 2);
+      log(s, 'Đuổi được con chồn hương ra khỏi vườn');
+      return res(true, 'Chồn hương cụp đuôi chạy mất', [say(at, 'Xùy! 🦝')], 'bark');
+    }
+    // trộm người: hiện hộp thoại cho chọn kiểu phạt (issue 46)
+    if (th.kind === 'thief') s.teoCaught = (s.teoCaught || 0) + 1;
+    s.stats.thieves++;
+    s.caught = { kind: th.kind, name: THIEF_NAME[th.kind], coins: rint(...THREATS.thiefCaughtCoins) };
+    log(s, `Bắt được ${THIEF_LC[th.kind]} trong vườn`);
+    return res(true, `Bắt được ${THIEF_LC[th.kind]}! Phạt thế nào đây?`, [say(at, 'Bắt được! 🧢')], 'pop', { punish: punishInfo(s) });
   },
 
   pred(s, t, id, at) {
