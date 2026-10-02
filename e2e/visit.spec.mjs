@@ -189,8 +189,11 @@ test('B trong vườn A: nhà, thùng giao hàng, kho bị chặn kèm lý do, k
   await onDog(page.locator('#main-action'), 'Vuốt ve');
   await expect(page.locator('#toasts')).toContainText(`${dogName} chưa quen bạn`);
   expect(await st(page, () => globalThis.__farm.state.visit.fed)).toBe(false);
-  await onDog(page.locator('#chips .chip', { hasText: `Cho ${dogName} ăn` }), 'Cho');
-  await expect.poll(() => st(page, () => globalThis.__farm.state.basket.dogfood)).toBe(1);
+  // bấm trúng lúc chó vừa chạy khỏi tầm thì chưa cho ăn được: bấm lại tới khi giỏ hao đi
+  await expect.poll(async () => {
+    if (!(await st(page, () => globalThis.__farm.state.visit.fed))) await onDog(page.locator('#chips .chip', { hasText: `Cho ${dogName} ăn` }), 'Cho');
+    return st(page, () => globalThis.__farm.state.basket.dogfood);
+  }, { timeout: 30_000 }).toBe(1);
   expect(await st(page, () => globalThis.__farm.state.visit.fed)).toBe(true);
   await expect.poll(async () => {
     await onDog(page.locator('#main-action:not(.disabled)'), 'Vuốt ve');

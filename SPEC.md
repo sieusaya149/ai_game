@@ -1,4 +1,4 @@
-# Nông Trại Vui: đặc tả kỹ thuật (Phase 0 xong; Phase 1 online xong; Phase 2 vật nuôi: bản lưu v3, vòng đời con vật)
+# Nông Trại Vui: đặc tả kỹ thuật (Phase 0, Phase 1 online, Phase 2 vật nuôi đã xong)
 
 Game nông trại 2D nhìn từ trên xuống, kiểu **nông trại Avatar (TeaMobi)**. Người chơi điều khiển nhân vật đi tới tận nơi để làm mọi việc.
 Người chơi hiện vẫn thấy bản chơi đơn, chạy hoàn toàn trong trình duyệt, lưu vào `localStorage`. Từ issue 20 (Phase 1) bản deploy chạy bằng **server Node** trong `server/` (file tĩnh + API HTTP JSON + WebSocket + SQLite, xem mục Server). Mở `public/` bằng server tĩnh bất kỳ vẫn chơi đơn được.
@@ -16,8 +16,9 @@ Người chơi hiện vẫn thấy bản chơi đơn, chạy hoàn toàn trong t
 |---|---|
 | [`DESIGN.md`](DESIGN.md) | Thiết kế tổng thể toàn game, thứ tự phase (mục 9), danh sách chủ đề đã grill |
 | [`docs/prd/0001-phase-0-nen-mong.md`](docs/prd/0001-phase-0-nen-mong.md) | PRD Phase 0: user story, quyết định, cách test |
+| [`docs/prd/0002-phase-1-online.md`](docs/prd/0002-phase-1-online.md) | PRD Phase 1 (làng online): tài khoản, vườn online, làng real-time, bạn bè, giúp/trộm, chó canh khách |
 | [`docs/adr/`](docs/adr/) | 0001 nền móng trước online sau · 0002 dữ liệu vườn trình duyệt+server · 0003 hai lịch, đóng băng 8 giờ · 0004 offline không gây chết · 0005 đặt tự do, luật đặt nằm trong `state.js` · 0006 VPS sau ai_gateway · 0007 `ws` · 0008 test qua hai seam · 0009 kinh tế chống lạm phát · 0010–0015 (Phase 1–3) · 0016 đổi phiên chơi chờ bản lưu cuối |
-| [`docs/issues/`](docs/issues/README.md) | Các issue Phase 0 (01–19) kèm báo cáo từng cái |
+| [`docs/issues/`](docs/issues/README.md) | Các issue Phase 0 (01–19) và Phase 1 (20–33) kèm báo cáo từng cái |
 | [`README.md`](README.md) | Cách chạy, test, deploy ngắn gọn |
 
 ## Các file và việc được sửa
@@ -933,6 +934,8 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
 - Bản nháp trên máy: `localStorage['nongtrai-online-draft']` = `{ name, rev, save }`, ghi mỗi lần `save()`. Lần vào làng sau, nếu nháp cùng tài khoản, `rev` trùng với server (chưa máy nào ghi thêm) và `savedAt` mới hơn thì dùng nháp (phần chơi lúc mất mạng rồi đóng trang không mất).
 - "Chơi lại từ đầu" khi online: vườn mới thay vườn trên làng, không xóa bản chơi đơn. Đồng hồ và nút x5/x20 như Phase 0 (issue 23 đổi).
 ## Quy trình phát hành (DESIGN mục 9, ADR 0006)
+
+> Từ Phase 1 người dùng chốt phát hành **chỉ kiểm tra local** (2026-10-02): bước 1 (và rà 360px, SPEC, ghi chú phát hành) là bắt buộc; bước 2–4 (VPS, smoke live, sao lưu server) bỏ, chỉ dev local, không push/deploy. Mô tả dưới giữ lại làm tài liệu cho lúc nào deploy thật.
 
 1. **Local:** `npm test` và `npm run test:e2e` pass hết (không GitHub Actions).
 2. **Deploy lên VPS** `image.huninna.com`: vào `~/project/ai_game`, chạy `git pull && docker compose up -d --build`. Container `ai-game` (`node:22-alpine`, chạy `server/main.mjs` nghe cổng 80, người dùng `node`) nằm trong network `gateway`; Caddy của `ai_gateway` chuyển `game.huninna.com` tới `ai-game:80`. Dữ liệu ở volume `ai-game_data` (`/data`). Khóa gateway lưu trên VPS, không nằm trong repo.

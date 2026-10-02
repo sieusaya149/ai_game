@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync, mkdirSync } from 'node:fs';
+import { E2E_DB } from '../playwright.config.mjs';
+import { runAdmin } from '../tests/helpers/server.mjs';
 import { makeSave, seedSave, plantedCrop, closeAway } from './helpers.mjs';
 import { mapOf } from '../public/state.js';
 
@@ -170,6 +172,142 @@ for (const size of SIZES) {
       await page.goto('/'); await ready(page);
       await expect(page.locator('#whatsnew')).toBeVisible();
       await audit(page, 'whatsnew', size, true);
+    });
+
+    // ---- Phase 1 online (issue 33) ----
+    const mark = (context, name) => context.addInitScript(n => {
+      try { localStorage.setItem('nongtrai-online', n); localStorage.setItem('nongtrai-pref', JSON.stringify({ battery: false, hinted: true })); } catch {}
+    }, name);
+
+    test('chọn chế độ, đăng nhập, đăng ký', async ({ page }) => {
+      await page.goto('/');
+      await expect(page.getByRole('button', { name: /Vào làng/ })).toBeVisible();
+      await audit(page, 'mode', size, true);
+      await page.getByRole('button', { name: /Vào làng/ }).click();
+      await expect(page.getByRole('button', { name: /Tạo tài khoản mới/ })).toBeVisible();
+      await audit(page, 'auth-login', size, true);
+      await page.getByRole('button', { name: /Tạo tài khoản mới/ }).click();
+      await expect(page.locator('#creator input').first()).toBeVisible();
+      await audit(page, 'auth-register', size);
+    });
+
+    test('Mang vườn này lên làng?', async ({ page, context, baseURL }) => {
+      const name = 'Bu' + Math.random().toString(36).slice(2, 7);
+      const invite = (await runAdmin('invite', '--db', E2E_DB)).out;
+      expect((await context.request.post('/api/register', { data: { name, pin: '123456', invite } })).ok()).toBe(true);
+      await seedSave(context, makeSave(s => { s.coins = 4321; }));
+      await page.goto('/'); await ready(page);
+      await open(page, 'settings');
+      await page.locator('.sheet').getByRole('button', { name: /Vào làng/ }).click();
+      await page.getByRole('button', { name: /Vào làng/ }).click();
+      await expect(page.getByText('Mang vườn này lên làng?')).toBeVisible();
+      await page.addStyleTag({ content: '#hud, #mini-wrap { display: none !important }' });   // HUD nằm dưới hộp thoại phủ kín, người chơi không thấy
+      await audit(page, 'bringup', size, true);
+    });
+
+    // người chơi online: mở làng, có một bạn, quà và lời nhắn ở cổng
+    test('làng real-time, chat, bạn bè, hộp quà, sổ lưu bút', async ({ page, context, browser, baseURL }) => {
+      const reg = async ctx => {
+        const name = 'Ol' + Math.random().toString(36).slice(2, 7);
+        const invite = (await runAdmin('invite', '--db', E2E_DB)).out;
+        expect((await ctx.request.post('/api/register', { data: { name, pin: '123456', invite } })).ok()).toBe(true);
+        const { play } = await (await ctx.request.post('/api/play', { data: {} })).json();
+        return { name, play };
+      };
+      const other = await browser.newContext({ baseURL });
+      const c = await reg(other);
+      expect((await other.request.post('/api/farm', { data: { play: c.play, save: makeSave(s => { s.exp = 500; s.inv.cai = 9; s.basket = { cai: 9 }; }, { name: c.name }) } })).ok()).toBe(true);
+      const me = await reg(context);
+      const guest = { id: 'gst-1', kind: 'steal', act: 'crop', by: c.name, lv: 5, at: Date.now() - 600_000, seen: true, item: 'cai', qty: 3 };
+      const save = makeSave(s => {
+        s.scene = 'village'; s.coins = 500; s.exp = 500; s.basket = { cai: 5 };
+        s.guests = [guest, { id: 'gst-2', kind: 'help', act: 'water', by: c.name, lv: 5, at: Date.now() - 900_000, seen: true }, { id: 'gst-3', kind: 'bark', act: 'bark', by: c.name, lv: 5, at: Date.now() - 300_000, seen: true }];
+      }, { name: me.name });
+      expect((await context.request.post('/api/farm', { data: { play: me.play, save } })).ok()).toBe(true);
+      expect((await context.request.post('/api/friends', { data: { name: c.name } })).ok()).toBe(true);
+      expect((await other.request.post('/api/gifts', { data: { to: me.name, item: 'cai', qty: 2, op: 'gift-op-1' } })).ok()).toBe(true);
+      expect((await other.request.post('/api/guestbook', { data: { to: me.name, text: 'Vườn bạn đẹp quá, mình ghé chơi nè! Cảm ơn bạn nhiều lắm nhé' } })).ok()).toBe(true);
+      await mark(context, me.name);
+      await page.goto('/');
+      await page.waitForFunction(() => globalThis.__farm?.state?.mode === 'online');
+      await closeAway(page);
+      await expect(page.locator('#live')).toBeVisible();
+      await page.waitForTimeout(500);
+      await audit(page, 'online-village', size, true);
+      await page.locator('#live-chat').click();
+      await expect(page.locator('#live-says')).toBeVisible();
+      // mọi câu chat chạm được: không nút nào bị bản đồ nhỏ / nút Việc cần làm che
+      expect(await page.evaluate(() => [...document.querySelectorAll('#live-says .btn')].filter(b => { const r = b.getBoundingClientRect(); return [[r.left + 4, r.top + 4], [r.right - 4, r.top + 4], [r.right - 4, r.bottom - 4], [r.left + r.width / 2, r.top + r.height / 2]].some(([x, y]) => !b.contains(document.elementFromPoint(x, y))); }).map(b => b.textContent))).toEqual([]);
+      await audit(page, 'online-chat', size, true);
+      await page.locator('#live-chat').click();
+      for (const id of ['online', 'friends', 'giftbox', 'guestbook', 'log']) {
+        await open(page, id);
+        await expect(page.locator('.sheet')).toBeVisible();
+        await page.waitForTimeout(300);
+        await audit(page, 'online-' + id, size, true);
+        await page.keyboard.press('Escape');
+        if (await page.locator('.sheet').count()) await page.locator('.sheet .close').click();
+      }
+      await other.close();
+    });
+
+    // online: server gom việc khách làm lúc vắng (giúp, trộm, chó đớp, quà, lời nhắn) vào màn "Trong lúc bạn vắng nhà"
+    test('Trong lúc bạn vắng nhà (có khách)', async ({ page, context, browser, baseURL }) => {
+      const reg = async ctx => {
+        const name = 'Av' + Math.random().toString(36).slice(2, 7);
+        const invite = (await runAdmin('invite', '--db', E2E_DB)).out;
+        expect((await ctx.request.post('/api/register', { data: { name, pin: '123456', invite } })).ok()).toBe(true);
+        const { play } = await (await ctx.request.post('/api/play', { data: {} })).json();
+        return { name, play };
+      };
+      const other = await browser.newContext({ baseURL });
+      const c = await reg(other);
+      expect((await other.request.post('/api/farm', { data: { play: c.play, save: makeSave(s => { s.exp = 500; s.basket = { cai: 9 }; }, { name: c.name }) } })).ok()).toBe(true);
+      const me = await reg(context);
+      const ago = h => Date.now() - h * 3600_000;
+      const save = makeSave(s => {
+        for (let i = 0; i < 3; i++) plantedCrop(s, i, 0.5);
+        s.exp = 500;
+        s.guests = [
+          { id: 'a1', kind: 'steal', act: 'crop', by: c.name, lv: 6, at: ago(3), seen: false, item: 'cai', qty: 4 },
+          { id: 'a2', kind: 'help', act: 'water', by: c.name, lv: 3, at: ago(4), seen: false },
+          { id: 'a3', kind: 'bite', act: 'bite', by: c.name, lv: 6, at: ago(5), seen: false, fine: 20 },
+        ];
+        s.savedAt = ago(10);
+      }, { name: me.name });
+      expect((await context.request.post('/api/farm', { data: { play: me.play, save } })).ok()).toBe(true);
+      expect((await other.request.post('/api/gifts', { data: { to: me.name, item: 'cai', qty: 2, op: 'gift-op-2' } })).ok()).toBe(true);
+      expect((await other.request.post('/api/guestbook', { data: { to: me.name, text: 'Ghé chơi nè' } })).ok()).toBe(true);
+      await mark(context, me.name);
+      await page.goto('/'); await ready(page);
+      await expect(page.locator('#away')).toBeVisible();
+      await expect(page.locator('#away .away-guests li').first()).toBeVisible();
+      await audit(page, 'away-guests', size, true);
+      await closeAway(page);
+      await other.close();
+    });
+
+    test('băng rôn đỏ khi đang ở làng (kèm nút Về vườn)', async ({ page, context }) => {
+      await seedSave(context, makeSave(s => {
+        plantedCrop(s, 0, 1); s.scene = 'village'; s.weather = 'rain';
+        s.threats = [{ id: 901, kind: 'crow', plot: 0, x: 600, y: 248, arriveAt: 0, state: 'eating', since: s.time + 40_000 }];
+      }));
+      await page.goto('/'); await ready(page);
+      await expect(page.locator('#alert-banner')).toBeVisible();
+      await expect(page.locator('#alert-home')).toBeVisible();
+      await audit(page, 'alert-village', size, true);
+    });
+
+    test('chó Mực: xích, thả, cho ăn', async ({ page, context }) => {
+      await seedSave(context, makeSave(s => {
+        s.dog.adult = true; s.dog.age = 1e12; s.dog.chained = true; s.inv.sausage = 3;
+        const h = s.farm.ents.find(e => e.kind === 'doghouse');
+        const p = mapOf(s).dogHome; Object.assign(s.dog, p); Object.assign(s.player, { x: p.x + 12, y: p.y + 20 });
+        void h;
+      }));
+      await page.goto('/'); await ready(page);
+      await page.waitForTimeout(700);
+      await audit(page, 'dog', size, true);
     });
   });
 }

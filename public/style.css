@@ -407,6 +407,7 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 .away-h { margin: 4px 0 0; font-size: 15px; font-weight: 900; color: var(--wood-d); text-align: left; }
 .away-guests li[data-kind="steal"] { color: #a8321f; }
 .away-card .mini { margin: 0; }
+.away-card > .btn { position: sticky; bottom: 4px; z-index: 1; }   /* danh sách dài (nhiều khách) thì nút đóng vẫn luôn thấy */
 #whatsnew { position: absolute; inset: 0; z-index: 66; display: grid; place-items: center; padding: calc(12px + var(--st)) calc(12px + var(--sr)) calc(12px + var(--sb)) calc(12px + var(--sl)); background: rgba(30, 15, 0, 0.6); pointer-events: auto; animation: fade 0.25s; }
 #whatsnew[hidden] { display: none; }
 .news-list li { align-items: flex-start; }
@@ -471,6 +472,8 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
   .bb-lbl { display: none; }   /* 7 nút trên 320px không đủ chỗ cho chữ */
   .bb-ico { height: 34px; }
   #bottombar { gap: 3px; }
+  #hud-clock { padding-left: 4px; padding-right: 4px; }   /* ngày làng 5 chữ số ("Ngày 19768 · 9:14 sáng") phải vừa một dòng */
+  #hud-time { letter-spacing: -0.3px; }
 }
 /* Điện thoại: chip hành động rộng hơn để chữ không xuống hai dòng, cột nút đỡ cao */
 @media (max-width: 440px) {
@@ -543,7 +546,7 @@ body.building #bottombar, body.building #actions, body.building #joy-base, body.
 #hud-speed[hidden] { display: none; }
 
 /* ---------- Làng real-time (issue 25): cột biểu cảm + chat nhanh + người đang ở đây, mép trái, trên joystick ---------- */
-#live { position: absolute; left: calc(8px + var(--sl)); bottom: calc(var(--ui-bottom) + 12px); z-index: 6; display: flex; flex-direction: column; gap: 5px; }
+#live { position: absolute; left: calc(8px + var(--sl)); bottom: calc(var(--ui-bottom) + 12px); z-index: 9; display: flex; flex-direction: column; gap: 5px; }
 body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* điện thoại: ngay trên joystick */
 #live[hidden], body.building #live { display: none; }
 .live-row { display: flex; flex-direction: column; gap: 5px; }
@@ -555,7 +558,7 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 .live-btn img { width: 22px; height: 22px; image-rendering: pixelated; }
 #live-says { position: absolute; left: 48px; bottom: 0; width: max-content; max-width: min(230px, calc(100vw - 72px)); padding: 6px; display: flex; flex-direction: column; gap: 5px; z-index: 7; }
 #live-says[hidden] { display: none; }
-#live-says .btn { min-height: 36px; padding: 4px 12px; font-size: 13px; justify-content: flex-start; text-align: left; white-space: normal; }
+#live-says .btn { min-height: 40px; padding: 4px 12px; font-size: 13px; justify-content: flex-start; text-align: left; white-space: normal; }
 
 /* bạn bè và cổng vườn (issue 26) */
 .fr-add { display: flex; gap: 8px; align-items: center; }

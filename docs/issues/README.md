@@ -51,7 +51,7 @@ Nguồn: [PRD 0002](../prd/0002-phase-1-online.md).
 | 30 | [Trộm và giới hạn](30-trom-va-gioi-han.md) | 28 | ✅ |
 | 31 | [Chó Mực canh khách](31-cho-muc-canh-khach.md) | 30 | ✅ |
 | 32 | [Vắng nhà, thông báo, thành tựu xã hội](32-vang-nha-thong-bao-thanh-tuu-xa-hoi.md) | 29, 31 | ✅ |
-| 33 | [Phát hành Phase 1](33-phat-hanh-phase-1.md) | 20–32 | ⬜ |
+| 33 | [Phát hành Phase 1](33-phat-hanh-phase-1.md) | 20–32 | ✅ |
 
 **Làm song song được:** sau 22 thì 23, 24, 25; sau 27 thì 28, 29.
 
