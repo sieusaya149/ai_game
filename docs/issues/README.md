@@ -86,7 +86,7 @@ Nguồn: [PRD 0004](../prd/0004-phase-3-cay-va-nuoc.md).
 
 | # | Issue | Bị chặn bởi | Trạng thái |
 |---|---|---|---|
-| 50 | [Bản lưu v4 và 16 loại cây](50-ban-luu-v4-16-cay.md) | 49 | ⬜ |
+| 50 | [Bản lưu v4 và 16 loại cây](50-ban-luu-v4-16-cay.md) | 49 | ✅ |
 | 51 | [Cấp thành thạo](51-cap-thanh-thao.md) | 50 | ⬜ |
 | 52 | [Chất lượng ★](52-chat-luong-sao.md) | 50 | ⬜ |
 | 53 | [Trái khổng lồ](53-trai-khong-lo.md) | 51, 52 | ⬜ |
