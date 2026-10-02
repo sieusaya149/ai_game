@@ -455,7 +455,8 @@ body.alerting #hud { top: calc(50px + var(--st)); }
 #ui #build-msg { pointer-events: none; max-width: 420px; padding: 7px 14px; font-size: 14px; font-weight: 900; text-align: center; }
 #build-msg[data-ok="1"] { background: #dff7d4; border-color: var(--green-d); }
 #build-msg[data-ok="0"] { background: #ffd9d2; border-color: var(--red-d); }
-#build-store { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
+#build-store, #build-upgrade { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
+#build-upgrade.dim { opacity: 0.65; }
 #ui #build-tray { pointer-events: auto; width: 100%; max-width: 560px; padding: 6px; }
 .bt-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
 .bt-tab { flex: 1; min-height: 44px; border: 2px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; font-weight: 900; cursor: pointer; }

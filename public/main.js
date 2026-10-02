@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
+  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -199,6 +199,17 @@ const api = {
     b.sel = null; ui.buildSel(null);
     ui.buildMsg(r.msg, r.ok);
     ui.handleEvents([{ type: 'sound', name: r.ok ? 'pop' : 'error' }]);
+    ui.buildTray(state, b);
+    changed();
+  },
+  // Nâng cấp chuồng đang chọn trong chế độ xây dựng
+  buildUpgrade() {
+    const b = world.build;
+    if (!b?.sel) return;
+    const r = upgradePen(state, b.sel);
+    ui.buildMsg(r.msg, r.ok);
+    ui.handleEvents([{ type: 'sound', name: r.ok ? 'coin' : 'error' }]);
+    ui.buildSel(null, upgradeInfo(state, b.sel));
     ui.buildTray(state, b);
     changed();
   },
@@ -405,6 +416,7 @@ function buildUp(e) {
   if (d.tap && !g) {   // chạm không kéo: chọn món, hiện nút Cất nếu cất được
     const ent = state.farm.ents.find(x => x.id === d.id);
     if (ent && (ent.kind === 'deco' || ent.kind === 'field')) { b.sel = ent.id; ui.buildSel(entName(ent)); }
+    else if (ent && upgradeInfo(state, ent.id)) { b.sel = ent.id; ui.buildSel(null, upgradeInfo(state, ent.id)); }   // chuồng, chuồng chó: nâng cấp
     ui.buildMsg(BUILD_HINT, null);
     return;
   }

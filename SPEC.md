@@ -26,9 +26,9 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`; Phase 2: `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`. Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`; Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`. Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
-| `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
+| `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `troughOf(map, {pen, id?})`; bản đồ vườn có `pens` (chuồng đầu tiên mỗi loại), `penList`/`penById` (mọi chuồng: `{ id, type, lv, name, rect, gates, trough|null, area, house, ent }`), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
 | `public/migrate.js` | `SAVE_VERSION` (3), `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`: v1→v2, v2→v3); `animalDefaults`/`fillAnimal`: hình dạng con vật v3 và mặc định của nó. Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
 | `public/clock.js` | Đồng hồ ngoài đời: `now()`, `setClock(fn)` (Phase 1 gắn giờ server), `realDay()` (`'YYYY-MM-DD'` cho nhiệm vụ hằng ngày sau này) |
 | `public/state.js` | Mô hình dữ liệu + **mọi luật chơi** + lưu/tải. Thuần JS, không DOM (trừ `localStorage` bọc try/catch). Đây là API công khai duy nhất của luật chơi |
@@ -119,7 +119,7 @@ state = {
 | `house`, `gate` | không | cố định, không dời được (`fixed`). Nhà có cửa sang `house`, cổng có cửa sang `village` |
 | `shed`, `well`, `board`, `shipbin`, `doghouse` | không | chân đế theo `BUILDING_DEFS`; dời được |
 | `field` | `plots: [9 chỉ số vào state.plots]` | khối ruộng 3x3; ô thứ k ở `(c + k%3, r + floor(k/3))` |
-| `pen` | `pen: 'chicken'|'pig'|'pasture'` | chuồng, kích thước theo `PEN_DEFS`; mỗi loại chỉ một cái |
+| `pen` | `pen: 'chicken'|'pig'|'pasture'|'quarantine'`, `lv?: 1..3` | chuồng, kích thước theo `PEN_DEFS` (không đổi theo cấp); `lv` thiếu = 1; nhiều chuồng mỗi loại, giới hạn theo cấp người chơi (`PEN_TABLE.limit`). Chuồng chó (`doghouse`) cũng có `lv?` |
 | `deco` | `item: 'deco_scarecrow'|'deco_flower'|'deco_lamp'|'deco_bench'` | đồ trang trí 1 ô |
 | `tree` | không | cây cảnh, không dời được |
 | `bush`, `rock` | không | bụi, đá **chưa dọn** trên dải đất mới; chắn đường, dọn bằng tay (`CLUTTER`) |
@@ -149,7 +149,7 @@ Animal = {
 }
 ```
 
-**Thêm trường cho lát sau:** thêm một dòng mặc định vào `animalDefaults` là xong, **không tăng phiên bản** (bản v3 cũ thiếu trường sẽ được điền khi nạp). Chỉ tăng lên v4 khi đổi nghĩa/cấu trúc trường đã có. Gợi ý cho các lát sau: chuồng nhiều cái thì thêm `pen: id thực thể chuồng | null`; vắc-xin `vaccUntil`; nghỉ hưu `retired`; đặt tên `named`.
+**Thêm trường cho lát sau:** thêm một dòng mặc định vào `animalDefaults` là xong, **không tăng phiên bản** (bản v3 cũ thiếu trường sẽ được điền khi nạp). Chỉ tăng lên v4 khi đổi nghĩa/cấu trúc trường đã có. Đã có `pen: id thực thể chuồng | null` (issue 35; null thì `settlePens` xếp vào chuồng cùng loại còn chỗ). Gợi ý cho các lát sau: vắc-xin `vaccUntil`; nghỉ hưu `retired`; đặt tên `named`.
 
 **Chuyển v2→v3** (`v2to3`, thuần): bỏ `adult`; con trưởng thành cũ thành `stage: 'truong'` ở **đầu** giai đoạn (`age = stageStart(type, 'truong')`), con non thành `'non'` (`age = 0`); `sex` theo id chẵn/lẻ (mỗi loài có ít nhất một cặp nếu có ≥ 2 con); `bond: 2`, `dirty: 0`, `sick: true → 1`, các trường khác theo `animalDefaults`. Không con nào bị mất. Chó: `adult` → `stage` tương tự (theo `LIFE.cho`). Bản v2 hỏng (`animals` không phải mảng, con vật loài lạ / không có id) thì ném lỗi, `loadGame` trả `null`, không ghi gì.
 
@@ -233,10 +233,19 @@ canAfford(state, what)            // → { ok } | { ok: false, reason: 'no_item'
 placeCost(state, what)            // giá xu của món định đặt
 snapLayout(state) / restoreLayout(state, snap)   // chụp bố cục lúc vào chế độ xây dựng / trả lại đúng như cũ (nút Hủy)
 canMove(ent)  entName(ent)  footprint(ent)
-fieldCount(state)  fieldLimit(state)  fieldNextLevel(state)  fieldCost(state)  penLevel(pen)
+fieldCount(state)  fieldLimit(state)  fieldNextLevel(state)  fieldCost(state)  penLevel(pen)   // penLevel = cấp người chơi để xây loại chuồng đó (PEN_TABLE.lv)
+penLimit(state, pen)  penNextLevel(state, pen)   // số chuồng loại pen tối đa ở cấp hiện tại · cấp kế để có thêm (null = hết)
+// Chuồng 3 cấp (issue 35). Bảng `PEN_TABLE` trong data.js: cap (sức chứa 3 cấp), lv, limit, up (giá nâng), upLv (cấp người chơi để nâng), extra3 (đồ cấp 3).
+//   gà 6/12/18 (cấp 1) · heo 3/5/8 (cấp 3) · chuồng lớn + đồng cỏ 3/6/9 (cấp 5) · cách ly 1/2/3 (cấp 3, nhận mọi loài) · chuồng chó 3 cấp
+upgradeInfo(state, id)    // → { lv (cấp sau khi nâng), price, need (cấp người chơi), error? } | null (đã tối đa / không nâng được). id = chuồng hoặc chuồng chó
+upgradePen(state, id)     // → R { id, lv } nâng 1 cấp, trừ xu, con vật giữ nguyên; reason: scene missing max level coins
+penLv(ent)  penCapOf(ent)  penUse(state, id)   // cấp · sức chứa · số con đang ở chuồng id (a.pen). Tính cả con thả rông
+penCount(state, loại)  penCap(state, loại)     // tổng con / tổng sức chứa của mọi chuồng loại đó (chuồng cách ly là loại `quarantine`)
+animalPen(state, a)       // → chuồng (trên mapOf(state).penById) con vật a đang ở; tự xếp nếu a.pen chưa có
+moveAnimal(state, animalId, penId)   // → R chuyển sang chuồng đúng loài hoặc chuồng cách ly còn chỗ; reason: missing species full
 placeDeco(state, itemId)          // đặt đồ trang trí ngay dưới chân nhân vật (cách đặt cũ, còn dùng được)
 ```
-**Danh sách `reason` của `canPlace`:** `missing` (không thấy công trình), `fixed` (nhà/cổng/cây không dời được), `exists` (đã có chuồng loại đó), `outside` (ngoài đất đã mua), `uncleared` (còn bụi/đá chưa dọn), `overlap` (chồng lên công trình khác), `max_fields` (vượt số khối ruộng tối đa theo cấp), `blocks_path` (chặn đường từ cổng tới nhà, cửa công trình, cửa chuồng hoặc khối ruộng; kiểm tra bằng tìm đường trên lưới va chạm của bố cục thử). `placeEntity` thêm: `scene` (không ở vườn), `no_item`, `level`, `coins`. `storeEntity`: `missing`, `has_crop`, `last_field`, `fixed`.
+**Danh sách `reason` của `canPlace`:** `missing` (không thấy công trình), `fixed` (nhà/cổng/cây không dời được), `max_pens` (đủ số chuồng loại đó ở cấp hiện tại, `PEN_TABLE.limit`), `level` (chuồng mới chưa đủ cấp xây), `missing` (loại chuồng lạ), `outside` (ngoài đất đã mua), `uncleared` (còn bụi/đá chưa dọn), `overlap` (chồng lên công trình khác), `max_fields` (vượt số khối ruộng tối đa theo cấp), `blocks_path` (chặn đường từ cổng tới nhà, cửa công trình, cửa chuồng hoặc khối ruộng; kiểm tra bằng tìm đường trên lưới va chạm của bố cục thử). `placeEntity` thêm: `scene` (không ở vườn), `no_item`, `level`, `coins`. `storeEntity`: `missing`, `has_crop`, `last_field`, `fixed`.
 
 Thêm luật đặt mới thì thêm một bước kiểm tra trong `canPlace` **trước** bước tìm đường, kèm `reason` mới, và một test cho `reason` đó.
 
@@ -292,7 +301,7 @@ Lúc sang ngày mới (6h) lái buôn lấy hết, trả xu, sinh event `shipped
 ### Chợ, cửa hàng, đơn hàng (mua bán chỉ trong giờ chợ mở 6h–18h; ngoài giờ trả `reason: 'closed'`)
 ```js
 buy(state, itemId, qty)           // → R: kiểm tra cấp, xu
-buyAnimal(state, type)            // → R: cần đã có chuồng loại đó, chưa chật PEN_CAP
+buyAnimal(state, type)            // → R: cần đã có chuồng loại đó còn chỗ (xếp vào chuồng còn chỗ); reason: no_pen full
 sell(state, itemId, qty|'all')    // → R { coins }
 sellAll(state)                    // → R { coins } bán mọi nông sản & sản phẩm (không bán vật tư/hạt)
 buyOutfit(state, 'hat'|'acc', index)  setLook(state, look)
@@ -327,7 +336,7 @@ Loại việc của `todoList`: `crow`, `thief`, `sick` (gấp); `hungry`, `dry`
 { kind: 'animal', id }
 { kind: 'egg', id }
 { kind: 'poop', id }
-{ kind: 'trough', pen }        // 'chicken'|'pig'|'pasture'
+{ kind: 'trough', pen, id? }   // pen: 'chicken'|'pig'|'pasture'; id = thực thể chuồng (có nhiều chuồng cùng loại). Máng ăn gom theo loại: state.troughs[loại]
 { kind: 'nest' }
 { kind: 'dog' }
 { kind: 'threat', id }
@@ -338,7 +347,7 @@ Loại việc của `todoList`: `crow`, `thief`, `sick` (gấp); `hungry`, `dry`
 { kind: 'building', id }       // theo bản đồ đang đứng. Vườn: house, gate, shed, shipbin, board, well, doghouse (không tương tác).
                                //   Nhà: bed, wardrobe, (stove, table, plant chỉ để ngắm). Làng: market, smithy, friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill`; ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill` (và `upgrade` nâng cấp chuồng); ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 

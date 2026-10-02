@@ -67,7 +67,6 @@ export const ANIMALS = {
   bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
   cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
 };
-export const PEN_CAP = { chicken: 10, pig: 6, pasture: 5 };
 export const HUSBANDRY = {
   hungerMs: 5 * MIN,          // từ no (100) xuống đói hẳn (0)
   autoEatBelow: 60,           // đói hơn mức này thì tự ra máng ăn nếu máng còn cám
@@ -227,7 +226,17 @@ export const expandLevel = n => 1 + Math.floor((n - START_PLOTS) / 3);
 export const FIELD_LIMITS = [[1, 1], [4, 2], [8, 3], [12, 4], [16, 5], [20, 6], [25, 7], [30, 8]];
 export const FIELD_PRICES = [300, 600, 1000, 1500, 2200, 3000, 4000];
 // Giá xây chuồng (mở theo cấp mua được con vật tương ứng trong ANIMALS)
-export const PEN_PRICES = { chicken: 200, pig: 600, pasture: 1500 };
+export const PEN_PRICES = { chicken: 200, pig: 600, pasture: 1500, quarantine: 400 };
+// Bảng chuồng theo (loại, cấp). cap: sức chứa 3 cấp; lv: cấp người chơi để xây; limit: [cấp, số chuồng tối đa] (như FIELD_LIMITS);
+// up: giá nâng lên cấp 2, 3; upLv: cấp người chơi để nâng; extra3: đồ có thêm ở cấp 3 (shower để dành Phase 3, cách ly nhận mọi loài).
+export const PEN_TABLE = {
+  chicken:    { cap: [6, 12, 18], lv: 1, limit: [[1, 1], [4, 2], [8, 3]],  up: [300, 800],   upLv: [2, 4], extra3: ['autoNest', 'sandbox'] },
+  pig:        { cap: [3, 5, 8],   lv: 3, limit: [[3, 1], [6, 2], [10, 3]], up: [800, 2000],  upLv: [4, 6], extra3: ['mudPit', 'shower'] },
+  pasture:    { cap: [3, 6, 9],   lv: 5, limit: [[5, 1], [8, 2], [12, 3]], up: [2000, 4500], upLv: [6, 8], extra3: ['autoGrass'] },
+  quarantine: { cap: [1, 2, 3],   lv: 3, limit: [[3, 1], [7, 2]],         up: [500, 1200],  upLv: [5, 7], extra3: [] },
+  doghouse:   { cap: [1, 1, 1],   lv: 1, limit: [[1, 1]],                 up: [150, 400],   upLv: [2, 4], extra3: ['bed', 'toy'] },
+};
+export const PEN_LEVELS = 3;
 export const expNeed = level => Math.floor(25 * level ** 1.5);
 export function levelInfo(exp) {
   let level = 1;

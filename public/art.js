@@ -737,26 +737,28 @@ function signboard() {
 }
 
 // Hàng rào: nằm ngang (h) hoặc dọc (v), vẽ vào một ô 16x16.
-export function fenceTile(x, kind, px, py) {
+// Màu hàng rào theo cấp chuồng: 1 gỗ mộc, 2 sơn kem, 3 sơn xanh (viền, thanh ngang, cột, điểm sáng)
+const FENCE = [['#3b2412', '#c98c4a', '#b07a45', '#e0a868'], ['#3b2412', '#fff0d0', '#e0c898', '#ffffff'], ['#1c2a44', '#9fc0e8', '#5f88c0', '#d8ecff']];
+export function fenceTile(x, kind, px, py, lv = 1) {
+  const [ol, rail, post, hi] = FENCE[Math.min(3, Math.max(1, lv)) - 1];
   if (kind === 'h') {
-    rect(x, '#3b2412', px, py + 5, 16, 3); rect(x, '#c98c4a', px, py + 6, 16, 1);
-    rect(x, '#3b2412', px, py + 10, 16, 3); rect(x, '#c98c4a', px, py + 11, 16, 1);
+    rect(x, ol, px, py + 5, 16, 3); rect(x, rail, px, py + 6, 16, 1);
+    rect(x, ol, px, py + 10, 16, 3); rect(x, rail, px, py + 11, 16, 1);
     for (const ox of [2, 10]) {
-      rect(x, '#3b2412', px + ox, py + 1, 4, 15);
-      rect(x, '#b07a45', px + ox + 1, py + 2, 2, 13);
-      rect(x, '#e0a868', px + ox + 1, py + 2, 2, 1);
+      rect(x, ol, px + ox, py + 1, 4, 15);
+      rect(x, post, px + ox + 1, py + 2, 2, 13);
+      rect(x, hi, px + ox + 1, py + 2, 2, 1);
     }
   } else {
-    rect(x, '#3b2412', px + 5, py, 2, 16); rect(x, '#3b2412', px + 9, py, 2, 16);
-    rect(x, '#c98c4a', px + 6, py, 1, 16); rect(x, '#c98c4a', px + 10, py, 1, 16);
+    rect(x, ol, px + 5, py, 2, 16); rect(x, ol, px + 9, py, 2, 16);
+    rect(x, rail, px + 6, py, 1, 16); rect(x, rail, px + 10, py, 1, 16);
     for (const oy of [0, 8]) {
-      rect(x, '#3b2412', px + 5, py + oy, 6, 7);
-      rect(x, '#b07a45', px + 6, py + oy + 1, 4, 5);
-      rect(x, '#e0a868', px + 6, py + oy + 1, 4, 1);
+      rect(x, ol, px + 5, py + oy, 6, 7);
+      rect(x, post, px + 6, py + oy + 1, 4, 5);
+      rect(x, hi, px + 6, py + oy + 1, 4, 1);
     }
   }
 }
-
 // ---------- Công cụ vẽ thêm ----------
 
 const OUT = '#3b2412';

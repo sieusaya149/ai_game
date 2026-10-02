@@ -113,13 +113,12 @@ export function buildTray(s, b) {
     cards.push(card({ kind: 'field' }, h('span', { class: 'ico emo' }, '🟫'), `Khối ruộng ${n}/${max}`,
       full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : S.fieldCost(s) ? `🪙 ${fmt(S.fieldCost(s))}` : 'Miễn phí', full));
   } else if (trayTab === 'pen') {
-    const have = new Set(s.farm.ents.filter(e => e.kind === 'pen').map(e => e.pen));
     for (const pen of Object.keys(D.PEN_PRICES)) {
-      if (have.has(pen)) continue;
-      const lv = S.penLevel(pen), low = level(s) < lv;
-      cards.push(card({ kind: 'pen', pen }, ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]), PEN_NAME2[pen], low ? `Cần cấp ${lv}` : `🪙 ${fmt(D.PEN_PRICES[pen])}`, low));
+      const lv = S.penLevel(pen), low = level(s) < lv, n = s.farm.ents.filter(e => e.kind === 'pen' && e.pen === pen).length, max = S.penLimit(s, pen), nx = S.penNextLevel(s, pen);
+      const full = !low && n >= max;
+      cards.push(card({ kind: 'pen', pen }, penIco(pen), low ? PEN_NAME2[pen] : `${PEN_NAME2[pen]} ${n}/${max}`,
+        low ? `Cần cấp ${lv}` : full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : `🪙 ${fmt(D.PEN_PRICES[pen])}`, low || full));
     }
-    empty = 'Bạn đã có đủ các loại chuồng rồi.';
   } else {
     for (const k of Object.keys(s.inv || {})) if (s.inv[k] > 0 && D.ITEMS[k]?.kind === 'deco') cards.push(card({ kind: 'deco', item: k }, ico(k), D.ITEMS[k].name, `Có ×${s.inv[k]}`));
     empty = 'Chưa có đồ trang trí. Mua ở Chợ Bà Tư nhé.';
@@ -129,12 +128,15 @@ export function buildTray(s, b) {
     h('div', { class: 'bt-tabs' }, tab('field', 'Ruộng'), tab('pen', 'Chuồng'), tab('deco', 'Trang trí')),
     cards.length ? h('div', { class: 'bt-list' }, cards) : h('div', { class: 'bt-empty' }, empty));
 }
-const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu' };
+const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu', quarantine: 'Chuồng cách ly' };
+const penIco = pen => (pen === 'quarantine' ? h('span', { class: 'ico emo' }, '🏥') : ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]));
 // Nút Cất cho món đang chạm (label = tên món, null = ẩn)
-export function buildSel(label) {
-  const b = $('build-store');
+export function buildSel(label, up) {   // label: món cất được (nút Cất); up: S.upgradeInfo của chuồng đang chọn (nút Nâng cấp)
+  const b = $('build-store'), u = $('build-upgrade');
   b.hidden = !label;
   if (label) b.textContent = `Cất ${label.toLowerCase()}`;
+  u.hidden = !up;
+  if (up) { u.textContent = `⬆️ Nâng lên cấp ${up.lv} (🪙 ${fmt(up.price)})`; u.classList.toggle('dim', !!up.error); }
 }
 // ok: true = đặt được (xanh), false = không được (đỏ), null = gợi ý
 export function buildMsg(text, ok) {
@@ -517,13 +519,13 @@ PANELS.market = {
     }
     if (t === 'animal') {
       for (const [type, a] of Object.entries(D.ANIMALS).sort((x, y) => x[1].lv - y[1].lv)) {
-        const n = (s.animals || []).filter(x => D.ANIMALS[x.type].pen === a.pen).length, cap = D.PEN_CAP[a.pen];
+        const n = S.penCount(s, a.pen), cap = S.penCap(s, a.pen);
         const locked = a.lv > lv, full = n >= cap;
         list.append(row({
           icon: ico(type), name: a.baby, locked,
           desc: [`Trưởng thành sau ${D.stageStart(type, 'truong') / MIN} phút ·${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`],
           right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + a.lv)
-            : [coinTag(a.price), btn(full ? 'Đầy' : 'Mua', () => res(S.buyAnimal(st(), type), 'coin')?.ok && (flags.bought = true), 'green', { disabled: shut || full || s.coins < a.price })],
+            : [coinTag(a.price), btn(full ? (cap ? 'Đầy' : 'Chưa có chuồng') : 'Mua', () => res(S.buyAnimal(st(), type), 'coin')?.ok && (flags.bought = true), 'green', { disabled: shut || full || s.coins < a.price })],
         }));
       }
       return;
@@ -1172,6 +1174,7 @@ export function initUI(a) {
   $('build-done').addEventListener('click', () => api.buildDone());
   $('build-cancel').addEventListener('click', () => api.buildCancel());
   $('build-store').addEventListener('click', () => api.buildStore());
+$('build-upgrade').addEventListener('click', () => api.buildUpgrade());
 
   addEventListener('keydown', e => {
     if (e.key === 'Escape') {

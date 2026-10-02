@@ -1,13 +1,13 @@
 // Mô hình dữ liệu + luật chơi. Thuần JS, không DOM (localStorage có bọc try/catch).
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
-  ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
+  ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
-import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
+import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal } from './migrate.js';
 import { now } from './clock.js';
 
@@ -96,8 +96,35 @@ function checkAch(s) {
   }
 }
 
-const penPoint = (s, pen) => { const a = mapOf(s).pens[pen].area; return { x: a.x + rnd(0, a.w), y: a.y + rnd(0, a.h) }; };
-const penCount = (s, pen) => s.animals.filter(a => ANIMALS[a.type].pen === pen).length;
+// Điểm ngẫu nhiên trong chuồng: đúng chuồng id nếu có, không thì chuồng đầu tiên của loại
+const penPoint = (s, type, id) => { const m = mapOf(s), a = (m.penById[id] ?? m.pens[type]).area; return { x: a.x + rnd(0, a.w), y: a.y + rnd(0, a.h) }; };
+
+// ---------- Chuồng nhiều cái, 3 cấp (PEN_TABLE) ----------
+// Mỗi con vật ở một chuồng (a.pen = id thực thể chuồng): chuồng đúng loài của nó, hoặc chuồng cách ly (nhận mọi loài).
+// Bản lưu cũ / con mới sinh chưa có a.pen thì settlePens xếp vào chuồng cùng loại còn chỗ (hết chỗ thì chuồng đầu, không đuổi con nào ra).
+const penEnts = (s, type) => s.farm.ents.filter(e => e.kind === 'pen' && e.pen === type);
+export const penLv = e => e.lv ?? 1;
+export const penCapOf = e => PEN_TABLE[e.pen].cap[penLv(e) - 1];
+export const penUse = (s, id) => s.animals.filter(a => a.pen === id).length;
+function settlePens(s) {
+  const pens = s.farm.ents.filter(e => e.kind === 'pen');
+  const home = a => { const e = pens.find(x => x.id === a.pen); return !!e && (e.pen === 'quarantine' || e.pen === ANIMALS[a.type].pen); };
+  for (const a of s.animals) if (!home(a)) {
+    const list = pens.filter(e => e.pen === ANIMALS[a.type].pen);
+    a.pen = (list.find(e => penUse(s, e.id) < penCapOf(e)) ?? list[0])?.id ?? null;
+  }
+}
+const roomyPen = (s, type) => { settlePens(s); return penEnts(s, type).find(e => penUse(s, e.id) < penCapOf(e)) ?? null; };
+// Số con đang nuôi / sức chứa gộp của mọi chuồng loại type (chuồng cách ly là loại riêng)
+export function penCount(s, type) { settlePens(s); const ids = penEnts(s, type).map(e => e.id); return s.animals.filter(a => ids.includes(a.pen)).length; }
+export const penCap = (s, type) => penEnts(s, type).reduce((n, e) => n + penCapOf(e), 0);
+const typeFree = (s, type) => Math.max(0, penCap(s, type) - penCount(s, type));
+// Chuồng của con vật trên bản đồ vườn (cho WORLD đi lại)
+export function animalPen(s, a) {
+  const m = mapOf(s);
+  if (!m.penById[a.pen]) settlePens(s);
+  return m.penById[a.pen] ?? m.pens[ANIMALS[a.type].pen] ?? null;
+}
 const isRipe = p => p.crop && !p.crop.dead && !p.crop.rotten && p.crop.progress >= 1;
 const nextPoopAt = s => s.time + rnd(...DOG.poopEvery);
 
@@ -138,6 +165,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
   Object.assign(s.dog, m.dogHome);
   s.dog.nextPoop = nextPoopAt(s);
   for (const a of START.animals) { const p = penPoint(s, ANIMALS[a.type].pen); mkAnimal(s, a.type, a.stage, p.x, p.y, { sex: a.sex }); }
+  settlePens(s);
   evq = [];
   return s;
 }
@@ -186,6 +214,7 @@ export function loadGame() {
   for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
   s.shipbin = { items: Object.fromEntries(Object.entries(s.shipbin?.items ?? {}).filter(([k, n]) => (CROPS[k] || PRODUCTS[k]) && n > 0)) };
   ensureShipbin(s);   // vườn cũ chưa có thùng: thêm một thùng cạnh nhà kho
+  settlePens(s);      // con vật chưa có chuồng (bản cũ): xếp vào chuồng cùng loại
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
   s.stamina = clamp(s.stamina, 0, STAMINA.max); s.sit = false;
@@ -474,21 +503,22 @@ function stepAnimals(s, d) {
 }
 
 function stepPigs(s, d) {
-  const pigs = s.animals.filter(a => a.type === 'heo');
+  settlePens(s);
+  const pigs = s.animals.filter(a => a.type === 'heo' && s.farm.ents.find(e => e.id === a.pen)?.pen !== 'quarantine');   // heo ở chuồng cách ly không sinh sản
   let total = pigs.length;
   for (const a of [...pigs]) {
     if (!a.pregnant || a.sick || s.time < a.dueAt) continue;
-    const room = PEN_CAP.pig - total, n = Math.min(rint(...HUSBANDRY.pigLitter), Math.max(0, room));
+    const room = penCap(s, 'pig') - total, n = Math.min(rint(...HUSBANDRY.pigLitter), Math.max(0, room));
     if (n <= 0) continue; // chuồng chật thì chờ
     a.pregnant = false; a.nextProduct = s.time + HUSBANDRY.pigGestation; // nghỉ trước lứa sau
-    for (let i = 0; i < n; i++) { const b = mkAnimal(s, 'heo', 'non', a.x + rnd(-6, 6), a.y + rnd(-6, 6)); spawnEv('piglet', b.x, b.y); }
+    for (let i = 0; i < n; i++) { const b = mkAnimal(s, 'heo', 'non', a.x + rnd(-6, 6), a.y + rnd(-6, 6), { pen: roomyPen(s, 'pig')?.id ?? a.pen }); spawnEv('piglet', b.x, b.y); }
     s.stats.piglets += n; addExp(s, ANIMALS.heo.exp);
     fxEv(a.x, a.y, `Heo đẻ ${n} heo con! 🐷`, COL.good); snd('oink');
     log(s, `Heo nái đẻ ${n} heo con`);
     total += n;
   }
   const fit = pigs.filter(a => animalCan(a, 'product') && !a.sick && a.hunger > HUSBANDRY.growNeedsHunger && a.happy > 40);
-  if (fit.length < 2 || total >= PEN_CAP.pig || !chance(HUSBANDRY.pigBreedChancePerMin, d)) return;
+  if (fit.length < 2 || total >= penCap(s, 'pig') || !chance(HUSBANDRY.pigBreedChancePerMin, d)) return;
   const cand = fit.filter(a => !a.pregnant && s.time >= a.nextProduct);
   if (!cand.length) return;
   const sow = pick(cand);
@@ -497,20 +527,20 @@ function stepPigs(s, d) {
 }
 
 function stepEggs(s) {
-  const chickPen = () => penCount(s, 'chicken') < PEN_CAP.chicken;
+  const chickPen = () => typeFree(s, 'chicken') > 0;
   // trứng bỏ quên: mỗi eggForgetMs thử một lần
   for (const e of [...s.eggs]) {
     e.check ??= e.laidAt + HUSBANDRY.eggForgetMs;
     if (s.time < e.check) continue;
     if (chickPen() && Math.random() < HUSBANDRY.eggHatchChance) {
       s.eggs.splice(s.eggs.indexOf(e), 1);
-      mkAnimal(s, 'ga', 'non', e.x, e.y); s.stats.hatches++;
+      mkAnimal(s, 'ga', 'non', e.x, e.y, { pen: roomyPen(s, 'chicken')?.id }); s.stats.hatches++;
       spawnEv('chick', e.x, e.y); snd('cluck'); fxEv(e.x, e.y, 'Trứng nở! 🐣', COL.good); log(s, 'Một quả trứng bỏ quên đã nở thành gà con');
     } else e.check += HUSBANDRY.eggForgetMs;
   }
   if (s.nest.egg && s.time >= s.nest.hatchAt && chickPen()) {
-    const at = mapOf(s).building('coop').at, p = penPoint(s, 'chicken');
-    s.nest.egg = false; mkAnimal(s, 'ga', 'non', p.x, p.y); s.stats.hatches++;
+    const rp = roomyPen(s, 'chicken'), at = mapOf(s).building('coop').at, p = penPoint(s, 'chicken', rp?.id);
+    s.nest.egg = false; mkAnimal(s, 'ga', 'non', p.x, p.y, { pen: rp?.id }); s.stats.hatches++;
     spawnEv('chick', at.x, at.y); snd('cluck'); fxEv(at.x, at.y, 'Trứng nở! 🐣', COL.good); toast('Trứng ở ổ ấp đã nở gà con 🐣'); log(s, 'Ổ ấp nở ra một gà con');
   }
 }
@@ -750,9 +780,13 @@ function animalActs(s, t) {
 function troughActs(s, t) {
   const item = FEED_OF_PEN[t.pen], n = have(s, item);
   if (!item) return [];
-  return [mk('fill', '🌾', `Đổ cám vào máng (${s.troughs[t.pen]}/${HUSBANDRY.troughMax})`,
+  const acts = [mk('fill', '🌾', `Đổ cám vào máng (${s.troughs[t.pen]}/${HUSBANDRY.troughMax})`,
     n <= 0 ? noItem(item) : s.troughs[t.pen] >= HUSBANDRY.troughMax ? 'Máng đầy ắp rồi' : null)];
+  const up = upgradeInfo(s, t.id ?? mapOf(s).pens[t.pen]?.id);   // chạm vào chuồng (qua máng) cũng nâng cấp được
+  if (up) acts.push(mk('upgrade', '⬆️', `Nâng chuồng lên cấp ${up.lv} (${fmtXu(up.price)} xu)`, up.error));
+  return acts;
 }
+const fmtXu = n => n.toLocaleString('vi-VN');
 
 function nestActs(s) {
   if (s.nest.egg) return [mk('wait', '🪺', `Đang ấp trứng (còn ${mmss(s.nest.hatchAt - s.time)})`, 'Chờ trứng nở nhé')];
@@ -826,7 +860,7 @@ const bad = (msg, at) => res(false, msg, at ? [{ text: msg, color: COL.bad, x: a
 function posOf(s, t) {
   const m = mapOf(s);
   if (t.kind === 'plot' || t.kind === 'lockedPlot') return m.plotCenter(t.idx) ?? s.player;
-  if (t.kind === 'trough') return m.pens[t.pen]?.trough ?? s.player;
+  if (t.kind === 'trough') return troughOf(m, t) ?? s.player;
   if (t.kind === 'nest') return m.building('coop')?.at ?? s.player;
   if (t.kind === 'building') return sceneMap(s).building(t.id)?.at ?? s.player;
   if (t.kind === 'door') return doorOf(s, t.to)?.at ?? s.player;
@@ -953,6 +987,10 @@ const DO = {
   },
 
   trough(s, t, id, at) {
+    if (id === 'upgrade') {
+      const r = upgradePen(s, t.id ?? mapOf(s).pens[t.pen]?.id);
+      return res(r.ok, r.msg, r.ok ? [say(at, `Cấp ${r.lv}! ⬆️`)] : [], r.ok ? 'coin' : 'error');
+    }
     take(s, FEED_OF_PEN[t.pen]);
     s.troughs[t.pen] = Math.min(HUSBANDRY.troughMax, s.troughs[t.pen] + HUSBANDRY.unitsPerBag);
     return res(true, 'Đã đổ cám vào máng', [say(at, `+${HUSBANDRY.unitsPerBag} phần ăn`)], 'eat');
@@ -1048,13 +1086,13 @@ export function buyAnimal(s, type) {
   const def = ANIMALS[type];
   if (!def) return R(false, 'Không có con này');
   if (level(s) < def.lv) return R(false, `Cần cấp ${def.lv} mới mua được`);
-  const pen = mapOf(s).pens[def.pen];
-  if (!pen) return R(false, `Bạn chưa có ${PEN_DEFS[def.pen].name.toLowerCase()}, xây chuồng trước nhé`);
-  if (penCount(s, def.pen) >= PEN_CAP[def.pen]) return R(false, `${pen.name} đã chật rồi`);
+  if (!penEnts(s, def.pen).length) return R(false, `Bạn chưa có ${PEN_DEFS[def.pen].name.toLowerCase()}, xây chuồng trước nhé`, { reason: 'no_pen' });
+  const pen = roomyPen(s, def.pen);
+  if (!pen) return R(false, `${PEN_DEFS[def.pen].name} đã chật rồi, nâng cấp hoặc xây thêm chuồng nhé`, { reason: 'full' });
   if (s.coins < def.price) return R(false, 'Chưa đủ xu, cố lên nhé');
   s.coins -= def.price;
-  const p = penPoint(s, def.pen);
-  mkAnimal(s, type, 'non', p.x, p.y);
+  const p = penPoint(s, def.pen, pen.id);
+  mkAnimal(s, type, 'non', p.x, p.y, { pen: pen.id });
   return R(true, `Đã mua ${def.baby.toLowerCase()}`);
 }
 
@@ -1204,7 +1242,7 @@ function access(m) {
   const add = (key, name, p) => out.push({ key, name, ok: reachable(m, from, p) });
   const mid = (c, r) => ({ x: c * TS + 8, y: r * TS + 8 });
   for (const b of m.buildings) if (b.at && b.id !== 'gate') add(b.id === 'house' ? 'house' : `b${b.ent.id}${b.id}`, b.name, b.at);
-  for (const p of Object.values(m.pens)) add(`p${p.ent.id}`, p.name, mid(...p.gates[0]));
+  for (const p of m.penList) add(`p${p.ent.id}`, p.name, mid(...p.gates[0]));
   for (const e of m.fields) add(`f${e.id}`, 'Khối ruộng', mid(e.c + 1, e.r + 1));
   return out;
 }
@@ -1213,7 +1251,14 @@ export function canPlace(s, what, c, r) {
   const f = s.farm, old = what.id != null ? f.ents.find(e => e.id === what.id) : null;
   if (what.id != null && !old) return no('missing', 'Không thấy công trình này');
   if (old && !canMove(old)) return no('fixed', `${entName(old)} không dời được`);
-  if (!old && what.kind === 'pen' && f.ents.some(x => x.kind === 'pen' && x.pen === what.pen)) return no('exists', `Bạn đã có ${PEN_DEFS[what.pen].name.toLowerCase()} rồi`);
+  if (!old && what.kind === 'pen') {   // chuồng mới: cấp tối thiểu rồi tới số chuồng tối đa mỗi loại theo cấp
+    if (!PEN_TABLE[what.pen]) return no('missing', 'Không có loại chuồng này');
+    if (level(s) < penLevel(what.pen)) return no('level', `Cần cấp ${penLevel(what.pen)} mới xây ${PEN_DEFS[what.pen].name.toLowerCase()} được`);
+    if (penEnts(s, what.pen).length >= penLimit(s, what.pen)) {
+      const nx = penNextLevel(s, what.pen);
+      return no('max_pens', nx ? `Đã đủ ${penLimit(s, what.pen)} ${PEN_DEFS[what.pen].name.toLowerCase()}, lên cấp ${nx} để xây thêm` : `Đã đủ số ${PEN_DEFS[what.pen].name.toLowerCase()} tối đa`);
+    }
+  }
   const e = { ...(old ?? what), c, r }, ft = footprint(e), o = f.owned;
   if (ft.c < o.c || ft.r < o.r || ft.c + ft.w > o.c + o.w || ft.r + ft.h > o.r + o.h) return no('outside', 'Chỗ này ngoài đất của bạn');
   if (f.ents.some(x => CLUTTER[x.kind] && overlaps(ft, footprint(x)))) return no('uncleared', 'Còn bụi cây, đá chưa dọn');
@@ -1284,7 +1329,45 @@ export const fieldCount = s => s.farm.ents.filter(e => e.kind === 'field').lengt
 export const fieldLimit = s => FIELD_LIMITS.reduce((n, [lv, k]) => (level(s) >= lv ? k : n), 0);
 export const fieldNextLevel = s => FIELD_LIMITS.find(([, k]) => k > fieldLimit(s))?.[0] ?? null;   // cấp để có thêm khối; null = đã tối đa
 export const fieldCost = s => (fieldCount(s) < 1 ? 0 : FIELD_PRICES[Math.min(fieldCount(s), FIELD_PRICES.length) - 1]);   // giá khối kế tiếp
-export const penLevel = pen => Math.min(...Object.values(ANIMALS).filter(a => a.pen === pen).map(a => a.lv));
+export const penLevel = pen => PEN_TABLE[pen]?.lv;   // cấp người chơi để xây chuồng loại đó
+export const penLimit = (s, pen) => PEN_TABLE[pen].limit.reduce((n, [lv, k]) => (level(s) >= lv ? k : n), 0);   // số chuồng loại đó tối đa ở cấp hiện tại
+export const penNextLevel = (s, pen) => PEN_TABLE[pen].limit.find(([, k]) => k > penLimit(s, pen))?.[0] ?? null;
+
+// Chuyển con vật sang chuồng khác (vd. vào chuồng cách ly): chuồng đúng loài hoặc chuồng cách ly, còn chỗ.
+export function moveAnimal(s, animalId, penId) {
+  const a = s.animals.find(x => x.id === animalId), e = s.farm.ents.find(x => x.id === penId && x.kind === 'pen');
+  if (!a || !e) return R(false, 'Không thấy con vật hoặc chuồng', { reason: 'missing' });
+  if (e.pen !== 'quarantine' && e.pen !== ANIMALS[a.type].pen) return R(false, `${PEN_DEFS[e.pen].name} không nhận ${ANIMALS[a.type].name.toLowerCase()}`, { reason: 'species' });
+  settlePens(s);
+  if (a.pen === e.id) return R(true, '');
+  if (penUse(s, e.id) >= penCapOf(e)) return R(false, `${PEN_DEFS[e.pen].name} đã chật rồi`, { reason: 'full' });
+  a.pen = e.id;
+  const p = penPoint(s, e.pen, e.id);
+  Object.assign(a, { x: p.x, y: p.y, tile: null });
+  return R(true, `Đã chuyển ${ANIMALS[a.type].name.toLowerCase()} sang ${PEN_DEFS[e.pen].name.toLowerCase()}`, { id: a.id });
+}
+
+// Nâng cấp chuồng (hoặc chuồng chó) id lên cấp kế: trừ xu, sức chứa tăng ngay, con vật giữ nguyên.
+const upKey = e => (e?.kind === 'pen' ? e.pen : e?.kind);
+export function upgradeInfo(s, id) {   // → { lv: cấp sau khi nâng, price, need: cấp người chơi cần, error?: lý do chưa nâng được } | null (đã tối đa / không nâng được)
+  const e = s.farm.ents.find(x => x.id === id), t = PEN_TABLE[upKey(e)];
+  if (!t || penLv(e) >= PEN_LEVELS) return null;
+  const i = penLv(e) - 1, price = t.up[i], need = t.upLv[i];
+  const error = level(s) < need ? `Cần cấp ${need} mới nâng cấp được` : s.coins < price ? 'Chưa đủ xu, cố lên nhé' : null;
+  return { lv: penLv(e) + 1, price, need, ...(error ? { error } : {}) };
+}
+export function upgradePen(s, id) {
+  if (s.scene && s.scene !== 'farm') return R(false, 'Ra vườn rồi hãy nâng cấp nhé', { reason: 'scene' });
+  const e = s.farm.ents.find(x => x.id === id);
+  if (!PEN_TABLE[upKey(e)]) return R(false, 'Không nâng cấp được món này', { reason: 'missing' });
+  const up = upgradeInfo(s, id);
+  if (!up) return R(false, `${entName(e)} đã cấp tối đa rồi`, { reason: 'max' });
+  if (level(s) < up.need) return R(false, up.error, { reason: 'level' });
+  if (s.coins < up.price) return R(false, up.error, { reason: 'coins' });
+  s.coins -= up.price; e.lv = up.lv;
+  bumpLayout(s);
+  return R(true, `Đã nâng ${entName(e).toLowerCase()} lên cấp ${up.lv}`, { id, lv: up.lv, sound: 'coin' });
+}
 // Giá và điều kiện (ngoài chỗ đặt) của món định đặt: xu, cấp, đồ trong túi
 export function placeCost(s, what) {
   if (what.kind === 'field') return fieldCost(s);
@@ -1369,7 +1452,8 @@ export function moveEntity(s, id, c, r) {
   if (!dx && !dy) return R(true, '');
   if (e.kind === 'pen') {   // con vật, trứng trong chuồng đi theo; con vật hoảng một lúc
     const ft = footprint(e), inPen = o => o.x >= ft.c * TS && o.x < (ft.c + ft.w) * TS && o.y >= ft.r * TS && o.y < (ft.r + ft.h) * TS;
-    for (const a of s.animals) if (ANIMALS[a.type].pen === e.pen && a.x != null) { a.x += dx; a.y += dy; a.scaredUntil = s.time + SCARED_MS; }
+    settlePens(s);
+    for (const a of s.animals) if (a.pen === e.id && a.x != null) { a.x += dx; a.y += dy; a.scaredUntil = s.time + SCARED_MS; }
     for (const o of s.eggs) if (o.x != null && inPen(o)) { o.x += dx; o.y += dy; }
   }
   e.c = c; e.r = r;

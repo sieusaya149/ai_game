@@ -154,6 +154,8 @@ test('mở rộng đất theo thứ tự (vườn chuyển từ v1 còn ô khóa
 test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () => {
   const s = newGame();
   s.animals = [];
+  s.exp = 1e4; s.coins = 5000;
+  assert.ok(G.placeEntity(s, { kind: 'pen', pen: 'pig' }, 34, 18).ok);   // chuồng heo (sức chứa cấp 1: 3 con)
   const troughOk = () => { s.troughs.pig = 20; };
   for (let i = 0; i < 2; i++) {
     const a = { id: s.nextId++, type: 'heo', stage: 'truong', age: G.stageStart('heo', 'truong'), hunger: 100, happy: 100, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 330, y: 320, name: 'Heo' };
@@ -347,7 +349,7 @@ test('mua bán: kiểm tra cấp, xu, chuồng', () => {
   assert.ok(G.buyAnimal(s, 'ga').ok);
   s.coins = 1e6;
   while (G.buyAnimal(s, 'ga').ok);
-  assert.equal(s.animals.filter(a => a.type === 'ga').length, 10);
+  assert.equal(s.animals.filter(a => a.type === 'ga').length, 6);   // chuồng gà cấp 1 chứa 6
   assert.ok(G.buyOutfit(s, 'hat', 2).ok);
   assert.equal(G.buyOutfit(s, 'hat', 2).ok, false);
   G.setLook(s, { hat: 2, acc: 2 });

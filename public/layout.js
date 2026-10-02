@@ -25,23 +25,29 @@ export const BUILDING_DEFS = {
 };
 
 // Chuồng: kích thước khung rào (ô); các vị trí bên trong tính so với góc trên-trái khung.
-// trough: ô máng (c, r) + điểm vẽ (x, y); area: vùng con vật đi lang thang (điểm ảnh).
+// trough: ô máng (c, r) + điểm vẽ (x, y), không có thì chuồng không có máng; area: vùng con vật đi lang thang (điểm ảnh);
+// house: điểm chân (giữa đáy) của nhà/mái chuồng vẽ theo cấp (SPR3.pen).
 export const PEN_DEFS = {
   chicken: {
     name: 'Chuồng gà', w: 13, h: 9, gates: [[6, 0], [7, 0]],
-    trough: { c: 1, r: 1, x: 32, y: 30 }, area: { x: 22, y: 42, w: 164, h: 84 },
+    trough: { c: 1, r: 1, x: 32, y: 30 }, area: { x: 22, y: 42, w: 164, h: 84 }, house: { x: 74, y: 42, sprite: 'coop' },
     ground: { kind: 'PEN', c: 1, r: 1, w: 11, h: 7 },
     nest: { foot: { c: 9, r: 1, w: 2, h: 1 }, spr: { x: 145, y: 4 }, at: { x: 160, y: 42 } },
   },
   pig: {
     name: 'Chuồng heo', w: 6, h: 9, gates: [[2, 0]],
-    trough: { c: 3, r: 1, x: 64, y: 30 }, area: { x: 22, y: 42, w: 52, h: 84 },
+    trough: { c: 3, r: 1, x: 64, y: 30 }, area: { x: 22, y: 42, w: 52, h: 84 }, house: { x: 62, y: 126, sprite: 'pig' },
     ground: { kind: 'MUD', c: 1, r: 1, w: 4, h: 7 },
     mud: { x: 24, y: 84, w: 40, h: 22 }, mudSpot: { x: 44, y: 95, rx: 22, ry: 14, x0: 28, x1: 60, y0: 88, y1: 102 },
   },
   pasture: {
     name: 'Đồng cỏ bò cừu', w: 8, h: 9, gates: [[3, 0]],
-    trough: { c: 5, r: 1, x: 96, y: 30 }, area: { x: 22, y: 42, w: 84, h: 84 },
+    trough: { c: 5, r: 1, x: 96, y: 30 }, area: { x: 22, y: 42, w: 84, h: 84 }, house: { x: 100, y: 126, sprite: 'barn' },
+  },
+  // Chuồng cách ly: nhận mọi loài, mỗi chỗ một con, không có máng
+  quarantine: {
+    name: 'Chuồng cách ly', w: 5, h: 5, gates: [[2, 0]],
+    area: { x: 18, y: 26, w: 44, h: 36 }, house: { x: 40, y: 78, sprite: 'quarantine' },
   },
 };
 

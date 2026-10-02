@@ -17,7 +17,8 @@ export const animalDefaults = a => ({
   bond: 2,                              // độ thân ❤️1..5
   weight: weightAt(a.type, a.stage ?? 'non'),   // kg
   mom: null, dad: null,                 // { id, name } của cha mẹ nếu đẻ trong trại
-  tile: null,                           // { c, r } ô đang đứng khi thả rông (ADR 0013); null = trong chuồng
+  pen: null,                            // id thực thể chuồng đang ở (xếp tự động khi null, xem settlePens ở state.js)
+  tile: null,                          // { c, r } ô đang đứng khi thả rông (ADR 0013); null = trong chuồng
   nextProduct: 0, ready: false, pregnant: false, dueAt: 0,
 });
 export function fillAnimal(a) {

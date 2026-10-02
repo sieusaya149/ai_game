@@ -4,7 +4,7 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR3 } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, actionsFor, nextStrip } from './state.js';
+import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
@@ -203,10 +203,12 @@ export function crowImg(face, frame) {
 export const eggSize = () => { const e = eggImg(); return { w: e.width, h: e.height }; };
 export const poopSize = () => { const e = poopImg(); return { w: e.width, h: e.height }; };
 const spr2 = key => String(key).split('.').reduce((o, k) => o?.[k], SPR2);   // 'villageHouses.1' = phần tử của mảng
+const PEN_SHORT = { chicken: 'Gà', pig: 'Heo', pasture: 'Bò cừu', quarantine: 'Cách ly' };
 export function buildingImg(b) {
   if (b.interior) return spr2(b.sprite) ?? furnFallback(b.sprite);
   if (b.sprite === 'well') return wellImg();
   if (b.sprite === 'board') return boardImg();
+  if (b.sprite === 'doghouse' && SPR3?.doghouse) return SPR3.doghouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.doghouse[0];   // chuồng chó 3 cấp
   return SPR[b.sprite] ?? SPR2?.[b.sprite] ?? null;
 }
 export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h: i.height }; }
@@ -322,7 +324,7 @@ function outdoorChunk(m, ci, cw) {
   }
 
   // hàng rào, xếp theo hàng để chồng lớp đúng
-  for (const f of fences.filter(f => f.c >= c0 && f.c <= c1 && f.r >= r0 && f.r <= r1).sort((a, b) => a.r - b.r || a.c - b.c)) fenceTile(x, f.kind, f.c * TS, f.r * TS);
+  for (const f of fences.filter(f => f.c >= c0 && f.c <= c1 && f.r >= r0 && f.r <= r1).sort((a, b) => a.r - b.r || a.c - b.c)) fenceTile(x, f.kind, f.c * TS, f.r * TS, f.lv);
 
   // cỏ và hoa lác đác
   const nearRoad = (c, r) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => gAt(c + a, r + b) === GROUND.ROAD);
@@ -505,9 +507,11 @@ export function render(ctx, f) {
     }
     if (b.id === 'market' && SPR2?.marketClosed && !marketOpen(state)) add((b.foot.r + b.foot.h) * TS + 0.5, () => blit(SPR2.marketClosed, b.x + 12, b.y + 22));
   }
-  for (const [pen, p] of Object.entries(m.pens)) {
-    const tr = p.trough, n = state.troughs?.[pen] ?? 0;
-    if (!vis(tr.x, tr.y, 20)) continue;
+  for (const p of m.penList) {   // nhà/mái chuồng theo cấp, rồi máng
+    const hs = p.house, hi = hs.sprite === 'quarantine' ? SPR3?.quarantine : SPR3?.pen?.[hs.sprite]?.[p.lv - 1];
+    if (hi && vis(hs.x, hs.y - hi.height / 2, hi.width)) add(hs.y, () => blit(hi, hs.x - hi.width / 2, hs.y - hi.height));
+    const tr = p.trough, n = state.troughs?.[p.type] ?? 0;
+    if (!tr || !vis(tr.x, tr.y, 20)) continue;
     add(tr.y, () => {
       blit(SPR.trough, tr.x - 13, tr.y - 12);
       if (n <= 0) { rect(ctx, '#8a5a2b', tr.x - 12, tr.y - 9, 24, 3); rect(ctx, '#6b4020', tr.x - 12, tr.y - 9, 24, 1); }
@@ -789,6 +793,12 @@ export function render(ctx, f) {
     if (b.sub) outlined(b.sub, toSX(cx), toSY(b.y + img.height) + 11 * scale, Math.round(11 * dpr), '#ffe9a0');
     if (b.id === 'market' && !marketOpen(state)) fit('Đóng cửa', toSX(b.x + 24), toSY(b.y + 22 + 9), 20 * scale, Math.round(5.5 * scale), '#ffe9a0');
     if (b.id === 'friendGate') fit('Bạn bè', toSX(b.x + 20), toSY(b.y + 18), 14 * scale, Math.round(4.5 * scale), '#4a2c14');
+  }
+  // biển chuồng: tên ngắn + số con/sức chứa
+  for (const p of m.penList) {
+    const cx = (p.rect.c + p.rect.w / 2) * TS, y = p.rect.r * TS - 1;
+    if (!vis(cx, y, 40)) continue;
+    outlined(`${PEN_SHORT[p.type]} ${penUse(state, p.id)}/${penCapOf(p.ent)}`, toSX(cx), toSY(y), Math.round(10 * dpr), '#fff6d8');
   }
   // tên người chơi
   {

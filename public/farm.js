@@ -36,12 +36,14 @@ export function footprint(e) {
 
 // Dựng bản đồ từ một bố cục bất kỳ, không nhớ tạm (để thử bố cục trước khi đặt).
 export const buildMap = f => build(f);
+// Máng của mục tiêu { pen, id? }: máng đúng chuồng nếu có id, không thì chuồng đầu tiên của loại
+export const troughOf = (m, t) => (m.penById[t.id] ?? m.pens[t.pen])?.trough;
 
 function build(f) {
   const { mw, mh, owned } = f, W = mw * TS, H = mh * TS;
   const idx = (c, r) => r * mw + c;
   const ground = new Uint8Array(mw * mh), solid = new Uint8Array(mw * mh);
-  const fences = [], buildings = [], pens = {}, troughs = [], trees = [], decos = [], fields = [], clutter = [];
+  const fences = [], buildings = [], pens = {}, penList = [], penById = {}, troughs = [], trees = [], decos = [], fields = [], clutter = [];
   const plotPos = new Map(), plotByTile = new Map();
   const inside = (c, r) => c >= 0 && r >= 0 && c < mw && r < mh;
   const fill = (c, r, w, h, g) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (inside(x, y)) ground[idx(x, y)] = g; };
@@ -67,19 +69,20 @@ function build(f) {
       if (d.ground) fill(e.c + d.ground.c, e.r + d.ground.r, d.ground.w, d.ground.h, GROUND[d.ground.kind]);
       const gates = d.gates.map(([dc, dr]) => [e.c + dc, e.r + dr]);
       const isGate = (x, y) => gates.some(([gx, gy]) => gx === x && gy === y);
-      for (let x = rect.c; x < rect.c + rect.w; x++) for (const y of [rect.r, rect.r + rect.h - 1]) if (!isGate(x, y)) fences.push({ c: x, r: y, kind: 'h' });
-      for (let y = rect.r + 1; y < rect.r + rect.h - 1; y++) for (const x of [rect.c, rect.c + rect.w - 1]) if (!isGate(x, y)) fences.push({ c: x, r: y, kind: 'v' });
-      const trough = { c: e.c + d.trough.c, r: e.r + d.trough.r, x: px + d.trough.x, y: py + d.trough.y };
-      pens[e.pen] = { name: d.name, rect, gates, trough, area: { x: px + d.area.x, y: py + d.area.y, w: d.area.w, h: d.area.h }, ent: e };
-      troughs.push({ pen: e.pen, c: trough.c, r: trough.r, w: 2 });
-      block(trough.c, trough.r, 2, 1);
-      if (d.nest) {
+      for (let x = rect.c; x < rect.c + rect.w; x++) for (const y of [rect.r, rect.r + rect.h - 1]) if (!isGate(x, y)) fences.push({ c: x, r: y, kind: 'h', lv: e.lv ?? 1 });
+      for (let y = rect.r + 1; y < rect.r + rect.h - 1; y++) for (const x of [rect.c, rect.c + rect.w - 1]) if (!isGate(x, y)) fences.push({ c: x, r: y, kind: 'v', lv: e.lv ?? 1 });
+      const trough = d.trough ? { c: e.c + d.trough.c, r: e.r + d.trough.r, x: px + d.trough.x, y: py + d.trough.y } : null;
+      const pen = { id: e.id, type: e.pen, lv: e.lv ?? 1, name: d.name, rect, gates, trough, area: { x: px + d.area.x, y: py + d.area.y, w: d.area.w, h: d.area.h }, house: { x: px + d.house.x, y: py + d.house.y, sprite: d.house.sprite }, ent: e };
+      pens[e.pen] ??= pen;   // pens[loại] = chuồng đầu tiên của loại đó; penList/penById có đủ mọi chuồng
+      penList.push(pen); penById[e.id] = pen;
+      if (trough) { troughs.push({ pen: e.pen, id: e.id, c: trough.c, r: trough.r, w: 2 }); block(trough.c, trough.r, 2, 1); }
+      if (d.nest && !buildings.some(b => b.id === 'coop')) {   // ổ ấp chỉ có ở chuồng gà đầu tiên
         const n = d.nest;
         buildings.push({ id: 'coop', kind: 'coop', name: 'Ổ ấp trứng', sprite: 'coop', x: px + n.spr.x, y: py + n.spr.y,
           foot: { c: e.c + n.foot.c, r: e.r + n.foot.r, w: n.foot.w, h: n.foot.h }, at: { x: px + n.at.x, y: py + n.at.y }, ent: e });
         block(e.c + n.foot.c, e.r + n.foot.r, n.foot.w, n.foot.h);
       }
-      if (d.mud) {
+      if (d.mud && !mud) {
         mud = { x: px + d.mud.x, y: py + d.mud.y, w: d.mud.w, h: d.mud.h };
         const q = d.mudSpot;
         mudSpot = { x: px + q.x, y: py + q.y, rx: q.rx, ry: q.ry, x0: px + q.x0, x1: px + q.x1, y0: py + q.y0, y1: py + q.y1 };
@@ -122,7 +125,7 @@ function build(f) {
   const view = { x0: Math.max(0, owned.c * TS - pad), y0: Math.max(0, owned.r * TS - pad), x1: Math.min(W, (owned.c + owned.w) * TS + pad), y1: Math.min(H, (owned.r + owned.h) * TS + pad) };
   const plotTile = i => plotPos.get(i) ?? null;
   return {
-    scene: 'farm', rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, troughs, trees, border, bushes, decos, fields, clutter, mud, mudSpot,
+    scene: 'farm', rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, penList, penById, troughs, trees, border, bushes, decos, fields, clutter, mud, mudSpot,
     doors, arrive,
     spawn: spawn ?? { x: (owned.c + 2) * TS, y: (owned.r + 2) * TS }, dogHome: dogHome ?? spawn, gateIn,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)),
@@ -178,7 +181,7 @@ function buildFixed(id, d) {
     : { x0: 0, y0: 0, x1: W, y1: H };
   return {
     scene: id, interior: !out, outdoor: out, name: d.name, mw, mh, W, H, owned, view, ground, solid,
-    fences: [], buildings, pens: {}, troughs: [], trees, border: border.filter(p => !clear(p)), bushes, decos: [], fields: [], clutter: [], mud: null, mudSpot: null,
+    fences: [], buildings, pens: {}, penList: [], penById: {}, troughs: [], trees, border: border.filter(p => !clear(p)), bushes, decos: [], fields: [], clutter: [], mud: null, mudSpot: null,
     props: d.props, doors, arrive: d.arrive, spawn: Object.values(d.arrive)[0], dogHome: null, gateIn: null,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)), isOwned: (c, r) => inside(c, r),
     building: bid => buildings.find(b => b.id === bid) ?? null,
