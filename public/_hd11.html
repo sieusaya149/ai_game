@@ -1,0 +1,98 @@
+<!doctype html><meta charset="utf-8"><title>HD11 công trình</title>
+<style>
+  body { margin: 0; padding: 10px; background: #4f8a34; font: 12px sans-serif; color: #fff; }
+  h2 { margin: 10px 0 6px; font-size: 14px; }
+  canvas { image-rendering: pixelated; display: block; }
+  #grid { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+  .cell { background: #5e9a40; border: 1px solid #2f5a1e; padding: 4px; }
+  .cell .t { font-size: 11px; margin-bottom: 2px; }
+  .pair { display: flex; gap: 6px; align-items: flex-end; }
+  .pair div { text-align: center; font-size: 10px; }
+  #report { white-space: pre; font: 12px monospace; background: #222; padding: 6px; margin-top: 8px; }
+</style>
+<body>
+<h2>Công trình: Cũ (bộ cũ, phóng) | Mới (SPR11, 2x, cùng cỡ màn hình)</h2>
+<div id="grid"></div>
+<div id="report"></div>
+<script type="module">
+import { SPR } from './art.js';
+import { SPR2 } from './art2.js';
+import { SPR3 } from './art3.js';
+let SPR11 = {};
+try { ({ SPR11 } = await import('./art11.js')); } catch (e) { console.error('art11', e.message, e.stack); }
+const Q = new URLSearchParams(location.search);
+const S = +(Q.get('s') || 3);
+const OLD = { SPR, SPR2, SPR3 };
+// [bộ cũ, đường dẫn]
+const LIST = [
+  ['SPR', 'house'], ['SPR', 'shed'], ['SPR2', 'shippingBin'], ['SPR', 'well'], ['SPR', 'board'], ['SPR', 'signboard'],
+  ['SPR', 'coop'], ['SPR', 'nestEmpty'], ['SPR', 'nestEgg'], ['SPR', 'trough'], ['SPR', 'hay'],
+  ['SPR3', 'pen.coop.0'], ['SPR3', 'pen.coop.1'], ['SPR3', 'pen.coop.2'],
+  ['SPR3', 'pen.pig.0'], ['SPR3', 'pen.pig.1'], ['SPR3', 'pen.pig.2'],
+  ['SPR3', 'pen.barn.0'], ['SPR3', 'pen.barn.1'], ['SPR3', 'pen.barn.2'],
+  ['SPR3', 'quarantine'], ['SPR3', 'doghouse.0'], ['SPR3', 'doghouse.1'], ['SPR3', 'doghouse.2'],
+  ['SPR3', 'cathouse.0'], ['SPR3', 'cathouse.1'], ['SPR3', 'cathouse.2'], ['SPR3', 'catDoor'],
+  ['SPR3', 'homeBoard'], ['SPR3', 'scale'], ['SPR3', 'guardPost'], ['SPR3', 'lowFence.h'], ['SPR3', 'lowFence.v'],
+  ['SPR3', 'canopy'],
+  ['SPR3', 'vetClinic'],
+  ['SPR2', 'marketStall'], ['SPR2', 'marketClosed'], ['SPR2', 'smithy'], ['SPR2', 'villageHouses.0'], ['SPR2', 'villageHouses.1'],
+  ['SPR2', 'friendGate'], ['SPR2', 'homeGate'], ['SPR2', 'giftBox'], ['SPR2', 'giftBoxFull'], ['SPR2', 'giftBoxOpen'],
+  ['SPR2', 'guestBook'], ['SPR2', 'guestBookOpen'], ['SPR2', 'lampPost'], ['SPR2', 'bench'], ['SPR2', 'dogChain'],
+  ['SPR2', 'bed'], ['SPR2', 'bedSleep'], ['SPR2', 'wardrobe'], ['SPR2', 'table'], ['SPR2', 'stove'], ['SPR2', 'rug'],
+  ['SPR2', 'window'], ['SPR2', 'pottedPlant'], ['SPR2', 'phone'], ['SPR2', 'doorMat'], ['SPR2', 'wallInner'],
+  ['SPR2', 'floors.0'], ['SPR2', 'floors.1'],
+  ['SPR', 'deco.deco_scarecrow'], ['SPR', 'deco.deco_flower'], ['SPR', 'deco.deco_lamp'], ['SPR', 'deco.deco_bench'],
+  ['SPR', 'shop'], ['SPR', 'mailbox'],
+];
+const get = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
+const only = Q.get('only') ? Q.get('only').split(',') : null;
+const report = [], bad = [];
+const grid = document.getElementById('grid');
+function view(im, k) {
+  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  c.style.width = (im.width / k) * S + 'px'; c.style.height = (im.height / k) * S + 'px';
+  c.getContext('2d').drawImage(im, 0, 0);
+  return c;
+}
+const lab = (t, cv) => { const d = document.createElement('div'); d.append(cv, t); return d; };
+for (const [set, p] of LIST) {
+  const o = get(OLD[set], p);
+  if (!o) { report.push(`-- ${set}.${p}: bộ cũ không có`); continue; }
+  let n = get(SPR11, p);
+  if (n && !(n instanceof HTMLCanvasElement)) { report.push(`!! ${set}.${p}: SPR11 có khóa nhưng không phải ảnh (khác cấu trúc)`); n = null; }
+  if (!n) report.push(`   ${set}.${p}: ${o.width}x${o.height} chưa vẽ`);
+  else {
+    const ok = n.width === 2 * o.width && n.height === 2 * o.height;
+    if (!ok) bad.push(p);
+    report.push(`${ok ? 'ok ' : 'SAI'} ${set}.${p}: cũ ${o.width}x${o.height} → mới ${n.width}x${n.height}`);
+  }
+  if (only && !only.some(s => p === s || p.startsWith(s + '.'))) continue;
+  if (Q.get('newonly') && !n) continue;
+  const cell = document.createElement('div'); cell.className = 'cell';
+  cell.innerHTML = `<div class="t">${set}.${p}</div>`;
+  const pr = document.createElement('div'); pr.className = 'pair';
+  pr.append(lab('Cũ', view(o, 1)));
+  if (n) pr.append(lab('Mới', view(n, 2)));
+  cell.append(pr); grid.append(cell);
+}
+// hàng rào: fenceTile (cũ) và fenceTileHD (mới, vẽ trên lớp scale 2) — 3 ô ngang + 2 ô dọc mỗi cấp
+if (!only || only.includes('fence')) {
+  const { fenceTile } = await import('./art.js');
+  const { fenceTileHD } = await import('./art11.js').catch(() => ({}));
+  for (const lv of [1, 2, 3]) for (const [k, fn] of [['Cũ', fenceTile], ['Mới', fenceTileHD]]) {
+    if (!fn) continue;
+    const R = k === 'Mới' ? 2 : 1, c = document.createElement('canvas'); c.width = 64 * R; c.height = 48 * R;
+    c.style.width = 64 * S + 'px'; c.style.height = 48 * S + 'px';
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.scale(R, R);
+    for (let i = 0; i < 3; i++) fn(x, 'h', i * 16, 0, lv);
+    fn(x, 'h', 48, 0, lv); fn(x, 'v', 48, 16, lv); fn(x, 'v', 48, 32, lv);
+    const cell = document.createElement('div'); cell.className = 'cell';
+    cell.innerHTML = `<div class="t">fence lv${lv} ${k}</div>`; cell.append(c); grid.append(cell);
+  }
+}
+report.unshift(`SPR11: ${Object.keys(SPR11).length} khóa; sai cỡ: ${bad.length ? bad.join(', ') : 'không'}`);
+document.getElementById('report').textContent = report.join('\n');
+if (Q.get('norep')) document.getElementById('report').style.display = 'none';
+window.__report = report;
+window.__ready = true;
+</script>

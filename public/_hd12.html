@@ -1,0 +1,154 @@
+<!doctype html><meta charset="utf-8"><title>HD12</title>
+<style>
+  body { margin: 0; padding: 8px; background: #3a5a2a; font: 11px sans-serif; color: #fff; }
+  h2 { margin: 10px 0 2px; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+  .pair { display: flex; gap: 3px; align-items: flex-end; background: rgba(0,0,0,0.18); padding: 3px; }
+  .cell { display: flex; flex-direction: column; gap: 1px; }
+  .cell span { font-size: 9px; color: #ffe9a8; }
+  canvas { image-rendering: pixelated; }
+  #bad { color: #ffb0a0; font-weight: bold; }
+  .mos { display: flex; gap: 12px; }
+</style>
+<body>
+<div id="bad"></div>
+<div id="mos" class="mos"></div>
+<div id="root"></div>
+<script type="module">
+import { SPR, hash, paint, canvas as mk } from './art.js';
+import { SPR2 } from './art2.js';
+import { SPR3 } from './art3.js';
+import { SPR12, SPR12_FROM, SPR12_EXTRA, landHD } from './art12.js';
+import { GROUND, tileHash } from './layout.js';
+const q = new URLSearchParams(location.search);
+const Z = Number(q.get('z') || 4), only = q.get('only'), noMos = q.has('nomos');
+const OLD = { SPR, SPR2, SPR3 };
+const bad = [], ok = [];
+function cv(img, z) {
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  c.getContext('2d').drawImage(img, 0, 0);
+  c.style.width = img.width * z + 'px'; c.style.height = img.height * z + 'px';
+  return c;
+}
+function cell(img, label, z) { const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span'); s.textContent = label; d.append(s, cv(img, z)); return d; }
+const isImg = v => v instanceof HTMLCanvasElement;
+// ovs = các ảnh/nhánh cũ cùng đường khóa ở mọi bộ cũ (khóa trùng tên giữa SPR/SPR2/SPR3); lá phải khớp đúng 2x một ảnh cũ
+function walk(row, nv, ovs, path) {
+  if (isImg(nv)) {
+    const imgs = ovs.filter(isImg), ov = imgs.find(o => nv.width === o.width * 2 && nv.height === o.height * 2);
+    if (!imgs.length) { bad.push(`${path}: không có khóa cũ`); return; }
+    if (!ov) { bad.push(`${path}: ${nv.width}x${nv.height} ≠ 2×${imgs[0].width}x${imgs[0].height}`); return; }
+    ok.push(path);
+    if (row) { const p = document.createElement('div'); p.className = 'pair'; p.append(cell(ov, `Cũ ${path.split('.').slice(-2).join('.')} ${ov.width}x${ov.height}`, Z), cell(nv, `Mới ${nv.width}x${nv.height}`, Z / 2)); row.append(p); }
+    return;
+  }
+  if (!ovs.length) { bad.push(`${path}: không có khóa cũ`); return; }
+  for (const k in nv) walk(row, nv[k], ovs.map(o => o?.[k]).filter(v => v != null), `${path}.${k}`);
+}
+const root = document.getElementById('root');
+for (const top in SPR12) {
+  const srcs = Object.entries(OLD).filter(([, O]) => O[top] != null);
+  const show = !only || only.split(',').some(o => top.startsWith(o));
+  let row = null;
+  if (show) { const h = document.createElement('h2'); h.textContent = `${top}  (thay ${SPR12_FROM[top] ?? srcs.map(s => s[0]).join('/')}.${top})`; row = document.createElement('div'); row.className = 'row'; root.append(h, row); }
+  walk(row, SPR12[top], srcs.map(s => s[1][top]), top);
+}
+{ // cặp không chung khóa được (SPR12_EXTRA)
+  const h = document.createElement('h2'); h.textContent = 'SPR12_EXTRA.medicine3 (thay SPR3.items.medicine)';
+  const row = document.createElement('div'); row.className = 'row'; root.append(h, row);
+  walk(only ? null : row, SPR12_EXTRA.medicine3, [SPR3.items.medicine], 'SPR3.items.medicine');
+}
+document.getElementById('bad').textContent = bad.length ? 'SAI CỠ: ' + bad.join(' | ') : `Kiểm cỡ: ${ok.length} sprite đều đúng 2×`;
+
+// ---------- mảng nền 10x8 ô ghép thử: cũ (render.js bản 1x) | mới (landHD + sprite 2x) ----------
+const MW = 10, MH = 8, TS = 16, G = GROUND;
+const L = [
+  'FFFFFFFFFF',
+  'FgggggRggF',
+  'FgPPPgRggF',
+  'FgPMPgRRRR',
+  'FgPPPgRggg',
+  'RRRRRRRggg',
+  'gggaaaRgbg',
+  'gggaaaRggg',
+];
+const code = { F: G.FOREST, g: G.GRASS, b: G.GRASS, R: G.ROAD, P: G.PEN, M: G.MUD, a: G.FIELD };
+const ground = L.flatMap(r => [...r].map(ch => code[ch]));
+const m = { ground, mw: MW, mh: MH, W: MW * TS, H: MH * TS, solid: new Array(MW * MH).fill(0) };
+// bản cũ: chép đúng luật tô nền của render.outdoorChunk
+function oldLand() {
+  const gAt = (c, r) => (c < 0 || r < 0 || c >= MW || r >= MH) ? -1 : ground[r * MW + c];
+  const isRoad = (c, r) => { const g = gAt(c, r); return g === G.ROAD || g === -1; };
+  return paint(m.W, m.H, (px, py) => {
+    const tc = px >> 4, tr = py >> 4, lx = px & 15, ly = py & 15;
+    const g = ground[tr * MW + tc], n = hash(px, py);
+    if (g === G.ROAD) {
+      let d = 99;
+      if (!isRoad(tc - 1, tr)) d = Math.min(d, lx);
+      if (!isRoad(tc + 1, tr)) d = Math.min(d, 15 - lx);
+      if (!isRoad(tc, tr - 1)) d = Math.min(d, ly);
+      if (!isRoad(tc, tr + 1)) d = Math.min(d, 15 - ly);
+      for (const [dc, dr] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) if (!isRoad(tc + dc, tr + dr) && isRoad(tc + dc, tr) && isRoad(tc, tr + dr)) d = Math.min(d, Math.max(dc < 0 ? lx : 15 - lx, dr < 0 ? ly : 15 - ly));
+      if (d === 0) return '#a98b56';
+      if (d === 1) return n < 0.6 ? '#c3a571' : '#d1b683';
+      if (d === 2 && n < 0.3) return '#d1b683';
+      if (n < 0.07) return '#c8ab77';
+      if (n > 0.96) return '#ecd9a8';
+      if (hash(px >> 2, py >> 2) < 0.18) return '#d6bb86';
+      return '#dcc490';
+    }
+    if (g === G.FOREST) { const b = hash(px >> 3, py >> 3); if (n < 0.06) return '#1f3d16'; return b < 0.3 ? '#2c5520' : b > 0.8 ? '#36662a' : '#305c24'; }
+    if (g === G.FIELD) return n < 0.08 ? '#6a4324' : '#7b512b';
+    if (g === G.PEN) { let col = '#c9a56b'; const b = hash(px >> 2, py >> 2); if (b < 0.2) col = '#bf9a60'; else if (b > 0.85) col = '#d4b37a'; if (n < 0.05) col = '#a9854f'; const s = hash((px >> 1) + 31, py + 17); if (s < 0.05) col = '#efd067'; else if (s < 0.08) col = '#dcb13c'; if (hash(px >> 2, py * 3 + 9) < 0.05 && (px & 3) < 3) col = '#f0d668'; return col; }
+    if (g === G.MUD) { const b = hash(px >> 2, py >> 2); if (b < 0.28) return '#5f3f23'; if (n > 0.95) return '#8b6a44'; return n < 0.1 ? '#654427' : '#6f4c2c'; }
+    if ((lx === 0 && isRoad(tc - 1, tr) && gAt(tc - 1, tr) === G.ROAD) || (lx === 15 && gAt(tc + 1, tr) === G.ROAD) || (ly === 0 && gAt(tc, tr - 1) === G.ROAD) || (ly === 15 && gAt(tc, tr + 1) === G.ROAD)) { if (n < 0.65) return '#5d9f3d'; }
+    const b = hash(px >> 3, py >> 3);
+    let col = b < 0.22 ? '#67b142' : b > 0.86 ? '#74c24d' : '#6cb846';
+    if (n < 0.05) col = '#57a238'; else if (n < 0.075 && hash(px, py - 1) < 0.5) col = '#5aa63a'; else if (n > 0.985) col = '#93d95e';
+    return col;
+  });
+}
+// Ghép như render: nền, rừng, vật trên cỏ; S = 1 (cũ) hoặc 2 (mới)
+function scene(S) {
+  const c = mk(m.W * S, m.H * S), x = c.getContext('2d');
+  x.imageSmoothingEnabled = false;
+  x.scale(S, S);
+  const H = S === 2;
+  const pick = (o, n) => (H && n ? n : o);
+  const put = (o, n, px, py) => (H && n ? x.drawImage(n, px, py, o.width, o.height) : x.drawImage(o, px, py));
+  if (H) x.drawImage(landHD(m, 0, 0, m.W, m.H), 0, 0, m.W, m.H); else x.drawImage(oldLand(), 0, 0);
+  for (let r = 0; r < MH; r++) for (let cc = 0; cc < MW; cc++) {
+    const i = r * MW + cc;
+    if (ground[i] === G.FOREST) { const k = tileHash(cc, r) % 6; put(SPR2.forest[k], SPR12.forest[k], cc * TS, r * TS); }
+    if (ground[i] === G.FIELD) {
+      const k = (cc + r) % 3, o = [SPR.soil.untilled, SPR.soil.tilledDry, SPR.soil.tilledWet][k], n = [SPR12.soil.untilled, SPR12.soil.tilledDry, SPR12.soil.tilledWet][k];
+      put(o, n, cc * TS, r * TS);
+    }
+  }
+  // vũng bùn trong chuồng
+  put(SPR.mud, SPR12.mud, 2 * TS + 4, 3 * TS - 3);
+  // cỏ và hoa lác đác (cùng luật băm như render)
+  const nearRoad = (c, r) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => ground[(r + b) * MW + c + a] === G.ROAD);
+  for (let r = 0; r < MH; r++) for (let cc = 0; cc < MW; cc++) {
+    if (ground[r * MW + cc] !== G.GRASS || nearRoad(cc, r)) continue;
+    const h = hash(cc * 7 + 3, r * 13 + 5), ox = Math.floor(hash(cc, r + 99) * 10) + 1, oy = Math.floor(hash(cc + 50, r) * 11) + 2;
+    if (h < 0.3) put(SPR.tuft, SPR12.tuft, cc * TS + ox, r * TS + oy);
+    else if (h < 0.5) { const k = Math.floor(hash(cc + 9, r + 9) * 3); put(SPR.flowers[k], SPR12.flowers[k], cc * TS + ox, r * TS + oy); }
+  }
+  put(SPR2.rocks[0], SPR12.rocks[0], 8 * TS, 4 * TS);
+  put(SPR2.bushes[1], SPR12.bushes[1], 7 * TS, 1 * TS);
+  put(SPR2.stump, SPR12.stump, 1 * TS, 6 * TS);
+  put(SPR.bush, SPR12.bush, 8 * TS + 2, 6 * TS);
+  put(SPR.tree, SPR12.tree, 3 * TS, 0 * TS - 6);
+  put(SPR.deco.deco_scarecrow, SPR12.deco.deco_scarecrow, 4 * TS, 6 * TS - 12);
+  put(SPR.select, SPR12.select, 5 * TS, 7 * TS);
+  return c;
+}
+if (!noMos) {
+  const mos = document.getElementById('mos');
+  const MZ = Number(q.get('mz') || 4);
+  mos.append(cell(scene(1), `Cũ: nền 10x8 ô (x${MZ})`, MZ), cell(scene(2), `Mới: landHD + sprite 2x (x${MZ})`, MZ / 2));
+}
+window.__sizeReport = { ok: ok.length, bad };
+window.__ready = true;
+</script>

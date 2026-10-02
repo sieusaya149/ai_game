@@ -53,7 +53,10 @@ function computeScale() {
   const forced = Number(new URLSearchParams(location.search).get('scale'));
   if (forced > 0) return forced * dpr;
   const s = Math.min(canvas.width, canvas.height) / (12 * TS);   // cạnh ngắn thấy ~12 ô
-  return dpr >= 2 ? Math.max(1, Math.round(s * 2) / 2) : Math.max(1, Math.round(s));
+  // số chẵn điểm canvas cho mỗi điểm bản đồ: art 2x (kiểu A) mỗi điểm = scale/2 điểm canvas, luôn đều.
+  // Chọn số chẵn gần nhất theo tỉ lệ (lệch tầm nhìn ít nhất): lo..lo+2, lấy lo+2 khi s vượt trung bình nhân.
+  const lo = Math.max(2, 2 * Math.floor(s / 2));
+  return s * s > lo * (lo + 2) ? lo + 2 : lo;
 }
 function resize() {
   dpr = window.devicePixelRatio || 1;

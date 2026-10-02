@@ -1,0 +1,92 @@
+<!doctype html><meta charset="utf-8"><title>HD13</title>
+<style>
+  body { margin: 0; padding: 8px; background: #3a5a2a; font: 11px sans-serif; color: #fff; }
+  h2 { margin: 10px 0 2px; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+  .pair { display: flex; gap: 3px; align-items: flex-end; background: rgba(0,0,0,0.18); padding: 3px; }
+  .cell { display: flex; flex-direction: column; gap: 1px; }
+  .cell span { font-size: 9px; color: #ffe9a8; }
+  canvas { image-rendering: pixelated; }
+  #bad { color: #ffb0a0; font-weight: bold; }
+  .mos { display: flex; gap: 12px; }
+  pre { font-size: 10px; }
+</style>
+<body>
+<div id="bad"></div>
+<div id="mos" class="mos"></div>
+<div id="root"></div>
+<pre id="out"></pre>
+<script type="module">
+import { SPR } from './art.js';
+import { SPR2 } from './art2.js';
+import { SPR3 } from './art3.js';
+import { SPR4 } from './art4.js';
+const q = new URLSearchParams(location.search);
+const isImg = v => v instanceof HTMLCanvasElement || v instanceof HTMLImageElement;
+if (q.has('list')) {
+  // Liệt kê mọi ảnh của bộ cũ chưa được hd.js nối sang bản 2x
+  const { hdOf, hdStats } = await import('./hd.js');
+  const miss = [], seen = new Set();
+  let total = 0;
+  const walk = (v, path) => {
+    if (v == null) return;
+    if (isImg(v)) { total++; if (!hdOf(v)) miss.push(`${path} ${v.width}x${v.height}`); return; }
+    if (typeof v !== 'object' || seen.has(v)) return;
+    seen.add(v);
+    for (const k of Object.keys(v)) walk(v[k], `${path}.${k}`);
+  };
+  for (const [n, S] of Object.entries({ SPR, SPR2, SPR3, SPR4 })) walk(S, n);
+  const st = hdStats();
+  window.__list = { total, miss, stats: { files: st.files, linked: st.linked, bad: st.bad } };
+  document.getElementById('out').textContent = JSON.stringify(window.__list, null, 1);
+  window.__ready = true;
+} else {
+  const { SPR13, SPR13_FROM } = await import('./art13.js');
+  const Z = Number(q.get('z') || 4), only = q.get('only');
+  const OLD = { SPR, SPR2, SPR3 };
+  const bad = [], ok = [];
+  const cv = (img, z) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); c.style.width = img.width * z + 'px'; c.style.height = img.height * z + 'px'; return c; };
+  const cell = (img, label, z) => { const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span'); s.textContent = label; d.append(s, cv(img, z)); return d; };
+  function walk(row, nv, ov, path) {
+    if (isImg(nv)) {
+      if (!isImg(ov)) { bad.push(`${path}: không có ảnh cũ`); return; }
+      if (nv.width !== ov.width * 2 || nv.height !== ov.height * 2) { bad.push(`${path}: ${nv.width}x${nv.height} ≠ 2×${ov.width}x${ov.height}`); return; }
+      ok.push(path);
+      if (row) { const p = document.createElement('div'); p.className = 'pair'; p.append(cell(ov, `Cũ ${path} ${ov.width}x${ov.height}`, Z), cell(nv, `Mới ${nv.width}x${nv.height}`, Z / 2)); row.append(p); }
+      return;
+    }
+    if (ov == null) { bad.push(`${path}: không có khóa cũ`); return; }
+    for (const k in nv) walk(row, nv[k], ov[k], `${path}.${k}`);
+  }
+  const root = document.getElementById('root');
+  for (const top in SPR13) {
+    const from = SPR13_FROM[top], O = OLD[from];
+    const show = !only || only.split(',').includes(top);
+    let row = null;
+    if (show) { const h = document.createElement('h2'); h.textContent = `${top} (thay ${from}.${top})`; row = document.createElement('div'); row.className = 'row'; root.append(h, row); }
+    walk(row, SPR13[top], O?.[top], `${from}.${top}`);
+  }
+  document.getElementById('bad').textContent = bad.length ? 'SAI CỠ: ' + bad.join(' | ') : `Kiểm cỡ: ${ok.length} sprite đều đúng 2×`;
+  // Phòng thử 8x6 ô: cũ | mới (sàn lát, vách sau, đồ đạc như interiorLayer + props của render)
+  function room(S) {
+    const TS = 16, mw = 8, mh = 6, c = document.createElement('canvas'); c.width = mw * TS * S; c.height = mh * TS * S;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.scale(S, S);
+    const pick = k => (S === 2 && SPR13[k] ? SPR13[k] : SPR2[k]);
+    const put = (k, px, py, i) => { const o = i == null ? SPR2[k] : SPR2[k][i], n = i == null ? pick(k) : pick(k)[i]; x.drawImage(n, px, py, o.width, o.height); };
+    for (let r = 2; r < mh; r++) for (let col = 0; col < mw; col++) put('floors', col * TS, r * TS, (col * 7 + r * 3) % 2);
+    for (let col = 0; col < mw; col++) put('wallInner', col * TS, 0);
+    put('window', 2 * TS, 4); put('window', 5 * TS, 4);
+    put('rug', 3 * TS, 3 * TS);
+    put('bed', 0, 2 * TS + 4); put('wardrobe', 7 * TS - 24 + 16 - 8, 2 * TS - 16);
+    put('table', 3 * TS + 8, 3 * TS + 4); put('stove', 6 * TS, 4 * TS + 4); put('pottedPlant', 2 * TS, 4 * TS + 6);
+    put('phone', 4 * TS + 8, 0); put('doorMat', 4 * TS, 5 * TS);
+    const p = (o, n, px, py) => x.drawImage(S === 2 ? n : o, px, py, o.width, o.height);
+    p(SPR.poop, SPR13.poop, 1 * TS + 4, 5 * TS + 4); p(SPR.stink[0], SPR13.stink[0], 1 * TS + 5, 5 * TS - 6);
+    p(SPR3.thiefShoes.left, SPR13.thiefShoes.left, 6 * TS - 4, 2 * TS + 4); p(SPR3.thiefTorch.right[1], SPR13.thiefTorch.right[1], 6 * TS + 10, 2 * TS - 2);
+    return c;
+  }
+  if (!q.has('nomos')) { const mos = document.getElementById('mos'); const MZ = Number(q.get('mz') || 3); mos.append(cell(room(1), `Cũ: phòng thử (x${MZ})`, MZ), cell(room(2), `Mới (x${MZ})`, MZ / 2)); }
+  window.__sizeReport = { ok: ok.length, bad };
+  window.__ready = true;
+}
+</script>
