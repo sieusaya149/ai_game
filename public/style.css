@@ -484,3 +484,18 @@ body.alerting #hud { top: calc(50px + var(--st)); }
 .build-btns { display: flex; gap: 12px; }
 .build-btns .btn { min-width: 128px; min-height: 52px; }
 body.building #bottombar, body.building #actions, body.building #joy-base, body.building #tutorial { display: none !important; }
+
+/* ---------- Làng real-time (issue 25): cột biểu cảm + chat nhanh + người đang ở đây, mép trái, trên joystick ---------- */
+#live { position: absolute; left: calc(8px + var(--sl)); bottom: calc(var(--ui-bottom) + 12px); z-index: 6; display: flex; flex-direction: column; gap: 5px; }
+body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* điện thoại: ngay trên joystick */
+#live[hidden], body.building #live { display: none; }
+.live-row { display: flex; flex-direction: column; gap: 5px; }
+.live-btn { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; border-radius: 50%; cursor: pointer; font-size: 19px; line-height: 1;
+  background: rgba(255, 248, 225, 0.92); border: 3px solid var(--wood); box-shadow: 0 2px 0 var(--wood-d), 0 3px 6px rgba(0, 0, 0, 0.25); touch-action: manipulation; }
+.live-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--wood-d); }
+.live-btn.wide { border-radius: 20px; font-size: 14px; gap: 0; grid-auto-flow: row; }
+.live-btn.wide b { font-size: 11px; line-height: 1; margin-top: -2px; }
+.live-btn img { width: 22px; height: 22px; image-rendering: pixelated; }
+#live-says { position: absolute; left: 48px; bottom: 0; width: max-content; max-width: min(230px, calc(100vw - 72px)); padding: 6px; display: flex; flex-direction: column; gap: 5px; z-index: 7; }
+#live-says[hidden] { display: none; }
+#live-says .btn { min-height: 36px; padding: 4px 12px; font-size: 13px; justify-content: flex-start; text-align: left; white-space: normal; }

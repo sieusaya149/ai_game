@@ -5,7 +5,7 @@ import {
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
-import { DIR_NAME } from './data.js';
+import { DIR_NAME, LIVE } from './data.js';
 import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
@@ -13,6 +13,7 @@ import { todoList } from './todo.js';
 import * as P from './perf.js';
 import * as net from './net.js';
 import { claim, startSync } from './sync.js';
+import { createPeers } from './presence.js';
 
 const ACTION_MS = 350;
 const actionMs = () => ACTION_MS * slowFactor(state);   // hết thể lực thì làm chậm
@@ -198,6 +199,7 @@ function playOnline(s) {
     onStatus: ui.setOnline,
     onKicked: () => { sync = null; quit(); net.forget(); ui.showMode('Bạn đã đăng nhập ở thiết bị khác.'); },
     onReject: msg => ui.toast(`Làng chưa nhận bản lưu: ${msg}`),
+    onMessage: liveMsg,
   });
   begin();
 }
@@ -207,7 +209,36 @@ function quit() {
   state = null; busy = null; curTarget = null; lastTargetKey = '';
   ui.setTarget(null, [], '');
   ui.setOnline(true);
+  liveReset();
 }
+
+// ---------- Làng real-time (issue 25): người khác cùng bản đồ, chat nhanh, biểu cảm (giao thức ở SPEC mục Server) ----------
+const peers = createPeers();
+const me = { chat: null, emote: null, chatUntil: 0, emoteT0: 0 };   // bong bóng của chính mình
+let liveMap = null, livePos = '', livePosAt = 0;
+function liveReset() { peers.clear(); liveMap = null; ui.setLive(!!sync, 0); }
+// tin từ WebSocket (qua sync.js): kết nối (lại) thì vào lại bản đồ ở khung hình tới; rớt thì xóa người khác
+function liveMsg(m) {
+  if (m.t === 'hello' || m.t === 'down') { liveReset(); return; }
+  if (peers.receive(m, performance.now())) ui.setLive(true, peers.size);
+}
+// mỗi khung hình: đổi bản đồ thì báo join, đi thì gửi vị trí tối đa LIVE.hz lần mỗi giây
+function liveFrame(now) {
+  if (!sync || !state) return;
+  const p = state.player, x = Math.round(p.x), y = Math.round(p.y), dir = p.dir ?? 0, key = `${x},${y},${dir}`;
+  if (liveMap !== state.scene) {
+    if (!sync.send({ t: 'join', map: state.scene, x, y, dir, look: state.look })) return;
+    peers.clear(); ui.setLive(true, 0);
+    liveMap = state.scene; livePos = key; livePosAt = now;
+    return;
+  }
+  if (key === livePos || now - livePosAt < 1000 / LIVE.hz) return;
+  if (sync.send({ t: 'pos', x, y, dir })) { livePos = key; livePosAt = now; }
+}
+// câu chat nhanh / biểu cảm: hiện trên đầu mình ngay, gửi cho người cùng bản đồ
+function say(text) { me.chat = text; me.chatUntil = performance.now() + LIVE.chatMs; sync?.send({ t: 'chat', text }); }
+function emote(e) { me.emote = e; me.emoteT0 = performance.now(); sync?.send({ t: 'emote', e }); }
+const myTalk = now => ({ chat: now < me.chatUntil ? me.chat : null, emote: me.emote && now - me.emoteT0 < LIVE.emoteMs ? { e: me.emote, age: (now - me.emoteT0) / LIVE.emoteMs } : null });
 
 const api = {
   getState: () => state,
@@ -279,6 +310,8 @@ const api = {
     return true;
   },
   startSolo: () => startSolo(false),
+  say, emote,
+  people: () => peers.roster(),
   startOnline,
   // Về màn chọn chế độ (Cài đặt → Vào làng / Đăng xuất): lưu vườn (online thì gửi bản cuối lên làng) rồi rời vườn
   async leaveToMode() {
@@ -558,6 +591,7 @@ function frame(now) {
 
   // 4) target
   syncTarget(now);
+  liveFrame(now);
 
   // 5) vẽ
   updateCamera(dt, false);
@@ -569,6 +603,7 @@ function frame(now) {
     target: curTarget ? { target: curTarget } : null,
     busy: busy ? clamp((now - busy.t0) / actionMs(), 0, 1) : null,
     fx: world.fx, battery: prefs.battery, quality: P.particleBudget(fps.fps),
+    peers: sync ? peers.view(state.player, now) : null, me: sync ? myTalk(now) : null,
   });
 
   // 6) sự kiện cho UI, HUD, lưu
@@ -604,7 +639,7 @@ function startSolo(first) {
     if (loadProblem()) ui.toast('Không đọc được bản lưu cũ, bản cũ vẫn được giữ nguyên. Bạn có thể bắt đầu vườn mới.');
   }
 }
-globalThis.__farm = { get state() { return state; }, get world() { return world; }, get scale() { return scale; }, get view() { return view; }, get dpr() { return dpr; },
+globalThis.__farm = { get state() { return state; }, get peers() { return sync && state ? peers.view(state.player, performance.now()) : []; }, get world() { return world; }, get scale() { return scale; }, get view() { return view; }, get dpr() { return dpr; },
   get perf() { return { chunksDrawn: R.chunkStats().drawn, fps: fps.avg, fpsNow: fps.fps, measured: fps.elapsed, battery: prefs.battery, hinted: prefs.hinted }; } };
 requestAnimationFrame(t => { last = t; lastSave = t; requestAnimationFrame(frame); });
 // Máy này còn đăng nhập thì vào vườn online. Không thì: có bản lưu chơi đơn → chơi tiếp, chưa có → chọn chế độ.

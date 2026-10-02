@@ -21,15 +21,15 @@ Làng có người thật đi lại. Chợ Bà Tư và tiệm rèn Ông Sáu c�
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 3): hai kết nối cùng bản đồ làng nhận được vị trí của nhau; kết nối ở bản đồ khác (dựng bằng chọn bản đồ khác lúc kết nối) không nhận gì.
-- [ ] Unit test (seam 3): tần suất vị trí server phát không vượt quá 6 lần mỗi giây cho mỗi người gửi, dù người đó gửi dồn dập.
-- [ ] Unit test (seam 3): chat nhanh và biểu cảm chỉ đến người cùng bản đồ; chuỗi lạ ngoài danh sách câu cho phép bị từ chối.
-- [ ] Unit test (seam 3): rớt WebSocket rồi tự kết nối lại → vào lại làng, nhận lại vị trí của người khác.
-- [ ] Unit test (seam 1): hàm chọn ai hiện đầy đủ, ai hiện tên mờ khi làng quá 12 người, theo khoảng cách tới người xem.
-- [ ] E2E (Playwright, 2 trình duyệt, desktop + 360px): hai người cùng vào làng → mỗi bên thấy tên và nhân vật bên kia; một bên đi thì bên kia thấy di chuyển mượt (vị trí đổi liên tục chứ không nhảy); một bên bấm câu chat thì bên kia thấy bong bóng; bấm 😂 thì bên kia thấy biểu cảm.
-- [ ] E2E: hai người ở hai bản đồ khác nhau (một ở làng, một ở trong nhà) không thấy chat của nhau.
-- [ ] E2E: mua một hạt giống ở chợ Bà Tư khi online vẫn được như cũ.
-- [ ] Thanh chat và hàng biểu cảm không đè joystick, nút hành động và bản đồ nhỏ ở 360px.
+- [x] Unit test (seam 3): hai kết nối cùng bản đồ làng nhận được vị trí của nhau; kết nối ở bản đồ khác (dựng bằng chọn bản đồ khác lúc kết nối) không nhận gì.
+- [x] Unit test (seam 3): tần suất vị trí server phát không vượt quá 6 lần mỗi giây cho mỗi người gửi, dù người đó gửi dồn dập.
+- [x] Unit test (seam 3): chat nhanh và biểu cảm chỉ đến người cùng bản đồ; chuỗi lạ ngoài danh sách câu cho phép bị từ chối.
+- [x] Unit test (seam 3): rớt WebSocket rồi tự kết nối lại → vào lại làng, nhận lại vị trí của người khác.
+- [x] Unit test (seam 1): hàm chọn ai hiện đầy đủ, ai hiện tên mờ khi làng quá 12 người, theo khoảng cách tới người xem.
+- [x] E2E (Playwright, 2 trình duyệt, desktop + 360px): hai người cùng vào làng → mỗi bên thấy tên và nhân vật bên kia; một bên đi thì bên kia thấy di chuyển mượt (vị trí đổi liên tục chứ không nhảy); một bên bấm câu chat thì bên kia thấy bong bóng; bấm 😂 thì bên kia thấy biểu cảm.
+- [x] E2E: hai người ở hai bản đồ khác nhau (một ở làng, một ở trong nhà) không thấy chat của nhau.
+- [x] E2E: mua một hạt giống ở chợ Bà Tư khi online vẫn được như cũ.
+- [x] Thanh chat và hàng biểu cảm không đè joystick, nút hành động và bản đồ nhỏ ở 360px. (kiểm bằng e2e 360px giả lập, chưa thử máy thật)
 
 ## Blocked by
 

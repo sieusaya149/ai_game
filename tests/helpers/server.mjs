@@ -38,8 +38,10 @@ export async function bootServer(opts = {}) {
         raw: s,
         send: m => s.send(JSON.stringify(m)),
         next: (ms = 2000) => inbox.length ? Promise.resolve(inbox.shift()) : new Promise((ok, no) => {
-          const t = setTimeout(() => no(new Error('quá lâu không có tin nhắn')), ms);
-          waiting.push(m => { clearTimeout(t); ok(m); });
+          const w = m => { clearTimeout(t); ok(m); };
+          // hết giờ thì bỏ chỗ chờ, để tin tới sau vẫn vào hộp thư
+          const t = setTimeout(() => { waiting.splice(waiting.indexOf(w), 1); no(new Error('quá lâu không có tin nhắn')); }, ms);
+          waiting.push(w);
         }),
         closed: new Promise(ok => s.on('close', code => ok(code))),
         close: () => s.close(),

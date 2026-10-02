@@ -258,3 +258,11 @@ export const EVENT_LEVEL = {
   sound:     { level: 'none', group: () => 'sound', label: 'Âm thanh' },
   spawn:     { level: 'none', group: () => 'spawn', label: 'Sinh vật xuất hiện' },
 };
+
+// ---------- Làng real-time (issue 25) ----------
+// hz: vị trí gửi/phát tối đa mấy lần mỗi giây · crowd: quá chừng này người (tính cả mình) thì người ở xa chỉ hiện tên mờ
+// delayMs: vẽ người khác trễ chừng này để nội suy mượt · chatMs/emoteMs: bong bóng chat, biểu cảm hiện bao lâu
+export const LIVE = { hz: 6, crowd: 12, delayMs: 300, chatMs: 4000, emoteMs: 2500 };
+// Câu chat nhanh có sẵn: server chỉ nhận đúng các câu này
+export const QUICK_CHAT = ['Chào cả làng!', 'Cảm ơn nhé!', 'Hẹn gặp lại!', 'Ghé vườn mình chơi nha!', 'Đi chợ không?', 'Tạm biệt!'];
+export const EMOTES = ['👋', '❤️', '😂', '😡'];

@@ -413,6 +413,47 @@ function drawBuild(ctx, state, m, b, now) {
 
 // ---------- Vẽ một khung hình ----------
 // f: { state, w (world), cam:{x,y}, scale, width, height, dpr, now, target, busy, fx }
+// Bong bóng chat nhanh và biểu cảm trên đầu một người (issue 25), tọa độ màn hình: (x, y) = đáy bong bóng.
+// who.chat = câu đang nói (hoặc null), who.emote = { e, age 0..1 } (hoặc null).
+// Có pixel art thì dùng: SPR2.chatBubble (khung 9 ô, góc = 1/3 cạnh), SPR2.chatTail (đuôi), SPR2.emotes[e]; chưa có thì vẽ tạm.
+function talk(ctx, who, x, y, dpr, now) {
+  if (who.chat) {
+    const size = Math.round(11 * dpr), pad = 5 * dpr;
+    ctx.font = `800 ${size}px ${FONT}`;
+    const w = Math.ceil(ctx.measureText(who.chat).width + pad * 2), h = size + pad * 1.6;
+    const bx = Math.round(x - w / 2), by = Math.round(y - h - 5 * dpr);
+    const nine = SPR2?.chatBubble, tail = SPR2?.chatTail;
+    if (nine) {
+      const c = Math.floor(nine.width / 3), k = Math.max(1, Math.round(dpr * 2)), cc = c * k, sw = nine.width - 2 * c, sh = nine.height - 2 * c;
+      const part = (sx, sy, sW, sH, dx, dy, dW, dH) => ctx.drawImage(nine, sx, sy, sW, sH, dx, dy, dW, dH);
+      const iw = w - 2 * cc, ih = h - 2 * cc;
+      part(0, 0, c, c, bx, by, cc, cc); part(c, 0, sw, c, bx + cc, by, iw, cc); part(c + sw, 0, c, c, bx + w - cc, by, cc, cc);
+      part(0, c, c, sh, bx, by + cc, cc, ih); part(c, c, sw, sh, bx + cc, by + cc, iw, ih); part(c + sw, c, c, sh, bx + w - cc, by + cc, cc, ih);
+      part(0, c + sh, c, c, bx, by + h - cc, cc, cc); part(c, c + sh, sw, c, bx + cc, by + h - cc, iw, cc); part(c + sw, c + sh, c, c, bx + w - cc, by + h - cc, cc, cc);
+      if (tail) ctx.drawImage(tail, Math.round(x - tail.width * k / 2), by + h - k, tail.width * k, tail.height * k);
+    } else {
+      const lw = Math.max(1, Math.round(2 * dpr));
+      ctx.fillStyle = '#3b2412';
+      ctx.fillRect(bx - lw, by - lw, w + lw * 2, h + lw * 2);
+      ctx.beginPath(); ctx.moveTo(x - 5 * dpr, by + h); ctx.lineTo(x + 5 * dpr, by + h); ctx.lineTo(x, by + h + 6 * dpr); ctx.fill();
+      ctx.fillStyle = '#fffaf0';
+      ctx.fillRect(bx, by, w, h);
+      ctx.beginPath(); ctx.moveTo(x - 3 * dpr, by + h - 1); ctx.lineTo(x + 3 * dpr, by + h - 1); ctx.lineTo(x, by + h + 3 * dpr); ctx.fill();
+    }
+    ctx.fillStyle = '#3b2412'; ctx.textAlign = 'center';
+    ctx.fillText(who.chat, x, by + h / 2 + size * 0.36);
+    y = by - 2 * dpr;
+  }
+  if (who.emote) {
+    const { e, age } = who.emote, rise = age * 18 * dpr, im = SPR2?.emotes?.[e];
+    ctx.globalAlpha = age < 0.7 ? 1 : Math.max(0, (1 - age) / 0.3);
+    const bob = Math.sin(now / 150) * dpr;
+    if (im) { const k = Math.max(1, Math.round(dpr * 2)); ctx.drawImage(im, Math.round(x - im.width * k / 2), Math.round(y - im.height * k - rise + bob), im.width * k, im.height * k); }
+    else { ctx.font = `${Math.round(20 * dpr)}px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(e, x, y - rise + bob); }
+    ctx.globalAlpha = 1;
+  }
+}
+
 export function render(ctx, f) {
   const { state, w: wd, scale, width, height, dpr, now } = f;
   const camX = Math.round(f.cam.x * scale), camY = Math.round(f.cam.y * scale);
@@ -618,6 +659,15 @@ export function render(ctx, f) {
       }
     });
   }
+  // người khác cùng bản đồ (issue 25, đã nội suy): người gần vẽ cả nhân vật, người xa (làng đông) chỉ hiện tên mờ ở phần chữ
+  for (const o of f.peers ?? []) {
+    if (!o.full || !vis(o.x, o.y)) continue;
+    const frames = wd.playerFrames(o.look), dir = o.dir ?? 0;
+    const fr = o.moving ? [1, 0, 2, 0][Math.floor(now / 125) % 4] : 0;
+    const im = frames[dir][dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr];
+    shadow(o.x, o.y, 6);
+    add(o.y, () => blit(im, o.x - 8, o.y - 23));
+  }
 
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.fn();
@@ -767,6 +817,15 @@ export function render(ctx, f) {
     const p = state.player;
     outlined(state.name, toSX(p.x), toSY(p.y - (f.busy != null ? 33 : 27)), Math.round(11 * dpr), '#ffffff');
   }
+  // người khác: tên (người xa trong làng đông chỉ có tên mờ), bong bóng chat, biểu cảm bay lên; rồi tới bong bóng của mình
+  for (const o of f.peers ?? []) {
+    if (!vis(o.x, o.y)) continue;
+    ctx.globalAlpha = o.full ? 1 : 0.45;
+    outlined(o.name, toSX(o.x), toSY(o.y - (o.full ? 27 : 8)), Math.round(11 * dpr), '#d6f1ff');
+    ctx.globalAlpha = 1;
+    talk(ctx, o, toSX(o.x), toSY(o.y - (o.full ? 27 : 8)) - 13 * dpr, dpr, now);
+  }
+  if (f.me) talk(ctx, f.me, toSX(state.player.x), toSY(state.player.y - (f.busy != null ? 33 : 27)) - 13 * dpr, dpr, now);
   // chữ bay
   for (const e of f.fx) {
     const age = (now - e.t0) / 1400;

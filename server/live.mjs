@@ -4,6 +4,7 @@
 import { WebSocketServer } from 'ws';
 import { accountOf, tokenOf } from './accounts.mjs';
 import { playOf } from './farms.mjs';
+import { createPresence } from './presence.mjs';
 
 const HANDLERS = {
   ping: (sock, m) => send(sock, { t: 'pong', id: m.id, now: Date.now() }),
@@ -21,6 +22,7 @@ export const send = (sock, m) => { if (sock.readyState === sock.OPEN) sock.send(
 
 export function attachLive(server, ctx) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
+  const pres = createPresence(ctx, send);   // làng real-time (issue 25): join, pos, chat, emote
   server.on('upgrade', (req, socket, head) => {
     if (req.url.split('?')[0] !== '/ws') return socket.destroy();
     wss.handleUpgrade(req, socket, head, sock => wss.emit('connection', sock, req));
@@ -30,8 +32,9 @@ export function attachLive(server, ctx) {
     sock.on('message', data => {
       let m;
       try { m = JSON.parse(data); } catch { return; }   // tin hỏng thì bỏ qua, không ngắt
-      HANDLERS[m?.t]?.(sock, m, ctx);
+      (HANDLERS[m?.t] ?? pres.handlers[m?.t])?.(sock, m, ctx);
     });
+    sock.on('close', () => pres.leave(sock));
   });
   const socketsOf = id => [...wss.clients].filter(s => s.account?.id === id);
   return {
@@ -45,6 +48,7 @@ export function attachLive(server, ctx) {
     },
     // đóng mọi kết nối (mã 1001 = server đi vắng), trình duyệt tự kết nối lại sau
     close() {
+      pres.stop();
       for (const s of wss.clients) s.close(1001, 'server tắt');
       return new Promise(ok => {
         const t = setTimeout(() => { for (const s of wss.clients) s.terminate(); }, 1000);

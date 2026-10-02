@@ -30,7 +30,8 @@ export async function claim(name) {
 
 // Bắt đầu đồng bộ. getSave() → bản lưu mới nhất (đã đóng dấu savedAt) hoặc null.
 // onStatus(online), onKicked() (máy khác đã vào), onReject(msg) (server không nhận bản lưu).
-export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReject }) {
+// onMessage(m): mọi tin khác từ WebSocket (làng real-time, issue 25); hello = vừa kết nối (lại) xong, { t: 'down' } = rớt kết nối.
+export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReject, onMessage }) {
   let ws = null, wsOk = false, httpOk = true, shown = true, stopped = false, busy = false, timer = 0, retry = 0, backoff = 1000, rejected = '';
   const status = () => { const on = wsOk && httpOk; if (on !== shown) { shown = on; onStatus?.(on); } };
   const later = ms => { clearTimeout(timer); if (!stopped) timer = setTimeout(loop, ms); };
@@ -74,11 +75,12 @@ export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReje
     s.onmessage = e => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.t === 'kicked') kicked();
-      else if (m.t === 'hello' && m.ok) { wsOk = true; backoff = 1000; status(); later(0); }   // kết nối (lại) xong: gửi bù ngay
+      else if (m.t === 'hello' && m.ok) { wsOk = true; backoff = 1000; status(); later(0); onMessage?.(m); }   // kết nối (lại) xong: gửi bù ngay
+      else if (m.t !== 'hello') onMessage?.(m);
     };
     s.onclose = () => {
       if (ws !== s) return;
-      wsOk = false; status();
+      wsOk = false; status(); onMessage?.({ t: 'down' });
       if (!stopped) { retry = setTimeout(connect, backoff); backoff = Math.min(backoff * 2, 10_000); }
     };
   }
@@ -94,6 +96,8 @@ export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReje
     // ghi bản nháp trên máy (main.js gọi mỗi lần lưu)
     draft(s) { if (!stopped) writeDraft({ name, rev, save: s }); },
     pushNow: () => later(0),
+    // gửi một tin qua WebSocket (chỉ khi đã kết nối xong); trả true nếu đã gửi
+    send(m) { if (!wsOk || ws?.readyState !== 1) return false; ws.send(JSON.stringify(m)); return true; },
     // đóng trang / ẩn tab: gửi bản mới nhất bằng keepalive (vẫn đi khi trang đã đóng)
     flush() { if (!stopped) push(getSave(), true); },
     // rời vườn online (Cài đặt → Đăng xuất): gửi bản cuối rồi ngắt

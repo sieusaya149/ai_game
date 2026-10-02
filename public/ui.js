@@ -871,6 +871,20 @@ PANELS.todo = {
     it.level === 'urgent' && h('span', { class: 'todo-tag' }, 'Gấp'), h('span', { class: 'todo-go' }, '›'))));
   },
 };
+// ---------- Người đang ở cùng bản đồ (issue 25, vườn online) ----------
+const LIVE_ICON = () => { try { return SPR2?.onlineIcon?.toDataURL?.() || null; } catch { return null; } };
+PANELS.online = {
+  title: '👥 Người đang ở đây',
+  render(body, s) {
+    const u = LIVE_ICON(), face = () => (u ? h('img', { class: 'ico', src: u, alt: '' }) : h('span', { class: 'ico emo' }, '🧑‍🌾'));
+    const list = [...(api.people?.() ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+    body.append(h('div', { class: 'note' }, s.scene === 'village' ? 'Bạn bè đang ở trong làng cùng bạn.' : 'Bạn đang ở ngoài làng: ra cổng vườn sang làng để gặp mọi người.'));
+    body.append(row({ icon: face(), name: `${s.name} (bạn)`, desc: `Cấp ${level(s)}` }));
+    for (const p of list) body.append(row({ icon: face(), name: p.name, desc: `Cấp ${p.level}`, cls: 'online-row' }));
+    if (!list.length) body.append(empty('Chưa có ai khác ở đây.'));
+  },
+};
+
 PANELS.map = {
   title: '🗺️ Bản đồ',
   render(body, s) {
@@ -1067,6 +1081,15 @@ export function showBringUp(name, solo, { bring, fresh }) {
     h('p', { class: 'mini' }, 'Vườn chơi một mình vẫn nằm nguyên trên máy này. Từ đây hai vườn là hai bản riêng.'));
 }
 // Biểu tượng nhỏ mất kết nối với làng (vườn online), vẫn chơi tiếp được
+// Cột biểu cảm / chat nhanh / người đang ở đây: chỉ hiện khi chơi vườn online. n = số người khác cùng bản đồ
+export function setLive(on, n = 0) {
+  const e = $('live');
+  if (!e) return;
+  e.hidden = !on;
+  if (!on) $('live-says').hidden = true;
+  $('live-n').textContent = String(n + 1);
+  if (panel === 'online') refreshPanel();
+}
 export function setOnline(on) {
   const e = $('hud-net');
   if (e) e.hidden = !!on;
@@ -1252,6 +1275,13 @@ export function initUI(a) {
     if (!b.classList.contains('nosound')) sound.play('click');
     if (!b.disabled) setTimeout(() => b.blur(), 0); // tránh Space bấm lại nút
   });
+
+  // làng real-time: biểu cảm bấm là bay lên đầu, 💬 mở danh sách câu có sẵn
+  const says = $('live-says');
+  $('live-emotes').append(...D.EMOTES.map(e => btn(e, () => { says.hidden = true; api.emote(e); }, 'live-btn nosound', { title: 'Biểu cảm ' + e, 'aria-label': e })));
+  says.append(...D.QUICK_CHAT.map(t => btn(t, () => { says.hidden = true; api.say(t); }, 'small')));
+  $('live-chat').addEventListener('click', () => { says.hidden = !says.hidden; });
+  $('live-people').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('online'); });
 
   $('bb-build').addEventListener('click', () => { if (!isBlocking()) api.buildStart(); });
   $('build-done').addEventListener('click', () => api.buildDone());
