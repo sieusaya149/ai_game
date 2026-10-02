@@ -124,6 +124,16 @@ export const AGING = {
   pigHungry: 1.5,     // heo nhỡ ăn khỏe: đói nhanh ×1.5 ...
   pigGain: 2,         // ... và tăng cân nhanh ×2
 };
+// ---------- Đực/cái và sinh sản (Phase 2, issue 36) ----------
+export const BREED = {
+  femaleMul: 1.3,          // con cái đắt hơn con đực chừng 30%
+  fertile: 0.4,            // có ≥1 gà trống trưởng thành: 40% trứng có phôi
+  gestation: { bo: 10 * HOUR, cuu: 8 * HOUR },   // bò đực + cái chung chuồng: mỗi 10 giờ vườn một bê; cừu 8 giờ
+  litterOld: [1, 2],       // heo nái già đẻ ít con hơn (heo thường: HUSBANDRY.pigLitter)
+  nameMax: 16,             // tên con vật tối đa chừng này ký tự
+  cockHour: 6,             // gà trống gáy lúc 6h sáng
+};
+export const animalPrice = (type, sex) => Math.round(ANIMALS[type].price * (sex === 'f' ? BREED.femaleMul : 1));
 // Việc từng giai đoạn làm được: theo loài, thiếu loài thì lấy `all`.
 // product: đẻ trứng / cho sữa / cho lông · plow: kéo cày (bò tơ kéo được cả hàng ruộng) · sell: bán được · vitamin: còn lớn được
 export const STAGE_CAN = {
@@ -218,6 +228,7 @@ export const CLUTTER = {
 // Nông sản & sản phẩm bán ở kho.
 export const PRODUCTS = {
   trung: { name: 'Trứng gà', price: 14 },
+  trung_phoi: { name: 'Trứng có phôi', price: 14 },   // đã soi: nở được trong ổ ấp
   sua:   { name: 'Sữa bò',   price: 40 },
   len:   { name: 'Lông cừu', price: 60 },
   sua_ngon: { name: 'Sữa ngon',    price: 60 },   // sao: bò được vuốt ve đều
@@ -346,6 +357,8 @@ export const EVENT_LEVEL = {
   oldSoon:   { level: 'important', cat: 'old', group: e => 'oldSoon:' + e.animal, label: 'Con vật sắp già', text: (n, e) => `${n} con ${animalN(e.animal)} sắp già, chuẩn bị hoặc bán đi nhé 👵` },
   passed:    { level: 'important', cat: 'old', group: e => 'passed:' + e.animal, label: 'Con vật già ra đi', text: (n, e) => `${n} con ${animalN(e.animal)} đã già và ra đi thanh thản 😇` },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
+  born:      { level: 'info', group: e => 'born:' + e.kind, label: 'Con vật chào đời' },
+  cockcrow:  { level: 'none', group: () => 'cockcrow', label: 'Gà trống gáy' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
   wallow:    { level: 'none', group: e => 'wallow:' + e.id, label: 'Heo, bò lăn bùn' },
   bathed:    { level: 'info', group: e => 'bathed:' + e.id, label: 'Đã tắm cho vật nuôi' },

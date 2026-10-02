@@ -16,7 +16,7 @@ function farmWith(type, extra = {}) {
       outer: for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) if (canPlace(s, { kind: 'pen', pen }, c, r).ok) { placeEntity(s, { kind: 'pen', pen }, c, r); break outer; }
     }
     s.animals = []; s.inv.hay = s.inv.feed_heo = 50; s.troughs.pig = 20; s.troughs.pasture = 20;
-    buyAnimal(s, type);
+    buyAnimal(s, type, 'f');   // con cái: bò cái mới có sữa (lát 36)
     s.coins = rich;
     const a = s.animals[0], area = mapOf(s).pens[{ heo: 'pig', bo: 'pasture' }[type]].area;
     Object.assign(a, { stage: 'truong', age: stageStart(type, 'truong'), bond: 2, bondXp: 0, hunger: 100, happy: 60, x: area.x + area.w / 2, y: area.y + area.h / 2, ...extra });

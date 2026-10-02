@@ -96,8 +96,9 @@ state = {
   animals: [ Animal ],                        // xem "Con vật (v3)" ngay dưới
   troughs: { chicken, pig, pasture },
   manure: { chicken, pig, pasture },          // phân chuồng tích dần 0..100 (đầy = chuồng bẩn), xúc ở máng (hành động `muck`)
-  eggs: [ { id, x, y, laidAt } ],
-  nest: { egg, hatchAt },
+  eggs: [ { id, x, y, laidAt, fertile?, candled?, mom?, dad? } ],   // fertile: có phôi (ẩn tới khi soi); mom/dad = { id, name }
+  clutch: [ { mom, dad } ],                    // gốc gác của các trứng có phôi đã nhặt (khớp theo thứ tự với món trung_phoi)
+  nest: { egg, hatchAt, mom, dad },
   dog: { stage, age, hunger, happy, x, y, nextPoop, name },   // stage/age như con vật, theo LIFE.cho
   poops: [ { id, x, y, at } ],
   threats: [ { id, kind: 'crow'|'thief', plot, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
@@ -190,7 +191,22 @@ farmHours(state)                  // giờ vườn đã chạy (simMs / 1 giờ)
 marketOpen(state)                 // chợ Bà Tư mở 6h–18h (MARKET)
 ```
 
-### Vòng đời con vật (Phase 2, issue 34)
+### Đực/cái, sinh sản, tên, phả hệ (issue 36)
+
+```
+renameAnimal(state, id, name)     // → R { id }: cắt khoảng trắng; reason: empty | long (> BREED.nameMax = 16) | missing; cập nhật tên trong mom/dad của các con
+pedigree(state, id)               // → { id, name, sex, mom, dad, kids: [{id,name,sex}] } | null
+breedNote(state, animal)          // → 'Chuồng đầy' | null: nái/bò/cừu cái đủ cặp nhưng chuồng đầy nên không sinh
+animalPrice(type, sex)            // (data.js) giá mua theo giới tính
+{ kind: 'egg' } actions           // candle (Soi trứng: e.candled = true, res.fertile) · collect (đã soi và có phôi → món trung_phoi, ngược lại trung)
+{ kind: 'animal' } action         // rename → res.rename = id (UI mở hộp nhập tên rồi gọi renameAnimal)
+{ kind: 'nest' } action           // incubate: chỉ nhận trung_phoi
+```
+
+- Luật (BREED trong data.js): chỉ gà mái đẻ; có gà trống trưởng thành thì 40% trứng `fertile`; gà trống gáy lúc 6h (đổi ngày; không gáy khi chạy bù): event `cockcrow {id}` + `sound cockcrow` + chữ bay.
+- Trứng có phôi mới nở: ổ ấp (nhận `trung_phoi`), trứng bỏ quên (20% mỗi 10 phút), ổ ấp tự động ở chuồng gà cấp 3 (`pen.incub = { at, mom, dad }`, tự nhận trứng có phôi nằm trong chuồng).
+- Heo/bò/cừu: đực + cái trưởng thành, no (> growNeedsHunger) và vui (> 40), cùng chuồng (cách ly không sinh). Heo: mỗi phút 25% một nái mang bầu, đẻ 1–3 (nái già 1–2); bò mang thai `BREED.gestation.bo` = 10 giờ vườn, cừu 8 giờ, đẻ 1 con. `a.mate` = cha lứa đang mang. Chuồng đầy (sức chứa cả loại chuồng) thì không thụ thai, không đẻ, hiện chữ "Chuồng đầy". Con vật bị đóng băng thì không sinh (dựa `s.time`).
+- Con mới sinh/nở: sex 50/50, `name` = "<tên mẹ> con", `mom`/`dad` = { id, name }; event `born`. Chưa có chống cận huyết (con gái trưởng thành sớm có thể phối với cha).
 ```js
 stageStart(kind, stage)           // tuổi (ms giờ vườn) lúc bắt đầu giai đoạn; kind = loại con vật hoặc 'cho'
 stageAt(kind, age)                // → 'non'|'nho'|'truong'|'gia'
@@ -316,7 +332,7 @@ Lúc sang ngày mới (6h) lái buôn lấy hết, trả xu, sinh event `shipped
 ### Chợ, cửa hàng, đơn hàng (mua bán chỉ trong giờ chợ mở 6h–18h; ngoài giờ trả `reason: 'closed'`)
 ```js
 buy(state, itemId, qty)           // → R: kiểm tra cấp, xu
-buyAnimal(state, type)            // → R: cần đã có chuồng loại đó còn chỗ (xếp vào chuồng còn chỗ); reason: no_pen full
+buyAnimal(state, type, sex = 'm')   // → R { price }: sex 'm' đực | 'f' cái (đắt hơn BREED.femaleMul ≈ 30%, animalPrice(type, sex)); cần chuồng loại đó còn chỗ; reason: no_pen full sex
 sell(state, itemId, qty|'all')    // → R { coins }
 sellAll(state)                    // → R { coins } bán mọi nông sản & sản phẩm (không bán vật tư/hạt)
 buyOutfit(state, 'hat'|'acc', index)  setLook(state, look)

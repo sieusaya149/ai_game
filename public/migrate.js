@@ -20,6 +20,7 @@ export const animalDefaults = a => ({
   pen: null,                            // id thực thể chuồng đang ở (xếp tự động khi null, xem settlePens ở state.js)
   tile: null,                          // { c, r } ô đang đứng khi thả rông (ADR 0013); null = trong chuồng
   nextProduct: 0, ready: false, pregnant: false, dueAt: 0,
+  mate: null,                           // { id, name } con đực đã làm cha lứa đang mang (nái/bò/cừu cái)
 });
 export function fillAnimal(a) {
   for (const [k, v] of Object.entries(animalDefaults(a))) if (a[k] === undefined) a[k] = v;

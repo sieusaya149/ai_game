@@ -4,14 +4,14 @@ import {
   ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
-  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice,
+  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal } from './migrate.js';
 import { now } from './clock.js';
 
-export { levelInfo, mapOf, reachable, footprint, sceneMap, stageStart, stageAt, lifeEnd };
+export { animalPrice, levelInfo, mapOf, reachable, footprint, sceneMap, stageStart, stageAt, lifeEnd };
 export const SAVE_KEY = 'nongtrai-save-v3';
 // Bản cũ: đọc được để chuyển, không bao giờ ghi đè hay xóa. Mỗi bản có cờ riêng "đã chuyển (hoặc đã chơi lại từ đầu)"
 // để không đọc lại nữa; đọc lần lượt v3 → v2 → v1.
@@ -134,6 +134,46 @@ function mkAnimal(s, type, stage, x, y, extra) {
   s.animals.push(an);
   return an;
 }
+
+// ---------- Đực/cái, sinh sản, tên, phả hệ (issue 36) ----------
+const isAdult = a => a.stage === 'truong' || a.stage === 'gia';
+const roosters = s => s.animals.filter(a => a.type === 'ga' && a.sex === 'm' && isAdult(a));
+const ref = a => (a ? { id: a.id, name: a.name } : null);
+const babyName = (type, mom) => (mom?.name ? `${mom.name.replace(/ con$/, '')} con`.slice(0, BREED.nameMax) : ANIMALS[type].baby);
+// Con mới sinh/nở: giới tính 50/50, tên theo mẹ, nhớ cha mẹ (mom/dad = { id, name } hoặc null)
+function newborn(s, type, mom, dad, x, y, pen) {
+  return mkAnimal(s, type, 'non', x, y, { pen, sex: Math.random() < 0.5 ? 'm' : 'f', name: babyName(type, mom), mom: mom ?? null, dad: dad ?? null });
+}
+// Chuồng cho con mới: chuồng của mẹ nếu còn chỗ, không thì chuồng còn chỗ khác
+function bornPen(s, mom, type) {
+  const e = s.farm.ents.find(x => x.id === mom?.pen);
+  return e && penUse(s, e.id) < penCapOf(e) ? e.id : roomyPen(s, ANIMALS[type].pen)?.id;
+}
+const penTypeOf = (s, a) => s.farm.ents.find(e => e.id === a.pen)?.pen;
+const fitToBreed = a => animalCan(a, 'product') && !a.sick && a.hunger > HUSBANDRY.growNeedsHunger && a.happy > 40;
+// Lý do con vật chưa sinh sản được dù đủ cặp: 'Chuồng đầy' | null
+export function breedNote(s, a) {
+  if (!['heo', 'bo', 'cuu'].includes(a.type) || a.sex !== 'f' || penTypeOf(s, a) === 'quarantine' || !fitToBreed(a)) return null;
+  const mate = s.animals.some(m => m.type === a.type && m.sex === 'm' && m.pen === a.pen && fitToBreed(m));
+  return mate && typeFree(s, ANIMALS[a.type].pen) <= 0 ? 'Chuồng đầy' : null;
+}
+// Đổi tên: bỏ khoảng trắng thừa; từ chối tên rỗng hoặc dài hơn BREED.nameMax
+export function renameAnimal(s, id, name) {
+  const a = s.animals.find(x => x.id === id);
+  if (!a) return R(false, 'Không thấy con vật này', { reason: 'missing' });
+  const n = String(name ?? '').trim().replace(/\s+/g, ' ');
+  if (!n) return R(false, 'Tên không được để trống', { reason: 'empty' });
+  if (n.length > BREED.nameMax) return R(false, `Tên dài quá, tối đa ${BREED.nameMax} chữ`, { reason: 'long' });
+  a.name = n;
+  for (const o of s.animals) for (const k of ['mom', 'dad']) if (o[k]?.id === id) o[k].name = n;   // phả hệ theo tên mới
+  return R(true, `Đã đặt tên ${n}`, { id });
+}
+// Phả hệ của con vật: cha, mẹ (còn sống hay không đều có tên), các con còn trong trại
+export function pedigree(s, id) {
+  const a = s.animals.find(x => x.id === id);
+  if (!a) return null;
+  return { id, name: a.name, sex: a.sex, mom: a.mom, dad: a.dad, kids: s.animals.filter(o => o.mom?.id === id || o.dad?.id === id).map(o => ({ id: o.id, name: o.name, sex: o.sex })) };
+}
 const newPlot = (idx, unlocked) => ({ idx, unlocked, soil: 'untilled', water: 0, weeds: false, crop: null });
 
 // ---------- Tạo / lưu / tải ----------
@@ -153,7 +193,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     inv: { ...START.items }, basket: {},   // inv = kho, basket = giỏ
     shipbin: { items: {} },   // thùng giao hàng: lái buôn lấy hết lúc 6h sáng
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
-    animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, manure: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
+    animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, manure: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], clutch: [], nest: { egg: false, hatchAt: 0, mom: null, dad: null },
     dog: { stage: START.dogStage, age: stageStart('cho', START.dogStage), hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name },
     poops: [], threats: [], orders: [], nextOrderAt: 0,
     stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0 },
@@ -212,7 +252,7 @@ export function loadGame() {
   s.troughs = { ...base.troughs, ...s.troughs };
   s.manure = { ...base.manure, ...s.manure };
   for (const k of ['owned', 'achievements', 'inv', 'basket', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
-  for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
+  for (const k of ['animals', 'eggs', 'clutch', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
   s.shipbin = { items: Object.fromEntries(Object.entries(s.shipbin?.items ?? {}).filter(([k, n]) => (CROPS[k] || PRODUCTS[k]) && n > 0)) };
   ensureShipbin(s);   // vườn cũ chưa có thùng: thêm một thùng cạnh nhà kho
   settlePens(s);      // con vật chưa có chuồng (bản cũ): xếp vào chuồng cùng loại
@@ -394,6 +434,7 @@ function step(s, d) {
     s.weather = r < 0.45 ? 'sun' : r < 0.75 ? 'cloud' : 'rain';
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.morningRegen);   // mỗi sáng 6h tự hồi một ít
     settleShip(s);
+    if (!catchUp) cockCrow(s);
     toast({ sun: 'Trời nắng đẹp ☀️', cloud: 'Trời nhiều mây ⛅', rain: 'Trời mưa rồi, ruộng tự có nước 🌧️' }[s.weather]);
   }
   if (s.sit) {   // ngồi ghế đá: hồi chậm, đầy thì tự đứng dậy
@@ -409,6 +450,12 @@ function step(s, d) {
   if (!catchUp) stepThreats(s, d);
   stepOrders(s);
   checkAch(s);
+}
+
+// 6h sáng: gà trống trưởng thành gáy (chữ bay, tiếng, event cho bong bóng); chạy bù không gáy
+function cockCrow(s) {
+  const list = roosters(s).filter(r => !r.sick);
+  list.forEach((r, i) => { fxEv(r.x, r.y - 10, 'Ò ó o o! 🐓', COL.coin); emit({ type: 'cockcrow', id: r.id }); if (!i) snd('cockcrow'); });
 }
 
 function stepPlot(s, p, d) {
@@ -549,12 +596,17 @@ function stepAnimals(s, d) {
     }
     a.walk = 0;
     if (!animalCan(a, 'product') || a.type === 'heo' || s.time < a.nextProduct) continue;
+    if (a.sex === 'm' && a.type !== 'cuu') continue;   // gà trống không đẻ, bò đực không có sữa
     if (a.type === 'ga') {
-      if (s.eggs.length < 30) { const e = { id: s.nextId++, x: a.x, y: a.y, laidAt: s.time }; s.eggs.push(e); emit({ type: 'egg' }); spawnEv('egg', e.x, e.y); }
+      if (s.eggs.length < 30) {
+        const roos = roosters(s), fert = roos.length > 0 && Math.random() < BREED.fertile;   // có trống: 40% trứng có phôi
+        const e = { id: s.nextId++, x: a.x, y: a.y, laidAt: s.time, fertile: fert, mom: ref(a), dad: fert ? ref(pick(roos)) : null };
+        s.eggs.push(e); emit({ type: 'egg' }); spawnEv('egg', e.x, e.y);
+      }
       a.nextProduct = s.time + productEvery(a);
     } else if (!a.ready) { a.ready = true; fxEv(a.x, a.y, a.type === 'bo' ? 'Có sữa! 🥛' : 'Có lông! ✂️'); }
   }
-  stepPigs(s, d);
+  stepBreeding(s, d);
 }
 
 // ---------- Dơ, tắm, dọn chuồng ----------
@@ -586,49 +638,94 @@ function stepManure(s, d) {
 export const dirtyAnimals = s => s.animals.filter(a => isDirty(a) && !DIRT.mud.includes(a.type));
 export const dirtyPens = s => Object.keys(s.manure).filter(pen => penDirty(s, pen) && s.animals.some(a => ANIMALS[a.type].pen === pen));
 
-function stepPigs(s, d) {
+// Sinh sản heo, bò, cừu: cần con đực và con cái trưởng thành, no và vui, chung một chuồng (chuồng cách ly thì không).
+// Heo: có cặp thì mỗi phút 25% một nái mang bầu, đẻ 1–3 con (nái già 1–2). Bò, cừu: có cặp là mang thai ngay, đẻ 1 con sau BREED.gestation.
+// Chuồng đầy (sức chứa cả loại chuồng) thì không thụ thai, không đẻ: con vật hiện lý do "Chuồng đầy".
+function stepBreeding(s, d) {
   settlePens(s);
-  const pigs = s.animals.filter(a => a.type === 'heo' && s.farm.ents.find(e => e.id === a.pen)?.pen !== 'quarantine');   // heo ở chuồng cách ly không sinh sản
-  let total = pigs.length;
-  for (const a of [...pigs]) {
-    if (!a.pregnant || a.sick || s.time < a.dueAt) continue;
-    const room = penCap(s, 'pig') - total, n = Math.min(rint(...HUSBANDRY.pigLitter), Math.max(0, room));
-    if (n <= 0) continue; // chuồng chật thì chờ
-    a.pregnant = false; a.nextProduct = s.time + HUSBANDRY.pigGestation; // nghỉ trước lứa sau
-    for (let i = 0; i < n; i++) { const b = mkAnimal(s, 'heo', 'non', a.x + rnd(-6, 6), a.y + rnd(-6, 6), { pen: roomyPen(s, 'pig')?.id ?? a.pen }); spawnEv('piglet', b.x, b.y); }
-    s.stats.piglets += n; addExp(s, ANIMALS.heo.exp);
-    fxEv(a.x, a.y, `Heo đẻ ${n} heo con! 🐷`, COL.good); snd('oink');
-    log(s, `Heo nái đẻ ${n} heo con`);
-    total += n;
+  const full = (a, def) => {
+    if (!a.fullAt || s.time - a.fullAt > 5 * MIN) { a.fullAt = s.time; fxEv(a.x, a.y - 8, 'Chuồng đầy 🚫', COL.bad); }
+    return typeFree(s, def.pen) <= 0;
+  };
+  for (const type of ['heo', 'bo', 'cuu']) {
+    const def = ANIMALS[type], herd = s.animals.filter(a => a.type === type && penTypeOf(s, a) !== 'quarantine');
+    const mateOf = f => herd.find(m => m.sex === 'm' && m.pen === f.pen && fitToBreed(m));
+    // đẻ
+    for (const a of herd) {
+      if (!a.pregnant || a.sick || s.time < a.dueAt) continue;
+      const free = typeFree(s, def.pen);
+      if (free <= 0) { full(a, def); continue; }   // chuồng chật thì chờ
+      const n = Math.min(type === 'heo' ? rint(...(a.stage === 'gia' ? BREED.litterOld : HUSBANDRY.pigLitter)) : 1, free);
+      a.pregnant = false; a.fullAt = 0;
+      const mom = ref(a), dad = a.mate; a.mate = null;
+      if (type === 'heo') a.nextProduct = s.time + HUSBANDRY.pigGestation;   // nghỉ trước lứa sau
+      for (let i = 0; i < n; i++) {
+        const b = newborn(s, type, mom, dad, a.x + rnd(-6, 6), a.y + rnd(-6, 6), bornPen(s, a, type));
+        spawnEv(type === 'heo' ? 'piglet' : type === 'bo' ? 'calf' : 'lamb', b.x, b.y);
+        emit({ type: 'born', kind: type, animal: def.name, id: b.id, x: b.x, y: b.y });
+      }
+      if (type === 'heo') { s.stats.piglets += n; snd('oink'); }
+      addExp(s, def.exp);
+      fxEv(a.x, a.y, `${def.name} đẻ ${n} ${def.baby.toLowerCase()}! ${ICON[type]}`, COL.good);
+      log(s, type === 'heo' ? `Heo nái đẻ ${n} heo con` : `${def.name} cái ${a.name} sinh ${def.baby.toLowerCase()}`);
+    }
+    // thụ thai
+    const sows = herd.filter(a => a.sex === 'f' && !a.pregnant && s.time >= (type === 'heo' ? a.nextProduct : 0) && fitToBreed(a) && mateOf(a));
+    if (!sows.length) continue;
+    if (type === 'heo') {
+      if (!chance(HUSBANDRY.pigBreedChancePerMin, d)) continue;
+      const sow = pick(sows);
+      if (full(sow, def)) continue;
+      sow.pregnant = true; sow.dueAt = s.time + HUSBANDRY.pigGestation; sow.mate = ref(mateOf(sow));
+      fxEv(sow.x, sow.y, 'Heo mang bầu 💕', COL.good); log(s, 'Một chú heo đang mang bầu');
+    } else for (const f of sows) {
+      if (full(f, def)) continue;
+      f.pregnant = true; f.dueAt = s.time + BREED.gestation[type]; f.mate = ref(mateOf(f));
+      fxEv(f.x, f.y, `${def.name} mang thai 💕`, COL.good);
+    }
   }
-  const fit = pigs.filter(a => animalCan(a, 'product') && !a.sick && a.hunger > HUSBANDRY.growNeedsHunger && a.happy > 40);
-  if (fit.length < 2 || total >= penCap(s, 'pig') || !chance(HUSBANDRY.pigBreedChancePerMin, d)) return;
-  const cand = fit.filter(a => !a.pregnant && s.time >= a.nextProduct);
-  if (!cand.length) return;
-  const sow = pick(cand);
-  sow.pregnant = true; sow.dueAt = s.time + HUSBANDRY.pigGestation;
-  fxEv(sow.x, sow.y, 'Heo mang bầu 💕', COL.good); log(s, 'Một chú heo đang mang bầu');
 }
 
+const inPen = (e, o) => { const ft = footprint(e); return o.x != null && o.x >= ft.c * TS && o.x < (ft.c + ft.w) * TS && o.y >= ft.r * TS && o.y < (ft.r + ft.h) * TS; };
+// Gà con nở ra: ở ổ ấp / chuồng ấp tự động thì ra chỗ ổ; trứng bỏ quên thì ra chỗ quả trứng
+function hatch(s, mom, dad, x, y, pen, ev) {
+  const b = newborn(s, 'ga', mom, dad, x, y, pen); s.stats.hatches++;
+  spawnEv('chick', ev.x, ev.y); snd('cluck'); fxEv(ev.x, ev.y, 'Trứng nở! 🐣', COL.good);
+  emit({ type: 'born', kind: 'ga', animal: 'Gà', id: b.id, x: b.x, y: b.y });
+  return b;
+}
 function stepEggs(s) {
   const chickPen = () => typeFree(s, 'chicken') > 0;
-  // trứng bỏ quên: mỗi eggForgetMs thử một lần
+  // trứng bỏ quên: mỗi eggForgetMs thử một lần; chỉ trứng có phôi mới nở được
   for (const e of [...s.eggs]) {
     e.check ??= e.laidAt + HUSBANDRY.eggForgetMs;
     if (s.time < e.check) continue;
-    if (chickPen() && Math.random() < HUSBANDRY.eggHatchChance) {
+    if (e.fertile && chickPen() && Math.random() < HUSBANDRY.eggHatchChance) {
       s.eggs.splice(s.eggs.indexOf(e), 1);
-      mkAnimal(s, 'ga', 'non', e.x, e.y, { pen: roomyPen(s, 'chicken')?.id }); s.stats.hatches++;
-      spawnEv('chick', e.x, e.y); snd('cluck'); fxEv(e.x, e.y, 'Trứng nở! 🐣', COL.good); log(s, 'Một quả trứng bỏ quên đã nở thành gà con');
+      hatch(s, e.mom, e.dad, e.x, e.y, roomyPen(s, 'chicken')?.id, e);
+      log(s, 'Một quả trứng bỏ quên đã nở thành gà con');
     } else e.check += HUSBANDRY.eggForgetMs;
   }
   if (s.nest.egg && s.time >= s.nest.hatchAt && chickPen()) {
     const rp = roomyPen(s, 'chicken'), at = mapOf(s).building('coop').at, p = penPoint(s, 'chicken', rp?.id);
-    s.nest.egg = false; mkAnimal(s, 'ga', 'non', p.x, p.y, { pen: rp?.id }); s.stats.hatches++;
-    spawnEv('chick', at.x, at.y); snd('cluck'); fxEv(at.x, at.y, 'Trứng nở! 🐣', COL.good); toast('Trứng ở ổ ấp đã nở gà con 🐣'); log(s, 'Ổ ấp nở ra một gà con');
+    s.nest.egg = false;
+    hatch(s, s.nest.mom, s.nest.dad, p.x, p.y, rp?.id, at); s.nest.mom = s.nest.dad = null;
+    toast('Trứng ở ổ ấp đã nở gà con 🐣'); log(s, 'Ổ ấp nở ra một gà con');
+  }
+  // ổ ấp tự động ở chuồng gà cấp 3: tự nhận trứng có phôi nằm trong chuồng (không cần soi), nở như ổ ấp thường
+  for (const pen of penEnts(s, 'chicken')) {
+    if (penLv(pen) < 3) continue;
+    if (pen.incub && s.time >= pen.incub.at && chickPen()) {
+      const rp = roomyPen(s, 'chicken'), p = penPoint(s, 'chicken', rp?.id);
+      hatch(s, pen.incub.mom, pen.incub.dad, p.x, p.y, rp?.id, p); pen.incub = null;
+      log(s, 'Ổ ấp tự động nở ra một gà con');
+    }
+    if (!pen.incub) {
+      const e = s.eggs.find(o => o.fertile && inPen(pen, o));
+      if (e) { s.eggs.splice(s.eggs.indexOf(e), 1); pen.incub = { at: s.time + HUSBANDRY.nestHatchMs, mom: e.mom, dad: e.dad }; }
+    }
   }
 }
-
 function stepDog(s, d) {
   const g = s.dog;
   g.hunger = Math.max(0, g.hunger - 100 * d / DOG.hungerMs);
@@ -806,7 +903,7 @@ const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 
 export function actionsFor(s, t) {
   if (!t) return [];
-  const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: s => [mk('collect', '🥚', 'Nhặt trứng', room(s) < 1 ? FULL : null)],
+  const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: eggActs,
     poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, scale: () => [mk('weigh', '⚖️', 'Cân heo xem số ký')], nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
   return f ? f(s, t) : [];
 }
@@ -858,6 +955,7 @@ function animalActs(s, t) {
   if (animalCan(a, 'vitamin') && !a.sick) A.vitamin = mk('vitamin', '💉', `Cho uống vitamin (còn ${have(s, 'vitamin')})`, have(s, 'vitamin') <= 0 ? noItem('vitamin') : null);
   const first = a.sick ? 'medicine' : a.ready ? 'collect' : a.hunger < 40 ? 'feed' : isDirty(a) ? 'bath' : 'pet';
   const list = [A[first], ...Object.entries(A).filter(([k]) => k !== first).map(([, v]) => v)];
+  list.push(mk('rename', '✏️', 'Đổi tên'));
   const q = sellQuote(s, a);
   if (animalCan(a, 'sell')) list.push(mk('sell', ICON[a.type], `Bán ${def.name.toLowerCase()} cho Chú Ba (${q.kg != null ? q.kg + ' kg · ' : ''}${q.price} xu)`));
   if (a.stage === 'gia' && !a.retired) list.push(mk('retire', '🪑', 'Cho nghỉ hưu (ở lại trại, không cho sản phẩm, cả chuồng vui hơn)'));
@@ -878,9 +976,16 @@ function troughActs(s, t) {
 }
 const fmtXu = n => n.toLocaleString('vi-VN');
 
+function eggActs(s, t) {
+  const e = s.eggs.find(x => x.id === t.id);
+  if (!e) return [];
+  const collect = mk('collect', '🥚', e.candled && e.fertile ? 'Nhặt trứng có phôi' : 'Nhặt trứng', room(s) < 1 ? FULL : null);
+  return e.candled ? [collect] : [mk('candle', '🔦', 'Soi trứng'), collect];
+}
+
 function nestActs(s) {
   if (s.nest.egg) return [mk('wait', '🪺', `Đang ấp trứng (còn ${mmss(s.nest.hatchAt - s.time)})`, 'Chờ trứng nở nhé')];
-  return [mk('incubate', '🥚', `Đặt trứng vào ổ ấp (còn ${have(s, 'trung')})`, have(s, 'trung') <= 0 ? 'Chưa có trứng, ra chuồng gà nhặt nhé' : null)];
+  return [mk('incubate', '🥚', `Đặt trứng có phôi vào ổ ấp (còn ${have(s, 'trung_phoi')})`, have(s, 'trung_phoi') <= 0 ? (have(s, 'trung') > 0 ? 'Ổ ấp chỉ nhận trứng có phôi, soi trứng ở chuồng nhé' : 'Chưa có trứng có phôi, soi trứng ở chuồng gà nhé') : null)];
 }
 
 function dogActs(s) {
@@ -1108,6 +1213,7 @@ const DO = {
         a.ready = false; a.nextProduct = s.time + productEvery(a); give(s, prod); addExp(s, def.exp);
         return res(true, `Được 1 ${PRODUCTS[prod].name}`, [say(at, `+1 ${PRODUCTS[prod].name}${star ? ' ⭐' : ''}`)], sound);
       }
+      case 'rename': return res(true, '', [], 'click', { rename: a.id });   // UI mở hộp nhập tên rồi gọi renameAnimal
       case 'sell': return sellAnimal(s, a.id, t.confirms ?? 0);
       case 'retire': return retireAnimal(s, a.id);
       case 'unretire': a.retired = false; return res(true, 'Đi làm lại thôi', [say(at, 'Làm lại! 💪')], 'pop');
@@ -1115,9 +1221,16 @@ const DO = {
   },
 
   egg(s, t, id, at) {
-    s.eggs.splice(s.eggs.findIndex(e => e.id === t.id), 1);
-    give(s, 'trung'); s.stats.eggs++; addExp(s, ANIMALS.ga.exp);
-    return res(true, 'Nhặt được 1 quả trứng', [say(at, '+1 Trứng gà')], 'pop');
+    const e = s.eggs.find(x => x.id === t.id);
+    if (id === 'candle') {   // soi: biết có phôi hay không (trứng trống nhặt về vẫn bán được)
+      e.candled = true;
+      return res(true, e.fertile ? 'Trứng có phôi, ấp được đấy' : 'Trứng trống, không có phôi', [say(at, e.fertile ? 'Có phôi! ✨' : 'Trứng trống', e.fertile ? COL.good : COL.info)], 'pop', { fertile: !!e.fertile });
+    }
+    s.eggs.splice(s.eggs.indexOf(e), 1);
+    const fert = !!(e.candled && e.fertile);   // chưa soi thì không biết có phôi: nhặt như trứng thường
+    give(s, fert ? 'trung_phoi' : 'trung'); s.stats.eggs++; addExp(s, ANIMALS.ga.exp);
+    if (fert) { s.clutch.push({ mom: e.mom, dad: e.dad }); if (s.clutch.length > 60) s.clutch.shift(); }
+    return res(true, fert ? 'Nhặt được 1 trứng có phôi' : 'Nhặt được 1 quả trứng', [say(at, fert ? '+1 Trứng có phôi' : '+1 Trứng gà')], 'pop');
   },
 
   poop(s, t, id, at) {
@@ -1150,7 +1263,9 @@ const DO = {
   },
 
   nest(s, t, id, at) {
-    take(s, 'trung'); s.nest.egg = true; s.nest.hatchAt = s.time + HUSBANDRY.nestHatchMs;
+    s.clutch.splice(0, Math.max(0, s.clutch.length - have(s, 'trung_phoi')));   // trứng có phôi đã bán bớt: bỏ gốc gác cũ nhất
+    take(s, 'trung_phoi'); const p = s.clutch.shift();
+    s.nest.egg = true; s.nest.hatchAt = s.time + HUSBANDRY.nestHatchMs; s.nest.mom = p?.mom ?? null; s.nest.dad = p?.dad ?? null;
     return res(true, 'Đã đặt trứng vào ổ ấp', [say(at, 'Ấp nào! 🥚')], 'pop');
   },
 
@@ -1234,7 +1349,8 @@ export function buy(s, itemId, qty = 1) {
   return R(true, `Đã mua ${qty} ${it.name.toLowerCase()}`);
 }
 
-export function buyAnimal(s, type) {
+// sex: 'm' đực (giá gốc) | 'f' cái (đắt hơn BREED.femaleMul). Không nói thì mua con đực.
+export function buyAnimal(s, type, sex = 'm') {
   if (!marketOpen(s)) return closed();
   const def = ANIMALS[type];
   if (!def) return R(false, 'Không có con này');
@@ -1242,11 +1358,13 @@ export function buyAnimal(s, type) {
   if (!penEnts(s, def.pen).length) return R(false, `Bạn chưa có ${PEN_DEFS[def.pen].name.toLowerCase()}, xây chuồng trước nhé`, { reason: 'no_pen' });
   const pen = roomyPen(s, def.pen);
   if (!pen) return R(false, `${PEN_DEFS[def.pen].name} đã chật rồi, nâng cấp hoặc xây thêm chuồng nhé`, { reason: 'full' });
-  if (s.coins < def.price) return R(false, 'Chưa đủ xu, cố lên nhé');
-  s.coins -= def.price;
+  if (sex !== 'm' && sex !== 'f') return R(false, 'Chọn đực hay cái nhé', { reason: 'sex' });
+  const price = animalPrice(type, sex);
+  if (s.coins < price) return R(false, 'Chưa đủ xu, cố lên nhé');
+  s.coins -= price;
   const p = penPoint(s, def.pen, pen.id);
-  mkAnimal(s, type, 'non', p.x, p.y, { pen: pen.id });
-  return R(true, `Đã mua ${def.baby.toLowerCase()}`);
+  mkAnimal(s, type, 'non', p.x, p.y, { pen: pen.id, sex });
+  return R(true, `Đã mua ${def.baby.toLowerCase()} ${sex === 'm' ? 'đực' : 'cái'}`, { price });
 }
 
 export function sell(s, itemId, qty = 1) {
