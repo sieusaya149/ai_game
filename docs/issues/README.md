@@ -46,8 +46,8 @@ Nguồn: [PRD 0002](../prd/0002-phase-1-online.md).
 | 25 | [Làng real-time](25-lang-real-time.md) | 22 | ✅ |
 | 26 | [Bạn bè và cổng vườn](26-ban-be-va-cong-vuon.md) | 25 | ✅ |
 | 27 | [Thăm vườn bạn](27-tham-vuon-ban.md) | 24, 25 | ✅ |
-| 28 | [Giúp vườn bạn](28-giup-vuon-ban.md) | 27 | ⬜ |
-| 29 | [Quà và sổ lưu bút](29-qua-va-so-luu-but.md) | 27 | ⬜ |
+| 28 | [Giúp vườn bạn](28-giup-vuon-ban.md) | 27 | ✅ |
+| 29 | [Quà và sổ lưu bút](29-qua-va-so-luu-but.md) | 27 | ✅ |
 | 30 | [Trộm và giới hạn](30-trom-va-gioi-han.md) | 28 | ⬜ |
 | 31 | [Chó Mực canh khách](31-cho-muc-canh-khach.md) | 30 | ⬜ |
 | 32 | [Vắng nhà, thông báo, thành tựu xã hội](32-vang-nha-thong-bao-thanh-tuu-xa-hoi.md) | 29, 31 | ⬜ |
