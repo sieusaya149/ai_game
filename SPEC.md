@@ -26,7 +26,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`; Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`. Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`; Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`. Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
 | `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `troughOf(map, {pen, id?})`; bản đồ vườn có `pens` (chuồng đầu tiên mỗi loại), `penList`/`penById` (mọi chuồng: `{ id, type, lv, name, rect, gates, trough|null, area, house, ent }`), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
 | `public/migrate.js` | `SAVE_VERSION` (3), `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`: v1→v2, v2→v3); `animalDefaults`/`fillAnimal`: hình dạng con vật v3 và mặc định của nó. Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
@@ -103,8 +103,9 @@ state = {
   dog: { stage, age, hunger, happy, x, y, nextPoop, name },   // stage/age như con vật, theo LIFE.cho
   poops: [ { id, x, y, at } ],
   threats: [ { id, kind: 'crow'|'thief', plot, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
+  preds: [ { id, kind: 'rat'|'hawk'|'weasel', state: 'hunt'|'leaving', since, strikeAt, warned, x, y, tx, ty, tile?, tileAt?, target?, carry? } ],   // kẻ săn mồi (issue 43)
   orders: [ { id, who, items, coins, exp } ], nextOrderAt,
-  stats: { harvests, bugs, eggs, poops, slips, piglets, hatches, orders, thieves, crows, earned, planted, shipped, bought, slept },
+  stats: { harvests, bugs, eggs, poops, slips, piglets, hatches, orders, thieves, crows, rats, preds, earned, planted, shipped, bought, slept },
   achievements: { id: true },
   grief: null | { until },                    // cả trại đang buồn vì có con mất (theo state.time); xem "Bệnh 4 giai đoạn" (lát 38)
   log: [ { t, text } ],                       // mới nhất ở đầu, tối đa 50
@@ -124,7 +125,7 @@ state = {
 | `shed`, `well`, `board`, `shipbin`, `doghouse` | không | chân đế theo `BUILDING_DEFS`; dời được |
 | `field` | `plots: [9 chỉ số vào state.plots]` | khối ruộng 3x3; ô thứ k ở `(c + k%3, r + floor(k/3))` |
 | `pen` | `pen: 'chicken'|'pig'|'pasture'|'quarantine'`, `lv?: 1..3` | chuồng, kích thước theo `PEN_DEFS` (không đổi theo cấp); `lv` thiếu = 1; nhiều chuồng mỗi loại, giới hạn theo cấp người chơi (`PEN_TABLE.limit`). Chuồng chó (`doghouse`) cũng có `lv?` |
-| `deco` | `item: 'deco_scarecrow'|'deco_flower'|'deco_lamp'|'deco_bench'` | đồ trang trí 1 ô |
+| `deco` | `item: 'deco_scarecrow'|'deco_flower'|'deco_lamp'|'deco_bench'|'deco_lowfence'|'deco_rattrap'|'deco_canopy'`, `shut?` (bẫy chuột đã sập) | đồ trang trí 1 ô |
 | `grave` | `animal` (loài), `name?` (chỉ con ❤️4+), `flower: bool` | ngôi mộ 1 ô, con vật mất để lại (lát 38); đặt/dời qua `canPlace` như mọi công trình |
 | `tree` | không | cây cảnh, không dời được |
 | `bush`, `rock` | không | bụi, đá **chưa dọn** trên dải đất mới; chắn đường, dọn bằng tay (`CLUTTER`) |
@@ -288,6 +289,25 @@ shoo(state, a, src, dt, { radius, speed, w })   // world.js: lùa một con ra x
 - **Rải thóc:** target mới `{ kind: 'gate', id }` (cửa chuồng, chỉ hiện từ chạng vạng và khi chuồng có loài thả rông). Hành động `scatter` tốn **1 bao cám** của loài đó (`ANIMALS[type].feed`); mọi con lạc của chuồng trong `FREE.lureRadius` (5 ô quanh ô cửa) vào chuồng ngay. Hết cám thì `disabled`; không còn con nào lạc cũng `disabled`. Kết quả có thêm `grain: { x, y }` để main đẩy hoạt cảnh thóc rải vào `world.grains`.
 - **Hiển thị:** `render.js` treo biển `SPR3.homeBoard` trên cửa chuồng với số `home/total` (đỏ khi chưa đủ, xanh khi đủ); con lạc đeo `SPR3.strayIcon` (💤) và ngủ gật; `ui.js` vẽ mũi tên vàng `SPR3.strayArrow` (`.alert-arrow[data-key="stray:<id>"]`) khi con lạc ở ngoài khung nhìn. Con đang bị lùa dùng dáng chạy hoảng `SPR3.run.<loài>.<giai đoạn>` (gà mái, gà trống, vịt).
 
+### Kẻ săn mồi: chuột, diều hâu, chồn (issue 43, ADR 0004 + 0013)
+```js
+preds(state)             // → state.preds: [{ id, kind: 'rat'|'hawk'|'weasel', state: 'hunt'|'leaving', strikeAt, x, y, tx, ty, tile?, target? }]
+predWarning(state)       // → những con đang trong khoảng cảnh báo (strikeAt - time <= PREDATOR.warnMs): nguồn của báo 🔴 và mũi tên
+hurtAnimals(state)       // → con non đang mang vết chuột cắn (a.hurt), chưa băng bó
+ratTraps(state)          // → các thực thể bẫy chuột đã đặt ({ kind: 'deco', item: 'deco_rattrap', shut? })
+PRED_NAME                // { rat: 'Chuột', hawk: 'Diều hâu', weasel: 'Chồn' }
+```
+- **Luật trừu tượng (ADR 0013):** mọi quyết định theo ô và xác suất nằm trong `state.js` (`stepPreds`); `world.js` chỉ diễn hoạt (chuột lon ton tới ô `p.tile`, diều hâu lượn vòng thu hẹp dần rồi sà xuống, chồn men tới con mồi). Luật đặt `p.tx/p.ty` = điểm nó nhắm tới, `world.js` kéo `p.x/p.y` tới đó.
+- **Cảnh báo trước 10 giây là việc của luật:** mỗi con có `strikeAt` = lúc ra tay. Khi còn `PREDATOR.warnMs` (10 giây) thì luật phát event `predator` (mức urgent) và `urgentSpots` có mục `pred:<id>`. **Đuổi kịp trong khoảng đó thì không ai bị hại**: target `{ kind: 'pred', id }`, hành động `shoo`.
+- **🐀 Chuột:** sinh ở ô cạnh **nhà kho, đống rơm (nhà chuồng đồng cỏ), máng ăn**, mỗi phút `PREDATOR.rat.spawnPerMin` (≈1 con mỗi giờ vườn), **tối đa `PREDATOR.rat.max` = 8 con**. Cứ `rat.moveMs` đổi ô một lần (lang thang trong bán kính `rat.radius`); cứ `rat.actMs` ra tay một lần: **ăn 1 phần cám** trong máng, **trộm 1 quả trứng**, hoặc **cắn con non** (`rat.biteChance`, hoặc chắc chắn khi hết cả cám lẫn trứng).
+- **Con non bị cắn:** `a.hurt = true`, `a.hurtMs` tăng theo giờ vườn; quá `rat.hurtDeadMs` thì con non không qua khỏi (chỉ khi đang chơi). Chữa bằng **1 liều thuốc thú y** (hành động `medicine` trên con vật, cũng là hành động chính lúc đó).
+- **🦅 Diều hâu:** chỉ **ban ngày**, chỉ nhắm **con non đang thả rông** (`a.stage === 'non'` và có `a.tile`); con vào chuồng rồi thì nó bỏ đi tay không. Khắc chế: **chó canh** (`guardOn`) và **mái che sân** `deco_canopy` (con non trong `hawk.coverRadius` ô quanh mái che thì không bị nhắm).
+- **🦊 Chồn:** chỉ trong khung giờ **nửa đêm** (`weasel.from`–`weasel.to`, 23h–2h), chỉ bắt **con ngủ ngoài chuồng** (`strays`). Khắc chế: lùa về chuồng (`passGate`), **chó canh**, **đèn lồng** (`weasel.lampMul` mỗi cái, tối đa 3).
+- **🪤 Bẫy chuột:** vật phẩm `deco_rattrap` bán ở chợ Bà Tư, đặt bằng `placeEntity` như đồ trang trí. Chuột trong `trap.lure` ô ngửi thấy mồi và mò tới; bước vào ô có bẫy chưa sập thì bị bắt (`stats.rats++`, event `trapped`), bẫy mang cờ `shut: true` và phải **gài lại** bằng hành động `arm` trên chính nó.
+- **Bảo hộ người mới:** dưới cấp `PREDATOR.minLevel` (5) không sinh con nào.
+- **ADR 0004 (cứng):** khi chạy bù offline (`catchUp`) **chuột chỉ ăn cám và trộm trứng** — không cắn con non; diều hâu, chồn **không tới** (con đã có sẵn trong bản lưu thì bỏ đi tay không), nên **không con nào chết**. Vết thương đang có bị kẹp ở `rat.hurtCapMs`. Chạy bù cũng không sinh chuột quá 8.
+- Hiển thị: `render.js` vẽ `SPR3.rat`/`ratEat`/`ratFlee`, `SPR3.hawk`/`hawkDive`/`hawkCarry` (+ `hawkShadow` in trên mặt đất), `SPR3.weasel`/`weaselCatch`, băng gạc `SPR3.hurtPatch` trên con non bị cắn, bẫy `SPR3.ratTrap`/`ratTrapShut`/`ratTrapFull`, mái che `SPR3.canopy`; bong bóng cảnh báo `SPR3.status.warn` trên đầu kẻ săn mồi sắp ra tay, `SPR3.status.hurtIcon` trên con bị thương.
+
 ### Vịt (issue 47)
 
 Vịt là **loài mới** trong `ANIMALS`/`LIFE` (`type: 'vit'`), không có trong bản lưu cũ nên **không cần bước chuyển v3**.
@@ -405,7 +425,7 @@ Chợ Bà Tư thay sạp hàng và nhà kho bán hàng cũ (sạp bị bỏ kh�
 
 ### Thông báo, Việc cần làm, cài đặt
 ```js
-notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, old)
+notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, old, stray, ill, pest)
 urgentSpots(state)                // → [{ key, kind, x, y, text }] chỗ đang có chuyện gấp, tính từ trạng thái (không cần event)
 // notify.js
 eventMeta(event)                  // → { level, cat, group, label } | null (event chưa khai báo mức)
@@ -415,7 +435,7 @@ arrowTargets(state, items)  arrowFor(point, box, margin)
 todoList(state)                   // → [{ kind, level: 'urgent'|'normal', count, scene: 'farm', x, y, target, spots: [{ key, x, y, target }], icon, label }]
                                   //   xếp theo mức gấp rồi số lượng; (x, y, target) là chỗ gần người chơi nhất
 ```
-Loại việc của `todoList`: `crow`, `thief`, `sick` (con Bệnh nặng trở lên — gấp); `tired` (con mệt), `hungry`, `dry`, `bugs`, `weeds`, `ripe`, `egg`, `trough`, `poop` (thường). Bảng Việc cần làm, bản đồ nhỏ và mũi tên đều đọc từ danh sách này (chạm một dòng thì `main.api.todoGo(kind)` cho nhân vật tự đi tới, kể cả khi đang ở bản đồ khác: ra cửa về vườn rồi đi tiếp).
+Loại việc của `todoList`: `crow`, `thief`, `pred` (kẻ săn mồi sắp ra tay), `hurt` (con non bị chuột cắn), `sick` (con Bệnh nặng trở lên — gấp); `tired` (con mệt), `hungry`, `dry`, `bugs`, `weeds`, `ripe`, `egg`, `trough`, `poop` (thường). Bảng Việc cần làm, bản đồ nhỏ và mũi tên đều đọc từ danh sách này (chạm một dòng thì `main.api.todoGo(kind)` cho nhân vật tự đi tới, kể cả khi đang ở bản đồ khác: ra cửa về vườn rồi đi tiếp).
 
 **Mức và khóa gộp của event** (`EVENT_LEVEL` trong `data.js`): mỗi event có `level`, `group(e)` (khóa gộp), `label`; mức `important` có thêm `cat` (loại tắt được) và `text(n, e)` (chữ đã gộp, ví dụ "5 ô cà chua đã chín"). Mức: `urgent` 🔴 (băng rôn đỏ, âm thanh, rung, mũi tên; không tắt được) · `important` 🟡 (toast nhỏ, tự gộp) · `info` ⚪ (chỉ ghi nhật ký) · `direct` (hiện ngay không gộp) · `none` (hiệu ứng/âm thanh, không thông báo). **Thêm event mới thì khai báo trong `EVENT_LEVEL`**, thiếu thì `eventMeta` trả `null`.
 
@@ -435,6 +455,7 @@ Loại việc của `todoList`: `crow`, `thief`, `sick` (con Bệnh nặng trở
 { kind: 'nest' }
 { kind: 'dog' }
 { kind: 'threat', id }
+{ kind: 'pred', id }           // chuột, diều hâu, chồn: chạm để đuổi (issue 43)
 { kind: 'deco', id }           // đồ trang trí trong vườn (ghế đá: ngồi nghỉ)
 { kind: 'clutter', id }        // bụi / đá chưa dọn: Dọn bụi, Đập đá
 { kind: 'strip', dir }         // mép vườn: mua dải đất 'N'|'S'|'E'|'W'
@@ -442,7 +463,7 @@ Loại việc của `todoList`: `crow`, `thief`, `sick` (con Bệnh nặng trở
 { kind: 'building', id }       // theo bản đồ đang đứng. Vườn: house, gate, shed, shipbin, board, well, doghouse (không tương tác).
                                //   Nhà: bed, wardrobe, (stove, table, plant chỉ để ngắm). Làng: market, smithy, friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck` (và `upgrade` nâng cấp chuồng); cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck` (và `upgrade` nâng cấp chuồng); cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 
@@ -455,6 +476,13 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `cured` | `animal`, `id` | info |
 | `grave` | `id` (thực thể mộ) | none |
 | `eating` | `kind` ('crow'/'thief') | urgent |
+| `predator` | `kind` ('rat'/'hawk'/'weasel'), `id`, `animal?` | urgent — kẻ săn mồi sắp ra tay, còn ~10 giây để đuổi |
+| `hurt` | `animal`, `id` | urgent — con non vừa bị chuột cắn |
+| `taken` | `animal`, `id`, `pred`, `kind`, `sex`, `x`, `y` | important (`loss`) — diều hâu/chồn bắt mất con vật |
+| `ratFeed` | `pen` | important (`pest`) — chuột ăn mất một phần cám |
+| `ratEgg` | — | important (`pest`) — chuột trộm mất một quả trứng |
+| `trapped` | `id` (thực thể bẫy) | info — bẫy chuột sập |
+| `shooed` | `pred`, `id` | info — đã đuổi được kẻ săn mồi |
 | `ripe` | `crop` | important (`ripe`) |
 | `rotten`, `dead` | `crop` | important (`spoil`) |
 | `hungry` | `animal` | important (`hungry`) |
@@ -472,7 +500,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `achievement` | `id`, `name`, `coins` | direct |
 | `fx` | `text`, `color`, `x`, `y` (chữ bay, điểm ảnh) | none |
 | `sound` | `name` | none |
-| `spawn` | `what` ('chick'/'piglet'/'egg'/'poop'/'crow'/'thief'/'angel'), `x`, `y` | none |
+| `spawn` | `what` ('chick'/'piglet'/'egg'/'poop'/'crow'/'thief'/'angel'/'rat'/'hawk'/'weasel'), `x`, `y` | none |
 
 Tên âm thanh (`sound.js`, `play(name)`, `setMuted(bool)`): `click coin harvest water dig plant spray pop bark oink cluck chirp moo baa slip levelup error eat alarm crow` (`chirp`: gà con kêu, world phát kèm chữ "chiếp").
 

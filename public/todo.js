@@ -1,6 +1,6 @@
 // Việc cần làm: đọc state, liệt kê việc trong vườn theo loại, mức gấp, số lượng và chỗ gần người chơi nhất. Thuần JS, không DOM.
 // Bảng 📋, bản đồ nhỏ và mũi tên chỉ hướng đều lấy vị trí từ đây.
-import { mapOf, dirtyAnimals, dirtyPens } from './state.js';
+import { mapOf, dirtyAnimals, dirtyPens, predWarning } from './state.js';
 import { ANIMALS, HUSBANDRY } from './data.js';
 import { TS } from './layout.js';
 
@@ -12,6 +12,8 @@ const DRY = 30;   // dưới mức này thì cây cần tưới (như hành đ�
 const KINDS = [
   { kind: 'crow', kp: 'threat', level: 'urgent', icon: '🪶', label: n => `${n} con quạ đang ăn cây`, spots: s => threats(s, 'crow') },
   { kind: 'thief', kp: 'threat', level: 'urgent', icon: '🧢', label: () => 'Có trộm đang hái cây', spots: s => threats(s, 'thief') },
+  { kind: 'pred', level: 'urgent', icon: '🐀', label: n => `${n} kẻ săn mồi đang rình`, spots: s => predWarning(s).map(p => ({ id: p.id, x: p.x, y: p.y, target: { kind: 'pred', id: p.id } })) },
+  { kind: 'hurt', level: 'urgent', icon: '🩹', label: n => `${n} con non bị chuột cắn`, spots: s => animals(s, a => a.hurt) },
   { kind: 'sick', level: 'urgent', icon: '🤒', label: n => `${n} con vật bệnh nặng`, spots: s => animals(s, a => a.sick >= 2) },
   { kind: 'tired', level: 'normal', icon: '🥱', label: n => `${n} con vật mệt`, spots: s => animals(s, a => a.sick && a.sick < 2) },
   { kind: 'hungry', level: 'normal', icon: '🍽️', label: n => `${n} con vật đói`, spots: s => animals(s, a => !a.sick && a.hunger < HUSBANDRY.growNeedsHunger) },

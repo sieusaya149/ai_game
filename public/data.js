@@ -224,6 +224,39 @@ export const FREE = {
   shyRadius: 32,              // px: con lạc chạy tránh người trong khoảng 2 ô
 };
 
+// ---------- Kẻ săn mồi: chuột, diều hâu, chồn (issue 43, ADR 0004 + 0013) ----------
+// Luật ở state.js quyết định theo ô và xác suất; world.js chỉ diễn hoạt. Chạy bù offline: chỉ chuột, và chuột chỉ ăn cám, trộm trứng.
+export const PREDATOR = {
+  minLevel: 5,                // bảo hộ người mới: dưới cấp này chưa có chuột, diều hâu, chồn
+  warnMs: 10_000,             // khi online: báo 🔴 trước chừng này rồi kẻ săn mồi mới ra tay (đuổi kịp thì không ai bị hại)
+  leaveMs: 6000,              // ra tay xong (hay bị đuổi) thì còn nán lại chừng này rồi biến mất
+  rat: {
+    max: 8,                   // tối đa 8 con chuột trong trại
+    spawnPerMin: 0.02,        // ~1 con mỗi giờ nếu không ai bắt (sinh ở kho, đống rơm, máng)
+    actMs: 5 * MIN,           // mỗi con chuột ra tay một lần sau chừng này
+    moveMs: 6000,             // đổi ô sau chừng này
+    radius: 3,                // ô kế tiếp cách ô hiện tại tối đa 3 ô
+    biteChance: 0.004,        // còn cám hay trứng thì thỉnh thoảng vẫn cắn con non; hết sạch thì cắn chắc
+    hurtDeadMs: 2 * HOUR,     // con non bị thương không chữa trong chừng này giờ vườn thì mất (chỉ khi đang chơi, ADR 0004)
+    hurtCapMs: 1.5 * HOUR,    // chạy bù offline: vết thương nặng nhất tới mức này rồi dừng, không bao giờ gây chết
+    hurtUnhappyPerMin: 2,     // con bị thương mất vui mỗi phút
+  },                          // ổ chuột (state.js nestTiles): ô cạnh nhà kho, đống rơm (nhà chuồng đồng cỏ) và máng ăn
+  hawk: {
+    chancePerMin: 0.001,      // hiếm; chỉ ban ngày, chỉ khi có con non đang thả rông
+    coverRadius: 4,           // con non trong chừng này ô quanh mái che thì diều hâu không nhắm
+  },
+  weasel: {
+    chancePerMin: 0.004,      // chỉ trong khung giờ nửa đêm, chỉ khi có con ngủ ngoài chuồng
+    from: 23, to: 2,          // khung giờ (giờ trong game) chồn mò tới
+    lampMul: 0.6,             // mỗi đèn lồng trong vườn nhân xác suất chừng này (tối đa 3 cái, như thằng Tèo)
+  },
+  trap: {
+    lure: 6,                  // chuột trong chừng này ô ngửi thấy mồi, mò tới bẫy
+    exp: 3,                   // bắt được một con chuột: cộng chừng này EXP
+  },
+  shooExp: 2,                 // đuổi được một kẻ săn mồi
+};
+
 // ---------- Vật phẩm ----------
 // kind: seed | supply | feed | deco. Hạt giống sinh tự động từ CROPS.
 export const ITEMS = {
@@ -249,6 +282,8 @@ export const ITEMS = {
   deco_lamp:      { name: 'Đèn lồng',      kind: 'deco',   price: 90,  lv: 3, desc: 'Sáng lung linh ban đêm, trộm ngại vào hơn.' },
   deco_bench:     { name: 'Ghế đá',        kind: 'deco',   price: 70,  lv: 2, desc: 'Ngồi nghỉ chân.' },
   deco_lowfence:  { name: 'Hàng rào thấp', kind: 'deco',   price: 8,   lv: 2, desc: 'Đặt quanh khối ruộng: gà không vào được, nhưng cũng hết gà mổ sâu giúp. Bạn bước qua được.' },
+  deco_rattrap:   { name: 'Bẫy chuột',     kind: 'deco',   price: 60,  lv: 5, desc: 'Đặt trong trại, bắt con chuột đi qua. Sập rồi thì phải gài lại.' },
+  deco_canopy:    { name: 'Mái che sân',   kind: 'deco',   price: 180, lv: 5, desc: 'Gà con, vịt con chơi gần mái che thì diều hâu không cắp được.' },
 };
 
 // ---------- Mua đất ----------
@@ -381,6 +416,7 @@ export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
   levelup: 'Lên cấp', order: 'Đơn hàng mới', old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài', ill: 'Con vật mệt',
+  pest: 'Chuột ăn cám, trộm trứng',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -398,6 +434,13 @@ export const EVENT_LEVEL = {
   oldSoon:   { level: 'important', cat: 'old', group: e => 'oldSoon:' + e.animal, label: 'Con vật sắp già', text: (n, e) => `${n} con ${animalN(e.animal)} sắp già, chuẩn bị hoặc bán đi nhé 👵` },
   passed:    { level: 'important', cat: 'old', group: e => 'passed:' + e.animal, label: 'Con vật già ra đi', text: (n, e) => `${n} con ${animalN(e.animal)} đã già và ra đi thanh thản 😇` },
   stray:     { level: 'important', cat: 'stray', group: e => 'stray:' + e.animal, label: 'Con lạc chưa về chuồng', text: (n, e) => `${n} con ${animalN(e.animal)} lạc, chưa về chuồng 💤` },
+  predator:  { level: 'urgent', group: e => 'pred:' + e.id, label: 'Kẻ săn mồi mò vào trại' },
+  hurt:      { level: 'urgent', group: e => 'hurt:' + e.id, label: 'Con non bị chuột cắn' },
+  taken:     { level: 'important', cat: 'loss', group: e => 'taken:' + e.pred, label: 'Kẻ săn mồi bắt mất con vật', text: (n, e) => `${e.pred === 'hawk' ? 'Diều hâu' : 'Chồn'} đã bắt mất ${n} con ${animalN(e.animal)} 😢` },
+  ratFeed:   { level: 'important', cat: 'pest', group: () => 'ratFeed', label: 'Chuột ăn cám', text: n => `Chuột đã ăn mất ${n} phần cám 🐀` },
+  ratEgg:    { level: 'important', cat: 'pest', group: () => 'ratEgg', label: 'Chuột trộm trứng', text: n => `Chuột đã trộm mất ${n} quả trứng 🐀` },
+  trapped:   { level: 'info', group: () => 'trapped', label: 'Bẫy chuột sập' },
+  shooed:    { level: 'info', group: e => 'shooed:' + e.pred, label: 'Đã đuổi kẻ săn mồi' },
   sickSevere:   { level: 'urgent', group: e => 'sick2:' + e.animal, label: 'Con vật bệnh nặng' },
   sickCritical: { level: 'urgent', group: e => 'sick3:' + e.animal, label: 'Con vật nguy kịch' },
   died:      { level: 'important', cat: 'old', group: e => 'died:' + e.animal, label: 'Con vật mất vì bệnh', text: (n, e) => `${n} con ${animalN(e.animal)} đã mất vì bệnh 😇` },

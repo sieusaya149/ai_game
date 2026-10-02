@@ -40,11 +40,11 @@ const EMOJI = {
   cai: '🥬', carot: '🥕', lua: '🌾', cachua: '🍅', bap: '🌽', dau: '🍓', bingo: '🎃', duahau: '🍉',
   trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴',
-  deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧',
+  deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧', deco_rattrap: '🪤', deco_canopy: '⛱️',
   wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩',
   ga: '🐔', vit: '🦆', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕',
 };
-const ITEM3 = { soap: 'soapBar', manure: 'manure', medicine: 'medicine', vaccine: 'vaccine' };
+const ITEM3 = { soap: 'soapBar', manure: 'manure', medicine: 'medicine', vaccine: 'vaccine', deco_rattrap: 'ratTrap' };
 const iconCache = new Map();
 function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
@@ -912,7 +912,7 @@ PANELS.board = {
 const STAT_LABELS = [
   ['harvests', '🧺 Lần thu hoạch'], ['planted', '🌱 Cây đã gieo'], ['bugs', '🐛 Sâu đã diệt'], ['eggs', '🥚 Trứng đã nhặt'],
   ['hatches', '🐣 Gà ấp nở'], ['piglets', '🐖 Heo con chào đời'], ['poops', '💩 Phân đã dọn'], ['slips', '🤸 Lần trượt phân'],
-  ['crows', '🐦 Quạ đã đuổi'], ['thieves', '🕵️ Trộm đã bắt'], ['orders', '📋 Đơn đã giao'], ['earned', '🪙 Tổng xu kiếm được'],
+  ['crows', '🐦 Quạ đã đuổi'], ['thieves', '🕵️ Trộm đã bắt'], ['rats', '🪤 Chuột dính bẫy'], ['preds', '💨 Kẻ săn mồi đã đuổi'], ['orders', '📋 Đơn đã giao'], ['earned', '🪙 Tổng xu kiếm được'],
 ];
 PANELS.house = {
   title: '🏠 Nhà của bạn',

@@ -44,10 +44,10 @@ for (const sp in SPR3.animal) {
 const groups = {
   'Hành động': ['run', 'heoMud', 'dogHerd', 'dogSit', 'dogBeg', 'catPounce', 'catNap', 'catMouse'],
   'Hiệu ứng': ['fx'],
-  'Săn mồi': ['rat', 'hawk', 'hawkShadow', 'weasel'],
+  'Săn mồi': ['rat', 'ratEat', 'ratFlee', 'hawk', 'hawkDive', 'hawkCarry', 'hawkShadow', 'weasel', 'weaselCatch', 'hurtPatch'],
   'NPC': ['npcTiSun', 'npcTiSunIdle', 'npcCoUt', 'npcCoUtIdle', 'npcChuBa', 'npcChuBaIdle'],
   'Chuồng': ['pen', 'quarantine', 'doghouse', 'catDoor', 'scale'],
-  'Đồ vật': ['grave', 'graveFlower', 'angel', 'eggNest', 'eggFertile', 'eggNestDuck', 'eggDuck', 'eggDuckFertile', 'grainScatter', 'homeBoard', 'strayArrow', 'lowFence', 'ratTrap', 'vetClinic'],
+  'Đồ vật': ['grave', 'graveFlower', 'angel', 'eggNest', 'eggFertile', 'eggNestDuck', 'eggDuck', 'eggDuckFertile', 'grainScatter', 'homeBoard', 'strayArrow', 'lowFence', 'ratTrap', 'ratTrapShut', 'ratTrapFull', 'canopy', 'vetClinic'],
   'Túi đồ & trạng thái': ['items', 'status'],
 };
 for (const g in groups) { const r = section(g); for (const k of groups[g]) walk(r, SPR3[k], k, true); }

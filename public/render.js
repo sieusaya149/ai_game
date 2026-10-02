@@ -125,8 +125,22 @@ const decoFallback = kind => once('deco' + kind, () => {
   }
   return c;
 });
-const decoImg = kind => (kind === 'deco_lowfence' ? SPR3?.lowFence?.h : kind === 'grave' ? SPR3?.grave : kind === 'grave_flower' ? SPR3?.graveFlower : null)
+const decoImg = kind => (kind === 'deco_lowfence' ? SPR3?.lowFence?.h : kind === 'grave' ? SPR3?.grave : kind === 'grave_flower' ? SPR3?.graveFlower
+  : kind === 'deco_rattrap' ? SPR3?.ratTrap : kind === 'deco_canopy' ? SPR3?.canopy : null)
   ?? SPR.deco?.[kind] ?? (kind === 'deco_bench' && SPR2?.bench) ?? decoFallback(kind);
+// Bẫy chuột: đang gài / đã sập (e.shut). Thiếu art thì dùng lại hình bẫy đang gài.
+const trapImg = e => (e.shut ? SPR3?.ratTrapFull ?? SPR3?.ratTrapShut : SPR3?.ratTrap) ?? decoImg('deco_rattrap');
+// Kẻ săn mồi (issue 43): mỗi loài một bộ hình riêng cho từng tư thế
+function predImg(p, rt) {
+  const f = Math.floor((rt.anim ?? 0) * 6) % 2;
+  const set = p.kind === 'rat' ? (p.state === 'leaving' ? SPR3?.ratFlee : rt.eat ? SPR3?.ratEat : SPR3?.rat)
+    : p.kind === 'hawk' ? (p.carry ? SPR3?.hawkCarry : rt.dive ? SPR3?.hawkDive : SPR3?.hawk)
+      : (rt.pounce ? SPR3?.weaselCatch : SPR3?.weasel);
+  const base = set ?? (p.kind === 'rat' ? SPR3?.rat : p.kind === 'hawk' ? SPR3?.hawk : SPR3?.weasel);
+  if (!base) return null;
+  const side = base[rt.face === 'right' ? 'right' : 'left'];
+  return side[f % side.length];
+}
 
 // Hàng rào thấp nằm cạnh hàng rào khác theo chiều dọc (mà không có hàng xóm ngang) thì vẽ cọc dọc
 const lowFenceAt = (m, e) => {
@@ -173,7 +187,7 @@ const STATUS_ROWS = {
   hungry: null,
 };
 function statusIcon(name) {
-  const s = SPR.status?.[name];
+  const s = SPR.status?.[name] ?? SPR3?.status?.[name];
   if (s) return s;
   if (name === 'crow') return once('stcrow', () => pix(['...yyyy', '...y..y', '...y..y', '...y.yy', '.yyy.y.', 'yyyy...', '.yy....'], { y: '#f2b81e' }));   // nốt nhạc: gà trống gáy
   if (name === 'hungry') return SPR.grain;
@@ -514,11 +528,12 @@ export function render(ctx, f) {
 
   // 2) bóng dưới chân
   shadow(state.player.x, state.player.y, 6);
-  const animals = farm ? state.animals : [], threats = farm ? state.threats ?? [] : [];
+  const animals = farm ? state.animals : [], threats = farm ? state.threats ?? [] : [], preds = farm ? state.preds ?? [] : [];
   const small = { non: 0.6, nho: 0.8 };
   for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, Math.round((a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : 6) * (small[a.stage] ?? 1)));
   if (farm && state.dog.x != null && vis(state.dog.x, state.dog.y)) shadow(state.dog.x, state.dog.y, 6);
   for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
+  for (const p of preds) if (p.x != null && vis(p.x, p.y, 40) && p.kind !== 'hawk') shadow(p.x, p.y, p.kind === 'rat' ? 4 : 6);
 
   // 3) các vật nhô lên, sắp theo y chân
   const items = [];
@@ -634,6 +649,7 @@ export function render(ctx, f) {
   for (const d of m.decos) {
     if (!vis(d.x, d.y)) continue;
     if (d.kind === 'deco_lowfence') { const fe = lowFenceAt(m, d.ent); add(d.y, () => blit(fe, d.ent.c * TS, d.ent.r * TS)); continue; }   // hàng rào thấp: vẽ theo ô, ngang hay dọc tùy hàng xóm
+    if (d.kind === 'deco_rattrap') { const tp = trapImg(d.ent); add(d.y, () => blit(tp, d.x - tp.width / 2, d.y - tp.height + 1)); continue; }   // bẫy chuột: gài / đã sập
     const im = decoImg(d.kind);
     add(d.y, () => blit(im, d.x - im.width / 2, d.y - im.height + 1));
   }
@@ -662,11 +678,13 @@ export function render(ctx, f) {
       if (ph?.name === 'soap') { const sz = im.width < 14 ? 's' : im.width < 20 ? 'm' : 'l', o = SPR3.fx.soap[sz][Math.floor(now / 250) % 2]; blit(o, a.x - o.width / 2, a.y - (im.height + o.height) / 2 + 1); }
       if (ph?.name === 'shake') { const sp = SPR3.fx.splash[Math.floor(ph.t * 3.2) % 3]; blit(sp, a.x - sp.width / 2, a.y - im.height - sp.height / 2); }
       if (ph?.name === 'sparkle') { const sp = SPR3.fx.sparkleClean[Math.floor(ph.t * 3) % 3]; blit(sp, a.x - sp.width / 2, a.y - im.height - sp.height / 2 + 2); }
+      if (a.hurt && SPR3?.hurtPatch) { const hp = SPR3.hurtPatch; blit(hp, a.x - hp.width / 2 + 1, a.y - im.height / 2 - hp.height / 2 + 1); }   // băng gạc vết chuột cắn
     });
     const emote = wd.emotes.get('a' + a.id);
     let icon = null, tone = null;
     if (emote && emote.until > now) icon = statusIcon(emote.icon);
     else if (state.time < (a.scaredUntil ?? 0)) icon = statusIcon('scared');
+    else if (a.hurt) { icon = statusIcon('hurtIcon') ?? statusIcon('sick'); tone = 'bad'; }   // con non bị chuột cắn: băng gạc nhấp nháy đỏ
     else if (a.sick) { icon = statusIcon('sick'); tone = a.sick >= 2 ? 'bad' : 'warn'; }
     else if (rt.scared) icon = statusIcon('scared');
     else if (a.stray) icon = SPR3?.strayIcon ?? statusIcon('zzz');   // con lạc ngủ ngoài 💤
@@ -749,6 +767,19 @@ export function render(ctx, f) {
       const im = frames[dir][dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr];
       add(t.y, () => blit(im, t.x - 8, t.y - 23));
     }
+  }
+  // kẻ săn mồi: chuột lon ton dưới đất, chồn men theo đất, diều hâu bay có bóng riêng in trên mặt đất
+  for (const p of preds) {
+    if (p.x == null || !vis(p.x, p.y, 48)) continue;
+    const rt = wd.rt.get('p' + p.id) ?? {};
+    const im = predImg(p, rt);
+    if (!im) continue;
+    if (p.kind === 'hawk') {
+      const gy = rt.ground ?? p.y, sh = SPR3?.hawkShadow;
+      if (sh) add(gy - 0.5, () => { ctx.globalAlpha = 0.7; blit(sh, p.x - sh.width / 2, gy - sh.height / 2); ctx.globalAlpha = 1; });
+      add(gy + 24, () => blit(im, p.x - im.width / 2, p.y - im.height + 1));
+    } else add(p.y, () => blit(im, p.x - im.width / 2, p.y - im.height + 1));
+    if (p.state !== 'leaving' && p.strikeAt - state.time <= 10_000) bub(p.x, p.y - im.height - 1, statusIcon('predIcon') ?? statusIcon('warn'), 'pred' + p.id, 'bad');   // bong bóng cảnh báo 🔴
   }
   // người chơi
   {
