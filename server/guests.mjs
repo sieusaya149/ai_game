@@ -8,7 +8,7 @@
 // Mã thao tác là duy nhất nên áp dụng hai lần cùng mã thì lần sau không làm gì (guestOpApply trả reason 'done').
 import { guestOpApply, basketCap, basketCount, haveItem } from '../public/state.js';
 import { migrate } from '../public/migrate.js';
-import { levelInfo, ITEMS, CROPS, PRODUCTS } from '../public/data.js';
+import { levelInfo, ITEMS, CROPS, PRODUCTS, GUEST } from '../public/data.js';
 import { serverDay } from '../public/clock.js';
 import { catchUpFarm, farmRow, writeFarm } from './farms.mjs';
 
@@ -66,6 +66,22 @@ export function runGuestQueue(db, row) {
   writeFarm(db, row.account_id, save, t);
   markApplied(db, rows, t);
   return farmRow(db, row.account_id);
+}
+
+// Bản lưu chủ vừa gửi lên (phiên chơi cấp lúc `since`) còn thiếu việc khách nào thì áp dụng luôn vào `save`, trả các
+// việc đó: việc server tự áp dụng sau mốc ấy (chủ rớt WebSocket một lúc nên server tưởng chủ vắng nhà) hoặc việc đang chờ
+// mà tin đẩy sang trình duyệt chủ bị lạc. Nhật ký khách đã đầy (rơi bớt việc cũ) thì bỏ qua việc cũ hơn dòng cũ nhất còn giữ.
+export function missedOps(db, ownerId, save, since = 0) {
+  const log = save.guests ?? [], seen = new Set(log.map(g => g.id));
+  const from = log.length >= GUEST.logMax ? Math.min(...log.map(g => g.at)) : 0;
+  const rows = db.prepare('SELECT op FROM guest_ops WHERE owner_id = ? AND (applied IS NULL OR applied >= ?) AND created >= ? ORDER BY created, rowid')
+    .all(ownerId, since, from);
+  const out = [];
+  for (const row of rows) {
+    const op = parse(row);
+    if (op && !seen.has(op.id) && guestOpApply(save, whoOf(op), op).ok) out.push(op);
+  }
+  return out;
 }
 
 // Khách `guest` (tài khoản) gửi một thao tác lên vườn `ownerId`. Trả { ok: true, id, reward } hoặc { ok: false, reason, msg }

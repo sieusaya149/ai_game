@@ -69,6 +69,13 @@ export const MIGRATIONS = [
         text TEXT NOT NULL, day TEXT NOT NULL, created INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0,
         UNIQUE (owner_id, author_id, day))`);
   },
+  // v7: giờ server lúc cấp phiên chơi đang giữ quyền ghi (farms.claimed). Việc khách mà server tự áp dụng sau mốc này
+  // (chủ rớt mạng một lúc) thì trình duyệt chủ chưa biết: bản lưu nó gửi lên thiếu thì server áp dụng lại.
+  // Dòng có từ trước: lấy giờ chạy migration, coi như vừa cấp phiên
+  db => {
+    db.exec('ALTER TABLE farms ADD COLUMN claimed INTEGER NOT NULL DEFAULT 0');
+    db.prepare('UPDATE farms SET claimed = ?').run(Date.now());
+  },
 ];
 
 // Mở (tạo nếu chưa có) file SQLite và đưa schema lên bản mới nhất

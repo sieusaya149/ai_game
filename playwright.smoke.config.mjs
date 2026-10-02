@@ -4,7 +4,7 @@ import { projects } from './playwright.config.mjs';
 
 export default defineConfig({
   testDir: 'e2e',
-  testMatch: /smoke/,
+  testMatch: /[\\/]smoke[^\\/]*\.spec\.mjs$/,   // smoke.spec.mjs, smoke-online.spec.mjs
   workers: 1,
   fullyParallel: false,
   retries: 0,

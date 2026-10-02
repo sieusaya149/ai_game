@@ -16,7 +16,7 @@ export const projects = [
 
 export default defineConfig({
   testDir: 'e2e',
-  testIgnore: /smoke/,
+  testIgnore: /[\\/]smoke[^\\/]*\.spec\.mjs$/,   // so tên file, không so cả đường dẫn (thư mục có chữ smoke)
   workers: 1,
   fullyParallel: false,
   retries: 0,

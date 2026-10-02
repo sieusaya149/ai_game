@@ -14,12 +14,17 @@ const ADMIN = fileURLToPath(new URL('../../server/admin.mjs', import.meta.url));
 export async function bootServer(opts = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'ai-game-test-'));
   const dbPath = join(dir, 'farm.db');
-  const srv = await startServer({ port: 0, host: '127.0.0.1', dbPath, ...opts });
+  let srv = await startServer({ port: 0, host: '127.0.0.1', dbPath, ...opts });
   const url = `http://127.0.0.1:${srv.port}`;
   const sockets = new Set();
   let closed = false;
   return {
     url, dbPath, dir,
+    // Tắt server rồi bật lại trên cùng file SQLite và cùng cổng (như container khởi động lại)
+    async restart() {
+      await srv.close();
+      srv = await startServer({ host: '127.0.0.1', dbPath, ...opts, port: srv.port });
+    },
     get: (path, init) => fetch(url + path, init),
     // GET/POST JSON, trả { status, body, headers }
     async json(path, body, init = {}) {

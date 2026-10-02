@@ -8,7 +8,7 @@ import { migrate } from '../public/migrate.js';
 import { checkSaveJump, loadGame } from '../public/state.js';
 import { now as clock, serverDay } from '../public/clock.js';
 import { MAX_CATCHUP_MS } from '../public/data.js';
-import { runGuestQueue, stealsOf } from './guests.mjs';
+import { runGuestQueue, stealsOf, missedOps } from './guests.mjs';
 import { gateNews } from './gate.mjs';
 
 export const FINAL_MS = 3000;    // chờ bản lưu cuối của máy cũ tối đa chừng này
@@ -24,7 +24,17 @@ const farmOut = r => (r?.save ? { farm: JSON.parse(r.save), rev: r.rev, savedAt:
 
 // Cấp phiên chơi mới cho tài khoản `a`. Trả { play, farm (null = chưa có vườn), rev, savedAt, gate }
 // gate = { gifts, notes }: quà đang chờ, lời nhắn chưa đọc ở cổng, cho màn "Trong lúc bạn vắng nhà…" (issue 32)
-export async function claimPlay({ db, live }, a) {
+// Hai máy cùng xin một lúc thì xếp hàng (máy sau chờ máy trước xong): không thì máy sau đổi phiên ngay giữa lúc
+// server còn chờ bản lưu cuối của máy cũ, bản đó bị từ chối và mất.
+const claiming = new Map();      // tài khoản → lượt xin phiên đang chạy
+export function claimPlay(ctx, a) {
+  const run = (claiming.get(a.id) ?? Promise.resolve()).then(() => claimNow(ctx, a));
+  const tail = run.catch(() => {});
+  claiming.set(a.id, tail);
+  tail.then(() => { if (claiming.get(a.id) === tail) claiming.delete(a.id); });
+  return run;
+}
+async function claimNow({ db, live }, a) {
   const old = rowOf(db, a.id)?.play;
   const socks = old ? live.kick(a.id, old) : [];
   // chờ bản lưu cuối, hoặc máy cũ đóng kết nối (vd chính trang đó vừa tải lại), hoặc hết giờ chờ
@@ -38,7 +48,8 @@ export async function claimPlay({ db, live }, a) {
     });
   }
   const play = randomBytes(16).toString('base64url');
-  db.prepare('INSERT INTO farms (account_id, play) VALUES (?, ?) ON CONFLICT(account_id) DO UPDATE SET play = excluded.play').run(a.id, play);
+  db.prepare('INSERT INTO farms (account_id, play, claimed) VALUES (?, ?, ?) ON CONFLICT(account_id) DO UPDATE SET play = excluded.play, claimed = excluded.claimed')
+    .run(a.id, play, Date.now());
   return { play, ...farmOut(runGuestQueue(db, catchUpFarm(db, rowOf(db, a.id)))), gate: gateNews({ db }, a) };
 }
 
@@ -77,7 +88,7 @@ export function readFarm(db, a) {
 
 // Nhận bản lưu từ trình duyệt đang giữ phiên chơi. Bản đầu tiên (mang vườn chơi đơn lên / vườn mới) nhận nguyên;
 // các bản sau so với bản trước bằng checkSaveJump (luật trong state.js) theo thời gian giữa hai bản.
-export function storeFarm({ db }, a, { play, save } = {}) {
+export function storeFarm({ db, live }, a, { play, save } = {}) {
   const r = rowOf(db, a.id);
   if (!play || r?.play !== play) throw new HttpError(409, 'Vườn đang được chơi ở thiết bị khác', { code: 'play_replaced' });
   try {
@@ -98,7 +109,10 @@ export function storeFarm({ db }, a, { play, save } = {}) {
     // nên xu và đồ "trộm được" cũng không vượt quá các vụ trộm hợp lệ
     const claimed = s.today?.day === serverDay(now) ? Math.floor(s.today.robs || 0) : 0;
     if (claimed > stealsOf(db, a.id, now)) throw new HttpError(422, 'Số vụ trộm trong bản lưu không khớp với làng', { code: 'implausible', reason: 'steals' });
+    // việc khách mà máy này chưa biết (vd chủ rớt mạng đúng lúc khách giúp): áp dụng lại rồi báo trình duyệt chủ
+    const missed = missedOps(db, a.id, s, r.claimed);
     db.prepare('UPDATE farms SET save = ?, saved_at = ?, updated = ?, rev = rev + 1 WHERE account_id = ?').run(JSON.stringify(s), s.savedAt, now, a.id);
+    for (const op of missed) live?.sendTo(a.id, { t: 'guestop', op });
     return { rev: r.rev + 1, savedAt: s.savedAt };
   } finally {
     waiting.get(play)?.();   // bản lưu cuối của máy cũ đã tới (nhận hay từ chối): máy mới khỏi chờ
