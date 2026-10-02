@@ -757,6 +757,70 @@ Cây lâu năm, trồng một lần, thu hoạch nhiều lần.
 - **Tiêu ở "Tiệm Danh Giá":** kiểu nhà đặc biệt, màu lông hiếm cho thú cưng, đồ trang trí độc quyền, danh hiệu dưới tên nhân vật, bản thiết kế máy cấp cao.
 - **Quy tắc:** không đổi qua lại với xu, không trộm được, không tặng được. Chế độ offline vẫn kiếm được từ mọi nguồn trừ giúp bạn bè.
 
+### 8.6 Chợ và sự kiện làng (đã chốt, Phase 4)
+
+Mọi mốc giờ trong mục này tính theo **giờ ngoài đời (giờ Việt Nam)**, vì 1 ngày game chỉ dài 20 phút.
+
+**Bán gì cho nhau.** Người chơi chỉ mua của nhau thứ mình không tự có hoặc tốn nhiều thời gian mới có: con giống và trứng phôi đã soi · hàng ★ (cho đơn hàng, hợp tác xã, hội chợ) · hạt giống hiếm (tách từ cây ★ / trái khổng lồ) · cây trồng vượt cấp người mua · hàng trái mùa · phân ủ, phân chuồng. Người bán được giá cao hơn thùng giao hàng (80%), người mua đỡ thời gian.
+
+**Giá bán giữa người chơi** (chợ phiên, livestream): người bán tự đặt trong khoảng **50%–200% giá gốc**; hàng không có ở chợ thì game tự tính giá gốc. Giới hạn này để không chuyển xu cho nhau qua giá ảo (giữ luật chống gian lận).
+
+#### Chợ online
+- App **"Chợ Làng Online"** (nút 📱 trên thanh dưới), mở từ **cấp 3** (tin nhắn "Bà Tư mở bán online rồi nè 📱"). Chơi đơn và online đều dùng được.
+- Bán gần hết hàng Bà Tư **cùng giá + phí giao**. Chỉ có ở chợ: hàng giảm giá hôm nay, hạt theo mùa vừa về, con vật.
+- **Hai gói giao:**
+
+| Gói | Tới đâu | Khi nào | Phí |
+|---|---|---|---|
+| Giao thường | Hộp quà ở cổng vườn | 6h sáng hôm sau (giờ game, tối đa ~20 phút ngoài đời) | ~10% giá đơn, tối thiểu 5 xu; đơn trên 500 xu miễn phí |
+| Giao tận kho | Thẳng vào kho | ~1 giờ game | ~25% giá đơn, tối thiểu 15 xu |
+
+- Phí không đổi theo giờ (ban đêm không phụ phí). Mưa bão (Phase 3) chỉ làm hàng tới trễ, có thông báo "Shipper kẹt mưa 🌧️".
+
+#### Chợ phiên
+- **Có giờ hẹn:** mỗi ngày hai phiên **12h–13h** và **20h–21h**, ở quảng trường làng.
+- **Sạp:** từ cấp 5, sạp đầu **4 ô miễn phí**, nâng bằng xu lên 6 rồi 8 ô (sạp đẹp dần). Ai cũng mua được, kể cả người mới.
+- Sạp mở **suốt phiên**, người bán đi đâu cũng được; hết phiên hàng chưa bán về kho.
+- **Khách NPC** đi chợ mua chậm, chỉ mua món giá ≤ giá gốc. Hàng giá cao chờ người chơi thật.
+- **Chơi đơn:** vẫn có chợ phiên với NPC (khách NPC + vài sạp NPC bán con giống, hạt hiếm giá cao).
+
+#### Mùa dịch
+- Khoảng **1 đợt mỗi tuần ngoài đời**, ngày ngẫu nhiên, kéo dài **1 ngày ngoài đời**, cả làng cùng lúc, báo trước ~1 giờ ("📢 Sắp có cúm gia cầm").
+- Mỗi đợt một nhóm: cúm gia cầm (gà, vịt) · dịch tả heo (heo) · lở mồm long móng (bò, cừu).
+- Trong đợt: Chú Ba ngừng thu mua, thùng giao hàng trả giá thấp cho sản phẩm nhóm đó; con thuộc nhóm đó **dễ bệnh gấp 3** (hệ thống bệnh Phase 2). Con **đã tiêm phòng** không sao, sản phẩm có nhãn **"✅ An toàn"**.
+
+#### Livestream bán hàng
+- Lên live **lúc nào cũng được**, mùa dịch là lúc cần nhất. Từ **cấp 5**, mỗi lần tối đa **30 phút**, tối đa **3 lần mỗi ngày ngoài đời**.
+- **Độ hot 🔥:** tăng khi làm việc thật trong vườn trước người xem (thu hoạch, khoe hàng ★ / "✅ An toàn", tắm heo, vuốt ve gà, nút "📣 Rao hàng"); đứng yên thì tụt, lặp một việc thì tăng ít dần. Thỉnh thoảng hiện **câu hỏi của người xem** ("Trứng này gà ta không shop?"), chọn đúng câu trả lời có sẵn thì độ hot tăng mạnh.
+- **Giỏ live:** tối đa 6 món, giá 50%–200%. Bạn xem bấm "🛒 Mua", hàng vào hộp quà ở cổng vườn họ, không phí giao. Người xem NPC đông theo độ hot, tự mua món giá ≤ giá gốc; mùa dịch trả tới **150%** cho hàng "✅ An toàn". Hết live hàng chưa bán về kho.
+- **Người xem:** bấm 🔴 LIVE ở cổng vườn hoặc danh sách bạn bè → vào vườn như đi thăm (đi lại, giúp vườn như issue 28), thả ❤️ / biểu cảm (có giới hạn), chat bằng câu có sẵn cho live. Ở lại đủ **3 phút** nhận 1 mã giảm giá, tối đa 3 mã mỗi ngày.
+- **Uy tín người bán (live + chợ phiên):** tự tính theo chất lượng hàng bán ra — tăng khi bán hàng ★ / "✅ An toàn" / con giống khỏe, giảm khi bán hàng héo, thối, con bệnh (khách NPC chê "Trứng hư rồi shop ơi 😤"). Uy tín cao thì live đông người xem NPC hơn, sạp chợ phiên đông khách NPC hơn; hiện cạnh tên ở sạp, live, danh sách bạn bè. *(Cách gộp với Tiếng tăm ⭐ ở mục 8.5: đang bàn, xem mục 11.)*
+
+#### Hợp tác xã
+- Mỗi **tuần ngoài đời** một chỉ tiêu chung 2–3 món theo mùa game đang chạy (ví dụ 500 bắp cải + 200 trứng + 50 sữa), góp ở nhà hợp tác xã trong làng.
+- Mỗi món góp được trả **100% giá chợ**. Đủ chỉ tiêu thì cả làng có thưởng (xu, mã giảm giá, đồ trang trí hiếm), góp nhiều được nhiều. Không đủ: không phạt.
+- Chỉ tiêu tính theo **số người chơi tuần trước** (có mức tối thiểu), NPC góp thêm ~20%. Chơi đơn có chỉ tiêu nhỏ riêng.
+
+#### Mã giảm giá
+- 3 loại: **giảm 10%**, **giảm 20%**, **miễn phí giao** (cả giao tận kho). Chỉ dùng cho **chợ online**, 1 mã mỗi đơn, hết hạn sau **3 ngày ngoài đời**, tặng bạn được qua hộp quà.
+- Nguồn: xem live đủ 3 phút · thưởng hợp tác xã · một số thành tựu · đăng nhập 7 ngày liền · sự kiện làng.
+
+#### Xe bán hàng rong
+- Đặt ở tiệm rèn Ông Sáu, ~800 xu, từ cấp 5. **3 ô hàng**, nâng lên 5.
+- Đẩy đi bán khắp làng **lúc nào cũng được** (ngoài giờ chợ phiên). Dân làng NPC ghé mua khi đi ngang chỗ đông (quảng trường, bến xe, cổng chợ); người chơi chạm xe để mua. Chỉ để bán, không chở giao giùm.
+
+#### Hội chợ nông sản (thi)
+- Mỗi **tối Chủ nhật 20h–21h** (cùng khung chợ phiên), đi cùng các trò chơi hội chợ ở mục 8.3.
+- 3 hạng mục: **trái to nhất** (trái khổng lồ; trước Phase 3 là nông sản ★ đẹp nhất) · **vật nuôi đẹp nhất** (độ thân, độ sạch, sức khỏe) · **rổ nông sản** (5 món, chất lượng + đa dạng).
+- Người có mặt bình chọn + giám khảo NPC chấm thêm (làng vắng vẫn có kết quả). Giải nhất, nhì, ba: xu, đồ trang trí hiếm (cúp, bảng vinh danh đặt ở vườn), uy tín.
+- **Bài dự thi không mất:** nông sản trưng bày xong trả về kho; vật nuôi dự thi bằng **hồ sơ** (hình, tên, độ thân, sạch, khỏe), con vẫn ở chuồng. Mỗi người tối đa 1 bài mỗi hạng mục.
+
+#### Sự kiện cả làng: diệt chuột, bắt rắn, phun thuốc
+- **2 lần mỗi tuần ngoài đời**, rơi vào một khung chợ phiên, báo trước ~1 giờ ("🐀 Chuột sắp tràn về làng lúc 20h!"), kéo dài **20 phút** (1 ngày game). Mỗi lần một loại: nạn chuột (ăn đồ, phá kho) · nạn rắn (rình trứng, gà con) · dịch sâu (tràn ruộng, phải phun thuốc).
+- Chuột / rắn / sâu xuất hiện ở **vườn của mọi người** đang chơi trong tuần (nhiều ít theo cỡ vườn). Diệt bằng thao tác có sẵn (đập / đặt bẫy chuột, bắt rắn — chó Mực sủa báo chỗ rắn, phun thuốc), sang **vườn bạn diệt giúp** được (nhất là vườn người offline), mèo tự bắt chuột. Mỗi con diệt được cộng vào **thanh tiến độ chung** của làng.
+- **Kết quả:** đủ chỉ tiêu (theo số người chơi) thì mọi người có mặt được thưởng (xu, mã giảm giá, thành tựu "Dũng sĩ diệt chuột 🐀"), diệt nhiều / diệt giúp được thêm, người đứng đầu nhận cúp nhỏ. Con sót lại gây hại nhẹ cho chính vườn đó (chuột ăn vài món trong kho, rắn ăn 1–2 trứng, sâu làm vài ô bị bệnh); không bao giờ chết con vật hay mất cả ruộng. Vườn người offline chỉ bị hại tối đa một nửa.
+- Chơi đơn: dân làng NPC cùng diệt, chỉ tiêu nhỏ hơn.
+
 ## 8a. Tiến trình (đã chốt)
 
 Giả định người chơi đều đặn khoảng 1 tiếng mỗi ngày:
@@ -854,7 +918,7 @@ Làm **nền móng trước, online sau**. Đặt công trình tự do và nhi�
 | 1. Online | Server Node + `ws` + SQLite trong Docker · tài khoản, 1 thiết bị · đồng bộ + server chạy bù · làng (chợ, thấy nhau, chat) · thăm vườn, giúp, trộm + giới hạn · chó phát hiện người chơi |
 | 2. Vật nuôi | Vòng đời, đực/cái, dơ/tắm, bệnh/chết, độ thân, bán theo cân · chuồng 3 cấp + cách ly · thả rông, về chuồng, lùa · kẻ săn mồi, mèo · dạy lệnh |
 | 3. Cây & nước | 16 loại cây với hình riêng · thành thạo, trái khổng lồ, ★ · mùa, thời tiết xấu · nhà kính · giếng, bồn, ống nước, tự động hóa |
-| 4. Kinh tế & làng | Sức mua, sự kiện giá · hóa đơn, hao mòn · kho, đồ hư, kho lạnh · máy chế biến, bếp · cư dân ❤️ · nhân công · hội chợ + loto · Tiếng tăm ⭐ |
+| 4. Kinh tế & làng | Sức mua, sự kiện giá · hóa đơn, hao mòn · kho, đồ hư, kho lạnh · máy chế biến, bếp · cư dân ❤️ · nhân công · hội chợ + loto + thi nông sản · Tiếng tăm ⭐ · chợ online + giao hàng · chợ phiên · mùa dịch + livestream bán hàng · hợp tác xã · mã giảm giá · xe hàng rong · sự kiện diệt chuột/rắn/sâu (mục 8.6) |
 | 5. Nhà | Nội thất, đặt đồ, Nhà đẹp · thú cưng cảnh · quần áo có tác dụng |
 | 6. Loài & khu mới | Hồ cá, cây ăn trái, ong, tằm · thỏ, ngỗng, dê, trâu, ếch, bồ câu, công, ngựa |
 | 7. Mục tiêu dài hạn | Nhiệm vụ hằng ngày · lễ hội · sổ sưu tầm · ~60 thành tựu · nhiệm vụ làm quen |
@@ -905,6 +969,7 @@ Làm **nền móng trước, online sau**. Đặt công trình tự do và nhi�
 | M | Online | Hosting & đối tượng chơi ✅ · tài khoản & thiết bị ✅ · bạn bè ✅ · thăm vườn ✅ · giúp/trộm ✅ · WebSocket ✅ · ai giữ dữ liệu ✅ · chế độ offline ✅ | ✅ |
 | N | Tiến trình & mục tiêu | Đường cong cấp ✅ · mở khóa ✅ · nhiệm vụ ✅ · thành tựu ✅ · lễ hội ✅ · sổ sưu tầm ✅ | ✅ |
 | O | UI/UX & hiệu năng | Thông báo 3 mức ✅ · bảng Việc cần làm ✅ · bản đồ nhỏ ✅ · hiệu năng ✅ · hướng dẫn người mới ✅ | ✅ |
+| Q | Chợ & sự kiện làng (mục 8.6) | Bán gì cho nhau ✅ · chợ online + 2 gói giao ✅ · chợ phiên (giờ, giá, sạp, NPC, chơi đơn) ✅ · mùa dịch ✅ · livestream (lúc nào, độ hot, giỏ live, người xem, giới hạn) ✅ · uy tín người bán ✅ · gộp uy tín với Tiếng tăm ⭐ 🔶 · hợp tác xã ✅ · mã giảm giá ✅ · xe hàng rong ✅ · thi nông sản ✅ · sự kiện diệt chuột/rắn/sâu ✅ | 🔶 |
 | P | Kỹ thuật & triển khai | Thứ tự phase ✅ · quy trình mỗi phase ✅ · chia agent/file + model ✅ · chuyển save cũ ✅ (mục 7) · test local + live từ máy local ✅ | ✅ |
 
 ## 10. Câu hỏi còn mở
