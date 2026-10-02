@@ -146,6 +146,9 @@ export const SICK = {
 };
 // Chỉ bán ở trạm thú y Cô Út trong làng (không có ở quầy vật tư chợ Bà Tư)
 export const VET_ITEMS = ['medicine', 'vaccine'];
+// ---------- Nhiệm vụ làm quen của Cô Út (issue 48) ----------
+// Mở khi mua con heo đầu tiên lúc đã đủ cấp nuôi heo (ANIMALS.heo.lv). Mỗi bước mở khi bước trước xong, bỏ qua được.
+export const CO_UT_QUEST = ['bathe', 'cure', 'vaccinate'];
 // ---------- Đực/cái và sinh sản (Phase 2, issue 36) ----------
 export const BREED = {
   femaleMul: 1.3,          // con cái đắt hơn con đực chừng 30%
@@ -446,7 +449,7 @@ export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
   levelup: 'Lên cấp', order: 'Đơn hàng mới', old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài', ill: 'Con vật mệt',
-  pest: 'Chuột ăn cám, trộm trứng',
+  pest: 'Chuột ăn cám, trộm trứng', birth: 'Vật nuôi sinh con',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -477,13 +480,14 @@ export const EVENT_LEVEL = {
   cured:     { level: 'info', group: e => 'cured:' + e.animal, label: 'Con vật khỏi bệnh' },
   grave:     { level: 'none', group: e => 'grave:' + e.id, label: 'Ngôi mộ mới' },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
-  born:      { level: 'info', group: e => 'born:' + e.kind, label: 'Con vật chào đời' },
+  born:      { level: 'important', cat: 'birth', group: e => 'born:' + e.kind, label: 'Con vật chào đời', text: (n, e) => `${n} ${animalN(e.animal)} con mới chào đời 🐣` },
   cockcrow:  { level: 'none', group: () => 'cockcrow', label: 'Gà trống gáy' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
   trick:     { level: 'info', group: e => 'trick:' + e.trick, label: 'Chó học xong một lệnh' },
   dogHerd:   { level: 'info', group: () => 'dogHerd', label: 'Chó lùa đàn về chuồng' },
   wallow:    { level: 'none', group: e => 'wallow:' + e.id, label: 'Heo, bò lăn bùn' },
   bathed:    { level: 'info', group: e => 'bathed:' + e.id, label: 'Đã tắm cho vật nuôi' },
+  vaccinated: { level: 'info', group: e => 'vaccinated:' + e.id, label: 'Đã tiêm vắc-xin' },
   mucked:    { level: 'info', group: e => 'mucked:' + e.pen, label: 'Đã xúc phân chuồng' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },
   log:       { level: 'info', group: () => 'log', label: 'Nhật ký' },

@@ -146,7 +146,7 @@ test('v1 vắng nhà lâu: màn "Trong lúc bạn vắng nhà" trước, đóng 
   await expect(page.locator('#whatsnew')).toBeVisible();
 });
 
-test('sổ tay mở từ túi đồ, lật đủ 9 trang', async ({ page, context }) => {
+test('sổ tay mở từ túi đồ, lật đủ 14 trang', async ({ page, context }) => {
   await noHint(context);
   await seedSave(context, makeSave());
   await page.goto('/');
@@ -156,7 +156,8 @@ test('sổ tay mở từ túi đồ, lật đủ 9 trang', async ({ page, contex
   await page.getByRole('button', { name: /Sổ tay hướng dẫn/ }).click();
   const head = page.locator('.sheet-head h2'), body = page.locator('.guide-page');
   await expect(head).toHaveText(/Sổ tay/);
-  const titles = ['Thể lực', 'Công cụ', 'Chế độ xây dựng', 'Mở đất', 'Thùng giao hàng', 'Chợ và giờ mở cửa', 'Đực, cái và sinh sản', 'Vịt', 'Chó Mực và dạy lệnh'];
+  const titles = ['Thể lực', 'Công cụ', 'Chế độ xây dựng', 'Mở đất', 'Thùng giao hàng', 'Chợ và giờ mở cửa', 'Đực, cái và sinh sản', 'Vịt', 'Chó Mực và dạy lệnh',
+    'Vòng đời', 'Tắm cho vật nuôi', 'Bệnh và thú y', 'Lùa về chuồng', 'Kẻ săn mồi'];
   for (let i = 0; i < titles.length; i++) {
     await expect(body.locator('h3')).toHaveText(titles[i]);
     await expect(body.locator('canvas.guide-art')).toBeVisible();
@@ -165,5 +166,5 @@ test('sổ tay mở từ túi đồ, lật đủ 9 trang', async ({ page, contex
     if (i < titles.length - 1) await page.getByRole('button', { name: 'Sau ▶' }).click();
   }
   await page.getByRole('button', { name: '◀ Trước' }).click();
-  await expect(body.locator('h3')).toHaveText('Vịt');
+  await expect(body.locator('h3')).toHaveText(titles.at(-2));
 });

@@ -1,6 +1,6 @@
 // Việc cần làm: đọc state, liệt kê việc trong vườn theo loại, mức gấp, số lượng và chỗ gần người chơi nhất. Thuần JS, không DOM.
 // Bảng 📋, bản đồ nhỏ và mũi tên chỉ hướng đều lấy vị trí từ đây.
-import { mapOf, dirtyAnimals, dirtyPens, predWarning } from './state.js';
+import { mapOf, dirtyAnimals, dirtyPens, predWarning, strays } from './state.js';
 import { ANIMALS, HUSBANDRY } from './data.js';
 import { TS } from './layout.js';
 
@@ -17,8 +17,9 @@ const KINDS = [
   { kind: 'sick', level: 'urgent', icon: '🤒', label: n => `${n} con vật bệnh nặng`, spots: s => animals(s, a => a.sick >= 2) },
   { kind: 'tired', level: 'normal', icon: '🥱', label: n => `${n} con vật mệt`, spots: s => animals(s, a => a.sick && a.sick < 2) },
   { kind: 'hungry', level: 'normal', icon: '🍽️', label: n => `${n} con vật đói`, spots: s => animals(s, a => !a.sick && a.hunger < HUSBANDRY.growNeedsHunger) },
-  { kind: 'dirty', level: 'normal', icon: '🧼', label: n => ` con vật dơ`, spots: s => animals(s, a => dirtyAnimals(s).includes(a)) },
-  { kind: 'muck', level: 'normal', icon: '💩', label: n => ` chuồng bẩn`, spots: s => muckPens(s) },
+  { kind: 'dirty', level: 'normal', icon: '🧼', label: n => `${n} con vật dơ`, spots: s => animals(s, a => dirtyAnimals(s).includes(a)) },
+  { kind: 'stray', level: 'normal', icon: '💤', label: n => `${n} con lạc ngủ ngoài`, spots: s => animals(s, a => strays(s).includes(a)) },
+  { kind: 'muck', level: 'normal', icon: '💩', label: n => `${n} chuồng bẩn`, spots: s => muckPens(s) },
   { kind: 'dry', level: 'normal', icon: '💧', label: n => `${n} ô khô`, spots: s => plots(s, p => alive(p) && p.water < DRY) },
   { kind: 'bugs', level: 'normal', icon: '🐛', label: n => `${n} ô có sâu`, spots: s => plots(s, p => alive(p) && p.crop.bugs) },
   { kind: 'weeds', level: 'normal', icon: '🌿', label: n => `${n} ô có cỏ`, spots: s => plots(s, p => p.weeds) },

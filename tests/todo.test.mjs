@@ -49,6 +49,20 @@ test('con vật bệnh là gấp, con vật đói là thường; mỗi loại gh
   assert.equal(hungry.level, 'normal'); assert.equal(hungry.count, 1, 'con bệnh đã tính ở dòng bệnh');
 });
 
+test('con dơ, con lạc, chuồng bẩn: đúng số lượng, nhãn tiếng Việt có số', () => {
+  const s = newGame();
+  s.animals.push(
+    { id: s.nextId++, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: false, dirty: 90, x: 1, y: 1, pen: 'p1' },
+    { id: s.nextId++, type: 'ga', stage: 'non', hunger: 100, happy: 60, sick: false, dirty: 0, stray: true, tile: { c: 3, r: 3 }, x: 50, y: 50, pen: 'p1' },
+    { id: s.nextId++, type: 'ga', stage: 'non', hunger: 100, happy: 60, sick: false, dirty: 0, stray: true, tile: { c: 5, r: 5 }, x: 90, y: 90, pen: 'p1' },
+  );
+  s.manure.chicken = 100;
+  const dirty = get(s, 'dirty'), stray = get(s, 'stray'), muck = get(s, 'muck');
+  assert.equal(dirty.count, 1); assert.equal(dirty.label, '🧼 1 con vật dơ'); assert.equal(dirty.level, 'normal');
+  assert.equal(stray.count, 2); assert.equal(stray.label, '💤 2 con lạc ngủ ngoài'); assert.equal(stray.level, 'normal');
+  assert.equal(muck.count, 1); assert.equal(muck.label, '💩 1 chuồng bẩn'); assert.equal(muck.level, 'normal');
+});
+
 test('trứng dưới đất, phân chó, máng hết cám', () => {
   const s = newGame();
   s.eggs.push({ id: 90, x: 10, y: 10, laidAt: 0 }, { id: 91, x: 20, y: 10, laidAt: 0 });

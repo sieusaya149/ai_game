@@ -383,6 +383,7 @@ export function renderHUD(s) {
   $('dot-board').hidden = !(s.orders || []).some(o => Object.entries(o.items).every(([k, q]) => have(s, k) >= q));
 
   updateTutorial(s);
+  updateCoUtQuest(s);
   if (panel === 'market' && S.marketOpen(s) !== marketWasOpen) refreshPanel();   // chợ vừa đóng/mở cửa khi đang xem
 }
 
@@ -424,6 +425,33 @@ function updateTutorial(s) {
     h('div', { class: 'tut-step' }, `Bước ${step + 1}/${TUT}`),
     h('div', { class: 'tut-text' }, text),
     h('button', { class: 'tut-x', type: 'button', title: 'Bỏ qua hướng dẫn', on: { click: () => { st().tutorial = TUT; updateTutorial(st()); } } }, '✕'));
+  box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
+}
+
+// ---------- Nhiệm vụ làm quen của Cô Út: tắm → chữa bệnh → vắc-xin khi mua con heo đầu tiên (issue 48) ----------
+const COUT_TEXT = {
+  bathe: 'Tắm cho một con vật nuôi: chạm vào con vật rồi chọn Tắm (cần xà phòng và nước trong bình, mua xà phòng ở chợ Bà Tư).',
+  cure: 'Chữa cho một con vật đang bệnh: cho uống thuốc thú y, hoặc gọi bác sĩ ở điện thoại trong nhà nếu nguy kịch (mua thuốc ở trạm thú y Cô Út trong làng).',
+  vaccinate: 'Tiêm vắc-xin cho một con vật khỏe mạnh để phòng bệnh (mua vắc-xin ở trạm thú y Cô Út).',
+};
+let coutKey = '';
+function updateCoUtQuest(s) {
+  const box = $('coutquest');
+  if (!box) return;
+  const q = S.coUtQuestInfo(s);
+  if (!q || q.done) {
+    if (q?.done && coutKey !== 'done') pushToast('Cô Út: Giỏi lắm, bạn đã biết chăm heo rồi đó! 🐷');
+    box.hidden = true; coutKey = q?.done ? 'done' : '';
+    return;
+  }
+  const key = q.step + q.id;
+  if (coutKey === key && !box.hidden) return;
+  coutKey = key;
+  box.hidden = false;
+  box.replaceChildren(
+    h('div', { class: 'tut-step' }, `Cô Út: bước ${q.step + 1}/${q.total}`),
+    h('div', { class: 'tut-text' }, COUT_TEXT[q.id]),
+    h('button', { class: 'tut-x', type: 'button', title: 'Bỏ qua bước này', on: { click: () => { S.skipCoUtQuest(st()); commit(); } } }, '✕'));
   box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
 }
 
@@ -774,6 +802,7 @@ PANELS.bag = {
 // ---------- Sổ tay hướng dẫn ----------
 // Mỗi trang: tên, lời giải thích, và các sprite có sẵn vẽ vào canvas nhỏ rồi phóng to (pixelated).
 const spr = () => SPR2 ?? {};
+const HOUR = 60 * MIN;
 const GUIDE = [
   { title: 'Thể lực', art: () => [spr().stamina, spr().staminaTired, spr().bed],
     text: [`Mỗi việc ở ruộng đều tốn thể lực (thanh ⚡ cạnh tên bạn). Hết thể lực thì đi và làm chậm gấp ${D.STAMINA.slow} lần.`,
@@ -810,6 +839,27 @@ const GUIDE = [
       `Chạm vào chó, chọn Dạy lệnh. Mỗi ngày game một buổi, mỗi buổi tốn 1 ${D.ITEMS.treat.name.toLowerCase()} (mua ở chợ Bà Tư). Bấm Khen đúng lúc kim chạy vào vạch xanh là đạt.`,
       `Chó vui thì học nhanh gấp đôi; chó đói hay buồn thì hay bỏ dở giữa chừng (vẫn mất bánh). Phải thuộc lệnh ${D.TRICKS.sit.name} trước rồi mới học lệnh khác.`,
       `Sáu lệnh: ${Object.values(D.TRICKS).map(t => `${t.icon} ${t.name} (${t.sessions})`).join(' · ')}. Thuộc đủ cả sáu thì chó không ăn xúc xích của người lạ.`] },
+  { title: 'Vòng đời', art: () => [SPR3?.animal?.ga?.non?.left?.[0], SPR3?.animal?.ga?.nho?.left?.[0], SPR3?.animal?.ga?.truong?.left?.[0], SPR3?.animal?.ga?.gia?.left?.[0]],
+    text: [`Mỗi con vật lớn qua 4 giai đoạn: ${D.STAGE_NAME.non} → ${D.STAGE_NAME.nho} → ${D.STAGE_NAME.truong} → ${D.STAGE_NAME.gia}, mỗi giai đoạn một hình và nết riêng.`,
+      'Tuổi tính theo giờ vườn thật sự chạy (đóng băng thì không già đi). Gà vịt sống nhanh nhất rồi tới heo, bò cừu sống lâu nhất; chó mèo không bao giờ ra đi vì già.',
+      `Sắp vào giai đoạn già thì được báo trước khoảng ${D.AGING.warnMs / HOUR} giờ vườn để chuẩn bị hoặc bán đi. Con già đẻ thưa, cho ít sản phẩm hơn và hay ngủ.`] },
+  { title: 'Tắm cho vật nuôi', art: () => [SPR3?.items?.soapBar, SPR3?.fx?.soap?.m?.[0], SPR3?.fx?.sparkleClean?.[0]],
+    text: [`Con vật dơ dần theo giờ vườn, dơ hẳn sau khoảng ${D.DIRT.fullMs / HOUR} giờ; trời mưa hoặc chuồng bẩn thì nhanh gấp ${D.DIRT.fastMul} lần. Dơ từ ${D.DIRT.high} trở lên là mất vui, dễ bệnh hơn, sản phẩm kém.`,
+      `Tắm tốn 1 ${D.ITEMS.soap.name.toLowerCase()} (mua ở chợ Bà Tư) và 1 nước trong bình tưới: sủi bọt, con vật lắc mình văng nước rồi sạch bong, +${D.DIRT.bathHappy} vui và thân hơn một chút.`,
+      'Heo và bò đầm bùn thì dơ ngay nhưng không mất vui — đó là nét vui của chúng, tắm xong một lúc lại lăn bùn tiếp.'] },
+  { title: 'Bệnh và thú y', art: () => [SPR3?.status?.warn, SPR3?.items?.medicine, SPR3?.items?.vaccine, SPR3?.quarantine],
+    text: [`Bệnh qua 4 giai đoạn: ${S.SICK_NAME.join(' → ')}.`,
+      `Mệt chữa bằng ${D.SICK.doses[1]} liều thuốc thú y, Bệnh nặng cần ${D.SICK.doses[2]} liều, Nguy kịch chỉ bác sĩ thú y mới cứu được (gọi qua điện thoại ở nhà, ${D.SICK.vetPrice} xu).`,
+      'Bệnh nặng lây cho một con cùng chuồng; chuồng cách ly không lây và hồi bệnh nhanh hơn. Thuốc, vắc-xin mua ở trạm thú y Cô Út trong làng.',
+      `Dưới cấp ${D.SICK.minLevel}, con vật không bệnh quá Mệt — người chơi mới được bảo hộ.`] },
+  { title: 'Lùa về chuồng', art: () => [SPR3?.homeBoard, SPR3?.strayArrow, SPR3?.dogHerd?.left?.[0]],
+    text: [`Chạng vạng (18h) gà vịt thả rông tự về chuồng, trừ ${D.FREE.strayPerDusk[0]}–${D.FREE.strayPerDusk[1]} con lạc 💤 ngủ ngoài tới sáng — không con nào gặp nguy hiểm chỉ vì chuyện này.`,
+      `Lùa tay: đi vòng ra sau con lạc, đẩy nó về phía cửa chuồng. Nhanh hơn thì rải thóc ở cửa chuồng (tốn 1 bao cám), mọi con lạc trong ${D.FREE.lureRadius} ô quanh đó tự chạy về.`,
+      `Chó học lệnh ${D.TRICKS.herd.name} (${D.TRICKS.herd.sessions} buổi) thì lùa cả đàn về chuồng trong khoảng ${D.TRAIN.herdMs / 1000} giây, và tự làm mỗi tối nếu no và vui.`] },
+  { title: 'Kẻ săn mồi', art: () => [SPR3?.rat?.left?.[0], SPR3?.hawk?.left?.[0], SPR3?.weasel?.left?.[0], SPR3?.status?.predIcon],
+    text: [`Từ cấp ${D.PREDATOR.minLevel}: chuột ăn cám, trộm trứng và cắn con non; diều hâu cắp gà vịt con đang thả rông ban ngày; chồn bắt con ngủ ngoài chuồng lúc nửa đêm.`,
+      `Đang chơi thì luôn được báo trước khoảng ${D.PREDATOR.warnMs / 1000} giây trước khi nó ra tay — chạm vào để đuổi là kịp, không ai bị hại.`,
+      'Phòng chuột bằng bẫy chuột; phòng diều hâu bằng mái che sân; phòng chồn bằng đèn lồng hoặc lùa đàn vào chuồng trước khi ngủ. Chó canh nhà cũng đuổi được cả ba.'] },
 ];
 let guidePage = 0;
 function guideIcon() {
