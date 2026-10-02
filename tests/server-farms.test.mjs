@@ -38,7 +38,7 @@ test('vườn online: tài khoản mới chưa có vườn; đẩy bản lưu r�
   const play = r.body.play;
   assert.ok(play);
 
-  const s = garden(s => { s.coins = 1234; s.plots[0].soil = 'tilled'; s.plots[0].crop = { id: 'cai', progress: 0.5 }; });
+  const s = garden(s => { s.coins = 1234; s.plots[0].soil = 'tilled'; s.plots[0].crop = { id: 'cai', progress: 0.5, q: { dry: false, bugMax: 0, hand: false } }; });
   r = await a.save(play, s);
   assert.equal(r.status, 200);
   assert.equal(r.body.rev, 1);
@@ -46,7 +46,7 @@ test('vườn online: tài khoản mới chưa có vườn; đẩy bản lưu r�
   assert.equal(r.status, 200);
   const f = r.body.farm;
   assert.equal(f.coins, 1234);
-  assert.deepEqual(f.plots[0].crop, { id: 'cai', progress: 0.5 });
+  assert.deepEqual(f.plots[0].crop, s.plots[0].crop);
   assert.deepEqual(f.farm, s.farm);
   assert.deepEqual([f.mode, f.account], ['online', 'Lan']);   // server đóng dấu vườn online của ai
   // xin phiên mới (vd tải lại trang) thì được trao lại đúng vườn

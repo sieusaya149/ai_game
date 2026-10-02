@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
 import { createGame, loadGame, tick, canPlace, placeEntity, upgradePen, catHouses, buyCat, cats, stageStart, vaccinate } from '../public/state.js';
 import { setClock } from '../public/clock.js';
+import { SAVE_VERSION } from '../public/migrate.js';
 import { MAX_CATCHUP_MS, SICK, PREDATOR, DAY_MS } from '../public/data.js';
 import { TS } from '../public/layout.js';
 import { serverDay, villageCal } from '../public/clock.js';
@@ -127,7 +128,7 @@ test('chạy bù vườn lưu bằng bản v2 có trường online: thành v3, g
   assert.equal((await u.save(play, v2)).status, 200);
 
   const f = (await (await user('Bình')).visit('Lan')).body.farm;
-  assert.equal(f.v, 3);
+  assert.equal(f.v, SAVE_VERSION);
   assert.equal(f.simMs - v2.simMs, 3 * H, 'chạy bù đủ 3 giờ');
   assert.equal(f.dog.stage, 'truong'); assert.equal(f.dog.adult, undefined);
   assert.equal(f.dog.chained, true);
@@ -153,7 +154,7 @@ test('chủ đăng nhập lại: dòng vườn bản v2 server cũ để lại l
   assert.equal(JSON.parse(db.prepare('SELECT save FROM farms').get().save).v, 2, 'trong DB đang là bản v2');
   db.close();
   const f = (await u.play()).body.farm;
-  assert.equal(f.v, 3);
+  assert.equal(f.v, SAVE_VERSION);
   assert.deepEqual(f.animals.map(a => [a.id, a.type, a.name]), v2.animals.map(a => [a.id, a.type, a.name]), 'đủ từng con, đúng loài, đúng tên');
   assert.ok(f.animals.every(a => a.stage && a.sex), 'mỗi con có giai đoạn và giới tính');
   assert.ok(f.animals.length >= 1 && v2.animals.some(a => !a.adult), 'bản v2 có cả con non lẫn con lớn');

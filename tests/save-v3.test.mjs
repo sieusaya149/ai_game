@@ -16,8 +16,7 @@ const quiet = fn => { const r = Math.random; Math.random = () => 0.99; try { ret
 test('mở bản v2 có đủ loài: thành v3, đủ con, giai đoạn đúng, giới tính theo id, độ thân 2, sạch', () => {
   const old = seedV2('v2-farm');
   const s = quiet(() => G.loadGame());
-  assert.equal(s.v, 3);
-  assert.equal(SAVE_VERSION, 3);
+  assert.equal(s.v, SAVE_VERSION);   // v2 → v3 → bản mới nhất
   assert.deepEqual(s.animals.map(a => a.id), old.animals.map(a => a.id));
   assert.deepEqual(new Set(s.animals.map(a => a.type)), new Set(['ga', 'heo', 'bo', 'cuu']));
   for (const a of s.animals) {
@@ -52,20 +51,20 @@ test('chuyển v2→v3 là hàm thuần: chạy hai lần cho cùng kết quả,
   // qua loadGame cũng thế (như mở trên hai máy)
   seedV2('v2-farm');
   const a = quiet(() => G.loadGame());
-  delete store[G.SAVE_KEY]; delete store['nongtrai-migrated-v3'];
+  delete store[G.SAVE_KEY]; delete store['nongtrai-migrated-v3']; delete store['nongtrai-migrated-v4'];
   const b = quiet(() => G.loadGame());
   for (const s of [a, b]) { delete s.savedAt; s.log = []; }
   assert.deepEqual(a, b);
 });
 
-test('key v2 còn nguyên sau khi chuyển; bản v3 ghi ở key mới', () => {
+test('key v2 còn nguyên sau khi chuyển; bản mới ghi ở key mới', () => {
   seedV2('v2-farm');
   const before = store[V2];
   quiet(() => G.loadGame());
   assert.equal(store[V2], before);
-  assert.equal(G.SAVE_KEY, 'nongtrai-save-v3');
-  assert.equal(JSON.parse(store[G.SAVE_KEY]).v, 3);
-  // đã có v3 thì đọc v3, không chuyển lại từ v2
+  assert.equal(G.SAVE_KEY, `nongtrai-save-v${SAVE_VERSION}`);
+  assert.equal(JSON.parse(store[G.SAVE_KEY]).v, SAVE_VERSION);
+  // đã có bản mới thì đọc bản mới, không chuyển lại từ v2
   const s = G.loadGame(); s.coins = 777; G.saveGame(s);
   assert.equal(G.loadGame().coins, 777);
   assert.equal(store[V2], before);
@@ -77,7 +76,7 @@ test('người chơi v2 đã từng chuyển từ v1 (có cờ cũ) vẫn mở �
   store['nongtrai-save-v1'] = JSON.stringify(fixture('v1-mid'));
   const s = quiet(() => G.loadGame());
   assert.equal(s.name, 'Mới');   // của bản v2, không phải v1-mid
-  assert.equal(s.v, 3);
+  assert.equal(s.v, SAVE_VERSION);
 });
 
 test('chơi lại từ đầu thì không lôi bản v2 cũ lên nữa', () => {
@@ -100,10 +99,10 @@ test('bản v2 hỏng: báo lỗi, không ghi gì, bản v2 giữ nguyên', () =
   }
 });
 
-test('vườn mới tạo ở v3: con vật có đủ trường của hình dạng mới', () => {
+test('vườn mới tạo ở bản mới nhất: con vật có đủ trường của hình dạng v3', () => {
   clear();
   const s = G.createGame({ name: 'Mới' });
-  assert.equal(s.v, 3);
+  assert.equal(s.v, SAVE_VERSION);
   const [hen, chick] = s.animals;
   assert.deepEqual([hen.stage, hen.sex, chick.stage, chick.sex], ['truong', 'f', 'non', 'm']);
   for (const a of s.animals) {

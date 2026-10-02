@@ -51,7 +51,7 @@ async function poll(get, pred, ms = 3000) {
     await new Promise(ok => setTimeout(ok, 50));
   }
 }
-const crop = p => { p.soil = 'tilled'; p.crop = { id: 'cai', progress: 0.3, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 }; };
+const crop = p => { p.soil = 'tilled'; p.crop = { id: 'cai', progress: 0.3, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: false } }; };
 // mọi ô có cây khô và cỏ: 9 ô x 2 việc = 18 việc giúp
 const garden = s => { for (const p of s.plots) { crop(p); p.water = 0; p.weeds = true; } };
 const op = (id, act, idx) => ({ id, kind: 'help', act, idx });

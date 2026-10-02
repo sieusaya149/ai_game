@@ -26,13 +26,18 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1) cho chuyển v3→v4: nạp bản v3 mẫu (mới tạo, đang chơi dở có cây đang lớn và đồ trong túi) thì cây giữ nguyên tiến độ, đồ cũ thành ★1, giếng cấp 1, thành thạo cấp 1 với số lần thu hoạch lấy từ thống kê. Chạy chuyển hai lần cho cùng kết quả, bản v3 vẫn còn. Bản v3 hỏng thì báo lỗi, không ghi đè.
-- [ ] Unit test: bảng cây có đúng 16 cây, mỗi mùa đúng 4 cây hợp mùa, 8 cây cũ giữ nguyên id và số liệu cũ, mọi cây đều có nhóm thời gian và cấp mở khóa.
-- [ ] Unit test: hạt cây mới chỉ mua được khi đủ cấp người chơi; chưa đủ cấp thì bị từ chối.
-- [ ] Toàn bộ unit test cũ vẫn pass.
-- [ ] E2E (Playwright, desktop + 360px): nạp bản lưu v3 ghi sẵn có cây đang lớn → game mở, cây còn nguyên tiến độ, thu hoạch được.
-- [ ] E2E: dựng bản lưu có đủ 16 cây ở đủ 5 giai đoạn, bệnh, héo, chết → mỗi cây hiện hình riêng (kiểm bằng ảnh chụp từng cây), không có hai cây khác loại dùng cùng hình ở giai đoạn giữa.
-- [ ] E2E: mở chợ Bà Tư ở cấp đủ → thấy hạt cây mới và mua được.
+- [x] Unit test (seam 1) cho chuyển v3→v4: nạp bản v3 mẫu (mới tạo, đang chơi dở có cây đang lớn và đồ trong túi) thì cây giữ nguyên tiến độ, đồ cũ thành ★1, giếng cấp 1, thành thạo cấp 1 với số lần thu hoạch lấy từ thống kê. Chạy chuyển hai lần cho cùng kết quả, bản v3 vẫn còn. Bản v3 hỏng thì báo lỗi, không ghi đè.
+- [x] Unit test: bảng cây có đúng 16 cây, mỗi mùa đúng 4 cây hợp mùa, 8 cây cũ giữ nguyên id và số liệu cũ, mọi cây đều có nhóm thời gian và cấp mở khóa.
+- [x] Unit test: hạt cây mới chỉ mua được khi đủ cấp người chơi; chưa đủ cấp thì bị từ chối.
+- [x] Toàn bộ unit test cũ vẫn pass.
+- [x] E2E (Playwright, desktop + 360px): nạp bản lưu v3 ghi sẵn có cây đang lớn → game mở, cây còn nguyên tiến độ, thu hoạch được.
+- [x] E2E: dựng bản lưu có đủ 16 cây ở đủ 5 giai đoạn, bệnh, héo, chết → mỗi cây hiện hình riêng (kiểm bằng ảnh chụp từng cây), không có hai cây khác loại dùng cùng hình ở giai đoạn giữa.
+- [x] E2E: mở chợ Bà Tư ở cấp đủ → thấy hạt cây mới và mua được.
+
+**Ghi chú khi làm:**
+- Thống kê v3 chỉ có tổng số lần thu hoạch (`stats.harvests`, giữ nguyên), không chia theo loại cây, nên thành thạo mọi cây bắt đầu cấp 1 với `n = 0`.
+- Hình dạng v4, khóa nông sản theo sao (`'cai'` ★1, `'cai@2'`, `'cai@3'`) và chỗ để sẵn cho issue 51–61: `SPEC.md` mục "Bản lưu v4 (Phase 3)".
+- 8 cây mới chưa có icon túi hạt (chợ, chọn hạt tạm hiện 🌱); icon nông sản dùng `SPR4.produce` (bản 2× ở `art10.js`).
 
 ## Blocked by
 

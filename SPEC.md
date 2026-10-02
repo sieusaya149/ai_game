@@ -28,10 +28,10 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED` (bán kính theo giai đoạn nằm ở `DOG.guardRadius`, dùng chung với trộm NPC); Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC), `BREED`/`animalPrice` (đực cái, sinh sản), `DIRT`/`MANURE` (dơ, phân chuồng), `SICK`/`VET_ITEMS` (bệnh, thú y), `BOND` (độ thân), `TRADE`/`pigKgPrice` (bán cho Chú Ba), `CAT` (mèo), `CO_UT_QUEST`, `BUILD_PRICES` (nhà mèo...). Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED` (bán kính theo giai đoạn nằm ở `DOG.guardRadius`, dùng chung với trộm NPC); Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC), `BREED`/`animalPrice` (đực cái, sinh sản), `DIRT`/`MANURE` (dơ, phân chuồng), `SICK`/`VET_ITEMS` (bệnh, thú y), `BOND` (độ thân), `TRADE`/`pigKgPrice` (bán cho Chú Ba), `CAT` (mèo), `CO_UT_QUEST`, `BUILD_PRICES` (nhà mèo...); Phase 3: `CROPS` 16 cây có `season`/`group`, `CROP_GROUPS`, nông sản có sao `STARS`/`starKey`/`starOf`/`baseOf`/`isProduce` (mục "Bản lưu v4"). Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
 | `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `troughOf(map, {pen, id?})`; bản đồ vườn có `pens` (chuồng đầu tiên mỗi loại), `penList`/`penById` (mọi chuồng: `{ id, type, lv, name, rect, gates, trough|null, area, house, ent }`), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
-| `public/migrate.js` | `SAVE_VERSION` (3), `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`: v1→v2, v2→v3); `animalDefaults`/`fillAnimal`: hình dạng con vật v3 và mặc định của nó. Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
+| `public/migrate.js` | `SAVE_VERSION` (4), `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`: v1→v2, v2→v3, v3→v4); `animalDefaults`/`fillAnimal`: hình dạng con vật v3 và mặc định của nó; `fillSave`/`cropQuality`/`fieldUpgrades`: chỗ để sẵn của Phase 3 (bản lưu v4) và mặc định của nó. Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
 | `public/clock.js` | Đồng hồ ngoài đời: `now()`, `setClock(fn)`, `realDay()` (giờ máy), và (issue 23) `measureOffset(ask, tries?, local?)` → độ lệch ms hoặc null, `useServerTime(offset|null)` (trỏ `now()` sang giờ server), `villageCal(t)` → `{ day, tod, frac }`, `serverDay(t)` → `'YYYY-MM-DD'` giờ Việt Nam (UTC+7), `VILLAGE_EPOCH` |
 | `public/state.js` | Mô hình dữ liệu + **mọi luật chơi** + lưu/tải. Thuần JS, không DOM (trừ `localStorage` bọc try/catch). Đây là API công khai duy nhất của luật chơi |
 | `public/notify.js` | Thông báo 3 mức: `eventMeta`, `createNotifier` (gộp toast), `arrowTargets`, `arrowFor`. Thuần JS |
@@ -45,7 +45,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/presence.js` | Người khác cùng bản đồ (issue 25): `crowdSplit(me, people, max)`, `sampleTrack(track, t)`, `createPeers()`. Thuần JS, xem mục Server |
 | `server/` | Server Node (ADR 0010), xem mục Server. `server.js` cũ (hỏng) và `scripts/static-server.mjs` đã bị xóa ở issue 20 |
 | `Dockerfile`, `compose.yml`, `.dockerignore` | `node:22-alpine` chạy `server/main.mjs`, nghe cổng 80; container `ai-game` trong network `gateway`, dữ liệu trên volume `data` (`/data/farm.db`) |
-| `tests/` | Unit test `node --test`: seam 1 (`state.js`), seam 3 (`server-*.test.mjs`, helper `tests/helpers/server.mjs`) và `tests/fixtures/` (bản lưu v1 và v2 mẫu) |
+| `tests/` | Unit test `node --test`: seam 1 (`state.js`), seam 3 (`server-*.test.mjs`, helper `tests/helpers/server.mjs`) và `tests/fixtures/` (bản lưu v1, v2, v3 mẫu) |
 | `e2e/`, `playwright*.config.mjs` | E2E và smoke Playwright (seam 2), `e2e/helpers.mjs` |
 
 ## Thời gian
@@ -61,17 +61,17 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 - **Chạy bù khi mở lại game:** tối đa `MAX_CATCHUP_MS` = 8 giờ ở tốc độ x1, chia bước ≤ 1000ms; lúc chạy bù không sinh quạ/trộm và (ADR 0004) không có gì làm con vật chết. Phần vắng vượt 8 giờ **không chạy** (đóng băng): ghi vào `frozenMs`, cộng dồn `frozenTotal`. Với vườn online, **giờ làng trong lúc chạy bù trôi theo bước đang mô phỏng** (`loadGame` đặt mốc `catchBase` = giờ ngoài đời lúc bắt đầu phần chạy bù; `dayOf`/`dayFraction` đọc `catchBase + simMs` thay cho `now()`), nên 8 giờ vắng là 24 ngày làng có ngày có đêm (chạng vạng, mèo ra vào, chồn nửa đêm...), không phải cả 8 giờ đứng yên ở giờ lúc mở lại (issue 49 sửa: trước đó server chạy bù lúc làng đang đêm thì mèo ngủ suốt 8 giờ, không bắt được con chuột nào).
 - **Giờ vườn đã chạy** `simMs`: chỉ tăng khi mô phỏng thật sự chạy (kể cả chạy bù và lúc ngủ). Từ Phase 2 tuổi con vật dựa vào đây (`farmHours(state)`).
 
-## Hình dạng bản lưu v3
+## Hình dạng bản lưu v4
 
-Khóa `localStorage`: `nongtrai-save-v3` (`SAVE_KEY`, từ issue 34). `loadGame` đọc lần lượt **v3 → v2 (`nongtrai-save-v2`) → v1 (`nongtrai-save-v1`)**; bản cũ chỉ được **đọc để chuyển, không bao giờ ghi đè hay xóa**. Mỗi bản cũ có cờ riêng "đã chuyển (hoặc đã chơi lại từ đầu)" để không đọc lại: `nongtrai-migrated-v3` cho v2, `nongtrai-migrated` cho v1 (cờ cũ của Phase 0; người chơi v2 đã có cờ này vẫn được đọc v2). Chuyển xong thì ghi bản mới vào `SAVE_KEY` và đặt cả hai cờ; `resetGame` cũng đặt cả hai. Chuyển lỗi thì không ghi gì. Tùy chọn riêng của máy (tiết kiệm pin) ở `nongtrai-pref`, không nằm trong bản lưu.
+Khóa `localStorage`: `nongtrai-save-v4` (`SAVE_KEY`, từ issue 50; v3 dùng `nongtrai-save-v3` từ issue 34). `loadGame` đọc lần lượt **v4 → v3 (`nongtrai-save-v3`) → v2 (`nongtrai-save-v2`) → v1 (`nongtrai-save-v1`)**; bản cũ chỉ được **đọc để chuyển, không bao giờ ghi đè hay xóa**. Mỗi bản cũ có cờ riêng "đã chuyển (hoặc đã chơi lại từ đầu)" để không đọc lại: `nongtrai-migrated-v4` cho v3, `nongtrai-migrated-v3` cho v2, `nongtrai-migrated` cho v1 (cờ cũ của Phase 0; người chơi v2 đã có cờ này vẫn được đọc v2). Chuyển xong thì ghi bản mới vào `SAVE_KEY` và đặt mọi cờ; `resetGame` cũng đặt mọi cờ. Chuyển lỗi thì không ghi gì. Tùy chọn riêng của máy (tiết kiệm pin) ở `nongtrai-pref`, không nằm trong bản lưu.
 
-(Bản online trên server: server không tự kiểm số phiên bản mà luôn đi qua chính `migrate()` / `loadGame(raw)` của `public/`: `POST /api/farm` chạy `migrate(save)` trước khi lưu, chạy bù (`catchUpFarm`) dùng `loadGame`, khách thăm vườn dùng `startVisit` → `loadGame`. Vườn đã lưu bằng bản v2 trước khi gộp Phase 2 tự lên v3 ở lần đọc/ghi kế tiếp, giữ nguyên các trường online.)
+(Bản online trên server: server không tự kiểm số phiên bản mà luôn đi qua chính `migrate()` / `loadGame(raw)` của `public/`: `POST /api/farm` chạy `migrate(save)` trước khi lưu, chạy bù (`catchUpFarm`) dùng `loadGame`, khách thăm vườn dùng `startVisit` → `loadGame`. Vườn đã lưu bằng bản v2/v3 tự lên v4 ở lần đọc/ghi kế tiếp (chủ nhận phiên chơi, khách ghé lúc chủ vắng, hoặc trình duyệt chưa tải lại còn gửi bản v3), giữ nguyên các trường online. `checkSaveJump` so bản v3 cũ trong DB với bản v4 mới bình thường: đồ cũ là ★1 nên của cải không đổi. Seam 3: `tests/server-v4.test.mjs`.)
 
-Các trường dưới đây lấy từ `createGame`/`loadGame` thật:
+Các trường dưới đây lấy từ `createGame`/`loadGame` thật (phần thêm ở v4 xem "Bản lưu v4 (Phase 3)" ngay dưới):
 
 ```js
 state = {
-  v: 3,
+  v: 4,
   name, look: { skin, hair, hairColor, shirt, pants, hat, acc },   // chỉ số lựa chọn, xem LOOK/HATS/ACCS trong data.js
   owned: { hat: [..], acc: [..] },            // mũ/phụ kiện đã mua (index)
   coins, exp,
@@ -96,9 +96,11 @@ state = {
   smith: null | { tool, doneAt },             // công cụ đang nằm lò rèn (doneAt theo state.time)
   inv: { ... },                               // KHO: mọi thứ (hạt, vật tư, thức ăn, nông sản, sản phẩm, gỗ, đá, đồ trang trí); chưa giới hạn
   basket: { ... },                            // GIỎ: chỉ nông sản và sản phẩm, có sức chứa basketCap
-  shipbin: { items: { cai: 3, ... } },        // thùng giao hàng, chốt lúc 6h sáng
-  plots: [ { idx, unlocked, removed?, soil: 'untilled'|'tilled', water: 0..100, weeds: false,
-             crop: null | { id, progress, planted, bugs, bugSince, sick, sickSince, fert, boosts, dead, rotten, ripeAt } } ],
+  shipbin: { items: { cai: 3, 'cai@2': 1, ... } },   // thùng giao hàng, chốt lúc 6h sáng
+                                              //   (v4) khóa nông sản theo sao: 'cai' = ★1, 'cai@2' = ★2, 'cai@3' = ★3 ở inv, basket, shipbin, orders[].items
+  plots: [ { idx, unlocked, removed?, soil: 'untilled'|'tilled', water: 0..100, weeds: false, mulch: false,   // mulch (v4): phủ rơm
+             crop: null | { id, progress, planted, bugs, bugSince, sick, sickSince, fert, boosts, dead, rotten, ripeAt,
+                            q: { dry, bugMax, hand } } } ],   // q (v4): theo dõi chất lượng vụ, xem dưới
   animals: [ Animal ],                        // xem "Con vật (v3)" ngay dưới
   troughs: { chicken, pig, pasture },
   manure: { chicken, pig, pasture },          // phân chuồng tích dần 0..100 (đầy = chuồng bẩn), xúc ở máng (hành động `muck`)
@@ -146,22 +148,43 @@ state = {
   //   kind: 'help' | 'steal' | 'bark' | 'bite' | 'sausage'; `fine` chỉ có ở dòng 'bite', `ate` chỉ có ở dòng 'sausage' (issue 31)
   // dog (issue 31): chained = xích chó (mặc định false) · nap = giấc ngủ gật tới lúc nào (giờ vườn) · napCheck = lần quay kế tiếp
   //   · quiet = mải ăn xúc xích tới lúc nào (giờ NGOÀI ĐỜI) · barkAt/barkX/barkY = lần sủa gần nhất và chỗ thấy khách lạ
+  // Phase 3 (v4, issue 50):
+  mastery: { [cropId]: { lv: 1..3, n } },     // thành thạo theo loại cây: cấp và số lần đã thu hoạch loại đó (đủ 16 cây, thiếu thì fillSave bù { lv: 1, n: 0 })
+  water: { level },                           // mực nước chung của mọi bồn (ADR 0015: một con số "lần nước"); sức chứa tính từ giếng cấp 4 và các bồn (issue 57)
 }
 ```
-Vườn online không bao giờ ghi vào `SAVE_KEY` (`nongtrai-save-v3`): bản chơi đơn và vườn trên làng là hai bản riêng, chỉ chép một lần lúc "Mang vườn này lên làng?".
+Vườn online không bao giờ ghi vào `SAVE_KEY` (`nongtrai-save-v4`): bản chơi đơn và vườn trên làng là hai bản riêng, chỉ chép một lần lúc "Mang vườn này lên làng?".
 
 **Thực thể đã đặt** (`farm.ents[i]`): `id`, `kind`, `c`, `r` (góc trên-trái, theo ô của bản đồ vườn) và dữ liệu riêng:
 
 | `kind` | Dữ liệu riêng | Ghi chú |
 |---|---|---|
 | `house`, `gate` | không | cố định, không dời được (`fixed`). Nhà có cửa sang `house`, cổng có cửa sang `village` |
-| `shed`, `well`, `board`, `shipbin`, `doghouse` | không | chân đế theo `BUILDING_DEFS`; dời được |
-| `field` | `plots: [9 chỉ số vào state.plots]` | khối ruộng 3x3; ô thứ k ở `(c + k%3, r + floor(k/3))` |
+| `shed`, `board`, `shipbin`, `doghouse` | không | chân đế theo `BUILDING_DEFS`; dời được |
+| `well` | `lv: 1..4` (v4) | giếng có cấp (issue 56: Giếng đất, Giếng xây, Bơm tay, Máy bơm); vườn cũ là cấp 1. Đọc bằng `wellLv(state)` |
+| `field` | `plots: [9 chỉ số vào state.plots]`, `up: { drip, spray, rich, glass }` (v4) | khối ruộng 3x3; ô thứ k ở `(c + k%3, r + floor(k/3))`. `up`: nâng cấp theo khối (tưới nhỏ giọt, phun thuốc tự động, đất màu mỡ: issue 58; nhà kính: issue 60), mặc định đều `false`; là thuộc tính của khối nên dời khối thì đi theo |
 | `pen` | `pen: 'chicken'|'pig'|'pasture'|'quarantine'`, `lv?: 1..3` | chuồng, kích thước theo `PEN_DEFS` (không đổi theo cấp); `lv` thiếu = 1; nhiều chuồng mỗi loại, giới hạn theo cấp người chơi (`PEN_TABLE.limit`). Chuồng chó (`doghouse`) cũng có `lv?` |
 | `deco` | `item: 'deco_scarecrow'|'deco_flower'|'deco_lamp'|'deco_bench'|'deco_lowfence'|'deco_rattrap'|'deco_canopy'`, `shut?` (bẫy chuột đã sập) | đồ trang trí 1 ô |
 | `grave` | `animal` (loài), `name?` (chỉ con ❤️4+), `flower: bool` | ngôi mộ 1 ô, con vật mất để lại (lát 38); đặt/dời qua `canPlace` như mọi công trình |
 | `tree` | không | cây cảnh, không dời được |
 | `bush`, `rock` | không | bụi, đá **chưa dọn** trên dải đất mới; chắn đường, dọn bằng tay (`CLUTTER`) |
+| `tank`, `pump`, `compost` (để dành) | bồn phụ / trạm bơm phụ: không (mực nước nằm ở `state.water`) · hố ủ: `pile: { item: n }`, `readyAt` | chưa có trong game: chỗ đã chốt cho issue 57 (bồn, trạm bơm phụ) và issue 61 (hố ủ). Thêm `kind` mới thì thêm mặc định vào `fillSave` |
+
+### Bản lưu v4 (Phase 3)
+
+Lát dọn đường cho cả Phase 3 (issue 50). Người chơi gần như chưa thấy gì mới ngoài 8 cây mới; bên dưới, bản lưu đã có chỗ cho mọi hệ thống sau. Mặc định nằm ở **một chỗ**: `fillSave(s)` trong `migrate.js` (giống `fillAnimal`), chạy mỗi lần `migrate()` và trong `createGame`; không ghi đè giá trị đã có. Thêm trường Phase 3 mới thì thêm mặc định vào `fillSave`, **không cần tăng phiên bản**.
+
+| Chỗ | Trường v4 | Mặc định | Dùng ở |
+|---|---|---|---|
+| ô ruộng | `plot.mulch` | `false` | phủ rơm (issue 55) |
+| vụ đang trồng | `crop.q = { dry, bugMax, hand }` (`cropQuality()`) | `{ dry: false, bugMax: 0, hand: false }` | chất lượng ★ (issue 52): `dry` = đã có lúc khô hẳn, `bugMax` = sâu lâu nhất (ms giờ vườn), `hand` = có ít nhất một lần chăm tay. "Có bón phân" là `crop.fert` có sẵn. Vụ mới (`plant`) có `q` mới, thu hoạch xong mất cùng `crop` |
+| nông sản | khóa `starKey(id, sao)`: `'cai'` ★1, `'cai@2'` ★2, `'cai@3'` ★3 | đồ cũ giữ khóa = ★1 | issue 52: giỏ, kho, thùng giao hàng, đơn hàng (`orders[].items`), quà, trộm tách theo sao vì khóa khác nhau. Chỉ nông sản cây trồng có sao; sản phẩm vật nuôi có món "sao" riêng (`sua_ngon`, `len_xoan`) |
+| vườn | `mastery[cropId] = { lv, n }` | `{ lv: 1, n: 0 }` cho cả 16 cây | thành thạo (issue 51): cấp lưu thẳng (cân bằng lại ngưỡng không làm tụt cấp), `n` = số lần thu hoạch loại đó |
+| giếng | `ent.lv` (kind `well`) | `1` | giếng 4 cấp (issue 56); `wellLv(state)` |
+| vườn | `water = { level }` | `{ level: 0 }` | bồn chứa, mạng nước (issue 57, ADR 0015): một con số chung; sức chứa tính từ giếng cấp 4 (200) và số bồn phụ (+150) nên không lưu |
+| khối ruộng | `ent.up = { drip, spray, rich, glass }` (`fieldUpgrades()`) | đều `false` | tưới nhỏ giọt, phun thuốc tự động, đất màu mỡ (issue 58), nhà kính (issue 60). `placeEntity` khối mới cũng có `up` |
+
+**Chuyển v3→v4** (`v3to4`, thuần): chép cả bản lưu, đặt `v: 4` rồi `fillSave`. Cây đang trồng dở giữ nguyên `id`, `progress`, `fert`... và có thêm `q` mặc định; nông sản giữ nguyên khóa nên thành ★1, số lượng không đổi; giếng cấp 1; bồn 0; khối ruộng chưa có nâng cấp. **Thành thạo bắt đầu cấp 1 với `n = 0`**: thống kê v3 chỉ có tổng số lần thu hoạch (`stats.harvests`, giữ nguyên) chứ không chia theo loại cây. Bản v3 hỏng (`plots` không phải mảng, `inv`/`basket` không phải object, cây có `id` lạ) thì ném lỗi, `loadGame` trả `null`, không ghi gì. Fixture: `tests/fixtures/v3-farm.json` (cây ở 4 giai đoạn, một ô bón phân, một ô chín, đồ trong giỏ, kho, thùng, một đơn hàng, đã thu hoạch 2 lần) và `v3-fresh.json`, sinh bằng `make-v3.mjs` chạy bằng code bản v3 trước issue 50. Test: `tests/save-v4.test.mjs`, `tests/server-v4.test.mjs`, `e2e/crops16.spec.mjs`.
 
 ### Con vật (v3)
 
@@ -198,10 +221,10 @@ Mối liên hệ vị trí: ô ruộng `idx` có thể có `removed: true` (kh�
 
 ### Quy tắc đổi phiên bản bản lưu
 
-1. Mỗi lần đổi **hình dạng** bản lưu thì tăng `SAVE_VERSION` trong `migrate.js` và thêm **một hàm chuyển đúng một bậc** vào `STEPS` (khóa là phiên bản nguồn: `STEPS = { 1: v1to2, 2: v2to3 }`). `migrate(raw)` chạy lần lượt tới `SAVE_VERSION`.
+1. Mỗi lần đổi **hình dạng** bản lưu thì tăng `SAVE_VERSION` trong `migrate.js` và thêm **một hàm chuyển đúng một bậc** vào `STEPS` (khóa là phiên bản nguồn: `STEPS = { 1: v1to2, 2: v2to3, 3: v3to4 }`). `migrate(raw)` chạy lần lượt tới `SAVE_VERSION`.
 2. Hàm chuyển phải **thuần**: không `Math.random`, không đọc đồng hồ, cùng đầu vào cho cùng đầu ra (chạy hai lần cho cùng kết quả). Không ghi đè hay xóa key cũ ngoài `localStorage`: mỗi phiên bản lưu ở key riêng (`nongtrai-save-vN`), chuyển xong ghi key mới, giữ nguyên key cũ; thêm key cũ vào `OLD_KEYS` của state.js kèm cờ "đã chuyển" riêng. Chuyển lỗi thì `loadGame` trả `null` và `loadProblem()` có thông báo, bản cũ còn nguyên.
-3. **Thêm trường nhỏ không đổi cấu trúc** (có giá trị mặc định hợp lý) thì không cần tăng phiên bản: bổ sung trong `loadGame` (mẫu: `basket`, `stamina`, `tools`, `simMs`, `notify`) hoặc trong `migrate` (mẫu: `s.basket ??= {}`). Công trình bị bỏ khỏi game thì thêm vào `RETIRED` trong `migrate.js`.
-4. **Test bằng fixture**: bản lưu mẫu của phiên bản cũ nằm ở `tests/fixtures/`: `v1-fresh`, `v1-mid`, `v1-full` (sinh bằng `make-v1.mjs` chạy bằng code của bản v1); `v2-farm` (đủ 4 loài, con non lẫn trưởng thành, một con bệnh, chó đã lớn) và `v2-fresh` (sinh bằng `make-v2.mjs` chạy bằng code bản v2 trước issue 34). Test: `tests/save-v2.test.mjs` (v1 → mới nhất), `tests/save-v3.test.mjs` (v2 → v3). Khi có phiên bản mới, chụp thêm fixture của bản trước rồi thêm test: không mất xu/đồ/cây/con vật, chạy hai lần cho cùng kết quả, bản lỗi không ghi đè.
+3. **Thêm trường nhỏ không đổi cấu trúc** (có giá trị mặc định hợp lý) thì không cần tăng phiên bản: bổ sung trong `loadGame` (mẫu: `basket`, `stamina`, `tools`, `simMs`, `notify`), trong `migrate` (mẫu: `s.basket ??= {}`), hay với trường Phase 3 thì trong `fillSave`. Công trình bị bỏ khỏi game thì thêm vào `RETIRED` trong `migrate.js`.
+4. **Test bằng fixture**: bản lưu mẫu của phiên bản cũ nằm ở `tests/fixtures/`: `v1-fresh`, `v1-mid`, `v1-full` (sinh bằng `make-v1.mjs` chạy bằng code của bản v1); `v2-farm` (đủ 4 loài, con non lẫn trưởng thành, một con bệnh, chó đã lớn) và `v2-fresh` (sinh bằng `make-v2.mjs` chạy bằng code bản v2 trước issue 34); `v3-farm`, `v3-fresh` (`make-v3.mjs`, code bản v3 trước issue 50). Test: `tests/save-v2.test.mjs` (v1 → mới nhất), `tests/save-v3.test.mjs` (v2 → mới nhất), `tests/save-v4.test.mjs` (v3 → v4). Khi có phiên bản mới, chụp thêm fixture của bản trước rồi thêm test: không mất xu/đồ/cây/con vật, chạy hai lần cho cùng kết quả, bản lỗi không ghi đè.
 
 ## API công khai của luật chơi (`public/state.js`)
 
@@ -209,8 +232,8 @@ Mối liên hệ vị trí: ô ruộng `idx` có thể có `removed: true` (kh�
 
 ### Vòng đời bản lưu
 ```js
-createGame({ name, look })        // → state v3 mới theo START + START_FARM; gà mái trưởng thành + gà trống con trong chuồng gà, chó con
-loadGame(raw?)                    // → state | null. Không truyền: đọc v3 trong localStorage, chưa có thì v2, rồi v1, và migrate.
+createGame({ name, look })        // → state v4 mới theo START + START_FARM; gà mái trưởng thành + gà trống con trong chuồng gà, chó con
+loadGame(raw?)                    // → state | null. Không truyền: đọc v4 trong localStorage, chưa có thì v3, v2, rồi v1, và migrate.
                                   // Truyền raw (bản lưu đã parse, vd vườn online từ server): đọc bản đó, không đụng localStorage.
                                   // Bù trường thiếu, tự chạy bù (≤ 8 giờ), đặt frozenMs/away
 saveGame(state)                   // cập nhật savedAt; vườn chơi đơn thì ghi SAVE_KEY, vườn online (mode 'online') thì không ghi gì
@@ -218,8 +241,9 @@ checkSaveJump(prev, next, dtMs)   // → R { reason: 'time'|'coins'|'exp' }: ch�
                                   // tăng không quá dtMs × x20 + một đêm ngủ; của cải (wealthOf = xu + đồ theo giá bán/giá mua) và EXP
                                   // tăng không quá mức cho sẵn + mỗi ô ruộng mỗi phút vườn chạy (SAVE_JUMP)
                                   // + giá trần của con vật có ở bản trước mà mất ở bản sau (bán cho Chú Ba, Phase 2)
-wealthOf(state), SAVE_JUMP
-resetGame()                       // xóa save hiện tại và đặt mọi cờ "đã chuyển" (không đụng bản v1, v2)
+wealthOf(state), SAVE_JUMP        // wealthOf tính nông sản theo sellPrice của khóa (★2 ×1.5, ★3 ×2): đổi nhãn ★1 thành ★3 là của cải tăng
+resetGame()                       // xóa save hiện tại và đặt mọi cờ "đã chuyển" (không đụng bản v1, v2, v3)
+wellLv(state)                     // → 1..4: cấp giếng (Phase 3, v4; vườn cũ 1)
 loadProblem()                     // → string | null: vì sao lần loadGame gần nhất không đọc được (bản vẫn được giữ)
 awaySummary(events, frozenMs)     // → string[]: các dòng cho màn "Trong lúc bạn vắng nhà" (cả thành tựu mở lúc chạy bù, issue 32)
 awayGuests(state, gate?)          // issue 32 → [{ kind: 'help'|'steal'|'gift'|'note'|'chase', icon, text }]: phần "Khách ghé vườn"

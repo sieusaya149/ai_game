@@ -29,17 +29,37 @@ export const GRID = 6;                    // ruộng tối đa 6x6 ô
 export const START_PLOTS = 9;
 
 // ---------- Cây trồng ----------
-// seed: giá hạt · grow: thời gian lớn tới lúc chín · yield: số nông sản · price: giá bán mỗi cái
+// lv: cấp người chơi mua được hạt · seed: giá hạt · grow: thời gian lớn tới lúc chín · yield: số nông sản · price: giá bán mỗi cái
+// season: mùa hợp (xuan | ha | thu | dong, mỗi mùa 4 cây) · group: nhóm thời gian cho ngưỡng thành thạo (CROP_GROUPS)
 export const CROPS = {
-  cai:    { name: 'Cải xanh', lv: 1,  seed: 8,   grow: 1.5 * MIN, yield: 4, price: 5,  exp: 2 },
-  carot:  { name: 'Cà rốt',   lv: 1,  seed: 15,  grow: 3 * MIN,   yield: 4, price: 9,  exp: 4 },
-  lua:    { name: 'Lúa',      lv: 2,  seed: 20,  grow: 5 * MIN,   yield: 5, price: 10, exp: 6 },
-  cachua: { name: 'Cà chua',  lv: 3,  seed: 35,  grow: 8 * MIN,   yield: 5, price: 18, exp: 10 },
-  bap:    { name: 'Bắp',      lv: 4,  seed: 50,  grow: 10 * MIN,  yield: 6, price: 22, exp: 14 },
-  dau:    { name: 'Dâu tây',  lv: 6,  seed: 80,  grow: 12 * MIN,  yield: 6, price: 35, exp: 20 },
-  bingo:  { name: 'Bí ngô',   lv: 8,  seed: 120, grow: 15 * MIN,  yield: 5, price: 60, exp: 28 },
-  duahau: { name: 'Dưa hấu',  lv: 10, seed: 180, grow: 20 * MIN,  yield: 6, price: 80, exp: 40 },
+  cai:       { name: 'Cải xanh',  lv: 1,  seed: 8,   grow: 1.5 * MIN, yield: 4, price: 5,  exp: 2,  season: 'xuan', group: 'short' },
+  carot:     { name: 'Cà rốt',    lv: 1,  seed: 15,  grow: 3 * MIN,   yield: 4, price: 9,  exp: 4,  season: 'dong', group: 'short' },
+  lua:       { name: 'Lúa',       lv: 2,  seed: 20,  grow: 5 * MIN,   yield: 5, price: 10, exp: 6,  season: 'thu',  group: 'mid' },
+  cachua:    { name: 'Cà chua',   lv: 3,  seed: 35,  grow: 8 * MIN,   yield: 5, price: 18, exp: 10, season: 'dong', group: 'mid' },
+  bap:       { name: 'Bắp',       lv: 4,  seed: 50,  grow: 10 * MIN,  yield: 6, price: 22, exp: 14, season: 'ha',   group: 'mid' },
+  dau:       { name: 'Dâu tây',   lv: 6,  seed: 80,  grow: 12 * MIN,  yield: 6, price: 35, exp: 20, season: 'xuan', group: 'long' },
+  bingo:     { name: 'Bí ngô',    lv: 8,  seed: 120, grow: 15 * MIN,  yield: 5, price: 60, exp: 28, season: 'thu',  group: 'long' },
+  duahau:    { name: 'Dưa hấu',   lv: 10, seed: 180, grow: 20 * MIN,  yield: 6, price: 80, exp: 40, season: 'ha',   group: 'long' },
+  // 8 cây mới Phase 3 (issue 50), mở dần theo cấp
+  hanhla:    { name: 'Hành lá',   lv: 2,  seed: 10,  grow: 2 * MIN,   yield: 4, price: 7,  exp: 3,  season: 'xuan', group: 'short' },
+  raumuong:  { name: 'Rau muống', lv: 3,  seed: 12,  grow: 2.5 * MIN, yield: 5, price: 6,  exp: 3,  season: 'ha',   group: 'short' },
+  suhao:     { name: 'Su hào',    lv: 4,  seed: 30,  grow: 6 * MIN,   yield: 4, price: 18, exp: 8,  season: 'dong', group: 'mid' },
+  dualeo:    { name: 'Dưa leo',   lv: 5,  seed: 40,  grow: 7 * MIN,   yield: 6, price: 16, exp: 10, season: 'ha',   group: 'mid' },
+  khoailang: { name: 'Khoai lang', lv: 6, seed: 45,  grow: 9 * MIN,   yield: 5, price: 22, exp: 12, season: 'thu',  group: 'mid' },
+  ot:        { name: 'Ớt',        lv: 7,  seed: 60,  grow: 10 * MIN,  yield: 8, price: 18, exp: 14, season: 'thu',  group: 'mid' },
+  dauphong:  { name: 'Đậu phộng', lv: 9,  seed: 100, grow: 13 * MIN,  yield: 6, price: 38, exp: 22, season: 'xuan', group: 'long' },
+  bapcai:    { name: 'Bắp cải',   lv: 12, seed: 150, grow: 18 * MIN,  yield: 4, price: 95, exp: 34, season: 'dong', group: 'long' },
 };
+// Nhóm thời gian lớn (ngưỡng thành thạo theo nhóm ở issue 51): ngắn ≤ 3 phút · trung bình 5–10 phút · dài ≥ 12 phút
+export const CROP_GROUPS = { short: 'Ngắn ngày', mid: 'Trung bình', long: 'Dài ngày' };
+// Chất lượng nông sản ★1–3 (Phase 3): khóa vật phẩm ★1 là id cây như bản lưu cũ ('cai'), ★2/★3 thêm hậu tố ('cai@2').
+// Chỉ nông sản cây trồng có sao; sản phẩm vật nuôi có món "sao" riêng (sua_ngon, len_xoan).
+export const STARS = { max: 3, mul: [1, 1.5, 2] };
+export const starKey = (id, star = 1) => (star > 1 ? `${id}@${star}` : id);
+export const starOf = k => { const m = /@([23])$/.exec(k); return m && CROPS[k.slice(0, -2)] ? +m[1] : 1; };
+export const baseOf = k => (starOf(k) > 1 ? k.slice(0, -2) : k);
+// Nông sản (mọi mức sao) hay sản phẩm vật nuôi: đồ bỏ giỏ, bán ở chợ, bỏ thùng giao hàng được
+export const isProduce = k => !!(CROPS[baseOf(k)] || PRODUCTS[k]);
 // Các giai đoạn theo % thời gian lớn: 0 hạt · 1 mầm · 2 cây non · 3 ra hoa/trái non · 4 chín.
 export const CROP_STAGES = [0, 0.1, 0.35, 0.7, 1];
 export const OVERRIPE = 1.5;              // chín quá (grow × 1.5) mà chưa hái thì héo, mất trắng
@@ -436,11 +456,11 @@ export const BOND = {
   lifeMul: 1.1,      // ❤️5: tuổi thọ (mốc già, mốc ra đi) +10%
   runRange: 80,      // ❤️4+: chạy lại khi người chơi trong tầm này
 };
-export const sellPrice = k => CROPS[k]?.price ?? PRODUCTS[k]?.price ?? 0;
+export const sellPrice = k => (CROPS[baseOf(k)] ? Math.round(CROPS[baseOf(k)].price * STARS.mul[starOf(k) - 1]) : PRODUCTS[k]?.price ?? 0);
 // Thùng giao hàng: lái buôn trả 80% giá chợ cho đồ trong thùng, chốt lúc 6h sáng (làm tròn xuống)
 export const SHIP_RATE = 0.8;
 export const shipValue = items => Math.floor(Object.entries(items).reduce((a, [k, n]) => a + sellPrice(k) * n, 0) * SHIP_RATE);
-export const itemName = k => ITEMS[k]?.name ?? CROPS[k]?.name ?? PRODUCTS[k]?.name ?? k;
+export const itemName = k => ITEMS[k]?.name ?? (starOf(k) > 1 ? `${CROPS[baseOf(k)].name} ★${starOf(k)}` : CROPS[k]?.name) ?? PRODUCTS[k]?.name ?? k;
 
 // ---------- Ngoại hình (skinset) ----------
 // Các phần cơ bản miễn phí; mũ và phụ kiện mua ở sạp (price 0 = có sẵn).

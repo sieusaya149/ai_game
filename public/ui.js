@@ -5,6 +5,7 @@ import * as D from './data.js';
 import * as sound from './sound.js';
 import { SPR2 } from './art2.js';
 import { SPR3 } from './art3.js';
+import { SPR4 } from './art4.js';
 import * as R from './render.js';
 import { createNotifier, arrowTargets, arrowFor } from './notify.js';
 import { todoList } from './todo.js';
@@ -44,6 +45,7 @@ const btn = (label, onClick, cls = '', extra = {}) => h('button', { class: 'btn 
 // ---------- Biểu tượng (art.icon, không có thì dùng emoji) ----------
 const EMOJI = {
   cai: '🥬', carot: '🥕', lua: '🌾', cachua: '🍅', bap: '🌽', dau: '🍓', bingo: '🎃', duahau: '🍉',
+  hanhla: '🧅', dauphong: '🥜', raumuong: '🥬', dualeo: '🥒', khoailang: '🍠', ot: '🌶️', suhao: '🥬', bapcai: '🥬',
   trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴', catfood: '🐟',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧', deco_rattrap: '🪤', deco_canopy: '⛱️',
@@ -58,17 +60,20 @@ function iconUrl(key) {
   try { const A = art.SPR, src = A.items[key] || A.ripe[key] || A.product[key] || A.baby[key]?.left[0] || A.animal[key]?.left[0] || A[key]; u = (hdOf(src) ? hdOf(src).toDataURL() : art.icon(key)) || null; } catch { u = null; }
   if (!u) try { u = ({ trung_phoi: SPR3?.eggFertile, trung_vit_phoi: SPR3?.eggDuckFertile, trung_vit: SPR3?.eggDuck, vit: SPR3?.animal?.vit?.non?.left?.[0], meo: SPR3?.animal?.meo?.truong?.left?.[0], cathouse: SPR3?.cathouse?.[0] }[key] ?? SPR2?.[key]); u = hd(u)?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
   if (!u) try { u = hd(SPR3?.items?.[ITEM3[key]])?.toDataURL?.() || null; } catch { u = null; }   // xà phòng, phân chuồng vẽ ở art3
+  if (!u) try { u = hd(SPR4?.produce?.[key])?.toDataURL?.() || null; } catch { u = null; }   // nông sản 8 cây mới (Phase 3) vẽ ở art4
   iconCache.set(key, u);
   return u;
 }
+// Nông sản có sao ('cai@2'): tạm dùng icon của nông sản đó (viền sao trên icon là issue 52)
+const iconKey = key => D.baseOf(key);
 function emojiFor(key) {
   if (EMOJI[key]) return EMOJI[key];
   if (key.startsWith('seed_')) return '🌱';
   return '📦';
 }
 function ico(key, cls = '') {
-  const u = iconUrl(key);
-  return u ? h('img', { class: 'ico ' + cls, src: u, alt: '', draggable: false }) : h('span', { class: 'ico emo ' + cls }, emojiFor(key));
+  const u = iconUrl(iconKey(key));
+  return u ? h('img', { class: 'ico ' + cls, src: u, alt: '', draggable: false }) : h('span', { class: 'ico emo ' + cls }, emojiFor(iconKey(key)));
 }
 // Icon của hành động có thể là emoji hoặc khóa vật phẩm
 const isKey = s => typeof s === 'string' && /^[a-z][a-z_0-9]+$/i.test(s);
@@ -613,7 +618,7 @@ async function buyItem(id, qty) {
   flags.bought = true;
   if (D.ITEMS[id]?.kind === 'deco') pushToast('Vào 🔨 Xây dựng để đặt ra vườn nhé');
 }
-const sellable = s => [...new Set([...Object.keys(s.basket || {}), ...Object.keys(s.inv || {})])].filter(k => (D.CROPS[k] || D.PRODUCTS[k]) && have(s, k) > 0);
+const sellable = s => [...new Set([...Object.keys(s.basket || {}), ...Object.keys(s.inv || {})])].filter(k => D.isProduce(k) && have(s, k) > 0);
 const sold = r => { if (r?.ok) flags.sold = true; };
 PANELS.market = {
   title: '🏪 Chợ Bà Tư',
@@ -838,7 +843,7 @@ PANELS.bag = {
       tl.append(h('div', { class: 'cell' }, toolIco(k, lv), h('div', { class: 'cell-name' }, D.TOOLS[k].name), h('div', { class: 'cell-sub' }, S.toolAway(s, k) ? 'Đang rèn' : `Cấp ${lv} (${D.TOOL_LEVEL[lv - 1]})`)));
     }
     body.append(tl);
-    const isProduce = k => D.CROPS[k] || D.PRODUCTS[k];
+    const isProduce = D.isProduce;
     const groups = [
       [`🧺 Giỏ (${S.basketCount(s)}/${S.basketCap(s)})`, s.basket, isProduce],
       ['📦 Kho: nông sản & sản phẩm', s.inv, isProduce],

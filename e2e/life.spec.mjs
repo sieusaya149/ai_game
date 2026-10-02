@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { makeSave, seedSave, installWarp, timeWarp } from './helpers.mjs';
 import { stageStart, lifeEnd } from '../public/state.js';
+import { SAVE_VERSION } from '../public/migrate.js';
 import { AGING, DAY_MS } from '../public/data.js';
 
 const MIN = 60_000;
@@ -28,7 +29,7 @@ test('mở bản lưu v2 cũ: đủ con vật; tua giờ vườn qua mốc thì 
   await page.waitForFunction(() => globalThis.__farm?.state);
   await expect(page.locator('#creator')).toBeHidden();
   const s = await page.evaluate(() => { const st = globalThis.__farm.state; return { v: st.v, ids: st.animals.map(a => a.id), stages: st.animals.map(a => a.stage) }; });
-  expect(s.v).toBe(3);
+  expect(s.v).toBe(SAVE_VERSION);
   expect(s.ids).toEqual(old.animals.map(a => a.id));
   expect(s.stages).toEqual(old.animals.map(a => a.adult ? 'truong' : 'non'));
   expect(await page.evaluate(k => localStorage.getItem(k), V2)).toBe(json);   // bản v2 còn nguyên

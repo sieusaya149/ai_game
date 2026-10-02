@@ -8,7 +8,7 @@
 // Mã thao tác là duy nhất nên áp dụng hai lần cùng mã thì lần sau không làm gì (guestOpApply trả reason 'done').
 import { guestOpApply, basketCap, basketCount, haveItem } from '../public/state.js';
 import { migrate } from '../public/migrate.js';
-import { levelInfo, ITEMS, CROPS, PRODUCTS, GUEST } from '../public/data.js';
+import { levelInfo, ITEMS, GUEST, isProduce } from '../public/data.js';
 import { serverDay } from '../public/clock.js';
 import { catchUpFarm, farmRow, writeFarm } from './farms.mjs';
 
@@ -17,7 +17,7 @@ const ACTS = { water: 'idx', weed: 'idx', catch: 'idx', shoo: 'crow', crop: 'idx
 const KINDS = { help: ['water', 'weed', 'catch', 'shoo'], steal: ['crop', 'egg', 'product'], bark: ['bark'], bite: ['bite'], sausage: ['sausage'] };
 const KEEP_MS = 7 * 86400_000;   // thao tác đã áp dụng giữ chừng này rồi dọn
 const no = (reason, msg) => ({ ok: false, reason, msg });
-const known = k => !!(ITEMS[k] || CROPS[k] || PRODUCTS[k]);
+const known = k => !!ITEMS[k] || isProduce(k);   // nông sản mọi mức sao (Phase 3)
 const coord = v => (Number.isFinite(v) ? Math.round(Math.max(-1e4, Math.min(1e4, v))) : 0);
 
 // Lọc thao tác nhận từ khách: chỉ giữ đúng các trường server biết, mọi thứ còn lại (ai làm, cấp mấy, giỏ còn

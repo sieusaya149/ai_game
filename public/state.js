@@ -5,18 +5,18 @@ import {
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
-  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST,
+  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce,
 } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
-import { migrate, newFarm, fillAnimal } from './migrate.js';
+import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
 import { now, villageCal, serverDay } from './clock.js';
 
 export { animalPrice, levelInfo, mapOf, reachable, footprint, sceneMap, stageStart, stageAt, lifeEnd };
-export const SAVE_KEY = 'nongtrai-save-v3';
+export const SAVE_KEY = 'nongtrai-save-v4';
 // Bản cũ: đọc được để chuyển, không bao giờ ghi đè hay xóa. Mỗi bản có cờ riêng "đã chuyển (hoặc đã chơi lại từ đầu)"
-// để không đọc lại nữa; đọc lần lượt v3 → v2 → v1.
-const OLD_KEYS = [['nongtrai-save-v2', 'nongtrai-migrated-v3'], ['nongtrai-save-v1', 'nongtrai-migrated']];
+// để không đọc lại nữa; đọc lần lượt v4 → v3 → v2 → v1.
+const OLD_KEYS = [['nongtrai-save-v3', 'nongtrai-migrated-v4'], ['nongtrai-save-v2', 'nongtrai-migrated-v3'], ['nongtrai-save-v1', 'nongtrai-migrated']];
 const MARKS = OLD_KEYS.map(([, m]) => m);
 const MIN = 60_000;
 const plotCenter = (s, i) => mapOf(s).plotCenter(i);
@@ -39,7 +39,7 @@ const chance = (pMin, dt) => Math.random() < 1 - Math.pow(1 - pMin, dt / MIN); /
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 // Hai chỗ chứa: giỏ (s.basket, chỉ nông sản & sản phẩm, có sức chứa) và kho (s.inv, mọi thứ, chưa giới hạn).
 // Hạt giống, vật tư, thức ăn, đồ trang trí luôn nằm ở kho, không tính vào giỏ.
-const inBasket = k => !!(CROPS[k] || PRODUCTS[k]);
+const inBasket = isProduce;   // nông sản mọi mức sao ('cai', 'cai@2'...) và sản phẩm vật nuôi
 const drop = (o, k, n) => { o[k] = (o[k] || 0) - n; if (o[k] <= 0) delete o[k]; };
 export const haveItem = (s, k) => (s.basket?.[k] || 0) + (s.inv[k] || 0);
 // Lấy n món: giỏ trước, thiếu thì lấy tiếp từ kho. Không đủ thì không lấy gì và trả false.
@@ -185,7 +185,9 @@ export function pedigree(s, id) {
   if (!a) return null;
   return { id, name: a.name, sex: a.sex, mom: a.mom, dad: a.dad, kids: s.animals.filter(o => o.mom?.id === id || o.dad?.id === id).map(o => ({ id: o.id, name: o.name, sex: o.sex })) };
 }
-const newPlot = (idx, unlocked) => ({ idx, unlocked, soil: 'untilled', water: 0, weeds: false, crop: null });
+const newPlot = (idx, unlocked) => ({ idx, unlocked, soil: 'untilled', water: 0, weeds: false, crop: null, mulch: false });
+// Giếng có cấp (Phase 3, issue 56): cấp của giếng đầu tiên trong vườn, vườn cũ là cấp 1
+export const wellLv = s => s.farm?.ents.find(e => e.kind === 'well')?.lv ?? 1;
 
 // ---------- Tạo / lưu / tải ----------
 export function createGame({ name = 'Nông dân', look = {} } = {}) {
@@ -195,7 +197,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
   if (!owned.acc.includes(lk.acc)) lk.acc = 0;
   const nf = newFarm(1);
   const s = {
-    v: 3, name, look: lk, owned, coins: START.coins, exp: 0,
+    v: SAVE_VERSION, name, look: lk, owned, coins: START.coins, exp: 0,
     time: 0, speed: 1, day: 1, weather: 'sun', savedAt: now(),
     simMs: 0, frozenMs: 0, frozenTotal: 0,   // giờ vườn đã chạy · khoảng đóng băng lần mở gần nhất · tổng đóng băng
     farm: nf.farm, scene: 'farm',     // scene: bản đồ đang đứng; player.x/y tính theo bản đồ đó
@@ -228,6 +230,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     guests: [],
     coUtQuest: null,   // nhiệm vụ làm quen của Cô Út (issue 48): { step } sau khi mua con heo đầu tiên
   };
+  fillSave(s);   // Phase 3 (bản lưu v4): mastery theo loại cây, water mực nước bồn, giếng cấp 1, nâng cấp khối ruộng, rơm phủ
   const m = mapOf(s);
   Object.assign(s.player, m.spawn);
   Object.assign(s.dog, m.dogHome);
@@ -291,7 +294,7 @@ export function loadGame(raw) {
   s.manure = { ...base.manure, ...s.manure };
   for (const k of ['owned', 'achievements', 'inv', 'basket', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
   for (const k of ['animals', 'eggs', 'clutch', 'poops', 'threats', 'preds', 'cats', 'orders', 'log']) s[k] ||= [];
-  s.shipbin = { items: Object.fromEntries(Object.entries(s.shipbin?.items ?? {}).filter(([k, n]) => (CROPS[k] || PRODUCTS[k]) && n > 0)) };
+  s.shipbin = { items: Object.fromEntries(Object.entries(s.shipbin?.items ?? {}).filter(([k, n]) => isProduce(k) && n > 0)) };
   ensureShipbin(s);   // vườn cũ chưa có thùng: thêm một thùng cạnh nhà kho
   ensureGateBoxes(s); // vườn cũ chưa có hộp quà, sổ lưu bút: thêm cạnh cổng
   settlePens(s);      // con vật chưa có chuồng (bản cũ): xếp vào chuồng cùng loại
@@ -2397,7 +2400,7 @@ const DO = {
       case 'plant': {
         const def = CROPS[s.selectedSeed];
         take(s, `seed_${s.selectedSeed}`); s.stats.planted++;
-        p.crop = { id: s.selectedSeed, progress: 0, planted: s.time, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
+        p.crop = { id: s.selectedSeed, progress: 0, planted: s.time, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: cropQuality() };
         return res(true, `Đã gieo ${def.name}`, [say(at, '🌱')], 'plant');
       }
       case 'water': s.can--; p.water = 100; return res(true, 'Đã tưới nước', [say(at, '💧', '#7ad7ff')], 'water');
@@ -2646,7 +2649,7 @@ export function enterScene(s, to) {
 // Khách tặng được hạt giống (trong kho) hoặc nông sản / sản phẩm (trong giỏ hoặc kho); chủ nhận nông sản vào giỏ (tới khi đầy),
 // hạt giống vào kho. Mỗi quà có mã thao tác op duy nhất: áp dụng lại cùng mã thì không làm gì.
 export const GATE_BOXES = ['giftbox', 'guestbook'];
-export const giftable = k => ITEMS[k]?.kind === 'seed' || !!CROPS[k] || !!PRODUCTS[k];
+export const giftable = k => ITEMS[k]?.kind === 'seed' || isProduce(k);
 // Hộp đã chứa thêm được một quà qty món item chưa (server gọi đúng hàm này; không biết giỏ khách nên chỉ kiểm hộp)
 export function giftBoxCheck(box, item, qty) {
   if (!giftable(item)) return no('bad_item', 'Món này không tặng được');
@@ -3170,7 +3173,7 @@ export function skipCoUtQuest(s) {
 
 export function sell(s, itemId, qty = 1) {
   if (!marketOpen(s)) return closed({ coins: 0 });
-  if (!CROPS[itemId] && !PRODUCTS[itemId]) return R(false, 'Món này không bán được', { coins: 0 });
+  if (!isProduce(itemId)) return R(false, 'Món này không bán được', { coins: 0 });
   const n = qty === 'all' ? have(s, itemId) : Math.floor(qty);
   if (!(n > 0) || n > have(s, itemId)) return R(false, 'Không đủ hàng để bán', { coins: 0 });
   const coins = n * sellPrice(itemId);
@@ -3501,6 +3504,7 @@ export function placeEntity(s, what, c, r) {
   else s.coins -= placeCost(s, what);
   if (what.kind === 'pen') e.pen = what.pen;
   if (what.kind === 'field') {
+    e.up = fieldUpgrades();
     e.plots = [];
     for (let i = 0; i < FIELD_SIZE * FIELD_SIZE; i++) { e.plots.push(s.plots.length); s.plots.push(newPlot(s.plots.length, true)); }
   }

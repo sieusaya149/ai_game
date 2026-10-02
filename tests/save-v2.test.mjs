@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
+import { SAVE_VERSION } from '../public/migrate.js';
 
 const store = {};
 globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
@@ -14,7 +15,7 @@ const quiet = fn => { const r = Math.random; Math.random = () => 0.99; try { ret
 test('mở bản v1 đang chơi dở: chuyển lên bản mới nhất, không mất xu, đồ, cấp, cây, con vật', () => {
   const old = seedV1('v1-mid');
   const s = G.loadGame();
-  assert.equal(s.v, 3);
+  assert.equal(s.v, SAVE_VERSION);
   assert.equal(s.coins, old.coins);
   assert.equal(s.exp, old.exp);
   assert.deepEqual(s.inv, old.inv);
@@ -89,7 +90,7 @@ test('bản v1 hỏng: không ghi đè, báo lỗi, không treo', () => {
 test('vườn mới: 1 khối ruộng, đủ công trình, 2 con gà trong chuồng gà, đi được từ cổng vào nhà', () => {
   clear();
   const s = G.createGame({ name: 'Mới' }), m = G.mapOf(s);
-  assert.equal(s.v, 3);
+  assert.equal(s.v, SAVE_VERSION);
   assert.equal(s.plots.length, 9);
   assert.ok(s.plots.every(p => p.unlocked));
   for (const id of ['house', 'gate', 'well', 'shed', 'board', 'doghouse', 'coop']) assert.ok(m.building(id), id);

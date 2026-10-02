@@ -1,7 +1,7 @@
 // Kẻ săn mồi: chuột, diều hâu, chồn (issue 43). Dựng bằng bản lưu ghi sẵn, không có hook test nào trong game (ADR 0008).
 import { test, expect } from '@playwright/test';
 import { makeSave, seedSave } from './helpers.mjs';
-import { mapOf, roamOf, placeEntity, canPlace, createGame, stageStart } from '../public/state.js';
+import { mapOf, roamOf, placeEntity, canPlace, createGame, stageStart, SAVE_KEY } from '../public/state.js';
 import { DAY_MS, PREDATOR as P } from '../public/data.js';
 
 const TS = 16;
@@ -93,7 +93,7 @@ test('chồn nửa đêm: báo động 🔴 có mũi tên chỉ hướng, chạm
   const pid2 = save2.preds[0].id, aid2 = save2.animals[0].id;
   await context.clearCookies();
   await page.evaluate(() => { try { localStorage.clear(); } catch {} });
-  await page.addInitScript(([k, j]) => { try { localStorage.setItem(k, j); } catch {} }, ['nongtrai-save-v3', JSON.stringify(save2)]);
+  await page.addInitScript(([k, j]) => { try { localStorage.setItem(k, j); } catch {} }, [SAVE_KEY, JSON.stringify(save2)]);
   await page.goto('/');
   await ready(page);
   await shooPred(page, touch, pid2);

@@ -1,0 +1,666 @@
+{
+ "v": 3,
+ "name": "Mới",
+ "look": {
+  "skin": 0,
+  "hair": 0,
+  "hairColor": 0,
+  "shirt": 0,
+  "pants": 0,
+  "hat": 1,
+  "acc": 0
+ },
+ "owned": {
+  "hat": [
+   0,
+   1
+  ],
+  "acc": [
+   0
+  ]
+ },
+ "coins": 250,
+ "exp": 0,
+ "time": 0,
+ "speed": 1,
+ "day": 1,
+ "weather": "sun",
+ "savedAt": 1700000000000,
+ "simMs": 0,
+ "frozenMs": 0,
+ "frozenTotal": 0,
+ "farm": {
+  "rev": 1,
+  "mw": 64,
+  "mh": 48,
+  "owned": {
+   "c": 20,
+   "r": 14,
+   "w": 24,
+   "h": 20
+  },
+  "paths": [
+   [
+    22,
+    19
+   ],
+   [
+    23,
+    19
+   ],
+   [
+    24,
+    19
+   ],
+   [
+    25,
+    19
+   ],
+   [
+    26,
+    19
+   ],
+   [
+    27,
+    19
+   ],
+   [
+    28,
+    19
+   ],
+   [
+    29,
+    19
+   ],
+   [
+    30,
+    19
+   ],
+   [
+    31,
+    19
+   ],
+   [
+    32,
+    19
+   ],
+   [
+    33,
+    19
+   ],
+   [
+    34,
+    19
+   ],
+   [
+    35,
+    19
+   ],
+   [
+    36,
+    19
+   ],
+   [
+    37,
+    19
+   ],
+   [
+    22,
+    20
+   ],
+   [
+    23,
+    20
+   ],
+   [
+    24,
+    20
+   ],
+   [
+    25,
+    20
+   ],
+   [
+    26,
+    20
+   ],
+   [
+    27,
+    20
+   ],
+   [
+    28,
+    20
+   ],
+   [
+    29,
+    20
+   ],
+   [
+    30,
+    20
+   ],
+   [
+    31,
+    20
+   ],
+   [
+    32,
+    20
+   ],
+   [
+    33,
+    20
+   ],
+   [
+    34,
+    20
+   ],
+   [
+    35,
+    20
+   ],
+   [
+    36,
+    20
+   ],
+   [
+    37,
+    20
+   ],
+   [
+    27,
+    21
+   ],
+   [
+    28,
+    21
+   ],
+   [
+    27,
+    22
+   ],
+   [
+    28,
+    22
+   ],
+   [
+    27,
+    23
+   ],
+   [
+    28,
+    23
+   ],
+   [
+    36,
+    21
+   ],
+   [
+    37,
+    21
+   ],
+   [
+    36,
+    22
+   ],
+   [
+    37,
+    22
+   ],
+   [
+    36,
+    23
+   ],
+   [
+    37,
+    23
+   ],
+   [
+    36,
+    24
+   ],
+   [
+    37,
+    24
+   ],
+   [
+    36,
+    25
+   ],
+   [
+    37,
+    25
+   ],
+   [
+    36,
+    26
+   ],
+   [
+    37,
+    26
+   ],
+   [
+    36,
+    27
+   ],
+   [
+    37,
+    27
+   ],
+   [
+    36,
+    28
+   ],
+   [
+    37,
+    28
+   ],
+   [
+    36,
+    29
+   ],
+   [
+    37,
+    29
+   ],
+   [
+    36,
+    30
+   ],
+   [
+    37,
+    30
+   ],
+   [
+    36,
+    31
+   ],
+   [
+    37,
+    31
+   ],
+   [
+    36,
+    32
+   ],
+   [
+    37,
+    32
+   ],
+   [
+    36,
+    33
+   ],
+   [
+    37,
+    33
+   ]
+  ],
+  "ents": [
+   {
+    "id": 1,
+    "kind": "house",
+    "c": 21,
+    "r": 15
+   },
+   {
+    "id": 2,
+    "kind": "shed",
+    "c": 26,
+    "r": 15
+   },
+   {
+    "id": 3,
+    "kind": "shipbin",
+    "c": 26,
+    "r": 18
+   },
+   {
+    "id": 4,
+    "kind": "board",
+    "c": 31,
+    "r": 16
+   },
+   {
+    "id": 5,
+    "kind": "well",
+    "c": 33,
+    "r": 17
+   },
+   {
+    "id": 6,
+    "kind": "field",
+    "c": 37,
+    "r": 15,
+    "plots": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   },
+   {
+    "id": 7,
+    "kind": "doghouse",
+    "c": 21,
+    "r": 21
+   },
+   {
+    "id": 8,
+    "kind": "pen",
+    "pen": "chicken",
+    "c": 21,
+    "r": 24
+   },
+   {
+    "id": 9,
+    "kind": "gate",
+    "c": 38,
+    "r": 33
+   },
+   {
+    "id": 10,
+    "kind": "tree",
+    "c": 42,
+    "r": 28
+   },
+   {
+    "id": 11,
+    "kind": "tree",
+    "c": 35,
+    "r": 30
+   },
+   {
+    "id": 12,
+    "kind": "giftbox",
+    "c": 41,
+    "r": 33
+   },
+   {
+    "id": 13,
+    "kind": "guestbook",
+    "c": 42,
+    "r": 33
+   }
+  ]
+ },
+ "scene": "farm",
+ "player": {
+  "x": 368,
+  "y": 318,
+  "dir": 0
+ },
+ "stamina": 100,
+ "sit": false,
+ "can": 10,
+ "selectedSeed": "cai",
+ "tools": {
+  "hoe": {
+   "lv": 1
+  },
+  "can": {
+   "lv": 1
+  },
+  "sickle": {
+   "lv": 1
+  },
+  "basket": {
+   "lv": 1
+  }
+ },
+ "smith": null,
+ "inv": {
+  "seed_cai": 6,
+  "seed_carot": 3,
+  "feed_ga": 3,
+  "dogfood": 3,
+  "pesticide": 1,
+  "fertilizer": 1
+ },
+ "basket": {},
+ "shipbin": {
+  "items": {}
+ },
+ "plots": [
+  {
+   "idx": 0,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 1,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 2,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 3,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 4,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 5,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 6,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 7,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  },
+  {
+   "idx": 8,
+   "unlocked": true,
+   "soil": "untilled",
+   "water": 0,
+   "weeds": false,
+   "crop": null
+  }
+ ],
+ "animals": [
+  {
+   "id": 14,
+   "type": "ga",
+   "stage": "truong",
+   "age": 900000,
+   "nextProduct": 150000,
+   "x": 516.4059163675765,
+   "y": 442.92710770345974,
+   "sex": "f",
+   "name": "Gà",
+   "hunger": 100,
+   "happy": 60,
+   "sick": 0,
+   "sickSince": 0,
+   "starvingSince": 0,
+   "sickMs": 0,
+   "dose": 0,
+   "vaccUntil": 0,
+   "dirty": 0,
+   "hurt": false,
+   "hurtMs": 0,
+   "bond": 2,
+   "bondXp": 0,
+   "weight": 2.5,
+   "mom": null,
+   "dad": null,
+   "pen": 8,
+   "stray": false,
+   "tile": null,
+   "ready": false,
+   "pregnant": false,
+   "dueAt": 0,
+   "mate": null
+  },
+  {
+   "id": 15,
+   "type": "ga",
+   "stage": "non",
+   "age": 0,
+   "nextProduct": 150000,
+   "x": 385.2397380696345,
+   "y": 493.97690800345947,
+   "sex": "m",
+   "name": "Gà",
+   "hunger": 100,
+   "happy": 60,
+   "sick": 0,
+   "sickSince": 0,
+   "starvingSince": 0,
+   "sickMs": 0,
+   "dose": 0,
+   "vaccUntil": 0,
+   "dirty": 0,
+   "hurt": false,
+   "hurtMs": 0,
+   "bond": 2,
+   "bondXp": 0,
+   "weight": 0.2,
+   "mom": null,
+   "dad": null,
+   "pen": 8,
+   "stray": false,
+   "tile": null,
+   "ready": false,
+   "pregnant": false,
+   "dueAt": 0,
+   "mate": null
+  }
+ ],
+ "troughs": {
+  "chicken": 0,
+  "pig": 0,
+  "pasture": 0
+ },
+ "manure": {
+  "chicken": 0,
+  "pig": 0,
+  "pasture": 0
+ },
+ "eggs": [],
+ "clutch": [],
+ "nest": {
+  "egg": false,
+  "hatchAt": 0,
+  "sp": null,
+  "mom": null,
+  "dad": null
+ },
+ "dog": {
+  "stage": "non",
+  "age": 0,
+  "hunger": 100,
+  "happy": 60,
+  "x": 344,
+  "y": 362,
+  "nextPoop": 125039.5400647958,
+  "name": "Mực",
+  "tricks": {},
+  "trainDay": 0,
+  "session": null,
+  "cmd": null,
+  "herdDay": 0,
+  "scene": "farm",
+  "chained": false,
+  "nap": 0,
+  "napCheck": 0,
+  "quiet": 0,
+  "barkAt": 0,
+  "barkX": 0,
+  "barkY": 0
+ },
+ "cats": [],
+ "poops": [],
+ "threats": [],
+ "preds": [],
+ "orders": [],
+ "nextOrderAt": 0,
+ "raid": null,
+ "caught": null,
+ "chore": null,
+ "teoCaught": 0,
+ "choreWeek": -1,
+ "stats": {
+  "harvests": 0,
+  "bugs": 0,
+  "eggs": 0,
+  "poops": 0,
+  "slips": 0,
+  "piglets": 0,
+  "hatches": 0,
+  "orders": 0,
+  "thieves": 0,
+  "crows": 0,
+  "rats": 0,
+  "preds": 0,
+  "earned": 0,
+  "planted": 0,
+  "shipped": 0,
+  "bought": 0,
+  "slept": 0,
+  "chased": 0,
+  "barks": 0,
+  "robStreak": 0,
+  "helps": 0
+ },
+ "achievements": {},
+ "log": [],
+ "tutorial": 0,
+ "nextId": 16,
+ "notify": {},
+ "mode": "offline",
+ "account": null,
+ "today": {
+  "day": "",
+  "helps": 0,
+  "steals": 0,
+  "stolen": 0,
+  "robs": 0
+ },
+ "guests": [],
+ "coUtQuest": null
+}

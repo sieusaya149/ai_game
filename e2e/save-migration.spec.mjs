@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { SAVE_VERSION } from '../public/migrate.js';
 
 const V1 = 'nongtrai-save-v1';
 const fixture = name => JSON.parse(readFileSync(new URL(`../tests/fixtures/${name}.json`, import.meta.url), 'utf8'));
@@ -19,7 +20,7 @@ test('người chơi cũ mở game: vườn v1 hiện lại đủ, bản v1 vẫ
     const st = globalThis.__farm.state;
     return { v: st.v, coins: st.coins, p0: st.plots[0].crop?.progress, unlocked: st.plots.filter(p => p.unlocked).length, animals: st.animals.length };
   });
-  expect(s.v).toBe(3);
+  expect(s.v).toBe(SAVE_VERSION);
   expect(Math.abs(s.coins - old.coins)).toBeLessThan(300);   // game có thể tự tiêu chút ít (thức ăn...) ngay khi chạy
   expect(s.p0).toBeGreaterThanOrEqual(old.plots[0].crop.progress);
   expect(s.unlocked).toBe(old.plots.filter(p => p.unlocked).length);
