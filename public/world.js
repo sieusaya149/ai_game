@@ -589,7 +589,7 @@ function biasOf(state, t) {
 
 export function findTarget(state, w) {
   use(state);
-  const p = state.player, face = DIRV[p.dir ?? 0];
+  const p = state.player, face = DIRV[p.dir ?? 0], now = performance.now();
   let best = null, bestS = Infinity;
   const consider = t => {
     const d = rangeDist(state, t);
@@ -598,6 +598,7 @@ export function findTarget(state, w) {
     let s = d - biasOf(state, t);
     if (len > 3 && (vx * face[0] + vy * face[1]) / len > 0.5) s -= 8;
     if (w.curKey === keyOf(t)) s -= 3;
+    if (w.tapKey === keyOf(t) && now < w.tapUntil) s -= 40;   // thứ vừa chạm vào: giữ làm mục tiêu khi còn trong tầm
     if (s < bestS) { bestS = s; best = t; }
   };
   const { c: pc, r: pr } = { c: Math.floor(p.x / TS), r: Math.floor(p.y / TS) };
@@ -744,15 +745,21 @@ export function hitTest(state, wx, wy) {
 export function walkTo(state, w, x, y) {
   use(state);
   const p = state.player;
-  w.pending = null;
+  w.pending = null; w.tapKey = null;
   w.path = findPath(p.x, p.y, x, y);
   w.marker = { x, y, t0: performance.now() };
   return w.path.length > 0;
 }
 // act = false: chỉ đi tới đứng trong tầm, không tự làm hành động chính (đi theo Việc cần làm)
 export function goToTarget(state, w, t, act = true) {
+  pickTarget(w, t);
   w.pending = t; w.pendingAct = act; w.pendingT = 0; w.repathT = 0; w.path = null;
 }
+// Người chơi chạm vào con vật nuôi t (chó, mèo, gia súc hay chạy lăng xăng, đứng cạnh thứ khác): thanh hành động theo
+// t khi nó còn trong tầm (6 giây, tới khi chạm chỗ khác hay đi bằng cần điều khiển). Thứ đứng yên thì chọn theo gần nhất như cũ.
+export const TAP_KEEP_MS = 6000;
+const KEEP_KINDS = new Set(['dog', 'cat', 'animal']);
+export function pickTarget(w, t) { w.tapKey = KEEP_KINDS.has(t.kind) ? keyOf(t) : null; w.tapUntil = performance.now() + TAP_KEEP_MS; }
 export function faceTo(state, x, y) {
   const p = state.player;
   if (Math.hypot(x - p.x, y - p.y) > 0.5) p.dir = dirOf(x - p.x, y - p.y);
@@ -801,7 +808,7 @@ export function update(state, w, dt) {
     let vx = w.input.x, vy = w.input.y;
     const len = Math.hypot(vx, vy);
     if (len > 0.15) {
-      w.path = null; w.pending = null;
+      w.path = null; w.pending = null; w.tapKey = null;
       if (len > 1) { vx /= len; vy /= len; }
       const ox = p.x, oy = p.y;
       moveBox(p, vx * speed * dt, vy * speed * dt);

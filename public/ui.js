@@ -1064,10 +1064,10 @@ export function showTrain(trickId) {
       const im = R.dogPoseImg(g, pose, 'right', Math.floor(performance.now() / 260));
       if (im) c.drawImage(hd(im), Math.round((pup.width - im.width * 2) / 2), pup.height - im.height * 2, im.width * 2, im.height * 2);
     };
-    let pose = 'beg', poseUntil = 0;
+    let pose = 'beg', poseUntil = 0, shown = 0;   // shown = chỗ kim đang hiện trên màn hình
     const loop = () => {
       if (!live) return;
-      const p = pos();
+      const p = shown = pos();
       mark.style.left = (p * 100) + '%';
       if (performance.now() > poseUntil) { pose = Math.floor(performance.now() / 1800) % 2 ? 'sit' : 'beg'; }
       drawPup(pose);
@@ -1082,7 +1082,8 @@ export function showTrain(trickId) {
     };
     const tap = () => {
       if (!live || round > T.rounds) return;
-      const p = pos(), ok = p >= zone && p <= zone + T.zone;
+      // chấm theo chỗ kim người chơi đang thấy: máy chậm thì khung hình thưa, kim vẽ trễ so với đồng hồ
+      const p = shown, ok = p >= zone && p <= zone + T.zone;
       if (ok) hits++;
       sound.play(ok ? 'pop' : 'error');
       praise(ok);

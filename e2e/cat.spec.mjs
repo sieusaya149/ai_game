@@ -118,9 +118,17 @@ test('mèo đói vừa đuổi bắt chuột rồi mang chiến lợi phẩm t�
   await page.screenshot({ path: testInfo.outputPath('cat-trophy.png') });
   // chạm vào mèo: khen là hành động chính → vui hơn, thân hơn, khoe xong
   const was = got.list.find(c => c.id === hunter.id);
+  const nm = await page.evaluate(id => globalThis.__farm.state.cats.find(c => c.id === id).name, hunter.id);
   await expect(async () => {
     const c = (await cats(page)).list.find(x => x.id === hunter.id);
-    if (c.trophy) await tapAt(page, touch, c.x, c.y - 4);
+    // 360px: dãy nút phụ của mục tiêu có thể nằm đè lên con mèo, chạm vào đó là bấm nhầm nút (Cho ăn). Khi đó bấm nút chính
+    const covered = await page.evaluate(([wx, wy]) => {
+      const f = globalThis.__farm, r = document.getElementById('game-canvas').getBoundingClientRect();
+      return document.elementFromPoint((wx * f.scale - f.view.camX) / f.dpr + r.left, (wy * f.scale - f.view.camY) / f.dpr + r.top)?.id !== 'game-canvas';
+    }, [c.x, c.y - 4]);
+    const main = page.locator('#main-action'), label = (await main.isVisible()) ? await main.textContent() : '';
+    if (c.trophy && covered && /Khen/.test(label) && label.includes(nm)) await main.click();
+    else if (c.trophy && !covered) await tapAt(page, touch, c.x, c.y - 4);
     await page.waitForTimeout(400);
     expect((await cats(page)).list.find(x => x.id === hunter.id).trophy).toBe(false);
   }).toPass({ timeout: 12_000, intervals: [300] });

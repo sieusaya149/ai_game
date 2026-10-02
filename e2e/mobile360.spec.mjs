@@ -525,12 +525,16 @@ for (const size of SIZES) {
         await page.screenshot({ path: `test-results/m360/${size[0]}-p2-village-sign-${where.replace(/\s+/g, '_')}.png` });
         const signs = await villageSigns(page);
         expect(signs.map(x => x.text)).toEqual(['Chợ Bà Tư', 'Đóng cửa']);
+        // vùng nhìn bản đồ: camera đặt nhân vật giữa dải từ đáy HUD tới đỉnh thanh dưới (main.updateCamera)
+        const band = await page.evaluate(() => ({ t: document.getElementById('hud').getBoundingClientRect().bottom, b: document.getElementById('bottombar').getBoundingClientRect().top }));
         for (const sg of signs) {
-          // mép trái/phải màn hình cắt bớt là chuyện cuộn bản đồ bình thường; ở đây chỉ kiểm không bị lớp nổi che
+          // mép màn hình / dải HUD cắt bớt là chuyện cuộn bản đồ bình thường; ở đây chỉ kiểm phần chữ trong vùng nhìn
+          // không bị lớp nổi (bản đồ nhỏ, Việc cần làm, nút tốc độ) che. 320x640: thang 2 điểm CSS/điểm bản đồ (số chẵn điểm
+          // canvas cho art 2x, trước là 1,75), dải nhìn cao 465 điểm CSS = 232 điểm bản đồ, ngồi ghế đá thì biển chợ cách
+          // ~120 điểm bản đồ lên trên (nửa dải chỉ 116) nên chữ lấn vào dải HUD, giống đứng ở cổng thì lấp ló ngoài mép phải.
           expect(sg.t >= 0 && sg.b <= size[1], `${sg.text} nằm trong màn hình theo chiều dọc: ${JSON.stringify(sg)}`).toBe(true);
-          // chỉ phần chữ nằm trong màn hình (320px: đứng ở cổng thì biển chợ còn lấp ló ngoài mép phải)
-          const l = Math.max(0, sg.l), r = Math.min(size[0], sg.r);
-          const hit = r - l < 1 ? [] : covers.filter(c => l < c.r && c.l < r && sg.t < c.b && c.t < sg.b);
+          const l = Math.max(0, sg.l), r = Math.min(size[0], sg.r), t = Math.max(band.t, sg.t), bt = Math.min(band.b, sg.b);
+          const hit = r - l < 1 || bt - t < 1 ? [] : covers.filter(c => l < c.r && c.l < r && t < c.b && c.t < bt);
           expect(hit.map(c => c.id), `${sg.text} bị che`).toEqual([]);
         }
       });

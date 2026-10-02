@@ -20,12 +20,24 @@ async function tap(page, touch, x, y) {
     const b = await page.evaluate(() => ({ w: innerWidth, top: document.getElementById('hud').getBoundingClientRect().bottom + 4, bot: document.getElementById('bottombar').getBoundingClientRect().top - 4, mini: document.getElementById('mini-wrap').getBoundingClientRect().toJSON() }));
     const inMini = (px, py) => px > b.mini.left - 14 && px < b.mini.right + 14 && py > b.mini.top - 14 && py < b.mini.bottom + 14;
     const ok = p.x > 4 && p.x < b.w - 4 && p.y > b.top && p.y < b.bot && !inMini(p.x, p.y);
-    let tx = p.x, ty = p.y;
-    if (!ok) { tx = Math.min(b.w - 20, Math.max(20, p.x)); ty = Math.min(b.bot - 20, Math.max(b.top + 20, p.y)); if (inMini(tx, ty)) ty = b.mini.bottom + 24; }
-    const onMap = await page.evaluate(([px, py]) => document.elementFromPoint(px, py)?.id === 'game-canvas', [tx, ty]);
-    if (!onMap) continue;
-    if (touch) await page.touchscreen.tap(tx, ty); else await page.mouse.click(tx, ty);
-    if (ok) return;
+    const onMap = ([px, py]) => document.elementFromPoint(px, py)?.id === 'game-canvas';
+    const press = (px, py) => (touch ? page.touchscreen.tap(px, py) : page.mouse.click(px, py));
+    if (ok) {
+      if (!(await page.evaluate(onMap, [p.x, p.y]))) continue;
+      await press(p.x, p.y);
+      return;
+    }
+    // điểm ngoài màn hình: kẹp về mép rồi lùi dần về giữa màn hình (cùng hướng) tới khi chạm được chỗ đi được.
+    // Điểm mép có thể trúng nút nổi (nút tốc độ góc trên trái) hay chỗ kín không có đường tới (trong chuồng rào)
+    let tx = Math.min(b.w - 20, Math.max(20, p.x)), ty = Math.min(b.bot - 20, Math.max(b.top + 20, p.y));
+    if (inMini(tx, ty)) ty = b.mini.bottom + 24;
+    const cx = b.w / 2, cy = (b.top + b.bot) / 2;
+    for (let k = 0; k <= 8; k++) {
+      const f = 1 - k * 0.1, px = cx + (tx - cx) * f, py = cy + (ty - cy) * f;
+      if (!(await page.evaluate(onMap, [px, py]))) continue;
+      await press(px, py);
+      if (await page.evaluate(() => (globalThis.__farm.world.path?.length ?? 0) > 0 || !!globalThis.__farm.world.pending)) break;
+    }
   }
   throw new Error(`Không chạm được điểm ${x},${y}`);
 }

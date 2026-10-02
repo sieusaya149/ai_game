@@ -649,7 +649,8 @@ function onTap(cx, cy) {
   }
   const hit = V.hitTest(state, wx, wy);
   if (!hit) { V.walkTo(state, world, wx, wy); return; }
-  if (V.inRange(state, hit)) autoAct(hit);
+  // đã trong tầm thì quay mặt về thứ vừa chạm; thanh hành động theo đúng thứ đó (V.pickTarget), không theo hướng đang nhìn
+  if (V.inRange(state, hit)) { const q = V.targetPos(state, hit); if (q) V.faceTo(state, q.x, q.y); V.pickTarget(world, hit); autoAct(hit); }
   else V.goToTarget(state, world, hit);
 }
 

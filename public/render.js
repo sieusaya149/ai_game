@@ -374,7 +374,8 @@ function layerOf(m) {
   if (m.interior) L = { m, canvas: null };
   else {
     const { cw, ch } = chunkGrid(m.mw, m.mh), prev = m.scene === 'farm' ? lastFarm : null, dirty = dirtyChunks(prev?.m, m);
-    L = { m, cw, cv: Array.from({ length: cw * ch }, (_, i) => (prev && !dirty.has(i) ? prev.cv[i] : null)) };
+    // mảng mượn dựng ở độ phân giải của lớp trước (r), drawStatic bỏ hết nếu r khác R hiện tại
+    L = { m, cw, r: prev?.r, cv: Array.from({ length: cw * ch }, (_, i) => (prev && !dirty.has(i) ? prev.cv[i] : null)) };
     if (m.scene === 'farm') lastFarm = L;
   }
   layers.set(m, L);

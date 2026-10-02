@@ -51,10 +51,12 @@ const praise = page => page.evaluate(() => new Promise((resolve, reject) => {
 
 // Một buổi dạy trọn vẹn: mở bảng, bấm Dạy, khen đủ số lượt
 async function trainOnce(page, trick) {
-  await standByDog(page);
-  await expect(page.getByRole('button', { name: /Dạy lệnh/ })).toBeVisible();
-  await page.getByRole('button', { name: /Dạy lệnh/ }).click();
-  await expect(page.locator('#panel-root .sheet')).toBeVisible();
+  // chó đi lang thang: máy bận thì từ lúc đứng sát tới lúc bấm nó đã đi xa, nút mất. Chưa mở được bảng thì đứng lại sát rồi bấm lại
+  await expect(async () => {
+    await standByDog(page);
+    await page.getByRole('button', { name: /Dạy lệnh/ }).click({ timeout: 2000 });
+    await expect(page.locator('#panel-root .sheet')).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
   await page.locator(`button[data-train="${trick}"]`).click();
   await expect(page.locator('.dialog.train')).toBeVisible();
   for (let i = 0; i < 3; i++) await praise(page);

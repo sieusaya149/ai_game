@@ -77,7 +77,13 @@ test('đi tìm và nhặt trứng trong bụi', async ({ page, context }, testIn
   const egg = await page.evaluate(() => { const e = globalThis.__farm.state.eggs.find(e => e.tile); return e && { id: e.id, ...e.tile }; });
   expect(egg).toBeTruthy();
   // đứng gần ổ trứng rồi chạm vào nó
-  await page.evaluate(e => { const p = globalThis.__farm.state.player; p.x = (e.c + 2) * 16 + 8; p.y = e.r * 16 + 8; }, egg);
+  // bụi có trứng chọn ngẫu nhiên: ô đứng phải là ô đi được (không lọt vào trong nhà kho cạnh bụi)
+  await page.evaluate(async e => {
+    const { mapOf } = await import('/state.js'), s = globalThis.__farm.state, m = mapOf(s), p = s.player;
+    const ok = (c, r) => c >= 0 && r >= 0 && c < m.mw && r < m.mh && !m.solid[r * m.mw + c];
+    const [dc, dr] = [[2, 0], [-2, 0], [0, 2], [0, -2], [1, 1], [-1, 1], [1, -1], [-1, -1]].find(([dc, dr]) => ok(e.c + dc, e.r + dr));
+    p.x = (e.c + dc) * 16 + 8; p.y = (e.r + dr) * 16 + 8;
+  }, egg);
   await page.waitForTimeout(500);
   await page.screenshot({ path: testInfo.outputPath('free-egg.png') });
   // trứng nhặt về: trứng thường hoặc trứng có phôi (lát 36: chạm lần đầu là soi trứng, lần sau mới nhặt)
