@@ -144,7 +144,14 @@ const P = {
   duck: ['#8c8e9e', '#c2c3cc', '#e9e9ec', '#ffffff'],
   duckY: ['#c49a2a', '#e8c44a', '#fde27a', '#fff6c2'],
   duckling: ['#b8900c', '#e2bc22', '#ffe24a', '#fff59a'],
+  ducklingM: ['#9a7608', '#c4a018', '#e8c63a', '#f8e487'],  // vịt con trống: vàng ngả nâu
+  drakeHead: ['#0b3620', '#115c38', '#1d8a52', '#49bd80'],  // đầu vịt cồ: xanh lục ánh kim
+  drakeBody: ['#6e7280', '#9a9ea8', '#c4c8ce', '#e6e8ec'],
+  drakeBr: ['#58240f', '#85381b', '#a85628', '#c87c46'],    // ức nâu hạt dẻ
+  drakeTail: ['#121420', '#212534', '#353b4c', '#4c5466'],
+  collar: ['#d4d4d8', '#e8e8ea', '#ffffff', '#ffffff'],     // vòng cổ trắng
   bill: ['#a84a08', '#de7414', '#f8a030', '#ffcc68'],
+  billM: ['#8a7a10', '#b8a420', '#dcc840', '#f2e480'],      // mỏ vịt cồ: vàng ô-liu
   pig: ['#a84a64', '#d8728c', '#f4a4b8', '#ffd2de'],
   snout: ['#a03e58', '#cc6480', '#ea8ca4', '#ffb8c8'],
   cowW: ['#948c8e', '#cbc4c0', '#eee8e0', '#ffffff'],
@@ -382,6 +389,79 @@ function duck(stage, frame, pose = 'stand') {
   if (pose === 'sleep') R(x, '#8a8c9e', ex, ey, 2, 1);
   else if (run) { R(x, EYE, ex, ey - 1, 1, 2); R(x, '#fff6dc', ex + 1, ey - 1); }
   else { R(x, EYE, ex, ey); if (pose === 'sick') R(x, '#6a6c7a', ex - 1, ey - 1); if (old) R(x, '#9a9caa', ex, ey - 1); }
+  return c;
+}
+
+// ---------- VỊT TRỐNG (vịt cồ) ---------- non 10x8 · nhỡ 12x11 · trưởng thành 16x13 · già 16x13
+// Khác hẳn vịt mái: đầu xanh lục ánh kim, vòng cổ trắng, ức nâu hạt dẻ, thân xám, lông đuôi đen vểnh.
+
+function drake(stage, frame, pose = 'stand') {
+  const sit = pose !== 'stand', sk = pose === 'sick' ? 1 : 0;
+  if (stage === 'non') {
+    // vịt con trống: vàng ngả nâu, mũ ô-liu sẫm, sọc lưng và vệt kẻ mắt
+    const oy = sit ? 1 : 0;
+    const cap = (px, py) => (py + 0.5 < 2.4 + oy + sk ? '#7a6a14' : undefined);
+    const c = fig(10, 8, [
+      !sit && B(frame ? 4 : 5, 6, 2, 1, P.billM, { noise: 0, min: 1 }),
+      !sit && B(7, frame ? 5 : 6, 2, 1, P.billM, { noise: 0, max: 1 }),
+      E(5.9, 4.5 + oy, 3.5, 2, P.ducklingM, { pat: (px, py) => (py + 0.5 < 3.6 + oy && px >= 4 && px <= 8 ? '#8a6c10' : undefined) }),
+      E(8.8, 3.2 + oy, 0.9, 0.9, P.ducklingM),
+      E(6.7, 4.5 + oy, 1.8, 1, P.ducklingM, { sep: true, max: 2 }),
+      E(3.6, 2.7 + oy + sk, 2, 1.8, P.ducklingM, { sep: true, pat: cap }),
+      B(1, 3 + oy + sk, 2, 1, P.billM, { noise: 0, min: 2 }),
+      B(1, 4 + oy + sk, 2, 1, P.billM, { noise: 0, max: 1 }),
+    ]);
+    const x = c.getContext('2d');
+    if (pose === 'sleep') R(x, '#6a5a10', 3, 3 + oy, 2, 1);
+    else { R(x, EYE, 3, 2 + oy + sk); R(x, '#7a6a14', 2, 2 + oy + sk); if (pose === 'sick') R(x, '#8a7a10', 4, 1 + oy + sk); }
+    return c;
+  }
+  if (stage === 'nho') {
+    // vịt nhỡ trống: thân xám lấm tấm, đầu đã chớm xanh lục, ức ngả nâu
+    const oy = sit ? 2 : 0;
+    const c = fig(12, 11, [
+      !sit && B(frame ? 4 : 5, 9, 2, 1, P.billM, { noise: 0, min: 1 }),
+      !sit && B(frame ? 8 : 7, frame ? 8 : 9, 2, 1, P.billM, { noise: 0, max: 1 }),
+      !sit && B(frame ? 5 : 6, 8, 1, 1, P.billM, { noise: 0 }),
+      E(10.4, 4.3 + oy, 1, 1, P.drakeTail),
+      E(6.6, 6.2 + oy, 4.1, 2.5, P.drakeBody, { pat: speck(P.drakeBody) }),
+      E(7.4, 6 + oy, 2.5, 1.4, P.drakeBr, { sep: true, max: 2 }),
+      E(3.8, 4.6 + oy, 1.3, 1.9, P.drakeBody, { min: 2 }),
+      E(3.6, 2.9 + oy + sk, 1.9, 1.7, P.drakeHead, { sep: true }),
+      B(1, 3 + oy + sk, 2, 1, P.billM, { noise: 0, min: 2 }),
+    ]);
+    const x = c.getContext('2d');
+    if (pose === 'sleep') R(x, '#0b3620', 3, 3 + oy, 2, 1);
+    else { R(x, EYE, 3, 3 + oy + sk); if (pose === 'sick') R(x, '#1d8a52', 2, 2 + oy + sk); }
+    return c;
+  }
+  const old = stage === 'gia';
+  const HD = old ? fade(P.drakeHead, 0.3, '#9aa89e') : P.drakeHead, BD = old ? fade(P.drakeBody, 0.25) : P.drakeBody;
+  const BR = old ? fade(P.drakeBr, 0.3) : P.drakeBr, TL = old ? fade(P.drakeTail, 0.28) : P.drakeTail, BL = old ? fade(P.billM, 0.3) : P.billM;
+  const oy = sit ? 2 : 0, hy = (old ? 1 : 0) + sk * 2 + (pose === 'sleep' ? 2 : 0);
+  const hx = pose === 'sleep' ? 2 : 0, td = old ? 1 : 0;
+  const c = fig(16, 13, [
+    !sit && B(frame ? 5 : 6, 11, 2, 1, BL, { noise: 0, min: 1 }),
+    !sit && B(frame ? 11 : 10, frame ? 10 : 11, 2, 1, BL, { noise: 0, max: 1 }),
+    !sit && B(frame ? 6 : 7, 10, 1, 1, BL, { noise: 0 }),
+    // lông đuôi đen: chùm sau đuôi + lông cong vểnh lên trên lưng
+    E(13.9, 6.4 + oy + td, 1.8, 1.5, TL),
+    E(8.6, 7.8 + oy, 5.2, 3, BD),
+    // cánh xám, gương cánh xanh lam
+    E(9.4, 7.5 + oy, 3.3, 1.7, BD, { sep: true, max: 2, pat: (px, py) => (px >= 11 && px <= 13 && py === Math.round(7.5 + oy) ? '#2f4f9e' : undefined) }),
+    E(12.9, 4.8 + oy + td, 1.4, 1.1, TL, { sep: true }),
+    E(11.7, 4.2 + oy + td, 0.7, 0.7, TL, { sep: true }),
+    E(5.6, 7.7 + oy, 2, 2.2, BR, { sep: true }),
+    E(4.8 + hx * 0.5, 5.9 + oy + hy * 0.5, 1.5, 2.4, BR),
+    B(3 + hx, 5 + oy + hy, 4, 1, P.collar, { noise: 0, min: 2 }),
+    E(4.6 + hx, 3.2 + oy + hy, 2.1, 1.9, HD, { sep: true, pat: (px, py, k) => (k >= 2 && (px + py) % 3 === 0 ? HD[3] : undefined) }),
+    B(1 + hx, 3 + oy + hy, 3, 1, BL, { noise: 0, min: 2 }),
+    B(1 + hx, 4 + oy + hy, 2, 1, BL, { noise: 0, max: 1 }),
+  ]);
+  const x = c.getContext('2d');
+  const ex = 4 + hx, ey = 3 + oy + hy;
+  if (pose === 'sleep') R(x, '#0b3620', ex, ey, 2, 1);
+  else { R(x, EYE, ex, ey); if (pose === 'sick') R(x, '#115c38', ex - 1, ey - 1); if (old) R(x, '#b0bcb4', ex, ey - 1); }
   return c;
 }
 
@@ -1579,6 +1659,34 @@ function eggNest() {
     for (const [gx, h] of [[0, 3], [2, 4], [6, 3], [9, 4], [11, 2]]) { R(x, '#2f6b1f', gx, 10 - h, 1, h); R(x, '#5fb33e', gx, 10 - h); }
   });
 }
+// Ổ trứng vịt giấu trong bụi: trứng to hơn, vỏ xanh nhạt
+function eggNestDuck() {
+  return draw(12, 10, x => {
+    shadow(x, 6, 8, 5.6, 1.4);
+    for (const [gx, h] of [[1, 5], [3, 7], [5, 8], [8, 7], [10, 5]]) { R(x, OUT, gx, 9 - h, 2, h); R(x, '#2f7a28', gx, 10 - h, 1, h - 1); R(x, '#53a53c', gx + 1, 10 - h, 1, h - 1); R(x, '#84cc58', gx, 9 - h + 1); }
+    ell(x, OUT, 5, 6, 2.3, 2.8); ell(x, '#d6ecd8', 5, 6, 1.4, 1.9); R(x, '#ffffff', 4, 5); R(x, '#a9cfae', 6, 7);
+    ell(x, OUT, 8, 7, 1.8, 2); ell(x, '#cae4cd', 8, 7, 0.9, 1.2); R(x, '#eaf7ea', 7, 6);
+    for (const [gx, h] of [[0, 3], [2, 4], [6, 3], [9, 4], [11, 2]]) { R(x, '#2a6a1c', gx, 10 - h, 1, h); R(x, '#53a53c', gx, 10 - h); }
+  });
+}
+// Trứng vịt: vỏ xanh nhạt, to hơn trứng gà một chút
+function eggDuck() {
+  return draw(9, 10, x => {
+    shadow(x, 8, 7, 3.4, 0.9);
+    ell(x, OUT, 4, 4, 3, 3.8); ell(x, '#bfe0c4', 4, 4, 2.2, 3); ell(x, '#dcf0de', 3, 3, 1, 1.4);
+    R(x, '#f2fbf2', 3, 2); R(x, '#8fbe97', 5, 6);
+  });
+}
+// Trứng vịt đã soi, có phôi: hào quang ấm trên vỏ xanh nhạt, quả to hơn trứng gà
+function eggDuckFertile() {
+  return draw(12, 13, x => {
+    ell(x, 'rgba(255,200,80,0.35)', 5.5, 6.5, 5.4, 5.8);
+    ell(x, 'rgba(230,240,170,0.45)', 5.5, 6.5, 4.1, 4.7);
+    ell(x, OUT, 5.5, 6.5, 2.9, 3.7); ell(x, '#dcecb4', 5.5, 6.5, 2, 2.8); ell(x, '#f0f8d8', 4.5, 5.5, 0.9, 1.3);
+    R(x, '#c0402a', 5, 7, 2, 1); R(x, '#e5452f', 5, 6); R(x, '#e88a50', 4, 8); R(x, '#e88a50', 7, 6);
+    R(x, '#ffffff', 4, 4);
+  });
+}
 function eggFertile() {
   return draw(11, 12, x => {
     // hào quang ấm khi soi
@@ -1833,6 +1941,7 @@ const ANIMAL = {
   ga: species(hen),
   gaTrong: species(rooster),
   vit: species(duck),
+  vitDuc: species(drake),
   heo: species(pig),
   bo: species((st, f) => cow(st, f)),
   boDuc: species((st, f) => cow(st, f, 'stand', true)),
@@ -1848,7 +1957,7 @@ export const SPR3 = {
   run: { ga: runner(hen), gaTrong: runner(rooster), vit: runner(duck) },
   // ngủ & bệnh theo dáng từng loài, giai đoạn trưởng thành (bản 'left'); xem sleepBy/sickBy để có đủ giai đoạn
   sleep: {
-    ga: hen('truong', 0, 'sleep'), gaTrong: rooster('truong', 0, 'sleep'), vit: duck('truong', 0, 'sleep'), heo: pig('truong', 0, 'sleep'),
+    ga: hen('truong', 0, 'sleep'), gaTrong: rooster('truong', 0, 'sleep'), vit: duck('truong', 0, 'sleep'), vitDuc: drake('truong', 0, 'sleep'), heo: pig('truong', 0, 'sleep'),
     bo: cow('truong', 0, 'sleep'), boDuc: cow('truong', 0, 'sleep', true), cuu: sheep('truong', 0, 'sleep'), cho: dog('truong', 0, 'sleep'), meo: catNap(0),
   },
   sick: {},
@@ -1887,6 +1996,9 @@ export const SPR3 = {
   angel: [angel(0), angel(1)],
   eggNest: eggNest(),
   eggFertile: eggFertile(),
+  eggDuck: eggDuck(),
+  eggNestDuck: eggNestDuck(),
+  eggDuckFertile: eggDuckFertile(),
   grainScatter: grainScatter(),
   homeBoard: homeBoard(),
   strayArrow: strayArrow(),
@@ -1899,7 +2011,7 @@ export const SPR3 = {
     dirtyIcon: dirtyIcon(), strayIcon: strayIcon(), warn: warn(),
   },
 };
-const POSE = { ga: hen, gaTrong: rooster, vit: duck, heo: pig, bo: (s, f, p) => cow(s, f, p), boDuc: (s, f, p) => cow(s, f, p, true), cuu: (s, f, p) => sheep(s, f, p), cuuXoan: (s, f, p) => sheep(s, f, p, true), cho: dog, meo: cat };
+const POSE = { ga: hen, gaTrong: rooster, vit: duck, vitDuc: drake, heo: pig, bo: (s, f, p) => cow(s, f, p), boDuc: (s, f, p) => cow(s, f, p, true), cuu: (s, f, p) => sheep(s, f, p), cuuXoan: (s, f, p) => sheep(s, f, p, true), cho: dog, meo: cat };
 for (const [k, fn] of Object.entries(POSE)) {
   SPR3.sleepBy[k] = Object.fromEntries(STAGES.map(st => [st, fn(st, 0, 'sleep')]));
   SPR3.sickBy[k] = Object.fromEntries(STAGES.map(st => [st, sicken(fn(st, 0, 'sick'))]));

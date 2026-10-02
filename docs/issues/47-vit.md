@@ -17,10 +17,10 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): vịt đi đủ 4 giai đoạn đúng mốc giờ; vịt mái trưởng thành đẻ trứng vịt, vịt non và vịt già không đẻ hoặc đẻ thưa; trứng vịt vào kho và bán được; vịt tính chung sức chứa chuồng gia cầm; vịt con đi theo vịt mẹ (nếu có luật theo ô).
-- [ ] Unit test: vịt dùng đúng các luật chung (thả rông, về chuồng 18h, tắm, bệnh) như gà; chạy bù offline có vịt không con nào chết (ADR 0004).
-- [ ] E2E (Playwright, desktop + 360px): mua vịt ở chợ Bà Tư → thả vào chuồng gia cầm → thấy vịt con đi hàng theo vịt mẹ; dựng bản lưu có vịt mái trưởng thành → đẻ trứng vịt → nhặt được.
-- [ ] Pixel art vịt các giai đoạn và trứng vịt có đủ.
+- [x] Unit test (seam 1): vịt đi đủ 4 giai đoạn đúng mốc giờ; vịt mái trưởng thành đẻ trứng vịt, vịt non và vịt già không đẻ hoặc đẻ thưa; trứng vịt vào kho và bán được; vịt tính chung sức chứa chuồng gia cầm; vịt con đi theo vịt mẹ (nếu có luật theo ô).
+- [x] Unit test: vịt dùng đúng các luật chung (thả rông, về chuồng 18h, tắm, bệnh) như gà; chạy bù offline có vịt không con nào chết (ADR 0004).
+- [x] E2E (Playwright, desktop + 360px): mua vịt ở chợ Bà Tư → thả vào chuồng gia cầm → thấy vịt con đi hàng theo vịt mẹ; dựng bản lưu có vịt mái trưởng thành → đẻ trứng vịt → nhặt được.
+- [x] Pixel art vịt các giai đoạn và trứng vịt có đủ.
 
 ## Blocked by
 

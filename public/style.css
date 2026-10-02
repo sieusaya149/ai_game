@@ -387,7 +387,7 @@ body.alerting #hud { top: calc(50px + var(--st)); }
 .guide-open { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 4px; padding: 8px 12px; border-radius: 15px; border: 2px solid var(--orange-d); background: var(--paper); color: var(--ink); font-family: inherit; font-size: 15px; text-align: left; cursor: pointer; }
 .guide-open small { flex: 1; font-size: 12px; opacity: 0.7; font-weight: 700; text-align: right; }
 .guide-ico { width: 24px; height: 24px; image-rendering: pixelated; flex: none; }
-.guide-dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.guide-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 10px; }   /* nhiều trang thì chấm xuống hàng, giữ nguyên cỡ chạm */
 .guide-dot { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid var(--wood); background: var(--paper); cursor: pointer; }
 .guide-dot.on { background: var(--orange); border-color: var(--orange-d); }
 .guide-page { padding: 12px; border-radius: 18px; background: var(--paper); border: 2px solid var(--line); box-shadow: 0 2px 0 var(--line); }
@@ -413,7 +413,7 @@ body.alerting #hud { top: calc(50px + var(--st)); }
   .btn.sm { min-height: 40px; min-width: 40px; }
   .chk { min-height: 44px; }
   .le-row .btn.sm { height: 40px; }
-  .guide-dot { position: relative; width: 40px; height: 40px; background: none; border: 0; }
+  .guide-dot { position: relative; flex: 0 0 40px; width: 40px; height: 40px; background: none; border: 0; }
   .guide-dot::before { content: ""; position: absolute; inset: 11px; border-radius: 50%; border: 2px solid var(--wood); background: var(--paper); }
   .guide-dot.on::before { background: var(--orange); border-color: var(--orange-d); }
   .guide-dots { gap: 0; }

@@ -11,7 +11,7 @@ const SPEED = 70;                 // px/s của người chơi
 const HW = 5, HH = 3;             // nửa hộp chân 10x6
 const DIRV = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 const TEO_LOOK = { skin: 1, hair: 0, hairColor: 4, shirt: 4, pants: 2, hat: 2, acc: 1 };
-const A_SPEED = { ga: 20, heo: 16, bo: 11, cuu: 13 };
+const A_SPEED = { ga: 20, vit: 17, heo: 16, bo: 11, cuu: 13 };
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -122,9 +122,16 @@ export function ensurePositions(state) {
 const onScreen = (w, o) => !w.view || (o.x >= w.view.x0 && o.x <= w.view.x1 && o.y >= w.view.y0 && o.y <= w.view.y1);
 // Tốc độ theo giai đoạn: con non lon ton, con già chậm chạp
 const STAGE_SPEED = { non: 1.25, nho: 1.1, truong: 1, gia: 0.6 };
-// Gà mẹ gần nhất cùng chuồng cho gà con chạy theo
-const henOf = (state, a) => a.type === 'ga' && a.stage === 'non'
-  ? state.animals.filter(h => h.type === 'ga' && h.sex === 'f' && (h.stage === 'truong' || h.stage === 'gia') && h.x != null).sort((u, v) => dist(u, a) - dist(v, a))[0] : null;
+// Gà/vịt mẹ gần nhất cùng loài cho con non chạy theo
+const POULTRY = ['ga', 'vit'];
+const henOf = (state, a) => POULTRY.includes(a.type) && a.stage === 'non'
+  ? state.animals.filter(h => h.type === a.type && h.sex === 'f' && (h.stage === 'truong' || h.stage === 'gia') && h.x != null).sort((u, v) => dist(u, a) - dist(v, a))[0] : null;
+// Vịt con đi thành hàng sau vịt mẹ: con thứ k cách mẹ (k+1) bước, phía sau hướng mẹ đang đi
+function duckRow(state, w, a, hen) {
+  const k = state.animals.filter(o => o.type === 'vit' && o.stage === 'non' && o.id < a.id && henOf(state, o) === hen).length;
+  const hr = rtOf(w, 'a' + hen.id), back = (hr.tx ?? hen.x) >= hen.x ? -1 : 1;
+  return { x: hen.x + back * (7 + 6 * k), y: hen.y + 1 };
+}
 // Gà thả rông (luật chọn ô a.tile, ở đây chỉ đi tới đó): thẳng tới điểm trong ô, không bước vào ô ngoài vùng đi lại; kẹt lâu thì nhảy tới nơi.
 // Lùa một con thả rông ra xa điểm src (người chơi lát 42, con chó lát 45): nó chạy ngược hướng src, tới cửa chuồng thì
 // luật ghi là đã về (ST.passGate). radius px, speed px/giây. Trả true nếu con này đang bị lùa (đã xử lý xong lượt đi của nó).
@@ -181,7 +188,7 @@ function updateAnimals(state, w, dt0, out) {
     const speed = (A_SPEED[a.type] ?? 14) * (STAGE_SPEED[a.stage] ?? 1) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
     rt.walking = false; rt.peck = false;
     // gà con kêu chiếp (thỉnh thoảng, khi đang ở trên màn hình)
-    if (a.type === 'ga' && a.stage === 'non' && seen && out && state.scene === 'farm' && Math.random() < dt * 0.06) {
+    if (POULTRY.includes(a.type) && a.stage === 'non' && seen && out && state.scene === 'farm' && Math.random() < dt * 0.06) {
       out.results.push({ ok: true, sound: 'chirp', fx: [{ text: 'chiếp', color: '#fff6a0', x: a.x, y: a.y + 14 }] });
     }
     // ❤️4+ chạy lại khi người chơi tới gần, ❤️5 đi theo từ xa (trong phạm vi chuồng)
@@ -213,7 +220,10 @@ function updateAnimals(state, w, dt0, out) {
         const inMud = a.type === 'heo' && inMudSpot(a);
         const trough = pen.trough ? state.troughs?.[ANIMALS[a.type].pen] ?? 0 : 0;   // chuồng cách ly không có máng
         const hen = henOf(state, a);
-        if (hen && Math.random() < 0.75) {   // gà con lon ton theo gà mẹ
+        if (hen && a.type === 'vit' && Math.random() < 0.9) {   // vịt con đi hàng theo vịt mẹ
+          const r = duckRow(state, w, a, hen);
+          rt.tx = clamp(r.x, area.x, area.x + area.w); rt.ty = clamp(r.y, area.y, area.y + area.h); rt.mode = 'walk';
+        } else if (hen && Math.random() < 0.75) {   // gà con lon ton theo gà mẹ
           rt.tx = clamp(hen.x + rnd(-9, 9), area.x, area.x + area.w); rt.ty = clamp(hen.y + rnd(2, 7), area.y, area.y + area.h); rt.mode = 'walk';
         } else if (a.stage === 'gia' && Math.random() < 0.45) {   // con già hay ngủ gật
           rt.mode = 'nap'; rt.nap = true; rt.timer = rnd(4, 9);
@@ -221,7 +231,7 @@ function updateAnimals(state, w, dt0, out) {
           rt.tx = clamp(pen.trough.x + rnd(-14, 14), area.x, area.x + area.w); rt.ty = area.y + rnd(1, 8); rt.mode = 'walk';
         } else if (a.type === 'heo' && ms && !inMud && Math.random() < 0.45) {
           rt.tx = rnd(ms.x0, ms.x1); rt.ty = rnd(ms.y0, ms.y1); rt.mode = 'walk';
-        } else if (a.type === 'ga' && Math.random() < (a.stage === 'nho' ? 0.7 : 0.4)) {   // gà nhỡ bới đất nhiều
+        } else if (POULTRY.includes(a.type) && Math.random() < (a.stage === 'nho' ? 0.7 : 0.4)) {   // gà nhỡ bới đất nhiều
           rt.mode = 'peck'; rt.timer = rnd(0.8, 1.8);
         } else {
           const t = inArea(area, 2); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk';

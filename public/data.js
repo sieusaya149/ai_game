@@ -63,6 +63,7 @@ export const FARMING = {
 // price: giá mua con non · every: chu kỳ ra sản phẩm khi trưởng thành (thời gian lớn: bảng LIFE) · sell: giá bán con trưởng thành
 export const ANIMALS = {
   ga:  { name: 'Gà',  baby: 'Gà con',  lv: 1, price: 40,  feed: 'feed_ga',  pen: 'chicken', product: 'trung', every: 2.5 * MIN, sell: 90,  exp: 3 },
+  vit: { name: 'Vịt', baby: 'Vịt con', lv: 2, price: 55,  feed: 'feed_ga',  pen: 'chicken', product: 'trung_vit', every: 3 * MIN, sell: 120, exp: 4 },
   heo: { name: 'Heo', baby: 'Heo con', lv: 3, price: 120, feed: 'feed_heo', pen: 'pig',     product: null,    every: 0,         sell: 380, exp: 12 },
   bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
   cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
@@ -109,6 +110,7 @@ export const STAGES = ['non', 'nho', 'truong', 'gia'];
 export const STAGE_NAME = { non: 'Non', nho: 'Nhỡ', truong: 'Trưởng thành', gia: 'Già' };
 export const LIFE = {
   ga:  { non: 5 * MIN,  nho: 10 * MIN, truong: 20 * HOUR, gia: 4 * HOUR },
+  vit: { non: 5 * MIN,  nho: 10 * MIN, truong: 20 * HOUR, gia: 4 * HOUR },
   heo: { non: 10 * MIN, nho: 20 * MIN, truong: 30 * HOUR, gia: 6 * HOUR },
   bo:  { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
   cuu: { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
@@ -143,7 +145,7 @@ export const STAGE_CAN = {
   vitamin: { all: ['non', 'nho'] },
 };
 // Cân nặng (kg): lúc mới sinh, lúc lớn hẳn. Con non, nhỡ ăn no thì lên cân dần trong hai giai đoạn đầu.
-export const WEIGHT = { ga: [0.2, 2.5], heo: [3, 100], bo: [30, 450], cuu: [4, 60] };
+export const WEIGHT = { ga: [0.2, 2.5], vit: [0.2, 3], heo: [3, 100], bo: [30, 450], cuu: [4, 60] };
 export const weightAt = (type, stage) => {
   const [w0, w1] = WEIGHT[type] ?? [1, 1];
   return stage === 'non' ? w0 : stage === 'nho' ? (w0 + w1) / 2 : w1;
@@ -189,7 +191,7 @@ export const THREATS = {
 
 // ---------- Thả rông ban ngày (ADR 0013) ----------
 export const FREE = {
-  types: ['ga'],              // loài được thả rông
+  types: ['ga', 'vit'],       // loài được thả rông
   max: 30,                    // tối đa 30 con thả rông; con vượt giới hạn ở trong chuồng
   moveMs: [8000, 20000],      // mỗi lần đổi ô sau khoảng này
   radius: 5,                  // ô kế tiếp cách ô hiện tại tối đa 5 ô
@@ -245,6 +247,8 @@ export const CLUTTER = {
 export const PRODUCTS = {
   trung: { name: 'Trứng gà', price: 14 },
   trung_phoi: { name: 'Trứng có phôi', price: 14 },   // đã soi: nở được trong ổ ấp
+  trung_vit: { name: 'Trứng vịt', price: 18 },
+  trung_vit_phoi: { name: 'Trứng vịt có phôi', price: 18 },   // đã soi: nở thành vịt con trong ổ ấp
   sua:   { name: 'Sữa bò',   price: 40 },
   len:   { name: 'Lông cừu', price: 60 },
   sua_ngon: { name: 'Sữa ngon',    price: 60 },   // sao: bò được vuốt ve đều

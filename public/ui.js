@@ -38,11 +38,11 @@ const btn = (label, onClick, cls = '', extra = {}) => h('button', { class: 'btn 
 // ---------- Biểu tượng (art.icon, không có thì dùng emoji) ----------
 const EMOJI = {
   cai: '🥬', carot: '🥕', lua: '🌾', cachua: '🍅', bap: '🌽', dau: '🍓', bingo: '🎃', duahau: '🍉',
-  trung: '🥚', trung_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💉', vitamin: '💊',
+  trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧',
   wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩',
-  ga: '🐔', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕',
+  ga: '🐔', vit: '🦆', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕',
 };
 const ITEM3 = { soap: 'soapBar', manure: 'manure' };
 const iconCache = new Map();
@@ -50,7 +50,7 @@ function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
   let u = null;
   try { u = art.icon(key) || null; } catch { u = null; }
-  if (!u) try { u = (key === 'trung_phoi' ? SPR3?.eggFertile : SPR2?.[key])?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
+  if (!u) try { u = ({ trung_phoi: SPR3?.eggFertile, trung_vit_phoi: SPR3?.eggDuckFertile, trung_vit: SPR3?.eggDuck, vit: SPR3?.animal?.vit?.non?.left?.[0] }[key] ?? SPR2?.[key])?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
   if (!u) try { u = SPR3?.items?.[ITEM3[key]]?.toDataURL?.() || null; } catch { u = null; }   // xà phòng, phân chuồng vẽ ở art3
   iconCache.set(key, u);
   return u;
@@ -745,6 +745,11 @@ const GUIDE = [
       `Có gà trống trưởng thành thì chừng ${Math.round(D.BREED.fertile * 100)}% trứng có phôi. Chạm vào trứng, chọn Soi trứng để biết; chỉ trứng có phôi mới ấp nở được trong ổ ấp.`,
       'Heo, bò, cừu: đực và cái trưởng thành, no và vui, ở chung chuồng thì sinh con. Chuồng đầy thì dừng, nhớ nâng chuồng hoặc bán bớt.',
       'Con sinh trong trại tự có tên theo mẹ. Xem cha mẹ, con cái và đổi tên ở Phả hệ vật nuôi.'] },
+  { title: 'Vịt', art: () => [SPR3?.animal?.vit?.non?.left?.[0], SPR3?.animal?.vit?.nho?.left?.[0], SPR3?.animal?.vit?.truong?.left?.[0], SPR3?.animal?.vitDuc?.truong?.left?.[0], SPR3?.eggDuck],
+    text: [`Vịt mở ở cấp ${D.ANIMALS.vit.lv}, nuôi chung chuồng gia cầm với gà nên sức chứa tính chung.`,
+      'Vịt con lon ton đi thành hàng sau vịt mẹ. Vịt nhỡ đi khắp trại ban ngày như gà, tối tự về chuồng.',
+      `Vịt mái trưởng thành đẻ trứng vịt (${D.PRODUCTS.trung_vit.price} xu, đắt hơn trứng gà); vịt già đẻ thưa dần. Có vịt cồ thì trứng có phôi, ấp nở ra vịt con.`,
+      'Thả rông thì vịt hay đẻ giấu trong bụi — nhớ đi một vòng vườn nhặt trứng. Chuyện vịt bơi ở hồ để dành phần sau nhé.'] },
 ];
 let guidePage = 0;
 function guideIcon() {
