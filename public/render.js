@@ -87,6 +87,9 @@ const stinkImgs = () => SPR.stink ?? once('stink', () => [0, 1].map(f => {
   return c;
 }));
 const eggImg = () => SPR.eggGround ?? SPR.product.trung;
+// Trứng đã soi: có phôi = SPR3.eggFertile (sáng, chấm phôi); trống = trứng sáng không chấm. Chưa soi: trứng thường.
+const eggEmpty = () => once('eggEmpty', () => pix(['....ggg....', '...gOOOg...', '..gOyyyOg..', '..OyywyyO..', '..OyyyyyO..', '..OyyyyyO..', '..OyyyyyO..', '...OyyyO...', '....OOO....'], { g: 'rgba(255,230,140,0.4)', O: '#3b2412', y: '#fff0c0', w: '#ffffff' }));
+const eggImgOf = e => (e.candled ? (e.fertile ? SPR3?.eggFertile : null) ?? eggEmpty() : eggImg());
 const wellImg = () => SPR.well ?? once('well', () => {
   const c = mkCanvas(24, 26), x = c.getContext('2d');
   rect(x, '#3b2412', 2, 0, 20, 4); rect(x, '#d9483b', 3, 1, 18, 2);
@@ -164,6 +167,7 @@ const STATUS_ROWS = {
 function statusIcon(name) {
   const s = SPR.status?.[name];
   if (s) return s;
+  if (name === 'crow') return once('stcrow', () => pix(['...yyyy', '...y..y', '...y..y', '...y.yy', '.yyy.y.', 'yyyy...', '.yy....'], { y: '#f2b81e' }));   // nốt nhạc: gà trống gáy
   if (name === 'hungry') return SPR.grain;
   if (name === 'milk') return SPR.product.sua;
   if (name === 'wool') return SPR.product.len;
@@ -189,6 +193,13 @@ export function animalImg(a, face, frame, sleep) {
   if (stage === 'nho') return scaled(im, 0.8);
   return stage === 'gia' ? tinted(im, '#d8d0c0', 0.35) : im;
 }
+// Con cái mang thai: thân nở ra một chút (bụng to)
+const bellied = img => derived(img, 'belly', () => {
+  const c = mkCanvas(Math.round(img.width * 1.2), img.height), x = c.getContext('2d');
+  x.imageSmoothingEnabled = false;
+  x.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+});
 export const ANGEL_MS = 2600;   // thiên thần bay lên trong chừng này ms
 const angelFallback = () => once('angel', () => {
   const c = mkCanvas(10, 11), x = c.getContext('2d');
@@ -557,7 +568,7 @@ export function render(ctx, f) {
   }
 
   // trứng, phân
-  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = eggImg(); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
+  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = eggImgOf(e); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
   for (const p of farm ? state.poops ?? [] : []) {
     if (p.x == null || !vis(p.x, p.y)) continue;
     add(p.y, () => {
@@ -582,8 +593,9 @@ export function render(ctx, f) {
     const rt = wd.rt.get('a' + a.id) ?? {};
     const frame = rt.walking ? Math.floor(rt.anim * 7) % 2 : rt.peck ? Math.floor(rt.anim * 6) % 2 : 0;
     const sleeping = !rt.walking && (night > 0.6 || rt.nap);   // ban đêm, hoặc con già ngủ gật
-    const im = animalImg(a, rt.face ?? 'left', frame, sleeping);
+    let im = animalImg(a, rt.face ?? 'left', frame, sleeping);
     if (!im) continue;
+    if (a.pregnant && !sleeping) im = bellied(im);
     const dy = rt.peck && frame ? 1 : 0;
     add(a.y, () => blit(im, a.x - im.width / 2, a.y - im.height + 1 + dy));
     const emote = wd.emotes.get('a' + a.id);

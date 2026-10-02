@@ -4,6 +4,7 @@ import * as art from './art.js';
 import * as D from './data.js';
 import * as sound from './sound.js';
 import { SPR2 } from './art2.js';
+import { SPR3 } from './art3.js';
 import { createNotifier, arrowTargets, arrowFor } from './notify.js';
 import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
@@ -37,7 +38,7 @@ const btn = (label, onClick, cls = '', extra = {}) => h('button', { class: 'btn 
 // ---------- Biểu tượng (art.icon, không có thì dùng emoji) ----------
 const EMOJI = {
   cai: '🥬', carot: '🥕', lua: '🌾', cachua: '🍅', bap: '🌽', dau: '🍓', bingo: '🎃', duahau: '🍉',
-  trung: '🥚', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💉', vitamin: '💊',
+  trung: '🥚', trung_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑',
   wood: '🪵', stone: '🪨',
@@ -48,7 +49,7 @@ function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
   let u = null;
   try { u = art.icon(key) || null; } catch { u = null; }
-  if (!u) try { u = SPR2?.[key]?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá)
+  if (!u) try { u = (key === 'trung_phoi' ? SPR3?.eggFertile : SPR2?.[key])?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá)
   iconCache.set(key, u);
   return u;
 }
@@ -196,6 +197,32 @@ export function confirmBox(text, yes = 'Đồng ý', no = 'Thôi', danger = fals
         btn(no, () => done(false), 'plain'),
         btn(yes, () => done(true), danger ? 'red' : 'green'))));
     root.hidden = false;
+  });
+}
+
+// ---------- Đặt tên con vật ----------
+// Trả về true nếu đã đổi tên. Tên rỗng hoặc dài quá thì báo lỗi ngay trong hộp, không đóng.
+export function askRename(id) {
+  const a = st().animals.find(x => x.id === id);
+  if (!a) return Promise.resolve(false);
+  return new Promise(resolve => {
+    const root = $('dialog-root');
+    const done = v => { root.hidden = true; root.replaceChildren(); dialogResolve = null; resolve(v); };
+    dialogResolve = done;
+    const input = h('input', { class: 'name-input', type: 'text', value: a.name, autocomplete: 'off', 'aria-label': 'Tên con vật' });
+    const err = h('div', { class: 'dialog-err', role: 'alert' });
+    const ok = () => {
+      const r = S.renameAnimal(st(), id, input.value);
+      if (!r.ok) { err.textContent = r.msg; sound.play('error'); return; }
+      sound.play('pop'); done(true); refreshPanel();
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') ok(); });
+    root.replaceChildren(h('div', { class: 'dialog' },
+      h('div', { class: 'dialog-text' }, `Đặt tên cho ${S.animalLabel(a)}`),
+      input, err,
+      h('div', { class: 'dialog-btns' }, btn('Thôi', () => done(false), 'plain'), btn('Lưu tên', ok, 'green', { id: 'name-ok' }))));
+    root.hidden = false;
+    input.focus(); input.select();
   });
 }
 
@@ -525,7 +552,8 @@ PANELS.market = {
           icon: ico(type), name: a.baby, locked,
           desc: [`Trưởng thành sau ${D.stageStart(type, 'truong') / MIN} phút ·${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`],
           right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + a.lv)
-            : [coinTag(a.price), btn(full ? (cap ? 'Đầy' : 'Chưa có chuồng') : 'Mua', () => res(S.buyAnimal(st(), type), 'coin')?.ok && (flags.bought = true), 'green', { disabled: shut || full || s.coins < a.price })],
+            : h('div', { class: 'sexbuy' }, ['m', 'f'].map(sex => h('div', { class: 'sexopt' }, coinTag(D.animalPrice(type, sex)),
+              btn(full ? (cap ? 'Đầy' : 'Chưa có chuồng') : (sex === 'm' ? 'Mua ♂ đực' : 'Mua ♀ cái'), () => res(S.buyAnimal(st(), type, sex), 'coin')?.ok && (flags.bought = true), 'green sm', { disabled: shut || full || s.coins < D.animalPrice(type, sex), 'data-sex': sex })))),
         }));
       }
       return;
@@ -710,6 +738,11 @@ const GUIDE = [
   { title: 'Chợ và giờ mở cửa', art: () => [spr().marketStall, spr().marketClosed],
     text: [`Chợ Bà Tư ở trong làng, ra cổng vườn là tới. Mở cửa ${D.MARKET.open}h–${D.MARKET.close}h, ngoài giờ đó không mua bán được.`,
       'Ở chợ có hạt giống, vật tư, thức ăn, đồ trang trí. Bán thẳng ở chợ được giá đủ; thùng giao hàng tiện hơn nhưng trừ một phần.'] },
+  { title: 'Đực, cái và sinh sản', art: () => [SPR3?.animal?.gaTrong?.truong?.left?.[0], SPR3?.animal?.ga?.truong?.left?.[0], SPR3?.eggFertile, SPR3?.animal?.ga?.non?.left?.[0]],
+    text: [`Mua con đực hay cái tùy bạn, con cái đắt hơn khoảng ${Math.round((D.BREED.femaleMul - 1) * 100)}%. Gà trống gáy lúc ${D.BREED.cockHour}h sáng.`,
+      `Có gà trống trưởng thành thì chừng ${Math.round(D.BREED.fertile * 100)}% trứng có phôi. Chạm vào trứng, chọn Soi trứng để biết; chỉ trứng có phôi mới ấp nở được trong ổ ấp.`,
+      'Heo, bò, cừu: đực và cái trưởng thành, no và vui, ở chung chuồng thì sinh con. Chuồng đầy thì dừng, nhớ nâng chuồng hoặc bán bớt.',
+      'Con sinh trong trại tự có tên theo mẹ. Xem cha mẹ, con cái và đổi tên ở Phả hệ vật nuôi.'] },
 ];
 let guidePage = 0;
 function guideIcon() {
@@ -733,11 +766,37 @@ function guideArt(list) {
 PANELS.guide = {
   title: '📖 Sổ tay',
   render(body) {
+    body.append(h('button', { class: 'guide-open', id: 'open-pedigree', type: 'button', on: { click: () => openPanel('pedigree') } }, h('span', { class: 'ico emo' }, '🌳'), h('b', {}, 'Phả hệ vật nuôi'), h('small', {}, 'Tên, cha mẹ, con của từng con')));
     const n = GUIDE.length, p = GUIDE[guidePage], go = d => { guidePage = (guidePage + d + n) % n; sound.play('click'); refreshPanel(); };
     body.append(
       h('div', { class: 'guide-dots' }, GUIDE.map((_, i) => h('button', { class: 'guide-dot nosound' + (i === guidePage ? ' on' : ''), type: 'button', title: GUIDE[i].title, 'aria-label': GUIDE[i].title, on: { click: () => { guidePage = i; sound.play('click'); refreshPanel(); } } }))),
       h('div', { class: 'guide-page' }, guideArt(p.art()), h('h3', {}, p.title), p.text.map(t => h('p', {}, t))),
       h('div', { class: 'guide-nav' }, btn('◀ Trước', () => go(-1), 'plain sm nosound'), h('span', { class: 'mini' }, `Trang ${guidePage + 1}/${n}`), btn('Sau ▶', () => go(1), 'plain sm nosound')));
+  },
+};
+
+// ---------- Phả hệ vật nuôi: tên, cha, mẹ, con của từng con; đổi tên ở đây hoặc ở hành động trên con vật ----------
+const SEX_MARK = { m: '♂', f: '♀' };
+const kin = r => r?.name ?? null;
+PANELS.pedigree = {
+  title: '🌳 Phả hệ vật nuôi',
+  render(body, s) {
+    if (!s.animals.length) return body.append(empty('Chưa có con vật nào. Mua ở chợ Bà Tư hoặc đợi gà ấp nở nhé!'));
+    const list = h('div', { class: 'list' });
+    body.append(list);
+    const order = Object.keys(D.ANIMALS);
+    for (const a of [...s.animals].sort((x, y) => order.indexOf(x.type) - order.indexOf(y.type) || x.id - y.id)) {
+      const p = S.pedigree(s, a.id), note = S.breedNote(s, a);
+      const born = p.mom || p.dad;
+      list.append(h('div', { class: 'row ped-row', 'data-id': a.id },
+        h('div', { class: 'row-ico' }, ico(a.type)),
+        h('div', { class: 'row-main' },
+          h('div', { class: 'row-name ped-name' }, `${a.name} ${SEX_MARK[a.sex] ?? ''}`),
+          h('div', { class: 'row-desc' }, S.stageName(a), a.pregnant ? ' · đang mang thai 💕' : '', note ? ` · ${note}` : ''),
+          h('div', { class: 'row-desc ped-kin' }, born ? [`Mẹ: ${kin(p.mom) ?? '?'} · Cha: ${kin(p.dad) ?? '?'}`] : 'Mua ở chợ hoặc chưa rõ cha mẹ'),
+          p.kids.length ? h('div', { class: 'row-desc ped-kids' }, `Con: ${p.kids.map(k => `${k.name} ${SEX_MARK[k.sex] ?? ''}`).join(', ')}`) : null),
+        h('div', { class: 'row-act' }, btn('✏️ Đổi tên', () => askRename(a.id), 'plain sm'))));
+    }
   },
 };
 

@@ -214,6 +214,10 @@ kbd {
 .row.locked .ico { filter: grayscale(1) brightness(0.8); }
 .row.done { background: #eaf7d8; border-color: #b6dc8c; }
 .qtys { display: flex; gap: 6px; }
+.sexbuy { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.sexopt { display: flex; align-items: center; gap: 6px; }
+.name-input { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 12px; border: 3px solid var(--wood); background: #fff; font: 800 17px inherit; font-family: inherit; color: var(--ink); }
+.dialog-err { min-height: 18px; margin: 6px 0 8px; font-size: 13px; font-weight: 800; color: #b3261e; }
 .price { font-weight: 900; font-size: 14px; color: var(--orange-d); white-space: nowrap; }
 .lock { font-weight: 900; font-size: 13px; color: #8a6a3a; white-space: nowrap; }
 .tick { font-weight: 900; font-size: 22px; color: var(--green-d); }

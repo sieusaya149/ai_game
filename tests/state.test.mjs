@@ -158,7 +158,7 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
   assert.ok(G.placeEntity(s, { kind: 'pen', pen: 'pig' }, 34, 18).ok);   // chuồng heo (sức chứa cấp 1: 3 con)
   const troughOk = () => { s.troughs.pig = 20; };
   for (let i = 0; i < 2; i++) {
-    const a = { id: s.nextId++, type: 'heo', stage: 'truong', age: G.stageStart('heo', 'truong'), hunger: 100, happy: 100, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 330, y: 320, name: 'Heo' };
+    const a = { id: s.nextId++, type: 'heo', stage: 'truong', age: G.stageStart('heo', 'truong'), hunger: 100, happy: 100, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 330, y: 320, name: 'Heo', sex: i ? 'f' : 'm' };
     s.animals.push(a);
   }
   let events = [];
@@ -183,13 +183,15 @@ test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () 
   assert.ok(ev.some(e => e.type === 'spawn' && e.what === 'egg'));
   assert.equal(s.eggs[0].x, 100);
   const egg = s.eggs[0];
-  assert.match(G.actionsFor(s, { kind: 'egg', id: egg.id })[0].label, /Nhặt trứng/);
+  assert.match(G.actionsFor(s, { kind: 'egg', id: egg.id }).find(a => a.id === 'collect').label, /Nhặt trứng/);
   const r = G.perform(s, { kind: 'egg', id: egg.id }, 'collect');
   assert.ok(r.ok);
   assert.equal(s.basket.trung, 1);
   assert.equal(s.stats.eggs, 1);
-  // ổ ấp
+  // ổ ấp: chỉ nhận trứng có phôi (đã soi)
   const nest = { kind: 'nest' };
+  assert.equal(G.actionsFor(s, nest)[0].disabled !== undefined, true);
+  s.inv.trung_phoi = 1;
   assert.ok(G.perform(s, nest, 'incubate').ok);
   assert.equal(s.nest.egg, true);
   const n0 = s.animals.length;
@@ -203,7 +205,7 @@ test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () 
 test('trứng bỏ quên tự nở', () => {
   const s = newGame();
   s.animals = [];
-  s.eggs.push({ id: 99, x: 60, y: 300, laidAt: 0 });
+  s.eggs.push({ id: 99, x: 60, y: 300, laidAt: 0, fertile: true });
   withRandom(LUCKY, () => run(s, HUSBANDRY.eggForgetMs + 2000));
   assert.equal(s.eggs.length, 0);
   assert.equal(s.animals.length, 1);

@@ -71,6 +71,7 @@ const SOUNDS = {
   pop:     () => tone({ f: 380, f2: 950, d: 0.09, type: 'sine', v: 0.22 }),
   bark:    () => { tone({ f: 430, f2: 200, d: 0.1, type: 'sawtooth', v: 0.18, lp: 1500 }); tone({ f: 460, f2: 210, t: 0.16, d: 0.1, type: 'sawtooth', v: 0.18, lp: 1500 }); },
   oink:    () => { tone({ f: 210, f2: 130, d: 0.16, type: 'sawtooth', v: 0.17, lp: 900 }); tone({ f: 190, f2: 120, t: 0.17, d: 0.2, type: 'sawtooth', v: 0.15, lp: 900 }); },
+  cockcrow: () => { tone({ f: 520, f2: 760, d: 0.14, type: 'sawtooth', v: 0.13, lp: 2400 }); tone({ f: 760, f2: 700, t: 0.16, d: 0.1, type: 'sawtooth', v: 0.12, lp: 2400 }); tone({ f: 700, f2: 880, t: 0.28, d: 0.22, type: 'sawtooth', v: 0.13, lp: 2400, vib: 30 }); tone({ f: 880, f2: 420, t: 0.5, d: 0.35, type: 'sawtooth', v: 0.12, lp: 2000 }); },
   cluck:   () => [0, 0.1, 0.2].forEach(t => tone({ f: 700, f2: 420, t, d: 0.07, type: 'square', v: 0.1, lp: 2200 })),
   chirp:   () => [0, 0.12].forEach(t => tone({ f: 2400, f2: 3100, t, d: 0.05, type: 'sine', v: 0.06 })),
   moo:     () => tone({ f: 150, f2: 105, d: 0.75, type: 'sawtooth', v: 0.2, lp: 500 }),

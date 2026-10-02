@@ -23,12 +23,12 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): con cái đắt hơn khoảng 30%; thống kê trên nhiều lần tick với hạt giống cố định cho thấy 40% trứng có phôi khi có trống và 0% khi không có trống; giới tính con đẻ xấp xỉ 50/50.
-- [ ] Unit test: ổ ấp từ chối trứng không phôi và nở trứng có phôi thành gà con; heo nái mang bầu chỉ khi có đủ đực, nái, no và vui, đẻ 1–3 con; bò đẻ khoảng mỗi 10 giờ vườn; cừu sinh con khi có đủ đực cái.
-- [ ] Unit test: chuồng đầy thì không ai sinh sản; vườn đóng băng thì không sinh sản; con đẻ ra có tên và có cha mẹ đúng trong bản lưu; đổi tên được và bị từ chối khi tên rỗng hoặc quá dài.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có trống, mái và trứng → soi trứng thấy trứng có phôi → bỏ vào ổ ấp → gà con nở; dựng bản lưu có heo nái bầu sắp đẻ → thấy heo con ra đời với tên → mở sổ tay thấy cây phả hệ → đổi tên được.
-- [ ] Gà trống gáy lúc 6h sáng trong game có thể kiểm bằng cách dựng bản lưu ở 5h59.
-- [ ] Pixel art gà trống/mái, heo nái bầu, hiệu ứng soi trứng có đủ.
+- [x] Unit test (seam 1): con cái đắt hơn khoảng 30%; thống kê trên nhiều lần tick với hạt giống cố định cho thấy 40% trứng có phôi khi có trống và 0% khi không có trống; giới tính con đẻ xấp xỉ 50/50.
+- [x] Unit test: ổ ấp từ chối trứng không phôi và nở trứng có phôi thành gà con; heo nái mang bầu chỉ khi có đủ đực, nái, no và vui, đẻ 1–3 con; bò đẻ khoảng mỗi 10 giờ vườn; cừu sinh con khi có đủ đực cái.
+- [x] Unit test: chuồng đầy thì không ai sinh sản; vườn đóng băng thì không sinh sản; con đẻ ra có tên và có cha mẹ đúng trong bản lưu; đổi tên được và bị từ chối khi tên rỗng hoặc quá dài.
+- [x] E2E (Playwright, desktop + 360px; tua ấp nở bằng timeWarp): dựng bản lưu có trống, mái và trứng → soi trứng thấy trứng có phôi → bỏ vào ổ ấp → gà con nở; dựng bản lưu có heo nái bầu sắp đẻ → thấy heo con ra đời với tên → mở sổ tay thấy cây phả hệ → đổi tên được.
+- [x] Gà trống gáy lúc 6h sáng trong game có thể kiểm bằng cách dựng bản lưu ở 5h59. (unit test; e2e không chụp âm thanh)
+- [x] Pixel art gà trống/mái, heo nái bầu, hiệu ứng soi trứng có đủ. (gà trống/mái và trứng có phôi dùng SPR3; heo nái bầu = sprite heo kéo giãn ngang, trứng soi trống và bong bóng gáy là fallback vẽ trong render.js, chờ agent Opus vẽ đẹp hơn)
 
 ## Blocked by
 
