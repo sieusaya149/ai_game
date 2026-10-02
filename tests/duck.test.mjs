@@ -18,6 +18,7 @@ const bird = (s, type, stage, sex, extra) => {
 const feed = s => { s.weather = 'sun'; for (const k of Object.keys(s.troughs)) s.troughs[k] = 20; for (const a of s.animals) { a.hunger = 100; a.happy = Math.max(a.happy, 80); } };
 const run = (s, ms, each) => { const ev = []; for (let t = 0; t < ms; t += 5000) { feed(s); each?.(s); ev.push(...G.tick(s, Math.min(5000, ms - t))); } return ev; };
 const healthy = s => { for (const a of s.animals) { a.sick = 0; a.dirty = 0; } };   // nuôi khéo: không bệnh, không dơ
+const penned = s => { for (const a of s.animals) { a.tile = null; a.stray = false; } };   // lùa về chuồng: để ngủ ngoài thì chồn hương bắt mất (lát 46)
 
 test('vịt có bảng loài riêng, cùng thang tuổi với gà, nuôi chung chuồng gia cầm', () => {
   assert.equal(ANIMALS.vit.pen, ANIMALS.ga.pen);
@@ -31,7 +32,7 @@ test('vịt đi đủ 4 giai đoạn đúng mốc giờ', () => {
   const s = newGame(), d = bird(s, 'vit', 'non', 'f', { age: 0, nextProduct: 1e15 });
   assert.equal(d.stage, 'non');
   const seen = [];
-  for (let t = 0; t < 21 * HOUR; t += MIN) { feed(s); G.tick(s, MIN); if (!seen.includes(d.stage)) seen.push(d.stage); if (d.stage === 'truong') break; }
+  for (let t = 0; t < 21 * HOUR; t += MIN) { feed(s); penned(s); G.tick(s, MIN); if (!seen.includes(d.stage)) seen.push(d.stage); if (d.stage === 'truong') break; }
   assert.deepEqual(seen, ['non', 'nho', 'truong']);
   assert.ok(d.age >= 15 * MIN && d.age < 16 * MIN + 1, 'lên trưởng thành sau 5+10 phút');
   d.age = G.stageStart('vit', 'gia'); feed(s); G.tick(s, 1000);
@@ -57,11 +58,12 @@ test('vịt mái trưởng thành đẻ trứng vịt, nhặt vào kho và bán 
 
 test('vịt non, vịt trống không đẻ; vịt già đẻ thưa hơn vịt trưởng thành', () => {
   const s = newGame(); bird(s, 'vit', 'non', 'f', { nextProduct: 0 }); bird(s, 'vit', 'nho', 'f', { nextProduct: 0 }); bird(s, 'vit', 'truong', 'm', { nextProduct: 0 });
-  run(s, 10 * MIN);   // vịt con 5+10 phút mới lớn
+  run(s, 10 * MIN, penned);   // vịt con 5+10 phút mới lớn
   assert.equal(s.eggs.length, 0);
   const a = newGame(), b = newGame(); bird(a, 'vit', 'truong', 'f'); bird(b, 'vit', 'gia', 'f');
   const laid = ev => ev.filter(e => e.type === 'egg').length;   // đếm lúc đẻ: khỏi phụ thuộc trứng còn nằm đó hay không
-  const nA = laid(run(a, 60 * MIN, healthy)), nB = laid(run(b, 60 * MIN, healthy));
+  const keep = s => { healthy(s); penned(s); };
+  const nA = laid(run(a, 60 * MIN, keep)), nB = laid(run(b, 60 * MIN, keep));
   assert.ok(nB < nA, `già ${nB} < trưởng thành ${nA}`);
 });
 

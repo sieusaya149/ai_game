@@ -14,6 +14,8 @@ const KINDS = [
   { kind: 'thief', kp: 'threat', level: 'urgent', icon: '🧢', label: () => 'Có trộm đang hái cây', spots: s => threats(s, 'thief') },
   { kind: 'pred', level: 'urgent', icon: '🐀', label: n => `${n} kẻ săn mồi đang rình`, spots: s => predWarning(s).map(p => ({ id: p.id, x: p.x, y: p.y, target: { kind: 'pred', id: p.id } })) },
   { kind: 'hurt', level: 'urgent', icon: '🩹', label: n => `${n} con non bị chuột cắn`, spots: s => animals(s, a => a.hurt) },
+  { kind: 'tisun', kp: 'threat', level: 'urgent', icon: '🥚', label: () => 'Tí Sún đang lấy trứng', spots: s => threats(s, 'tisun') },
+  { kind: 'civet', kp: 'threat', level: 'urgent', icon: '🦝', label: () => 'Chồn hương đang rình gà', spots: s => threats(s, 'civet') },
   { kind: 'sick', level: 'urgent', icon: '🤒', label: n => `${n} con vật bệnh nặng`, spots: s => animals(s, a => a.sick >= 2) },
   { kind: 'tired', level: 'normal', icon: '🥱', label: n => `${n} con vật mệt`, spots: s => animals(s, a => a.sick && a.sick < 2) },
   { kind: 'hungry', level: 'normal', icon: '🍽️', label: n => `${n} con vật đói`, spots: s => animals(s, a => !a.sick && a.hunger < HUSBANDRY.growNeedsHunger) },
@@ -29,8 +31,10 @@ const KINDS = [
   { kind: 'poop', level: 'normal', icon: '💩', label: n => `${n} đống phân chó`, spots: s => (s.poops ?? []).map(o => ({ id: o.id, x: o.x, y: o.y, target: { kind: 'poop', id: o.id } })) },
 ];
 
-const threats = (s, kind) => (s.threats ?? []).filter(t => t.kind === kind && t.state === 'eating' && s.plots[t.plot] && mapOf(s).plotCenter(t.plot))
-  .map(t => ({ id: t.id, ...mapOf(s).plotCenter(t.plot), target: { kind: 'threat', id: t.id } }));
+// Chỗ kẻ trộm đang đứng: quạ/Tèo nhắm một ô ruộng, Tí Sún và chồn hương nhắm một điểm trong vườn (t.at)
+const threatAt = (s, t) => t.at ?? (s.plots[t.plot] ? mapOf(s).plotCenter(t.plot) : null);
+const threats = (s, kind) => (s.threats ?? []).filter(t => t.kind === kind && t.state === 'eating' && threatAt(s, t))
+  .map(t => ({ id: t.id, ...threatAt(s, t), target: { kind: 'threat', id: t.id } }));
 const animals = (s, ok) => (s.animals ?? []).filter(a => a.x != null && ok(a)).map(a => ({ id: a.id, x: a.x, y: a.y, target: { kind: 'animal', id: a.id } }));
 const plots = (s, ok) => s.plots.filter(p => p.unlocked && ok(p) && mapOf(s).plotCenter(p.idx))
   .map(p => ({ id: p.idx, ...mapOf(s).plotCenter(p.idx), target: { kind: 'plot', idx: p.idx } }));
