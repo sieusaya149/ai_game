@@ -184,7 +184,7 @@ function updateAnimals(state, w, dt0, out) {
   const ms = M.mudSpot;
   const inMudSpot = a => !!ms && Math.abs(a.x - ms.x) < ms.rx && Math.abs(a.y - ms.y) < ms.ry;
   for (const a of state.animals) {
-    if (a.tile && state.scene === 'farm') { freeWalk(state, a, w, dt0); continue; }
+    if (a.tile && atFarm()) { freeWalk(state, a, w, dt0); continue; }
     const pen = ST.animalPen(state, a);
     if (!pen) continue;
     const area = pen.area, rt = rtOf(w, 'a' + a.id), seen = onScreen(w, a);
@@ -252,7 +252,7 @@ function updateAnimals(state, w, dt0, out) {
 // ---------- Chó Mực ----------
 // Chó chỉ chạy trên cỏ/đường trong đất nhà, không vào chuồng, không giẫm ruộng (chừa 1 ô quanh khối ruộng)
 const dogAllowed = (c, r) => {
-  if (M.scene !== 'farm') return !M.isSolid(c, r);   // đi theo chủ sang làng, vào nhà: chỗ nào người đi được thì chó đi được
+  if (!atFarm()) return !M.isSolid(c, r);   // đi theo chủ sang làng, vào nhà: chỗ nào người đi được thì chó đi được (vườn bạn đang thăm vẫn là vườn)
   if (!M.isOwned(c, r) || M.isSolid(c, r)) return false;
   const g = M.ground[r * M.mw + c];
   if (g !== GROUND.GRASS && g !== GROUND.ROAD) return false;
@@ -701,6 +701,8 @@ export function hitTest(state, wx, wy) {
     const [hw, hh] = p.kind === 'weasel' ? [10, 11] : [12, 14];
     if (hitRect(p.x - hw, p.y - hh, hw * 2, hh + 4, wx, wy, 4)) return { kind: 'pred', id: p.id };
   }
+  // máng ăn xét trước con vật: con vật hay đứng ăn ngay trên máng, chạm vào máng phải chọn được máng (chạm thân con vật phía trên vẫn trúng con vật)
+  for (const { pen, id } of M.troughs) { const tr = M.penById[id].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen, id }; }
   if (atFarm()) {
     for (const a of [...state.animals].sort((u, v) => v.y - u.y)) {
       const im = animalImg(a, 'left', 0);
@@ -720,7 +722,6 @@ export function hitTest(state, wx, wy) {
     if (di && dog.x != null && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
   }
   for (const d of M.decos) if (TAPPABLE_DECO.has(d.kind)) { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
-  for (const { pen, id } of M.troughs) { const tr = M.penById[id].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen, id }; }
   if (atFarm()) for (const p of M.penList) { const g = gateOn(state, p.id) && ST.gateOf(state, p.id); if (g && hitRect(g.x - 14, g.y - 16, 28, 22, wx, wy)) return { kind: 'gate', id: p.id }; }
   for (const p of M.penList) if (p.scale && hitRect(p.scale.x - 8, p.scale.y - 14, 16, 16, wx, wy)) return { kind: 'scale', pen: p.type, id: p.id };
   const cp = coop();

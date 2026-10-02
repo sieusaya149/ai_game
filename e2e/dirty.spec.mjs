@@ -12,6 +12,7 @@ const save = () => makeSave(s => {
   const [c, r] = cand.find(([c, r]) => canPlace(s, { kind: 'pen', pen: 'pig' }, c, r).ok);
   placeEntity(s, { kind: 'pen', pen: 'pig' }, c, r);
   buyAnimal(s, 'heo'); s.coins = 500;
+  s.coUtQuest = null;   // thẻ nhiệm vụ Cô Út (issue 48) che nửa trên màn hẹp; spec này chỉ thử tắm và xúc phân
   s.animals[0].dirty = 100; s.animals[0].wallowAt = 1e15;   // dơ sẵn và chưa tới lúc lăn bùn lại
   s.manure.pig = 100;
   s.inv = { seed_carot: 0 };
@@ -23,10 +24,21 @@ const screenOf = (page, x, y) => page.evaluate(([x, y]) => {
   const f = globalThis.__farm, rc = document.getElementById('game-canvas').getBoundingClientRect();
   return { x: (x * f.scale - f.view.camX) / f.dpr + rc.left, y: (y * f.scale - f.view.camY) / f.dpr + rc.top };
 }, [x, y]);
+// Chạm điểm (x, y) của bản đồ. Điểm đó nằm dưới HUD, thẻ Cô Út, bản đồ nhỏ hay thanh dưới (màn hẹp) thì chạm về
+// phía đó ở chỗ trống cho nhân vật đi tới; vòng toPass bên ngoài chạm lại khi camera đã theo tới.
 async function tap(page, touch, x, y) {
   await page.waitForTimeout(400);
   const p = await screenOf(page, x, y);
-  if (touch) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
+  const q = await page.evaluate(({ x, y }) => {
+    const cv = document.getElementById('game-canvas');
+    const clear = (x, y) => [[0, 0], [-12, 0], [12, 0], [0, -12], [0, 12]].every(([dx, dy]) => document.elementFromPoint(x + dx, y + dy) === cv);
+    if (clear(x, y)) return { x, y };
+    const top = document.getElementById('hud').getBoundingClientRect().bottom + 30, bot = document.getElementById('bottombar').getBoundingClientRect().top - 30;
+    const sx = Math.min(innerWidth - 60, Math.max(60, x));
+    for (let sy = Math.min(bot, Math.max(top, y)), i = 0; i < 40; i++, sy += (y < innerHeight / 2 ? 12 : -12)) if (clear(sx, sy)) return { x: sx, y: sy };
+    return { x: innerWidth / 2, y: (top + bot) / 2 };
+  }, p);
+  if (touch) await page.touchscreen.tap(q.x, q.y); else await page.mouse.click(q.x, q.y);
 }
 const where = (page, id) => page.evaluate(async id => {
   const { sceneMap } = await import('/state.js');

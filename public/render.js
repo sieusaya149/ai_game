@@ -657,7 +657,8 @@ export function render(ctx, f) {
   const small = { non: 0.6, nho: 0.8 };
   for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, Math.round((a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : 6) * (small[a.stage] ?? 1)));
   if (farm && state.dog.x != null && vis(state.dog.x, state.dog.y)) shadow(state.dog.x, state.dog.y, 6);
-  const cats = catsIn(state, m.scene);
+  const here = m.garden ? 'farm' : m.scene;   // vườn bạn đang thăm (scene 'visit'): chó mèo của chủ ghi chỗ ở là 'farm'
+  const cats = catsIn(state, here);
   for (const c of cats) if (c.x != null && vis(c.x, c.y)) shadow(c.x, c.y, Math.round(5 * (small[c.stage] ?? 1)));
   for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
   for (const p of preds) if (p.x != null && vis(p.x, p.y, 40) && p.kind !== 'hawk') shadow(p.x, p.y, p.kind === 'rat' ? 4 : 6);
@@ -891,7 +892,7 @@ export function render(ctx, f) {
   }
   // chó (đi theo chủ thì vẽ cả ở làng, trong nhà; issue 31: ngủ gật 💤, sủa "GÂU GÂU!", chạy đuổi khách lạ, khúc xúc xích dưới đất)
   const dog = state.dog;
-  if ((dog.scene ?? 'farm') === m.scene && dog.x != null && vis(dog.x, dog.y)) {
+  if ((dog.scene ?? 'farm') === here && dog.x != null && vis(dog.x, dog.y)) {
     const rt = wd.rt.get('dog') ?? {};
     const face = rt.face ?? 'right', nap = dogNapping(state), quiet = dogQuiet(state);
     const moving = rt.walking || rt.pose === 'herd';

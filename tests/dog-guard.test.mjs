@@ -5,11 +5,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createGame, startVisit, tick, actionsFor, perform, takeGuestLog,
+  createGame, loadGame, startVisit, tick, actionsFor, perform, takeGuestLog,
   guestOpApply, guestReward, guardRadius, guardArea, dogAsleep, dogQuiet, dogSees,
   walkSpeed, chaseSpeed, setChained, barkOp, biteOp, keepLoot, mapOf, urgentSpots, commandDog, dogPost, stageStart,
 } from '../public/state.js';
 import { todoList } from '../public/todo.js';
+import { readFileSync } from 'node:fs';
 import { setClock, serverDay } from '../public/clock.js';
 import { GUARD, DOG, GUEST, CROPS, DAY_MS, NIGHT_FROM, EVENT_LEVEL, TRICKS } from '../public/data.js';
 import { TS } from '../public/layout.js';
@@ -333,4 +334,17 @@ test('Canh khu nhân đôi bán kính với cả khách online; xích chó thì 
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'chained');
   assert.equal(commandDog(s, 'sit').ok, true, 'ngồi thì xích vẫn ngồi được');
+});
+test('bản lưu v2 cũ có Mực đã lớn: lên v3 là chó trưởng thành, vẫn canh và đớp được khách như trước', () => {
+  const raw = JSON.parse(readFileSync(new URL('./fixtures/v2-farm.json', import.meta.url), 'utf8'));
+  assert.equal(raw.v, 2); assert.equal(raw.dog.adult, true);
+  Object.assign(raw, { tutorial: 99, mode: 'online', account: 'Lan', savedAt: clock });
+  Object.assign(raw.dog, { hunger: 100, happy: 100, chained: false });
+  const s = loadGame(raw);
+  assert.equal(s.dog.stage, 'truong');
+  assert.equal(guardRadius(s), DOG.guardRadius.truong);
+  tick(s, 1000);
+  assert.equal(s.dog.stage, 'truong', 'tuổi khớp giai đoạn: tick không kéo chó về chó con');
+  const b = guestOpApply(s, who('Bình'), op('bite', 'bite', { loot: {} }));
+  assert.equal(b.ok, true, b.msg);
 });

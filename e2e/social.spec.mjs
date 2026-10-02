@@ -6,7 +6,7 @@ import WebSocket from 'ws';
 import { E2E_DB } from '../playwright.config.mjs';
 import { runAdmin } from '../tests/helpers/server.mjs';
 import { makeSave, closeAway, tapPlot } from './helpers.mjs';
-import { moveEntity, mapOf } from '../public/state.js';
+import { moveEntity, mapOf, stageStart } from '../public/state.js';
 import { FIELD_SIZE, TS } from '../public/layout.js';
 import { CROPS, GUEST } from '../public/data.js';
 
@@ -60,7 +60,7 @@ function ownerGarden(s) {
   s.farm.rev++;
   const id = k => s.farm.ents.find(e => e.kind === k).id;
   for (const [k, c, r] of [['shed', 39, 20], ['shipbin', 33, 22], ['doghouse', 43, 32]]) expect(moveEntity(s, id(k), c, r).ok, k).toBe(true);
-  Object.assign(s.dog, mapOf(s).dogHome, { adult: true, hunger: 100, happy: 100, chained: false });
+  Object.assign(s.dog, mapOf(s).dogHome, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false });
   const t0 = mapOf(s).plotTile(0), exit = mapOf(s).arrive.village, o = s.farm.owned, spots = [];
   const field = s.farm.ents.find(e => e.kind === 'field' && t0.c >= e.c && t0.c < e.c + FIELD_SIZE && t0.r >= e.r && t0.r < e.r + FIELD_SIZE);
   for (let r = o.r; r <= o.r + o.h - FIELD_SIZE; r++) for (let c = o.c; c <= o.c + o.w - FIELD_SIZE; c++)

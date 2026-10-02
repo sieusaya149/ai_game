@@ -15,7 +15,9 @@ const base = mutate => makeSave(s => {
 // Ô thả rông thứ k tính từ chỗ gần nhà nhất (ô chắc chắn hợp lệ cho con vật thả rông)
 const roamTile = (s, far = 0) => {
   const m = mapOf(s), sp = m.spawn;
-  const tiles = [...roamOf(s).tiles].sort((a, b) => (Math.hypot(a.c * TS - sp.x, a.r * TS - sp.y)) - (Math.hypot(b.c * TS - sp.x, b.r * TS - sp.y)));
+  // tránh ô sát cửa nhà: chạy theo diều hâu lượn ngang cửa là bước vào nhà mất (cửa đứng ngay cạnh chỗ sinh)
+  const nearDoor = t => m.doors.some(d => Math.hypot(t.c * TS + 8 - (d.x + d.w / 2), t.r * TS + 8 - (d.y + d.h / 2)) < 4 * TS);
+  const tiles = [...roamOf(s).tiles].filter(t => !nearDoor(t)).sort((a, b) => (Math.hypot(a.c * TS - sp.x, a.r * TS - sp.y)) - (Math.hypot(b.c * TS - sp.x, b.r * TS - sp.y)));
   return far ? tiles[tiles.length - 1] : tiles[0];
 };
 const addBird = (s, stage, tile, extra) => {

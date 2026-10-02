@@ -3,7 +3,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { E2E_DB } from '../playwright.config.mjs';
 import { runAdmin } from '../tests/helpers/server.mjs';
 import { makeSave, seedSave, plantedCrop, closeAway } from './helpers.mjs';
-import { mapOf } from '../public/state.js';
+import { mapOf, stageStart } from '../public/state.js';
 
 // Rà giao diện điện thoại: ở 360x740 (và 320x640, 412x915) mở từng màn/bảng rồi kiểm tra
 // không cuộn ngang, nút nào cũng nằm trong màn hình và đủ to, các lớp nổi không đè lên nhau,
@@ -300,7 +300,7 @@ for (const size of SIZES) {
 
     test('chó Mực: xích, thả, cho ăn', async ({ page, context }) => {
       await seedSave(context, makeSave(s => {
-        s.dog.adult = true; s.dog.age = 1e12; s.dog.chained = true; s.inv.sausage = 3;
+        s.dog.stage = 'truong'; s.dog.age = stageStart('cho', 'truong'); s.dog.chained = true; s.inv.sausage = 3;
         const h = s.farm.ents.find(e => e.kind === 'doghouse');
         const p = mapOf(s).dogHome; Object.assign(s.dog, p); Object.assign(s.player, { x: p.x + 12, y: p.y + 20 });
         void h;

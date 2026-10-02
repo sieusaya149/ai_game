@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 import { E2E_DB } from '../playwright.config.mjs';
 import { runAdmin } from '../tests/helpers/server.mjs';
 import { makeSave, closeAway, villageAt } from './helpers.mjs';
-import { moveEntity, mapOf } from '../public/state.js';
+import { moveEntity, mapOf, stageStart } from '../public/state.js';
 import { FIELD_SIZE, TS } from '../public/layout.js';
 import { GUARD, DAY_MS, NIGHT_FROM } from '../public/data.js';
 import { villageCal } from '../public/clock.js';
@@ -72,7 +72,7 @@ function guardGarden(s, opt = {}) {
   for (const d of [far, far + 1, far - 1, far + 2]) for (const [dc, dr] of [[0, -d], [d, -d], [-d, -d], [d, 0], [-d, 0], [d, d], [-d, d], [0, d]])
     if (!placed && moveEntity(s, id('doghouse'), f0.c + dc, f0.r + dr).ok) placed = true;
   expect(placed, 'đặt được chuồng chó').toBe(true);
-  Object.assign(s.dog, mapOf(s).dogHome, { adult: true, hunger: 100, happy: 100, chained: false }, opt.dog ?? {});
+  Object.assign(s.dog, mapOf(s).dogHome, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false }, opt.dog ?? {});
   const p = s.plots[0];
   p.soil = 'tilled'; p.water = 100; p.weeds = false;
   p.crop = { id: 'cachua', progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
@@ -153,6 +153,8 @@ async function approachDog(page, touch, tries = 14) {
 }
 const stealHere = async page => {
   const main = page.locator('#main-action');
+  // quạ của chủ đậu trên ô chín (chó bị xích chỉ canh 3 ô quanh chuồng nên không đuổi quạ xa): đuổi giúp trước rồi mới trộm
+  if (/Đuổi quạ/.test((await main.textContent().catch(() => '')) ?? '')) { await main.click(); await page.waitForTimeout(800); }
   await expect(main).toContainText('Trộm');
   await main.click();
 };
