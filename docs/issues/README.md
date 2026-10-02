@@ -72,7 +72,7 @@ Nguồn: [PRD 0003](../prd/0003-phase-2-vat-nuoi.md).
 | 42 | [Về chuồng và lùa](42-ve-chuong-va-lua.md) | 41 | ✅ |
 | 43 | [Kẻ săn mồi](43-ke-san-moi.md) | 42 | ⬜ |
 | 44 | [Mèo](44-meo.md) | 43 | ⬜ |
-| 45 | [Vòng đời chó và dạy lệnh](45-cho-vong-doi-va-day-lenh.md) | 42 | ⬜ |
+| 45 | [Vòng đời chó và dạy lệnh](45-cho-vong-doi-va-day-lenh.md) | 42 | ✅ |
 | 46 | [Trộm NPC mới](46-trom-npc-moi.md) | 42, 45 | ⬜ |
 | 47 | [Vịt](47-vit.md) | 41 | ✅ |
 | 48 | [Hướng dẫn và thông báo vật nuôi](48-huong-dan-thong-bao-vat-nuoi.md) | 38, 42, 43 | ⬜ |
