@@ -1,9 +1,23 @@
 .git
+.gitignore
+.gitattributes
 node_modules
 test-results
 playwright-report
+playwright*.mjs
+tmp
 farm.db*
+*.db
+*.db-*
 docs
 e2e
 tests
+*.md
+!README.md
+CLAUDE.local.md
+agent-brief.md
+HANDOVER.md
+.claude
 *.png
+# trang xem sprite nháp, không phát hành
+public/_*.html
