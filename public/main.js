@@ -248,7 +248,7 @@ function playOnline(s) {
 function quit() {
   if (world.build) { world.build = null; ui.showBuild(false); }
   state = null; home = null; busy = null; curTarget = null; lastTargetKey = '';
-  ui.setTarget(null, [], '');
+  ui.setTarget(null, [], ''); syncTarget.key = '';   // vào lại đúng chỗ cũ (cùng mục tiêu) thì vẫn hiện lại nút hành động
   ui.setVisit(null);
   ui.setOnline(true);
   liveReset();
