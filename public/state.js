@@ -29,7 +29,7 @@ export const UNLOCK_ORDER = Array.from({ length: GRID * GRID }, (_, i) => i).sor
 
 // ---------- Tiện ích ----------
 let evq = [];            // hàng đợi event; tick() trả ra và xóa
-let catchUp = false;     // đang chạy bù offline: không sinh quạ/trộm
+let catchUp = false;     // đang chạy bù offline: không sinh quạ, trộm NPC chỉ lấy trứng hay rau (ADR 0004)
 const emit = e => evq.push(e);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -280,6 +280,8 @@ export function loadGame() {
   s.teoCaught = Math.max(0, Math.floor(s.teoCaught) || 0);
   s.choreWeek = Number.isFinite(s.choreWeek) ? s.choreWeek : -1;
   s.raid ??= null; s.caught ??= null; s.chore ??= null;
+  // thoát game lúc hộp thoại phạt còn mở: coi như đã chọn bắt đền, khỏi treo lơ lửng
+  if (s.caught) { const c = s.caught; s.caught = null; addCoins(s, c.coins); log(s, `${c.name} xin lỗi và đền ${c.coins} xu`); }
   s.frozenMs = 0; delete s.away;
   evq = [];
   const t = now(), gone = Math.max(0, t - (s.savedAt || t)), elapsed = Math.min(gone, MAX_CATCHUP_MS);

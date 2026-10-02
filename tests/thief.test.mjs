@@ -343,3 +343,15 @@ test('bản lưu cũ chưa biết tới trộm NPC vẫn tải được', () => 
   assert.deepEqual(G.punishOptions(back), []);
   void ANIMALS; void DOG; void FREE;
 });
+
+test('thoát game lúc hộp thoại phạt còn mở: mở lại thì coi như đã bắt đền xu', () => {
+  const s = newGame();
+  s.caught = { kind: 'tisun', name: 'Tí Sún', coins: 40 };
+  const c = s.coins;
+  s.savedAt = Date.now();
+  G.saveGame(s);
+  const back = G.loadGame();
+  assert.equal(back.caught, null, 'không treo lơ lửng qua lần mở sau');
+  assert.equal(back.coins, c + 40, 'xu bắt đền vẫn vào túi');
+  assert.ok(back.log.some(l => /Tí Sún/.test(l.text)), 'có ghi nhật ký');
+});
