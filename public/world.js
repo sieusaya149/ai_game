@@ -155,6 +155,7 @@ function updateAnimals(state, w, dt0, out) {
           const st = Math.min(d, speed * dt);
           a.x = clamp(a.x + dx / d * st, area.x, area.x + area.w);
           a.y = clamp(a.y + dy / d * st, area.y, area.y + area.h);
+          a.walk = (a.walk || 0) + st;   // quãng đã đi (heo ít đi thì mau béo)
           if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
           rt.walking = true; rt.anim += dt;
         }
@@ -289,6 +290,7 @@ export const keyOf = t => t.kind + (t.id ?? t.idx ?? t.pen ?? t.to ?? t.dir ?? '
 const doorOf = to => M.doors.find(d => d.to === to);
 const inDoor = (d, x, y) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h;
 const troughAnchor = tg => { const t = troughOf(M, tg); return t ? { x: t.x, y: t.r * TS + 8 } : null; };
+const scaleOf = t => (M.penById[t.id] ?? M.pens[t.pen])?.scale;   // cân của chuồng heo { pen, id }
 const coop = () => M.building('coop');
 // Điểm trên ranh đất nhà theo hướng dir, thẳng với người chơi (target mua đất: đứng sát mép là chạm được)
 function stripEdge(state, dir) {
@@ -317,6 +319,7 @@ export function targetPos(state, t) {
     case 'threat': return findBy(state.threats, t.id);
     case 'dog': return state.dog;
     case 'trough': return troughAnchor(t);
+    case 'scale': { const c = scaleOf(t); return c ? { x: c.x, y: c.y + 8 } : null; }
     case 'nest': return coop()?.at ?? null;
     case 'building': return M.buildings.find(b => b.id === t.id)?.at ?? null;
     case 'door': return doorOf(t.to)?.at ?? null;
@@ -335,7 +338,7 @@ export function exists(state, t) {
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
 }
-const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
+const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -382,6 +385,7 @@ export function findTarget(state, w) {
     for (const dir of ['N', 'S', 'E', 'W']) consider({ kind: 'strip', dir });
   }
   for (const { pen, id } of M.troughs) consider({ kind: 'trough', pen, id });
+  for (const p of M.penList) if (p.scale) consider({ kind: 'scale', pen: p.type, id: p.id });
   for (const d of M.decos) if (d.kind === 'deco_bench') consider({ kind: 'deco', id: d.id });
   for (const b of M.buildings) if (b.at && b.id !== 'coop') consider({ kind: 'building', id: b.id });
   if (!atFarm()) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì sang nhà/làng bằng nút của nhà/cổng
@@ -400,6 +404,7 @@ export function nameOf(state, t) {
     case 'threat': return findBy(state.threats, t.id)?.kind === 'thief' ? 'Thằng Tèo' : 'Con quạ';
     case 'dog': return state.dog.name || DOG.name;
     case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;
+    case 'scale': return 'Cân heo';
     case 'nest': return 'Ổ ấp trứng';
     case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
@@ -422,6 +427,7 @@ export function anchorOf(state, t) {
     case 'dog': { const im = dogImg(state.dog, 'left', 0); return { x: pos.x, top: pos.y - (im?.height ?? 12) - 1 }; }
     case 'threat': { const th = pos; const alt = 0; return th.kind === 'crow' ? { x: th.x, top: th.y - 16 - alt } : { x: th.x, top: th.y - 26 }; }
     case 'trough': return { x: pos.x, top: pos.y - 12 };
+    case 'scale': return { x: pos.x, top: pos.y - 24 };
     case 'nest': return { x: pos.x, top: pos.y - 14 };
     case 'building': {
       const b = M.buildings.find(bb => bb.id === t.id);
@@ -456,6 +462,7 @@ export function hitTest(state, wx, wy) {
   }
   for (const d of M.decos) if (d.kind === 'deco_bench') { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
   for (const { pen, id } of M.troughs) { const tr = M.penById[id].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen, id }; }
+  for (const p of M.penList) if (p.scale && hitRect(p.scale.x - 8, p.scale.y - 14, 16, 16, wx, wy)) return { kind: 'scale', pen: p.type, id: p.id };
   const cp = coop();
   if (cp && hitRect(cp.x, cp.y, 30, 28, wx, wy, 0) || cp && hitRect(cp.at.x - 9, cp.at.y - 12, 18, 12, wx, wy)) return { kind: 'nest' };
   for (const b of M.buildings) {

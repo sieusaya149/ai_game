@@ -139,6 +139,23 @@ export const weightAt = (type, stage) => {
   return stage === 'non' ? w0 : stage === 'nho' ? (w0 + w1) / 2 : w1;
 };
 
+// ---------- Bán cho Chú Ba, heo theo cân, nghỉ hưu (issue 40) ----------
+// Con thường: giá bán ANIMALS[].sell × stageMul × bondMul (heo: số ký × giá chợ hôm đó × bondMul, không nhân stageMul vì cân đã nói lên giai đoạn)
+// Con bệnh / dơ thì nhân thêm sickMul / dirtyMul. Bán con ❤️confirmBond+ phải xác nhận `confirms` lần.
+export const TRADE = {
+  stageMul: { non: 0, nho: 0.6, truong: 1, gia: 0.6 },
+  bondMul: [0.85, 1, 1.15, 1.3, 1.5],   // ❤️1..5
+  sickMul: 0.6, dirtyMul: 0.8,
+  confirmBond: 4, confirms: 2,
+  pigKg: [4, 5, 5, 6, 7, 6, 4],         // lịch giá heo hơi (xu/kg) theo ngày game, lặp mỗi 7 ngày
+  walkPx: 16,                           // px/giây heo đi hết ga; ít đi hơn thì coi là ít vận động
+  gainActive: 0.6, gainLazy: 1.5,       // hệ số tăng cân khi hay vận động / nằm ườn
+  gainFull: 1.25, fullAt: 90,           // ăn no (đói ≥ fullAt) tăng thêm
+  retireHappy: 75,                      // có con nghỉ hưu: cả chuồng vui tối thiểu mức này
+  retireUndo: false,                    // nghỉ hưu có đảo ngược được không
+  visitMs: 6200,                        // Chú Ba dắt con vật đi: cảnh dài chừng này (chỉ hiển thị)
+};
+export const pigKgPrice = day => TRADE.pigKg[((day | 0) % 7 + 7) % 7];
 // ---------- Chó ----------
 export const DOG = {
   name: 'Mực',

@@ -18,7 +18,7 @@ function farmWith(type, bond, dx, dy, extra = {}, far = false) {
     buyAnimal(s, type);
     const a = s.animals[0], area = mapOf(s).pens[{ ga: 'chicken', heo: 'pig', bo: 'pasture' }[type]].area;
     Object.assign(a, { stage: 'truong', age: stageStart(type, 'truong'), bond, bondXp: 0, hunger: 100, happy: 60, x: area.x + (far ? 6 : area.w / 2), y: area.y + area.h / 2, ...extra });
-    s.player.x = far ? area.x + area.w + 60 : a.x + dx; s.player.y = a.y + dy;
+    s.player.x = far ? area.x - 60 : a.x + dx; s.player.y = a.y + dy;   // far: đứng ngoài chuồng, phía trái (con vật ở sát rào trái)
     s.savedAt = Date.now();
   });
 }
@@ -30,7 +30,8 @@ const open = async (page, context, save) => {
 const dist = page => page.evaluate(() => { const { animals: [a], player: p } = globalThis.__farm.state; return Math.hypot(a.x - p.x, a.y - p.y); });
 
 test('bò ❤️1: vuốt ve và cho ăn tận tay thì tim bay lên và số tim tăng', async ({ page, context }) => {
-  await open(page, context, farmWith('bo', 1, 0, 24, { hunger: 30 }));
+  // bò sạch, chưa lăn bùn lại: bò dơ thì việc chính là Tắm (lát 37), không phải Vuốt ve
+  await open(page, context, farmWith('bo', 1, 0, 24, { hunger: 30, dirty: 0, wallowAt: 1e15 }));
   const touch = test.info().project.name === 'mobile';
   let sawHeart = false;
   await expect(async () => {
@@ -47,17 +48,25 @@ test('bò ❤️1: vuốt ve và cho ăn tận tay thì tim bay lên và số ti
 });
 
 test('gà ❤️4: người chơi tới gần thì gà chạy lại', async ({ page, context }) => {
-  await open(page, context, farmWith('ga', 4, 60, 0));
+  // đứng ngoài tầm chạy lại (BOND.runRange) trước, rồi mới bước tới gần: gà ❤️4 chạy ngay khi trong tầm nên không đo kịp nếu đứng gần từ đầu
+  await open(page, context, farmWith('ga', 4, 120, 0));
+  expect(await dist(page)).toBeGreaterThan(90);
+  await page.evaluate(() => { const { animals: [a], player: p } = globalThis.__farm.state; p.x = a.x + 60; p.y = a.y; });
   expect(await dist(page)).toBeGreaterThan(50);
   await expect.poll(() => dist(page), { timeout: 15_000 }).toBeLessThan(32);
 });
 
 test('heo ❤️5: heo đi theo người chơi (người đứng ngoài chuồng thì heo ra sát hàng rào phía người)', async ({ page, context }) => {
-  await open(page, context, farmWith('heo', 5, 0, 0, {}, true));
+  // heo sạch, chưa lăn bùn (heo dơ dễ bệnh, bệnh thì không đi theo); người đứng phía trái trước rồi mới vòng sang phải
+  await open(page, context, farmWith('heo', 5, 0, 0, { dirty: 0, wallowAt: 1e15 }, true));
   const gap = () => page.evaluate(async () => {
     const { mapOf } = await import('/state.js'), s = globalThis.__farm.state, a = s.animals[0], area = mapOf(s).pens.pig.area;
     return area.x + area.w - a.x;
   });
   expect(await gap()).toBeGreaterThan(20);
+  await page.evaluate(async () => {
+    const { mapOf } = await import('/state.js'), s = globalThis.__farm.state, area = mapOf(s).pens.pig.area;
+    s.player.x = area.x + area.w + 60;
+  });
   await expect.poll(gap, { timeout: 20_000 }).toBeLessThan(6);
 });

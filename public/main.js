@@ -1,11 +1,11 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
+  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, sellQuote,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
-import { DIR_NAME } from './data.js';
+import { DIR_NAME, ANIMALS } from './data.js';
 import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
@@ -87,8 +87,25 @@ function updateCamera(dt, snap) {
 // ---------- API cho ui.js ----------
 function changed() { dirty = true; }
 
-function doAction(target, id) {
+// Bán con vật: báo giá, con ❤️4+ phải xác nhận 2 lần. Nghỉ hưu: hỏi một lần (không quay lại được)
+async function askAnimal(target, id) {
+  const a = state.animals.find(x => x.id === target.id);
+  if (!a) return null;
+  const nm = ANIMALS[a.type].name.toLowerCase();
+  if (id === 'retire') return await ui.confirmBox(`Cho ${nm} nghỉ hưu? Nó ở lại trại nhưng không cho sản phẩm nữa.`, 'Nghỉ hưu', 'Thôi') ? target : null;
+  const q = sellQuote(state, a);
+  const ask = q.kg != null ? `Chú Ba trả ${q.price} xu cho ${q.kg} kg (${q.unit} xu/kg hôm nay). Bán ${nm} này?` : `Chú Ba trả ${q.price} xu. Bán ${nm} này?`;
+  for (let i = 0; i < Math.max(1, q.need); i++) {
+    const text = q.need ? (i ? `Chắc chắn bán ${nm} ${'❤️'.repeat(a.bond)} chứ? Không đón lại được đâu!` : `${ask} Con này thân với bạn lắm ${'❤️'.repeat(a.bond)}`) : ask;
+    if (!await ui.confirmBox(text, i ? 'Bán thật' : 'Bán', 'Thôi', !!q.need)) return null;
+  }
+  return { ...target, confirms: q.need };
+}
+
+async function doAction(target, id) {
   if (!state || busy || fading || world.stun > 0) return;
+  if (target.kind === 'animal' && (id === 'sell' || id === 'retire') && !(target = await askAnimal(target, id))) return;
+  if (busy || !V.exists(state, target)) return;
   const pos = V.targetPos(state, target);
   if (pos) V.faceTo(state, pos.x, pos.y);
   V.cancelMove(world);
@@ -107,6 +124,7 @@ function applyResult(res, target, id) {
   if (evs.length) ui.handleEvents(evs);
   if (res.msg && (!res.ok || !res.fx?.length)) ui.toast(res.msg);
   if (res.open) ui.openPanel(res.open);
+  if (res.sold) (world.deals ??= []).push({ ...res.sold, t0: now });   // Chú Ba tới dắt đi
   if (res.go) goScene(res.go);
   if (res.bath != null) (world.baths ??= []).push({ id: res.bath, t0: now });
   if (res.buyStrip) askStrip(res.buyStrip);

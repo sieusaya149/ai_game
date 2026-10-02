@@ -76,6 +76,10 @@ function build(f) {
       pens[e.pen] ??= pen;   // pens[loại] = chuồng đầu tiên của loại đó; penList/penById có đủ mọi chuồng
       penList.push(pen); penById[e.id] = pen;
       if (trough) { troughs.push({ pen: e.pen, id: e.id, c: trough.c, r: trough.r, w: 2 }); block(trough.c, trough.r, 2, 1); }
+      if (d.scale) {   // cân heo đặt cạnh máng của từng chuồng heo
+        pen.scale = { c: e.c + d.scale.c, r: e.r + d.scale.r, x: px + d.scale.x, y: py + d.scale.y };
+        block(pen.scale.c, pen.scale.r, 1, 1);
+      }
       if (d.nest && !buildings.some(b => b.id === 'coop')) {   // ổ ấp chỉ có ở chuồng gà đầu tiên
         const n = d.nest;
         buildings.push({ id: 'coop', kind: 'coop', name: 'Ổ ấp trứng', sprite: 'coop', x: px + n.spr.x, y: py + n.spr.y,

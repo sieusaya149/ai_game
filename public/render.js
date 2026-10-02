@@ -6,7 +6,7 @@ import { SPR3, muddy } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
-import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
+import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
 
@@ -196,6 +196,7 @@ export function bathPhase(b, now) {
   return e < 1200 ? { name: 'soap', t: e / 1200 } : e < 2000 ? { name: 'shake', t: (e - 1200) / 800 } : e < BATH_MS ? { name: 'sparkle', t: (e - 2000) / 1000 } : null;
 }
 export const ANGEL_MS = 2600;   // thiên thần bay lên trong chừng này ms
+export const DEAL_MS = TRADE.visitMs;   // Chú Ba dắt con vật đi: cảnh dài chừng này ms
 const angelFallback = () => once('angel', () => {
   const c = mkCanvas(10, 11), x = c.getContext('2d');
   rect(x, '#f7d547', 3, 0, 4, 1); rect(x, '#ffffff', 0, 4, 3, 2); rect(x, '#ffffff', 7, 4, 3, 2); rect(x, '#fff3e0', 3, 2, 4, 8);
@@ -508,7 +509,7 @@ export function render(ctx, f) {
     if (!img || !vis(b.x + img.width / 2, b.y + img.height / 2, Math.max(img.width, img.height) / 2)) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
     if (b.npc) {   // người đứng cạnh công trình (Bà Tư), thở nhẹ hai nhịp
-      const idle = SPR2?.[b.npc.key + 'Idle'], im = idle?.[Math.floor(now / 700) % idle.length];
+      const idle = SPR2?.[b.npc.key + 'Idle'] ?? SPR3?.[b.npc.key + 'Idle'], im = idle?.[Math.floor(now / 700) % idle.length];
       if (im) add(b.npc.y, () => blit(im, b.npc.x - 8, b.npc.y - 24));
     }
     if (b.id === 'market' && SPR2?.marketClosed && !marketOpen(state)) add((b.foot.r + b.foot.h) * TS + 0.5, () => blit(SPR2.marketClosed, b.x + 12, b.y + 22));
@@ -523,6 +524,10 @@ export function render(ctx, f) {
       if (n <= 0) { rect(ctx, '#8a5a2b', tr.x - 12, tr.y - 9, 24, 3); rect(ctx, '#6b4020', tr.x - 12, tr.y - 9, 24, 1); }
       else { rect(ctx, '#3b2412', tr.x - 10, tr.y + 1, 20, 3); rect(ctx, '#5fd35f', tr.x - 9, tr.y + 2, Math.max(1, Math.round(18 * Math.min(1, n / 20))), 1); }
     });
+  }
+  for (const p of m.penList) {   // cân heo, mỗi chuồng heo một cái
+    const sc = p.scale, im = SPR3?.scale;
+    if (sc && im && vis(sc.x, sc.y, 20)) add(sc.y, () => blit(im, sc.x - 8, sc.y - 14));
   }
   // ổ ấp trứng cạnh chuồng gà nhỏ
   const coop = m.building('coop');
@@ -616,6 +621,34 @@ export function render(ctx, f) {
     else if (a.pregnant) icon = statusIcon('pregnant');
     else if (sleeping) icon = statusIcon('zzz');
     bub(a.x, a.y - im.height - 1, icon, 'a' + a.id);
+    if (a.retired) add(a.y + 1, () => { ctx.font = '7px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🪑', a.x + im.width / 2 + 1, a.y); });   // nghỉ hưu: ghế bên cạnh
+  }
+  // Chú Ba tới cổng, dắt con vật vừa bán đi (cảnh thuần hiển thị; main.js đẩy vào wd.deals khi bán xong)
+  const gin = m.gateIn;
+  for (const d of farm && gin ? wd.deals ?? [] : []) {
+    const u = (now - d.t0) / DEAL_MS, spot = { x: d.x, y: d.y };
+    if (u < 0 || u > 1) continue;
+    const lerp = (p, q, k) => ({ x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k });
+    const out = u > 0.47, cb = u < 0.35 ? lerp(gin, spot, u / 0.35) : !out ? spot : lerp(spot, gin, (u - 0.47) / 0.53);
+    const from = u < 0.35 ? gin : spot, to = u < 0.35 ? spot : gin, mv = u < 0.35 || out;
+    const dx = to.x - from.x, dy = to.y - from.y, dir = !mv ? 0 : Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : dy < 0 ? 3 : 0;
+    const set = SPR3?.npcChuBa?.[dir], im = set ? set[mv ? Math.floor(now / 140) % set.length : 0] : null;
+    const pet = animalImg({ type: d.type, stage: d.stage, sex: d.sex }, dx < 0 ? 'left' : 'right', out ? Math.floor(now / 160) % 2 : 0);
+    const L = Math.hypot(dx, dy) || 1, ap = out ? { x: cb.x - dx / L * 18, y: cb.y - dy / L * 18 } : spot;
+    add(Math.max(cb.y, ap.y), () => {
+      ctx.globalAlpha = u > 0.92 ? (1 - u) / 0.08 : 1;
+      if (pet) blit(pet, ap.x - pet.width / 2, ap.y - pet.height + 1);
+      if (out) { ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(cb.x + (dx < 0 ? -5 : 5), cb.y - 9); ctx.lineTo(ap.x, ap.y - 4); ctx.stroke(); }
+      if (im) blit(im, cb.x - 8, cb.y - 23);
+      if (u > 0.3 && u < 0.62) {   // bong bóng báo giá
+        const t = d.kg != null ? `${d.kg} kg × ${d.unit} = ${d.price} xu` : `${d.price} xu`;
+        ctx.font = '6px sans-serif'; ctx.textAlign = 'center';
+        const w = ctx.measureText(t).width + 6, bx = Math.round(cb.x - w / 2), by = Math.round(cb.y - 36);
+        rect(ctx, '#3b2412', bx - 1, by - 1, w + 2, 11); rect(ctx, '#fff6dc', bx, by, w, 9);
+        ctx.fillStyle = '#3b2412'; ctx.fillText(t, cb.x, by + 7);
+      }
+      ctx.globalAlpha = 1;
+    });
   }
   // con vật già ra đi: thiên thần bay lên rồi mờ dần (main.js đẩy vào wd.angels khi có event 'passed')
   for (const g of wd.angels ?? []) {

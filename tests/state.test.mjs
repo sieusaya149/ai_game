@@ -223,7 +223,7 @@ test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
   G.perform(s, { kind: 'animal', id: 50 }, 'milk');
   assert.equal(s.basket.sua, 1);
   const sellAct = G.actionsFor(s, { kind: 'animal', id: 50 }).find(a => a.id === 'sell');
-  assert.match(sellAct.label, /Bán bò \(700 xu\)/);
+  assert.match(sellAct.label, /Bán bò cho Chú Ba \(700 xu\)/);
   const c = s.coins;
   G.perform(s, { kind: 'animal', id: 50 }, 'sell');
   assert.equal(s.coins, c + 700);
