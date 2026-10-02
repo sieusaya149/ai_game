@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { makeSave, seedSave, bigFarmSave, closeAway } from './helpers.mjs';
 
-// Máy yếu giả lập: CPU chậm đi `rate` lần (chỉ giả lập, không phải điện thoại thật)
+// Máy yếu giả lập: CPU chậm đi `rate` lần (chỉ giả lập, không phải điện thoại thật).
+// Dùng 12×: 6× chưa đủ chậm trên máy dev nhanh nên game không gợi ý, test chập chờn.
 async function throttle(page, rate) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate });
@@ -70,7 +71,7 @@ test('dời một công trình chỉ vẽ lại vài mảng nền', async ({ pag
 test('máy chậm (CPU giả lập) thì gợi ý bật tiết kiệm pin, chỉ một lần', async ({ page, context }) => {
   test.setTimeout(90_000);
   await seedSave(context, bigFarmSave(), { hint: true });
-  await throttle(page, 6);
+  await throttle(page, 12);
   await page.goto('/');
   await ready(page);
   const dlg = page.locator('#dialog-root');
@@ -89,7 +90,7 @@ test('máy chậm (CPU giả lập) thì gợi ý bật tiết kiệm pin, chỉ
 test('máy chậm: nhận gợi ý thì tiết kiệm pin bật và nhớ qua lần tải lại', async ({ page, context }) => {
   test.setTimeout(90_000);
   await seedSave(context, bigFarmSave(), { hint: true });
-  await throttle(page, 6);
+  await throttle(page, 12);
   await page.goto('/');
   await ready(page);
   const dlg = page.locator('#dialog-root');

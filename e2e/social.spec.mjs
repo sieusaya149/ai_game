@@ -148,6 +148,8 @@ test('A offline: B giúp 2 việc, trộm 1 ô, bị chó đuổi, để lại m
   const fit = await st(A.page, () => {
     const card = document.querySelector('#away .away-card'), list = card.querySelector('.away-guests');
     for (let i = 0; i < 30; i++) list.append(list.lastElementChild.cloneNode(true));
+    // hiệu ứng "pop" phóng to 1.05 lúc mở; trang của A nằm sau trang B nên trình duyệt có thể chạy chậm hiệu ứng, cho xong hẳn rồi mới đo
+    card.getAnimations().forEach(a => a.finish());
     card.scrollTop = 0;
     const before = card.scrollTop;
     card.scrollTop = 99999;
