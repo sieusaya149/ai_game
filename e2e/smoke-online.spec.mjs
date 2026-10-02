@@ -8,6 +8,7 @@
 //        $env:SMOKE_INVITES='XXXX-XXXX,YYYY-YYYY'; npm run test:smoke; Remove-Item Env:SMOKE_INVITES
 //      (chỉ chạy bộ online: npx playwright test -c playwright.smoke.config.mjs e2e/smoke-online.spec.mjs)
 //      Thử với server local: $env:SMOKE_URL='http://127.0.0.1:4173' (mã mời tạo bằng admin trên DB của server đó).
+//      Giả lập mạng chậm như bản thật: thêm $env:SMOKE_LAG_MS='300' (mỗi request /api/* trễ chừng đó).
 //   3. Cuối lần chạy in ra dòng "SMOKE_ACCOUNTS: zzsmokeXXXXX zzsmokeYYYYY". Xóa hai tài khoản test trên VPS:
 //        cd ~/project/ai_game && docker compose exec web node server/admin.mjs delete-account zzsmokeXXXXX
 //        cd ~/project/ai_game && docker compose exec web node server/admin.mjs delete-account zzsmokeYYYYY
@@ -28,6 +29,7 @@ const INVITES = (process.env.SMOKE_INVITES || '').split(/[\s,;]+/).filter(Boolea
 const rand = () => Math.random().toString(36).slice(2, 7);
 const NAMES = ['zzsmoke' + rand(), 'zzsmoke' + rand()];
 const PIN = String(100000 + Math.floor(Math.random() * 900000));
+const LAG = Number(process.env.SMOKE_LAG_MS) || 0;
 const NET = { timeout: 20_000 };                  // mạng thật: chờ rộng tay
 const GATE_AT = { x: 488, y: 364 };               // trước cổng bạn bè trong làng
 const MARKET_AT = { x: 296, y: 96 };              // cạnh sạp chợ Bà Tư
@@ -145,6 +147,7 @@ async function relog(P) {
 async function bringUp(browser, baseURL, name, invite, mutate) {
   const context = await browser.newContext({ baseURL, viewport: { width: 1280, height: 800 } });
   await seedSave(context, makeSave(mutate, { name: 'Smoke' }));
+  if (LAG) await context.route('**/api/**', async r => { await new Promise(res => setTimeout(res, LAG)); await r.continue().catch(() => {}); });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');

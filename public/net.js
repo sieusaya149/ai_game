@@ -34,25 +34,36 @@ async function call(path, body) {
   } catch { return { ok: false, status: 0, error: 'Không kết nối được tới làng. Kiểm tra mạng rồi thử lại nhé.' }; }
 }
 
+// Đăng xuất đang chạy (lưu lần cuối rồi xóa phiên): hỏi phiên / đăng nhập phải chờ nó xong,
+// không thì mạng chậm sẽ thấy cookie cũ còn hạn, vào lại tài khoản vừa thoát rồi bị server đá ra
+let leaving = null;
+
 export async function login(name, pin) {
+  await leaving;
   const r = await call('/api/login', { name, pin });
   if (r.ok) remember(r.name);
   return r;
 }
 export async function register(name, pin, invite) {
+  await leaving;
   const r = await call('/api/register', { name, pin, invite });
   if (r.ok) remember(r.name);
   return r;
 }
-export async function logout() {
-  await call('/api/logout', {});
-  remember(null);
+// before: việc phải xong trước khi xóa phiên (gửi bản lưu cuối bằng phiên này)
+export function logout(before) {
+  return leaving = (async () => {
+    await before;
+    await call('/api/logout', {});
+    remember(null);
+  })();
 }
 // Đọc vườn của người khác để thăm (issue 27, chỉ đọc, server đã chạy bù): { ok, name, farm, savedAt } hoặc { ok: false, error }
 export const visitFarm = name => call('/api/visit?name=' + encodeURIComponent(name));
 // Máy này còn đăng nhập không? Trả tên, hoặc null (hết hạn/chưa vào làng). Mất mạng thì null nhưng giữ ghi nhớ.
 // force: hỏi server kể cả khi máy không nhớ (nút Vào làng: cookie còn hạn thì khỏi nhập PIN)
 export async function whoAmI(force) {
+  await leaving;
   if (!force && !rememberedName()) return null;
   const r = await call('/api/me');
   if (r.ok) { remember(r.name); return r.name; }

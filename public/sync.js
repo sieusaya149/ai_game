@@ -42,7 +42,7 @@ export async function claim(name) {
 // onMessage(m): mọi tin khác từ WebSocket (làng real-time, issue 25); hello = vừa kết nối (lại) xong, { t: 'down' } = rớt kết nối.
 export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReject, onMessage }) {
   let ws = null, wsOk = false, httpOk = true, shown = true, stopped = false, busy = false, timer = 0, retry = 0, backoff = 1000, rejected = '';
-  const status = () => { const on = wsOk && httpOk; if (on !== shown) { shown = on; onStatus?.(on); } };
+  const status = () => { if (stopped) return; const on = wsOk && httpOk; if (on !== shown) { shown = on; onStatus?.(on); } };
   const later = ms => { clearTimeout(timer); if (!stopped) timer = setTimeout(loop, ms); };
   const body = s => JSON.stringify({ play, save: s });
 
@@ -88,9 +88,9 @@ export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReje
       else if (m.t !== 'hello') onMessage?.(m);
     };
     s.onclose = () => {
-      if (ws !== s) return;
+      if (ws !== s || stopped) return;   // đã ngừng (đăng xuất / bị thay): đừng bật lại biểu tượng mất mạng
       wsOk = false; status(); onMessage?.({ t: 'down' });
-      if (!stopped) { retry = setTimeout(connect, backoff); backoff = Math.min(backoff * 2, 10_000); }
+      retry = setTimeout(connect, backoff); backoff = Math.min(backoff * 2, 10_000);
     };
   }
   // trình duyệt báo có mạng lại: kết nối lại và gửi bù ngay, khỏi chờ nhịp

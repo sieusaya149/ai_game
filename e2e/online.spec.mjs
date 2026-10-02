@@ -109,6 +109,27 @@ test('"Bắt đầu vườn mới" cho vườn khởi đầu sạch, không đ�
   await expect(page.locator('#hud-coins-n')).toHaveText('777');
 });
 
+test('mạng chậm: đăng xuất rồi bấm Vào làng ngay thì hiện ô đăng nhập; đăng nhập lại không còn biểu tượng mất mạng', async ({ page, context }) => {
+  test.setTimeout(60_000);
+  await noHint(context);
+  const name = uniq();
+  await newOnlineFarm(page, name);
+  // mỗi request tới server chậm 800 ms (mạng di động yếu): lưu lần cuối + đăng xuất chưa xong thì người chơi đã bấm tiếp
+  await context.route('**/api/**', async r => { await new Promise(res => setTimeout(res, 800)); await r.continue().catch(() => {}); });
+  await page.locator('.bb-btn[data-panel="settings"]').click();
+  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await page.getByRole('button', { name: /Vào làng/ }).click();
+  await expect(page.getByPlaceholder('PIN 6 số')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('nongtrai-online'))).toBeNull();
+  await page.getByPlaceholder('Tên nhân vật').fill(name);
+  await page.getByPlaceholder('PIN 6 số').fill('123456');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(page.locator('#creator')).toBeHidden();
+  await page.waitForFunction(() => globalThis.__farm?.state?.mode === 'online');
+  await expect(page.locator('#hud-name')).toHaveText(name);
+  await expect(page.locator('#hud-net')).toBeHidden();
+});
+
 test('tự lưu lên làng; mất mạng vẫn chơi, hiện biểu tượng, có mạng lại thì tự lưu bù', async ({ page, context }) => {
   test.setTimeout(90_000);
   await noHint(context);

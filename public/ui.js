@@ -1597,7 +1597,7 @@ PANELS.settings = {
       section('Làng'),
       ...(s.mode === 'online'
         ? [h('p', { class: 'mini' }, `Đang ở làng với tên ${s.account}. Vườn tự lưu lên làng.`),
-          btn('Đăng xuất', async () => { closePanel(); await api.leaveToMode(); await net.logout(); }, 'plain')]
+          btn('Đăng xuất', () => { closePanel(); net.logout(api.leaveToMode()); }, 'plain')]
         : [btn('🏘️ Vào làng', () => { closePanel(); api.leaveToMode(); }, 'green')]),
       section('Nguy hiểm'),
       btn('🗑️ Chơi lại từ đầu', async () => {
