@@ -114,7 +114,7 @@ export const LIFE = {
   heo: { non: 10 * MIN, nho: 20 * MIN, truong: 30 * HOUR, gia: 6 * HOUR },
   bo:  { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
   cuu: { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
-  cho: { non: 30 * MIN, nho: HOUR,     truong: Infinity,  gia: Infinity },
+  cho: { non: 30 * MIN, nho: HOUR,     truong: 40 * HOUR, gia: Infinity },   // chó có tuổi già nhưng không bao giờ ra đi
 };
 // Tuổi lúc bắt đầu một giai đoạn · giai đoạn ở tuổi `age` · tuổi ra đi (Infinity = không bao giờ)
 export const stageStart = (kind, stage) => STAGES.slice(0, STAGES.indexOf(stage)).reduce((t, k) => t + LIFE[kind][k], 0);
@@ -194,10 +194,39 @@ export const DOG = {
   hungerMs: 8 * MIN,
   poopEvery: [2 * MIN, 4 * MIN], // chó ỉa bậy ngẫu nhiên trong khoảng này
   maxPoops: 8,
+  poopPupMul: 0.55,           // chó con nghịch và ỉa nhiều hơn hẳn
   poopFertChance: 0.5,        // xúc phân chó: 50% được 1 bao phân bón
   stinkUnhappyPerPoop: 2,     // mỗi bãi phân làm vật nuôi giảm vui mỗi phút
   slipStunMs: 900,            // giẫm phải phân: trượt, đứng hình 0.9 giây
   guardChance: 0.7,           // chó no & vui đuổi được trộm/quạ
+  guardRadius: { non: 0, nho: 4, truong: 6, gia: 4 },   // bán kính phát hiện trộm (ô): chó con chưa canh, chó già mắt kém lại
+  guardPostMul: 2,            // đang gác một chỗ (lệnh Canh khu): bán kính ×2 tại chỗ gác
+};
+
+// ---------- Dạy lệnh cho chó (issue 45) ----------
+// sessions = số buổi phải đạt. Ngồi là lệnh nền, phải học trước mọi lệnh khác.
+export const TRICKS = {
+  sit:    { name: 'Ngồi',      icon: '🪑', sessions: 2, desc: 'Mực ngồi yên một chỗ, không chạy lung tung.' },
+  follow: { name: 'Đi theo',   icon: '🚶', sessions: 3, desc: 'Mực đi sát bên bạn, kể cả khi sang làng.' },
+  guard:  { name: 'Canh khu',  icon: '🛡️', sessions: 4, desc: 'Mực gác một chỗ bạn chọn, phát hiện trộm xa gấp đôi ở đó.' },
+  herd:   { name: 'Lùa',       icon: '🐑', sessions: 5, desc: 'Mực lùa cả đàn về chuồng trong khoảng 20 giây, tối nào cũng tự lùa nếu no và vui.' },
+  egg:    { name: 'Tìm trứng', icon: '👃', sessions: 4, desc: 'Mực đánh hơi tìm trứng giấu trong bụi.' },
+  bird:   { name: 'Đuổi chim', icon: '🐦', sessions: 3, auto: true, desc: 'Mực tự đuổi quạ, không cần bạn chạy ra.' },
+};
+export const TRICK_BASE = 'sit';          // lệnh nền, khóa các lệnh khác tới khi học xong
+export const TRAIN = {
+  stages: ['nho', 'truong'],   // chó con chưa học được, chó già không học thêm nữa
+  treat: 'treat',              // mỗi buổi tốn 1 bánh thưởng (mất cả khi chó bỏ giữa chừng)
+  fastHappy: 70,               // chó vui từ mức này thì học nhanh: một buổi đạt ăn 2 buổi
+  quitHunger: 40,              // đói dưới mức này ...
+  quitHappy: 35,               // ... hay buồn dưới mức này thì có thể bỏ buổi giữa chừng
+  quitChance: 0.5,
+  happyGain: 10,               // học xong một buổi chó vui thêm
+  rounds: 3, need: 2,          // minigame: 3 lượt bấm, trúng từ 2 lượt là đạt
+  zone: 0.26, sweepMs: 1500,   // bề rộng vạch khen (phần của thanh) và thời gian con trỏ chạy hết một lượt
+  herdMs: 20_000,              // lệnh Lùa: cả đàn về chuồng trong khoảng này
+  stayMs: 2 * MIN,             // bị lùa về rồi thì ở yên trong chuồng chừng này mới ra lại
+  autoHunger: 50, autoHappy: 60,   // tối nào chó no & vui tới mức này thì tự lùa đàn
 };
 
 // ---------- Kẻ phá hoại ----------
@@ -244,6 +273,7 @@ export const ITEMS = {
   wood:       { name: 'Gỗ',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi dọn bụi cây trên đất mới.' },
   stone:      { name: 'Đá',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi đập đá trên đất mới.' },
   dogfood:    { name: 'Xương cho chó',     kind: 'feed',   price: 8,  lv: 1, desc: 'Cho chó Mực ăn để nó lớn và chịu giữ nhà.' },
+  treat:      { name: 'Bánh thưởng',       kind: 'feed',   price: 15, lv: 1, desc: 'Bánh quy hình xương để dạy lệnh cho chó. Mỗi buổi dạy tốn 1 cái.' },
   deco_scarecrow: { name: 'Bù nhìn',       kind: 'deco',   price: 150, lv: 2, desc: 'Cắm gần ruộng, quạ không dám tới.' },
   deco_flower:    { name: 'Chậu hoa',      kind: 'deco',   price: 30,  lv: 1, desc: 'Cho nông trại thêm xinh.' },
   deco_lamp:      { name: 'Đèn lồng',      kind: 'deco',   price: 90,  lv: 3, desc: 'Sáng lung linh ban đêm, trộm ngại vào hơn.' },
@@ -407,6 +437,8 @@ export const EVENT_LEVEL = {
   born:      { level: 'info', group: e => 'born:' + e.kind, label: 'Con vật chào đời' },
   cockcrow:  { level: 'none', group: () => 'cockcrow', label: 'Gà trống gáy' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
+  trick:     { level: 'info', group: e => 'trick:' + e.trick, label: 'Chó học xong một lệnh' },
+  dogHerd:   { level: 'info', group: () => 'dogHerd', label: 'Chó lùa đàn về chuồng' },
   wallow:    { level: 'none', group: e => 'wallow:' + e.id, label: 'Heo, bò lăn bùn' },
   bathed:    { level: 'info', group: e => 'bathed:' + e.id, label: 'Đã tắm cho vật nuôi' },
   mucked:    { level: 'info', group: e => 'mucked:' + e.pen, label: 'Đã xúc phân chuồng' },

@@ -23,6 +23,8 @@ const dirOf = (dx, dy) => Math.abs(dy) > Math.abs(dx) ? (dy > 0 ? 0 : 3) : (dx <
 let M = null;
 const use = s => (M = ST.sceneMap(s));
 const atFarm = () => M.scene === 'farm';
+// Chó đang ở cùng bản đồ với người chơi? Bình thường nó ở vườn; có lệnh Đi theo thì nó lẽo đẽo sang làng, vào nhà (issue 45)
+export const dogHere = s => (s.dog.scene ?? 'farm') === s.scene;
 export const nextLockedIdx = s => ST.nextLockedPlot(s);
 
 export function createWorld() {
@@ -245,6 +247,7 @@ function updateAnimals(state, w, dt0, out) {
 // ---------- Chó Mực ----------
 // Chó chỉ chạy trên cỏ/đường trong đất nhà, không vào chuồng, không giẫm ruộng (chừa 1 ô quanh khối ruộng)
 const dogAllowed = (c, r) => {
+  if (M.scene !== 'farm') return !M.isSolid(c, r);   // đi theo chủ sang làng, vào nhà: chỗ nào người đi được thì chó đi được
   if (!M.isOwned(c, r) || M.isSolid(c, r)) return false;
   const g = M.ground[r * M.mw + c];
   if (g !== GROUND.GRASS && g !== GROUND.ROAD) return false;
@@ -252,11 +255,17 @@ const dogAllowed = (c, r) => {
   return !M.fields.some(f => c >= f.c - 1 && c < f.c + 4 && r >= f.r - 1 && r < f.r + 4);
 };
 const dogCan = (x, y) => dogAllowed(Math.floor(x / TS), Math.floor(y / TS)) && dogAllowed(Math.floor((x - 3) / TS), Math.floor(y / TS)) && dogAllowed(Math.floor((x + 3) / TS), Math.floor(y / TS));
-function updateDog(state, w, dt0) {
+function updateDog(state, w, dt0, out) {
   const d = state.dog, p = state.player, rt = rtOf(w, 'dog');
   const dt = aiStep(rt, dt0, onScreen(w, d));
   if (!dt) return;
-  if (!dogCan(d.x, d.y)) { d.x = M.dogHome.x; d.y = M.dogHome.y; }
+  // chó nhỡ sủa lung tung cả ngày (issue 45)
+  rt.barkT = Math.max(0, (rt.barkT ?? 0) - dt);
+  if (d.stage === 'nho' && out && !rt.barkT && onScreen(w, d) && Math.random() < dt * 0.09) {
+    rt.barkT = 0.7;
+    out.results.push({ ok: true, sound: 'bark', fx: [{ text: 'Gâu!', color: '#fff6a0', x: d.x, y: d.y - 14 }] });
+  }
+  if (!dogCan(d.x, d.y)) { const home = atFarm() ? M.dogHome : p; d.x = home.x; d.y = home.y; }
   const dp = dist(d, p);
   rt.walking = false; rt.run = false;
   rt.timer -= dt;
@@ -272,6 +281,38 @@ function updateDog(state, w, dt0) {
     rt.stuck = moved < st * 0.3 ? rt.stuck + dt : 0;
     return false;
   };
+  // đang có lệnh (issue 45): luật đã quyết kết quả, đây chỉ là diễn hoạt
+  const cmd = d.cmd?.id;
+  rt.pose = rt.barkT ? 'bark' : null;
+  if (cmd === 'sit') { rt.pose = 'sit'; rt.anim += dt; rt.mode = 'idle'; return; }
+  if (cmd === 'guard') {
+    const sp = ST.dogPost(state);
+    if (sp && atFarm()) {
+      const tx = sp.c * TS + 8, ty = sp.r * TS + 8;
+      if (goTo(tx, ty, 50)) { rt.pose = 'bark'; rt.anim += dt; }
+      return;
+    }
+  }
+  if (cmd === 'herd' && atFarm()) {
+    rt.pose = 'herd'; rt.run = true;
+    // chạy tới con ở ngoài chuồng gần nhất rồi lùa nó về phía cửa chuồng
+    const near = ST.outOfPen(state).filter(a => a.x != null).sort((u, v) => dist(u, d) - dist(v, d))[0];
+    if (near) {
+      goTo(near.x + (near.x > d.x ? -10 : 10), near.y, 78);
+      shoo(state, near, d, dt, { radius: 40, speed: 58, w });
+    } else goTo(p.x, p.y, 70);
+    rt.anim += dt * 1.6;
+    return;
+  }
+  if (cmd === 'follow') {
+    rt.run = dp > 70;
+    if (dp > 18) goTo(p.x, p.y, rt.run ? 72 : 44);
+    else { rt.walking = false; rt.anim += dt; }
+    return;
+  }
+  // chó già hay ngủ gật tại chỗ
+  if (d.stage === 'gia' && rt.mode === 'idle' && rt.timer > 0 && dp > 40) { rt.nap = true; rt.anim += dt; return; }
+  rt.nap = false;
   if (rt.mode === 'follow') {
     rt.run = dp > 70;
     if (dp < 22 || rt.timer <= 0 || rt.stuck > 0.5) { rt.mode = 'idle'; rt.timer = rnd(0.6, 2); rt.stuck = 0; }
@@ -388,7 +429,7 @@ export function targetPos(state, t) {
 }
 export function exists(state, t) {
   use(state);
-  if (!atFarm() && !['building', 'door'].includes(t.kind)) return false;
+  if (!atFarm() && !['building', 'door'].includes(t.kind) && !(t.kind === 'dog' && dogHere(state))) return false;
   if (t.kind === 'plot') return !!state.plots[t.idx]?.unlocked;
   if (t.kind === 'lockedPlot') return t.idx === ST.nextLockedPlot(state);
   if (t.kind === 'strip' && !atFarm()) return false;
@@ -438,11 +479,11 @@ export function findTarget(state, w) {
     for (const e of state.eggs ?? []) consider({ kind: 'egg', id: e.id });
     for (const o of state.poops ?? []) consider({ kind: 'poop', id: o.id });
     for (const t of state.threats ?? []) consider({ kind: 'threat', id: t.id });
-    consider({ kind: 'dog' });
     consider({ kind: 'nest' });
     for (const c of M.clutter) if (Math.abs(c.x + 8 - p.x) <= RANGE.clutter && Math.abs(c.y + 8 - p.y) <= RANGE.clutter) consider({ kind: 'clutter', id: c.id });   // ngoài tầm thì khỏi xét
     for (const dir of ['N', 'S', 'E', 'W']) consider({ kind: 'strip', dir });
   }
+  if (dogHere(state)) consider({ kind: 'dog' });
   for (const { pen, id } of M.troughs) consider({ kind: 'trough', pen, id });
   for (const p of M.penList) if (p.scale) consider({ kind: 'scale', pen: p.type, id: p.id });
   if (atFarm()) for (const p of M.penList) if (gateOn(state, p.id)) consider({ kind: 'gate', id: p.id });
@@ -517,10 +558,12 @@ export function hitTest(state, wx, wy) {
       const im = animalImg(a, 'left', 0);
       if (im && hitRect(a.x - im.width / 2, a.y - im.height, im.width, im.height, wx, wy)) return { kind: 'animal', id: a.id };
     }
-    const dog = state.dog, di = dogImg(dog, 'left', 0);
-    if (di && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
     for (const o of state.poops ?? []) if (Math.hypot(wx - o.x, wy - o.y + 3) < 9) return { kind: 'poop', id: o.id };
     for (const e of state.eggs ?? []) if (Math.hypot(wx - e.x, wy - e.y + 3) < 8) return { kind: 'egg', id: e.id };
+  }
+  if (dogHere(state)) {
+    const dog = state.dog, di = dogImg(dog, 'left', 0);
+    if (di && dog.x != null && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
   }
   for (const d of M.decos) if (TAPPABLE_DECO.has(d.kind)) { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
   for (const { pen, id } of M.troughs) { const tr = M.penById[id].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen, id }; }
@@ -629,8 +672,9 @@ export function update(state, w, dt) {
   const door = M.doors.find(d => inDoor(d, p.x, p.y));
   if (!door) w.doorArmed = true;
   else if (w.doorArmed && w.moving) { w.doorArmed = false; w.path = null; w.pending = null; out.door = door; }
-  // ở trong nhà: con vật, chó, quạ ngoài vườn đứng yên (luật vẫn chạy trong tick)
+  // ở trong nhà: con vật, quạ ngoài vườn đứng yên (luật vẫn chạy trong tick)
   if (atFarm()) updateFarm(state, w, dt, out);
+  if (dogHere(state)) updateDog(state, w, dt, out);   // chó đi theo thì chạy cả ở làng, trong nhà
 
   // đang đi tới thứ được chạm
   const t = w.pending;
@@ -669,6 +713,5 @@ function updateFarm(state, w, dt, out) {
   }
 
   updateAnimals(state, w, dt, out);
-  updateDog(state, w, dt);
   updateThreats(state, w, dt);
 }

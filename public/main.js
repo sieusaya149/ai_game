@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, sellQuote,
+  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, sellQuote, commandDog,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -129,6 +129,7 @@ function applyResult(res, target, id) {
   if (res.go) goScene(res.go);
   if (res.bath != null) (world.baths ??= []).push({ id: res.bath, t0: now });
   if (res.grain) (world.grains ??= []).push({ ...res.grain, t0: now });   // nắm thóc vừa rải ở cửa chuồng
+  if (res.pickSpot) { world.pick = res.pickSpot; ui.toast('Chạm vào chỗ muốn ' + state.dog.name + ' gác 🛡️'); }   // lệnh Canh khu: chọn ô gác
   if (res.buyStrip) askStrip(res.buyStrip);
   if (res.sleep) goSleep();
   if (res.ok && target && (/pet|vuot|stroke|love/i.test(id ?? '') || (target.kind === 'animal' && id === 'feed'))) {
@@ -377,6 +378,11 @@ function onTap(cx, cy) {
   plan = null;
   const r = canvas.getBoundingClientRect();
   const wx = ((cx - r.left) * dpr + view.camX) / scale, wy = ((cy - r.top) * dpr + view.camY) / scale;
+  if (world.pick) {   // đang chọn ô gác cho chó
+    const what = world.pick; world.pick = null;
+    applyResult(commandDog(state, what, { c: Math.floor(wx / TS), r: Math.floor(wy / TS) }));
+    return;
+  }
   const hit = V.hitTest(state, wx, wy);
   if (!hit) { V.walkTo(state, world, wx, wy); return; }
   if (V.inRange(state, hit)) autoAct(hit);

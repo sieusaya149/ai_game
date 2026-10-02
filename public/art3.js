@@ -852,68 +852,150 @@ function heoMud(f) {
   });
 }
 
-function dogRun(f) {
-  // phi nước đại: khung 0 duỗi dài, khung 1 co chân
-  const D = P.dog;
+// ---------- CHÓ MỰC: tư thế lệnh & lùa theo từng giai đoạn (issue 45) ----------
+// Luật art của repo: mỗi giai đoạn một bộ số riêng, không dùng chung hình.
+// non: nhỏ, tai cụp, đuôi cụt · nhỡ: cao lêu nghêu, tai lưng chừng ·
+// truong: vạm vỡ, tai vểnh, vòng cổ đỏ, lè lưỡi · gia: lông bạc (P.dogG), lưng còng, đầu cúi, chậm.
+
+// Mõm/má bạc của chó già (giống hàm dog()).
+const dogGray = (hX, hY) => (px, py) => (px + 0.5 < hX - 0.4 || py + 0.5 > hY + 1 ? P.dogG[1 + ((px + py) & 1)] : undefined);
+
+// Tai: cụp (chó con) · lưng chừng (nhỡ) · vểnh (trưởng thành) · rũ (già). back vẽ trước đầu, front vẽ sau.
+function dogEars(mode, hX, hY, hry) {
+  const D = P.dog, eY = hY - hry;
+  if (mode === 'cup') return { back: [E(hX + 2.2, eY + 2.4, 1, 1.9, D, { sep: true, max: 1 })], front: [E(hX + 2.3, eY + 2.6, 0.8, 1.6, D, { sep: true, max: 1 })] };
+  if (mode === 'half') return { back: [E(hX + 1.4, eY + 0.2, 0.8, 1.3, D), E(hX + 2.4, eY + 0.8, 1, 0.8, D, { max: 1 })], front: [] };
+  if (mode === 'ru') return { back: [E(hX + 2, eY + 1, 1.2, 1.2, D, { max: 1 })], front: [] };
+  return { back: [E(hX + 0.6, eY, 0.8, 1.7, D), E(hX + 2.4, eY + 0.1, 0.8, 1.6, D, { max: 1 })], front: [] };
+}
+
+// Mặt chó: mắt hổ phách (già thêm mày bạc), mũi đen, vòng cổ đỏ nơ vàng (chó con chưa đeo), lưỡi hồng.
+function dogFace(x, o) {
+  const old = o.stage === 'gia';
+  const [nx, ny, nrx, nry] = o.snout, [hX, hY, , hry] = o.head;
+  const nX = Math.round(nx - nrx), nY = Math.round(ny - nry);
+  R(x, '#08080c', nX, nY);
+  for (const [ex, ey] of o.eyes) { R(x, '#e09a3a', ex, ey); if (old) R(x, P.dogG[3], ex, ey - 1); else if (o.brow) R(x, '#4c4c5c', ex, ey - 1); }
+  if (o.stage !== 'non') {
+    const cX = Math.round(hX + 1), cY = Math.round(hY + hry - 1);
+    // ngồi: cổ dựng nên vòng cổ nằm ngang; đứng/chạy: vòng cổ chạy dọc cổ như hàm dog()
+    if (o.collarH) { R(x, '#c0302a', cX - 2, cY + 1, 3, 1); R(x, '#e85a44', cX - 2, cY + 1); R(x, '#f7d547', cX - 1, cY + 2); }
+    else { R(x, '#c0302a', cX, cY, 1, 3); R(x, '#e85a44', cX, cY); R(x, '#f7d547', cX - 1, cY + 2); }
+  }
+  if (o.tongue) { R(x, '#f07a8a', nX + 1, nY + 2); R(x, '#d8566a', nX + 1, nY + 3); }
+}
+
+// Thế ngồi: lệnh "Ngồi" (beg=false) và bắt tay/xin ăn (beg=true, giơ một chân trước).
+// ngồi: non 10x11 · nhỡ 12x14 · trưởng thành 14x16 · già 14x16
+const SEAT = {
+  non: { w: 10, h: 11, rump: [6.5, 7.8, 2.4, 2.4], chest: [4.5, 7.6, 1.8, 1.8], fl: [2, 7, 2, 3], head: [3.9, 3.4, 2.5, 2.3], snout: [1.5, 4.6, 1.2, 0.9], ear: 'cup', tail: [8.3, 8.4, 1.0, 1.0], eyes: [[3, 3], [5, 3]] },
+  nho: { w: 12, h: 14, rump: [7.6, 9.8, 2.9, 3.0], chest: [5.2, 9.2, 2.0, 2.2], fl: [3, 8, 2, 5], head: [4.5, 4.2, 2.4, 2.2], snout: [1.7, 5.5, 1.3, 1.0], ear: 'half', tail: [9.8, 11.6, 1.2, 0.9], eyes: [[3, 4], [5, 4]] },
+  truong: { w: 14, h: 16, rump: [9.0, 11.2, 3.2, 3.3], chest: [6.0, 10.6, 2.2, 2.5], fl: [4, 9, 2, 6], head: [4.8, 4.8, 2.8, 2.5], snout: [1.9, 6.2, 1.6, 1.1], ear: 'up', tail: [11.2, 13.6, 1.4, 0.9], eyes: [[3, 4], [6, 4]], tongue: true },
+  gia: { w: 14, h: 16, rump: [9.0, 11.4, 3.1, 3.2], chest: [6.0, 11.2, 2.1, 2.3], fl: [4, 10, 2, 5], head: [4.9, 6.4, 2.7, 2.4], snout: [2.0, 7.7, 1.6, 1.1], ear: 'ru', tail: [11.2, 14.0, 1.3, 0.8], eyes: [[3, 6], [6, 6]] },
+};
+
+function dogSeat(stage, f, beg) {
+  const D = P.dog, s = SEAT[stage], old = stage === 'gia';
+  const [bx, by, brx, bry] = s.rump, [ccx, ccy, crx, cry] = s.chest;
+  const [hX, hY, hrx, hry] = s.head, [nx, ny, nrx, nry] = s.snout;
+  const [lx, ly, lw, lh] = s.fl;
+  const ear = dogEars(s.ear, hX, hY, hry);
+  const wag = f ? 0.7 : 0;              // đuôi quẫy
+  const lift = beg ? (f ? 3 : 2) : 0;   // chân trước giơ lên bắt tay
+  const c = fig(s.w, s.h, [
+    E(s.tail[0], s.tail[1] - wag, s.tail[2], s.tail[3], D, { max: 2 }),
+    E(bx, by, brx, bry, D),
+    B(lx, ly, lw, lh, D, { max: 1 }),                                  // chân trước xa
+    !beg && B(lx + 1, ly, lw, lh, D, { sep: true, min: 1 }),           // chân trước gần
+    E(ccx, ccy, crx, cry, D),
+    old && E(ccx + 0.8, ccy - cry + 0.3, 1.7, 1.2, D, { max: 1 }),     // vai gù, lưng còng
+    ...ear.back,
+    E(hX, hY, hrx, hry, D, { sep: true, pat: old ? dogGray(hX, hY) : undefined }),
+    ...ear.front,
+    E(nx, ny, nrx, nry, old ? P.dogG : D, { sep: true, lift: old ? 0 : 0.25 }),
+    beg && B(lx - 1, ly - lift, lw + 1, 2, D, { sep: true, min: 1 }),  // chân giơ bắt tay (vẽ sau cùng, nằm trước ngực)
+  ]);
+  dogFace(c.getContext('2d'), { stage, head: s.head, snout: s.snout, eyes: s.eyes, tongue: s.tongue && !beg, brow: beg, collarH: true });
+  return c;
+}
+
+// Phi nước đại đi lùa đàn: khung 0 duỗi dài, khung 1 co chân.
+// non 13x9 · nhỡ 16x11 · trưởng thành 20x13 · già 20x13
+const HERD = {
+  non: { w: 13, h: 9, by: 5.2, body: [6.8, 4.2, 1.7], sh: [3.8, -0.3, 1.8, 1.8], head: [3.2, -2.0, 2.0, 1.8], snout: [1.2, -0.9, 0.9, 0.7], tail: [11.6, -1.4, 0.7, 1.2], ear: 'cup', ll: 2, lw: 2, st: 2.6 },
+  nho: { w: 16, h: 11, by: 6.4, body: [8.4, 5.2, 2.0], sh: [4.4, -0.3, 2.0, 2.2], head: [3.8, -2.3, 2.2, 2.0], snout: [1.5, -1.1, 1.1, 0.9], tail: [14.2, -1.8, 0.8, 1.6], ear: 'half', ll: 3, lw: 2, st: 3.6 },
+  truong: { w: 20, h: 13, by: 7.4, body: [10.0, 6.6, 2.6], sh: [5.2, -0.4, 2.2, 2.6], head: [4.6, -2.6, 2.7, 2.4], snout: [1.9, -1.4, 1.4, 1.1], tail: [17.6, -2.4, 0.9, 2.0], ear: 'up', ll: 3, lw: 3, st: 4.8 },
+  gia: { w: 20, h: 13, by: 7.8, body: [10.0, 6.2, 2.3], sh: [5.4, -0.5, 2.1, 2.4], head: [5.0, -2.2, 2.6, 2.3], snout: [2.3, -1.0, 1.4, 1.1], tail: [17.2, 0.2, 0.9, 1.4], ear: 'ru', ll: 3, lw: 3, st: 2.8 },
+};
+
+function dogGallop(stage, f) {
+  const D = P.dog, s = HERD[stage], old = stage === 'gia';
+  const by = s.by - (f ? 0.8 : 0);          // khung 1 nhổm cao hơn
+  const lt = s.h - 1 - s.ll;                // mép trên của chân; chân chạm hàng áp chót
+  const mid = s.w / 2;
   const legs = f
-    ? [B(6, 9, 2, 3, D, { max: 1 }), B(10, 9, 2, 3, D, { max: 1 }), B(7, 9, 2, 3, D, { sep: true, min: 1 }), B(11, 9, 2, 3, D, { sep: true, min: 1 })]
-    : [B(2, 9, 3, 2, D, { max: 1 }), B(14, 9, 3, 2, D, { max: 1 }), B(3, 10, 3, 2, D, { sep: true, min: 1 }), B(15, 10, 3, 2, D, { sep: true, min: 1 })];
-  const by = f ? 6.6 : 7.4;
-  const c = fig(20, 13, [
+    ? [B(Math.round(mid - 3.2), lt, s.lw, s.ll, D, { max: 1 }), B(Math.round(mid + 1.0), lt, s.lw, s.ll, D, { max: 1 }),
+      B(Math.round(mid - 2.0), lt, s.lw, s.ll, D, { sep: true, min: 1 }), B(Math.round(mid + 2.0), lt, s.lw, s.ll, D, { sep: true, min: 1 })]
+    : [B(Math.round(mid - s.st - 2), lt, s.lw + 1, s.ll - 1, D, { max: 1 }), B(Math.round(mid + s.st - 1), lt, s.lw + 1, s.ll - 1, D, { max: 1 }),
+      B(Math.round(mid - s.st - 1), lt + 1, s.lw + 1, s.ll - 1, D, { sep: true, min: 1 }), B(Math.round(mid + s.st), lt + 1, s.lw + 1, s.ll - 1, D, { sep: true, min: 1 })];
+  const head = [s.head[0], by + s.head[1], s.head[2], s.head[3]];
+  const snout = [s.snout[0], by + s.snout[1], s.snout[2], s.snout[3]];
+  const ear = dogEars(s.ear, head[0], head[1], head[3]);
+  const c = fig(s.w, s.h, [
     ...legs,
-    E(17.6, by - 2.4, 0.9, 2, D, { max: 2 }),
-    E(10, by, 6.6, 2.6, D),
-    E(5.2, by - 0.4, 2.2, 2.6, D),
-    E(4.4, by - 5.2, 0.8, 1.5, D), E(6, by - 5.2, 0.8, 1.4, D, { max: 1 }),
-    E(4.6, by - 2.6, 2.7, 2.4, D, { sep: true }),
-    E(1.9, by - 1.4, 1.4, 1.1, D, { sep: true, lift: 0.25 }),
+    E(s.tail[0], by + s.tail[1], s.tail[2], s.tail[3], D, { max: 2 }),
+    E(s.body[0], by, s.body[1], s.body[2], D),
+    old && E(s.body[0] + 2.2, by - s.body[2] + 0.5, 1.9, 1.3, D, { max: 1 }),   // mông nhô, giữa lưng võng
+    E(s.sh[0], by + s.sh[1], s.sh[2], s.sh[3], D),
+    ...ear.back,
+    E(head[0], head[1], head[2], head[3], D, { sep: true, pat: old ? dogGray(head[0], head[1]) : undefined }),
+    ...ear.front,
+    E(snout[0], snout[1], snout[2], snout[3], old ? P.dogG : D, { sep: true, lift: old ? 0 : 0.25 }),
   ]);
-  const x = c.getContext('2d');
-  const hy = Math.round(by - 2.6);
-  R(x, '#e09a3a', 3, hy - 1); R(x, '#e09a3a', 5, hy - 1);
-  R(x, '#08080c', 1, hy); R(x, '#f07a8a', 2, hy + 2); R(x, '#f07a8a', 3, hy + 3);
-  R(x, '#c0302a', 6, hy + 1, 1, 3); R(x, '#f7d547', 6, hy + 3);
+  const hy = Math.round(head[1]);
+  dogFace(c.getContext('2d'), {
+    stage, head, snout, eyes: [[Math.round(head[0] - 1.6), hy - 1], [Math.round(head[0] + 0.4), hy - 1]],
+    tongue: stage === 'truong',
+  });
   return c;
 }
-function dogSit(f) {
-  const D = P.dog;
-  const c = fig(14, 16, [
-    E(11.4, 13.4, f ? 2.4 : 2, 0.8, D, { max: 2 }), // đuôi quẫy
-    B(9, 11, 4, 3, D, { max: 1 }),
-    E(9, 10.6, 3.3, 3.6, D),
-    B(4, 9, 2, 5, D, { sep: true, min: 1 }), B(6, 9, 2, 5, D, { sep: true, max: 2 }),
-    E(5.6, 9, 2.4, 2.4, D),
-    E(4.6, 2.6, 0.8, 1.6, D), E(7, 2.6, 0.8, 1.6, D, { max: 1 }),
-    E(5.6, 5.4, 2.9, 2.5, D, { sep: true }),
-    E(3, 6.6, 1.6, 1.1, D, { sep: true, lift: 0.25 }),
+
+// Đứng sủa: hàm dưới tách khỏi mõm, đầu ngẩng, tai dựng; khung 1 hếch mõm lên → há to hơn.
+// non 12x11 · nhỡ 16x13 · trưởng thành 19x15 · già 19x15
+const BARK = {
+  non: { w: 12, h: 11, body: [7.4, 6.4, 3.3, 2.1], head: [4.0, 3.8, 2.8, 2.6], snout: [1.8, 4.9, 1.1, 0.8], jaw: [2.5, 6.4, 1.8, 0.7], ear: 'cup', legs: { fx: 4, bx: 8, top: 8, len: 2 }, tail: [10.6, 4.6, 0.8, 1.3], eyes: [[3, 3], [5, 3]] },
+  nho: { w: 16, h: 13, body: [9.4, 7.0, 4.6, 2.3], head: [4.6, 4.0, 2.6, 2.4], snout: [1.9, 5.1, 1.4, 1.0], jaw: [2.9, 6.8, 2.2, 0.8], ear: 'half', legs: { fx: 4, bx: 11, top: 9, len: 3 }, tail: [14.2, 4.6, 0.8, 1.9], eyes: [[3, 3], [5, 3]] },
+  truong: { w: 19, h: 15, body: [11, 8.0, 5.6, 2.8], head: [5.0, 4.2, 2.9, 2.6], snout: [2.0, 5.3, 1.6, 1.0], jaw: [3.4, 7.4, 2.6, 0.9], ear: 'up', legs: { fx: 5, bx: 13, top: 10, len: 4 }, tail: [17.0, 4.8, 1.0, 2.2], eyes: [[3, 3], [6, 3]] },
+  gia: { w: 19, h: 15, body: [11, 8.4, 5.4, 2.6], head: [5.2, 5.6, 2.9, 2.5], snout: [2.2, 6.8, 1.6, 1.0], jaw: [3.6, 8.8, 2.5, 0.9], ear: 'ru', legs: { fx: 5, bx: 13, top: 10, len: 4 }, tail: [16.8, 8.6, 1.3, 1.1], eyes: [[3, 5], [6, 5]] },
+};
+
+function dogBarkPose(stage, f) {
+  const D = P.dog, s = BARK[stage], old = stage === 'gia';
+  const [bx, by, brx, bry] = s.body;
+  const [hX, hY, hrx, hry] = s.head, [jx, jy, jrx, jry] = s.jaw;
+  const up = f ? 1 : 0;                                  // khung 1: hếch mõm lên, miệng há to
+  const snout = [s.snout[0], s.snout[1] - up, s.snout[2], s.snout[3]];
+  const ear = dogEars(s.ear, hX, hY, hry);
+  const c = fig(s.w, s.h, [
+    ...quadLegs({ ...s.legs, r: D, frame: f, slow: old }),
+    E(s.tail[0], s.tail[1] - (f ? 0.8 : 0), s.tail[2], s.tail[3], D, { max: 2 }),
+    E(bx, by, brx, bry, D),
+    old && E(bx + 2.2, by - bry + 0.4, 1.9, 1.3, D, { max: 1 }),            // mông nhô, giữa lưng võng
+    E(bx - brx + 1.8, by - 0.2, 2, bry + 0.4, D),                           // ngực
+    E(jx, jy, jrx, jry, old ? P.dogG : D, { sep: true, max: 1 }),           // hàm dưới há ra
+    ...ear.back,
+    E(hX, hY, hrx, hry, D, { sep: true, pat: old ? dogGray(hX, hY) : undefined }),
+    ...ear.front,
+    E(snout[0], snout[1], snout[2], snout[3], old ? P.dogG : D, { sep: true, lift: old ? 0 : 0.25 }),
   ]);
   const x = c.getContext('2d');
-  R(x, '#e09a3a', 4, 4); R(x, '#e09a3a', 6, 4);
-  R(x, '#08080c', 2, 6); R(x, '#f07a8a', 3, 8);
-  R(x, '#c0302a', 4, 8, 4, 1); R(x, '#f7d547', 5, 9);
+  dogFace(x, { stage, head: s.head, snout, eyes: s.eyes.map(([a, b]) => [a, b - up]), brow: true });
+  R(x, '#f07a8a', Math.round(jx - jrx + 1), Math.round(jy - jry));          // lưỡi trong miệng há
   return c;
 }
-function dogBeg(f) {
-  const D = P.dog;
-  const paw = f ? [B(2, 7, 3, 2, D, { sep: true, min: 1 })] : [B(3, 9, 2, 3, D, { sep: true, min: 1 })];
-  const c = fig(14, 16, [
-    E(11.4, 13.4, 2.2, 0.8, D, { max: 2 }),
-    B(9, 11, 4, 3, D, { max: 1 }),
-    E(9, 10.6, 3.3, 3.6, D),
-    B(6, 9, 2, 5, D, { sep: true, max: 2 }),
-    E(5.8, 9, 2.4, 2.4, D),
-    ...paw,
-    E(4.6, 2.6, 0.8, 1.6, D), E(7, 2.6, 0.8, 1.6, D, { max: 1 }),
-    E(5.6, 5.4, 2.9, 2.5, D, { sep: true }),
-    E(3, 6.6, 1.6, 1.1, D, { sep: true, lift: 0.25 }),
-  ]);
-  const x = c.getContext('2d');
-  R(x, '#e09a3a', 4, 4); R(x, '#e09a3a', 6, 4); R(x, '#4c4c5c', 4, 3); R(x, '#4c4c5c', 6, 3); // mày nhướn
-  R(x, '#08080c', 2, 6); R(x, '#f07a8a', 3, 8);
-  R(x, '#c0302a', 5, 8, 3, 1); R(x, '#f7d547', 6, 9);
-  if (f) { R(x, P.dog[3], 2, 7); }
-  return c;
-}
+
+// Gom theo giai đoạn: {non, nho, truong, gia} → pair(2 khung)
+const dogPoses = fn => Object.fromEntries(STAGES.map(st => [st, pair(f => fn(st, f))]));
 
 function catPounce(f) {
   const C = P.cat, W = P.cream, STR = '#9a4410';
@@ -1898,6 +1980,165 @@ function warn() {
   });
 }
 
+// ---------- dạy lệnh: thanh bấm đúng lúc, dấu khen, icon lệnh (issue 45) ----------
+
+// Thanh ngang 96x12: khung gỗ, lòng thanh màu nhạt.
+function trainTrack() {
+  return draw(96, 12, x => {
+    R(x, OUT, 0, 0, 96, 12);
+    R(x, WOOD[1], 1, 1, 94, 10); R(x, WOOD[2], 1, 1, 94, 1); R(x, WOOD[0], 1, 10, 94, 1);
+    R(x, OUT, 3, 3, 90, 6);
+    R(x, '#e8d6b0', 4, 4, 88, 4); R(x, '#fff8ea', 4, 4, 88, 1); R(x, '#d0b88c', 4, 7, 88, 1);
+    for (const nx of [2, 93]) { R(x, WOOD[3], nx, 2); R(x, WOOD[0], nx, 9); }   // đinh tán
+  });
+}
+// Vạch khen 24x12 vẽ đè lên track: xanh lá sáng, hai mép đậm hơn.
+function trainZone() {
+  return draw(24, 12, x => {
+    R(x, OUT, 0, 2, 24, 8);
+    R(x, '#5fb33e', 1, 3, 22, 6); R(x, '#8fd65a', 1, 3, 22, 2); R(x, '#3d8c2a', 1, 8, 22, 1);
+    R(x, '#1e5a1c', 1, 3, 2, 6); R(x, '#1e5a1c', 21, 3, 2, 6);                 // hai mép đậm
+    R(x, '#2f7a2a', 3, 3, 1, 6); R(x, '#2f7a2a', 20, 3, 1, 6);
+  });
+}
+// Con trỏ chạy 5x16: kim đỏ cam, chóp nhọn hai đầu.
+const MARK_ROWS = [
+  '..o..', '.ooo.', 'ohhho', 'ohrho', 'ohrho', '.oro.', '.oro.', '.oro.',
+  '.oro.', '.oro.', '.oro.', '.oro.', 'ohrho', 'ohrho', '.ooo.', '..o..',
+];
+const trainMark = () => spr(MARK_ROWS, { o: OUT, h: '#ff9a4a', r: '#f0641e' });
+
+// Dấu khen bay lên khi bấm trúng: ngôi sao vàng + tia sáng, 2 khung nhấp nháy.
+function praiseFrame(f) {
+  const st = outline(draw(11, 11, x => star(x, 5, 5, f ? 4 : 3, '#f7d547', '#fff8c8')));
+  return draw(14, 14, x => {
+    x.drawImage(st, f ? 1 : 2, f ? 1 : 2);
+    for (const [tx, ty] of f ? [[12, 2], [1, 11]] : [[1, 1], [12, 12]]) { R(x, '#fff3a0', tx, ty); R(x, '#f7d547', tx, ty + (f ? -1 : 1)); }
+  });
+}
+
+// ---------- icon lệnh 16x16 ----------
+
+function iconSit() {
+  // chó ngồi nhìn nghiêng trên nền tròn xanh
+  const D = P.dog;
+  const d = fig(9, 11, [
+    E(5.6, 7.2, 2.4, 2.6, D),
+    B(2, 7, 2, 3, D, { sep: true, min: 1 }),
+    E(4.0, 2.8, 0.7, 1.3, D), E(6.0, 2.9, 0.7, 1.2, D, { max: 1 }),
+    E(5.0, 4.8, 2.2, 2.0, D, { sep: true }),
+    E(2.6, 5.8, 1.2, 0.9, D, { sep: true, lift: 0.25 }),
+  ]);
+  const dx = d.getContext('2d');
+  R(dx, '#e09a3a', 4, 4); R(dx, '#08080c', 1, 5); R(dx, '#c0302a', 3, 7, 3, 1);
+  return draw(16, 16, x => {
+    // nền tròn kem sáng cho bóng chó đen nổi lên
+    ell(x, OUT, 8, 8, 7.4, 7.4); ell(x, '#f2e2c0', 8, 8, 6.4, 6.4); ell(x, '#fff8ea', 6, 6, 3.4, 3.0);
+    x.drawImage(d, 4, 3);
+  });
+}
+function iconFollow() {
+  // ba dấu chân chó nối nhau theo hướng đi (dấu mới đậm nhất)
+  return draw(16, 16, x => {
+    const paw = (px, py, col, hl) => {
+      dots(x, col, [[px + 1, py], [px + 3, py], [px, py + 1], [px + 4, py + 1]]);   // 4 ngón
+      R(x, col, px + 1, py + 2, 3, 2); R(x, col, px + 2, py + 1);                   // đệm bàn
+      R(x, hl, px + 2, py + 2);
+    };
+    paw(0, 11, '#6a4a2a', '#9a7a52'); paw(5, 6, '#4a3420', '#8a6a48'); paw(10, 1, '#2e1c0e', '#6a4a2a');
+  });
+}
+function iconGuard() {
+  // cái khiên có chữ thập vàng
+  const SHIELD = [
+    '................', '..oooooooooooo..', '..oLLLLLLddddo..', '..oLLLLLLddddo..',
+    '..oLLLhhhLdddo..', '..oLLLhhhLdddo..', '..oLhhhhhhhddo..', '..oLLLhhhLdddo..',
+    '..oLLLhhhLdddo..', '...oLLLLLdddo...', '...oLLLLLdddo...', '....oLLLdddo....',
+    '.....oLLddo.....', '......oLdo......', '.......oo.......', '................',
+  ];
+  return spr(SHIELD, { o: OUT, L: '#5a8ac4', d: '#2e4a6e', h: '#f7d547' });
+}
+function iconHerd() {
+  // con cừu nhỏ trong mũi tên vòng
+  const sh = fig(9, 7, [
+    B(2, 5, 1, 2, P.face), B(6, 5, 1, 2, P.face),
+    E(5.2, 3.2, 3.0, 2.1, P.wool),
+    E(2.0, 3.4, 1.6, 1.5, P.face, { sep: true }),
+  ]);
+  R(sh.getContext('2d'), '#f2e8d8', 1, 3);
+  return draw(16, 16, x => {
+    ell(x, OUT, 8, 8, 7.4, 7.4); ell(x, '#f0641e', 8, 8, 6.6, 6.6); ell(x, '#ff9a4a', 7, 7, 5.2, 5.2);
+    x.globalCompositeOperation = 'destination-out';
+    ell(x, '#000', 8, 8, 4.8, 4.8); x.fillRect(9, 9, 7, 7);           // hở góc dưới-phải
+    x.globalCompositeOperation = 'source-over';
+    // đầu mũi tên chúc xuống ở chỗ hở
+    R(x, OUT, 11, 10, 5, 2); R(x, OUT, 12, 12, 3, 1); R(x, OUT, 13, 13, 1, 1);
+    R(x, '#f0641e', 12, 11, 3, 1); R(x, '#f0641e', 13, 12, 1, 1); R(x, '#ff9a4a', 12, 11, 1, 1);
+    x.drawImage(sh, 3, 5);
+  });
+}
+function iconEgg() {
+  // mũi chó đánh hơi + quả trứng
+  return draw(16, 16, x => {
+    ell(x, OUT, 11, 10, 3.4, 4.4); ell(x, '#f4e8d0', 11, 10, 2.5, 3.5);
+    ell(x, '#fff8ea', 10, 8, 1.3, 1.6); R(x, '#d8c6a4', 12, 12, 2, 1);
+    ell(x, OUT, 4, 6, 3.6, 3.0); ell(x, '#40405a', 4, 6, 2.6, 2.1); ell(x, '#8a8aa8', 3, 4, 1.4, 0.8);
+    dots(x, '#08080c', [[2, 6], [2, 7], [5, 6], [5, 7], [3, 8], [4, 8]]);   // hai lỗ mũi + khe mõm
+    dots(x, '#cfeaff', [[7, 2], [9, 3], [8, 4]]);                     // vòng mùi bốc lên
+  });
+}
+function iconBird() {
+  // con quạ bị gạch chéo đỏ
+  const CR = ['#20202c', '#363648', '#525268', '#787892'];
+  const cr = fig(14, 11, [
+    B(5, 9, 1, 2, P.leg, { noise: 0 }), B(8, 9, 1, 2, P.leg, { noise: 0 }),      // chân
+    E(11.6, 4.2, 1.6, 2.2, CR),                                                  // đuôi vểnh
+    E(7.4, 6.4, 4.2, 2.6, CR),                                                   // thân
+    E(8.2, 6.0, 2.6, 1.5, CR, { sep: true }),                                    // cánh xếp
+    E(3.4, 3.8, 2.3, 2.1, CR, { sep: true }),                                    // đầu
+    B(0, 3, 2, 2, P.beak, { noise: 0, min: 2 }),                                 // mỏ
+  ]);
+  const cx = cr.getContext('2d');
+  R(cx, '#fff8ea', 3, 3); R(cx, EYE, 3, 3);
+  return draw(16, 16, x => {
+    x.drawImage(cr, 2, 3);
+    line(x, OUT, 0, 1, 13, 14); line(x, OUT, 2, 1, 15, 14);
+    line(x, '#e5452f', 1, 1, 14, 14); line(x, '#ff7a5a', 1, 1, 6, 6);
+  });
+}
+
+// Bong bóng lệnh 20x18: lòng trống 12x10 ở giữa cho render.js vẽ icon lệnh vào.
+function cmdBubble() {
+  return draw(20, 18, x => {
+    R(x, OUT, 2, 0, 16, 13); R(x, OUT, 0, 2, 20, 9); R(x, OUT, 1, 1, 18, 11);
+    R(x, OUT, 7, 12, 5, 3); R(x, OUT, 8, 15, 3, 1); R(x, OUT, 9, 16, 1, 2);   // đuôi nhọn chúc xuống
+    R(x, '#fff8ea', 3, 1, 14, 11); R(x, '#fff8ea', 1, 3, 18, 7); R(x, '#fff8ea', 2, 2, 16, 9);
+    R(x, '#fff8ea', 8, 12, 3, 2); R(x, '#fff8ea', 9, 14, 1, 2);
+    R(x, '#e8dcc4', 2, 10, 16, 1);
+  });
+}
+// Cọc gác 12x16: cọc gỗ cắm đất, treo tấm biển khiên nhỏ.
+function guardPost() {
+  return draw(12, 16, x => {
+    shadow(x, 6, 15, 4.6, 1.2);
+    R(x, OUT, 4, 5, 4, 11); R(x, WOOD[2], 5, 6, 2, 9); R(x, WOOD[3], 5, 6, 1, 9); R(x, WOOD[0], 6, 6, 1, 9);
+    ell(x, OUT, 6, 15, 4.2, 1.2); ell(x, '#6b4a22', 6, 15, 3.4, 0.8); R(x, '#8a6a38', 3, 14, 3, 1);
+    const HW = [5, 5, 5, 4, 4, 3, 2, 1];
+    HW.forEach((hw, j) => R(x, OUT, 6 - hw, j, hw * 2, 1));
+    HW.forEach((hw, j) => { if (hw > 1 && j > 0) R(x, j < 3 ? '#8ab4e6' : '#5a8ac4', 7 - hw, j, hw * 2 - 2, 1); });
+    R(x, '#2e4a6e', 7, 1, 2, 5); R(x, '#f7d547', 5, 2, 1, 3); R(x, '#f7d547', 4, 3, 3, 1);   // chữ thập vàng
+  });
+}
+// Dấu đánh hơi 10x10: ba vòng xoáy mùi nhỏ dần + chấm giữa, 2 khung toả ra.
+const SNIFF = [[
+  '...aaa....', '..a...a...', '.a..bb..a.', '.a.b..b.a.', 'a.b.c.b...',
+  'a.b...b...', '.a.b.b....', '.a..bb....', '..a.......', '..........',
+], [
+  '..aaaa....', '.a....a...', 'a..bbb..a.', 'a.b...b.a.', 'a.b.c..b..',
+  'a.b....b..', '.a.b..b...', '.a..bb....', '..aa......', '..........',
+]];
+const sniffFrame = f => spr(SNIFF[f], { a: '#9ad0f0', b: '#cfeaff', c: '#fff8ea' });
+
 // ---------- ghép bùn lên đúng hình con vật (kẹp theo alpha) ----------
 
 const dirtCache = new WeakMap();
@@ -1965,9 +2206,18 @@ export const SPR3 = {
   sleepBy: {},
   sickBy: {},
   heoMud: [heoMud(0), heoMud(1)],
-  dogHerd: pair(dogRun),
-  dogSit: pair(dogSit),
-  dogBeg: pair(dogBeg),
+  // chó: 4 tư thế lệnh, mỗi giai đoạn một bộ hình riêng (issue 45)
+  dogSitBy: dogPoses((st, f) => dogSeat(st, f, false)),
+  dogBegBy: dogPoses((st, f) => dogSeat(st, f, true)),
+  dogHerdBy: dogPoses(dogGallop),
+  dogBarkBy: dogPoses(dogBarkPose),
+  // đồ hoạ dạy lệnh
+  trainBar: { track: trainTrack(), zone: trainZone(), mark: trainMark() },
+  praise: pair(praiseFrame),
+  trickIcon: { sit: iconSit(), follow: iconFollow(), guard: iconGuard(), herd: iconHerd(), egg: iconEgg(), bird: iconBird() },
+  cmdBubble: cmdBubble(),
+  guardPost: guardPost(),
+  sniffMark: pair(sniffFrame),
   catPounce: pair(catPounce),
   catNap: pair(catNap),
   catMouse: pair(catMouse),
@@ -2011,6 +2261,11 @@ export const SPR3 = {
     dirtyIcon: dirtyIcon(), strayIcon: strayIcon(), warn: warn(),
   },
 };
+// giữ nguyên tên cũ: trỏ tới bản giai đoạn trưởng thành
+SPR3.dogHerd = SPR3.dogHerdBy.truong;
+SPR3.dogSit = SPR3.dogSitBy.truong;
+SPR3.dogBeg = SPR3.dogBegBy.truong;
+SPR3.dogBark = SPR3.dogBarkBy.truong;
 const POSE = { ga: hen, gaTrong: rooster, vit: duck, vitDuc: drake, heo: pig, bo: (s, f, p) => cow(s, f, p), boDuc: (s, f, p) => cow(s, f, p, true), cuu: (s, f, p) => sheep(s, f, p), cuuXoan: (s, f, p) => sheep(s, f, p, true), cho: dog, meo: cat };
 for (const [k, fn] of Object.entries(POSE)) {
   SPR3.sleepBy[k] = Object.fromEntries(STAGES.map(st => [st, fn(st, 0, 'sleep')]));

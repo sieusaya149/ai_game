@@ -42,7 +42,9 @@ for (const sp in SPR3.animal) {
   if (SPR3.sickBy[sp]) for (const st in SPR3.sickBy[sp]) put(r, SPR3.sickBy[sp][st], `bệnh ${st}`);
 }
 const groups = {
-  'Hành động': ['run', 'heoMud', 'dogHerd', 'dogSit', 'dogBeg', 'catPounce', 'catNap', 'catMouse'],
+  'Hành động': ['run', 'heoMud', 'catPounce', 'catNap', 'catMouse'],
+  'Chó Mực — tư thế lệnh theo giai đoạn': ['dogSitBy', 'dogBegBy', 'dogHerdBy', 'dogBarkBy'],
+  'Dạy lệnh': ['trainBar', 'praise', 'trickIcon', 'cmdBubble', 'guardPost', 'sniffMark'],
   'Hiệu ứng': ['fx'],
   'Săn mồi': ['rat', 'hawk', 'hawkShadow', 'weasel'],
   'NPC': ['npcTiSun', 'npcTiSunIdle', 'npcCoUt', 'npcCoUtIdle', 'npcChuBa', 'npcChuBaIdle'],
@@ -96,5 +98,25 @@ function scene(scale, t) {
   r.append(c);
 }
 scene(1, 0); scene(2, 0);
+
+// Ghép thanh dạy lệnh: track + zone (vẽ đè) + mark chạy, kèm dấu khen và bong bóng lệnh
+{
+  const r = section('Thanh dạy lệnh ghép (3x)');
+  const W = 128, H = 44, sc = 3;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'); grass(x, W, H);
+  const T = SPR3.trainBar;
+  x.drawImage(T.track, 8, 26);
+  x.drawImage(T.zone, 8 + 44, 26);
+  x.drawImage(T.mark, 8 + 50, 24);
+  x.drawImage(SPR3.praise.left[0], 8 + 48, 8);
+  x.drawImage(SPR3.cmdBubble, 4, 2);
+  x.drawImage(SPR3.trickIcon.sit, 6, 2);
+  x.drawImage(SPR3.guardPost, 112, 8);
+  feet(x, SPR3.dogSitBy.truong.left[0], 100, 24);
+  c.style.width = W * sc + 'px'; c.style.height = H * sc + 'px';
+  c.style.imageRendering = 'pixelated';
+  r.append(c);
+}
 document.title = 'done';
 </script>
