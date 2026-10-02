@@ -222,4 +222,7 @@ test('sổ tay có các trang mới: vòng đời, tắm, bệnh, lùa, kẻ să
     await page.locator(`.guide-dot[title="${t}"]`).click();
     await expect(page.locator('.guide-page h3')).toHaveText(t);
   }
+  // trang Lùa về chuồng có cả mèo (issue 44 làm song song với 48 nên lúc đầu thiếu): mèo vui lùa được 1 con gần nhất
+  await page.locator('.guide-dot[title="Lùa về chuồng"]').click();
+  await expect(page.locator('.guide-page')).toContainText(/Mèo .*lùa 1 con gần nhất/);
 });

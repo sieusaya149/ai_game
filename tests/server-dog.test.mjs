@@ -4,8 +4,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
-import { createGame, stageStart } from '../public/state.js';
-import { GUARD } from '../public/data.js';
+import { createGame, stageStart, commandDog, startVisit, dogPost, dogSees, guardRadius, barkOp } from '../public/state.js';
+import { GUARD, DOG, TRICKS } from '../public/data.js';
+import { TS } from '../public/layout.js';
 
 const LV5 = 500;
 
@@ -118,4 +119,65 @@ test('xúc xích: server đọc giỏ của khách, không có xúc xích thì t
     c.send({ t: 'guest', op: bad });
     assert.equal((await until(c, 'guest')).reason, 'op_invalid', JSON.stringify(bad));
   }
+});
+
+// Issue 45 (tiêu chí seam 3 hoãn tới lúc gộp): chó canh vườn online dùng vòng đời và lệnh Canh khu của chủ.
+// Đường thật: chủ ra lệnh gác rồi lưu lên server → khách đọc vườn (GET /api/visit) và dựng bản đi dạo bằng startVisit
+// → trình duyệt khách hỏi dogSees (world.js) xem chó có thấy mình không → thấy thì gửi thao tác sủa (barkOp) qua WebSocket
+// → server kiểm lại bằng guestOpApply (chó con không canh: từ chối) rồi ghi vào bản lưu chủ.
+const guardAt = (s, dc) => {
+  guarded(s);
+  s.dog.tricks = { sit: TRICKS.sit.sessions, guard: TRICKS.guard.sessions };
+  const spot = { c: Math.floor(s.dog.x / TS) + dc, r: Math.floor(s.dog.y / TS) };
+  assert.equal(commandDog(s, 'guard', spot).ok, true);
+  return spot;
+};
+const mid = (spot, dc) => ({ x: (spot.c + dc) * TS + 8, y: spot.r * TS + 8 });
+const guestOf = name => { const me = createGame({ name }); me.tutorial = 99; me.exp = LV5; return me; };
+
+test('Canh khu online: khách đọc vườn thấy chỗ gác của chủ, chó thấy xa gấp đôi quanh chỗ gác, sủa thì ghi vào vườn chủ', async t => {
+  const { player } = await setup(t);
+  let spot;
+  await player('Lan', s => { spot = guardAt(s, 12); });
+  const B = await player('Bình');
+  const v = startVisit(guestOf('Bình'), (await B.visit('Lan')).farm, 'Lan');
+  assert.deepEqual(dogPost(v), spot, 'bản đi dạo giữ đúng chỗ gác của chủ');
+  assert.equal(guardRadius(v), DOG.guardRadius.truong * DOG.guardPostMul);
+  const near = mid(spot, DOG.guardRadius.truong + 4), far = mid(spot, DOG.guardRadius.truong * DOG.guardPostMul + 2);
+  assert.equal(dogSees(v, near), true, 'cách chỗ gác 10 ô vẫn bị thấy (bán kính 6 ô ×2)');
+  assert.equal(dogSees(v, far), false, 'cách 14 ô thì không');
+
+  // khách đứng ở chỗ bị thấy: trình duyệt khách gửi thao tác sủa, server nhận và ghi chỗ thấy vào vườn chủ
+  Object.assign(v.player, near);
+  const op = barkOp(v).guestOp;
+  const b = await B.ws();
+  await join(b, { map: 'farm', owner: 'Lan' });
+  b.send({ t: 'guest', op });
+  assert.equal((await until(b, 'guest')).ok, true);
+  const seen = await poll(() => B.visit('Lan'), r => r.farm.guests.length >= 1);
+  assert.deepEqual([seen.farm.dog.barkX, seen.farm.dog.barkY], [near.x, near.y]);
+  assert.equal(seen.farm.stats.barks, 1);
+  assert.deepEqual(dogPost(seen.farm), spot, 'chó vẫn gác chỗ cũ');
+});
+
+test('vòng đời chó với khách online: chó con chưa canh (server từ chối sủa), chó già thấy gần hơn chó trưởng thành', async t => {
+  const { player } = await setup(t);
+  await player('Lan', s => { Object.assign(s.dog, { stage: 'non', age: 0, hunger: 100, happy: 100 }); });
+  await player('Chi', s => { Object.assign(s.dog, { stage: 'gia', age: stageStart('cho', 'gia'), hunger: 100, happy: 100 }); });
+  const B = await player('Bình');
+  const pup = startVisit(guestOf('Bình'), (await B.visit('Lan')).farm, 'Lan');
+  assert.equal(guardRadius(pup), 0);
+  assert.equal(dogSees(pup, pup.dog), false, 'chó con không thấy cả khách đứng sát bên');
+  const b = await B.ws();
+  await join(b, { map: 'farm', owner: 'Lan' });
+  b.send({ t: 'guest', op: { id: 'bark-0301-aaaa', kind: 'bark', act: 'bark', x: pup.dog.x, y: pup.dog.y } });
+  const no = await until(b, 'guest');
+  assert.equal(no.ok, false);
+  assert.equal(no.reason, 'no_guard', 'server kiểm bằng cùng luật: chó con không canh vườn');
+
+  const old = startVisit(guestOf('Bình'), (await B.visit('Chi')).farm, 'Chi');
+  assert.equal(guardRadius(old), DOG.guardRadius.gia);
+  const at = d => ({ x: old.dog.x + d * TS, y: old.dog.y });
+  assert.equal(dogSees(old, at(DOG.guardRadius.gia - 1)), true);
+  assert.equal(dogSees(old, at(DOG.guardRadius.gia + 1)), false, 'chó già mắt kém: 5 ô là không thấy (trưởng thành thấy 6 ô)');
 });

@@ -921,10 +921,11 @@ const GUIDE = [
       `Mệt chữa bằng ${D.SICK.doses[1]} liều thuốc thú y, Bệnh nặng cần ${D.SICK.doses[2]} liều, Nguy kịch chỉ bác sĩ thú y mới cứu được (gọi qua điện thoại ở nhà, ${D.SICK.vetPrice} xu).`,
       'Bệnh nặng lây cho một con cùng chuồng; chuồng cách ly không lây và hồi bệnh nhanh hơn. Thuốc, vắc-xin mua ở trạm thú y Cô Út trong làng.',
       `Dưới cấp ${D.SICK.minLevel}, con vật không bệnh quá Mệt — người chơi mới được bảo hộ.`] },
-  { title: 'Lùa về chuồng', lv: D.ANIMALS.vit.lv, art: () => [SPR3?.homeBoard, SPR3?.strayArrow, SPR3?.dogHerd?.left?.[0]],
+  { title: 'Lùa về chuồng', lv: D.ANIMALS.vit.lv, art: () => [SPR3?.homeBoard, SPR3?.strayArrow, SPR3?.dogHerd?.left?.[0], SPR3?.animal?.meo?.truong?.left?.[0]],
     text: [`Chạng vạng (18h) gà vịt thả rông tự về chuồng, trừ ${D.FREE.strayPerDusk[0]}–${D.FREE.strayPerDusk[1]} con lạc 💤 ngủ ngoài tới sáng — không con nào gặp nguy hiểm chỉ vì chuyện này.`,
       `Lùa tay: đi vòng ra sau con lạc, đẩy nó về phía cửa chuồng. Nhanh hơn thì rải thóc ở cửa chuồng (tốn 1 bao cám), mọi con lạc trong ${D.FREE.lureRadius} ô quanh đó tự chạy về.`,
-      `Chó học lệnh ${D.TRICKS.herd.name} (${D.TRICKS.herd.sessions} buổi) thì lùa cả đàn về chuồng trong khoảng ${D.TRAIN.herdMs / 1000} giây, và tự làm mỗi tối nếu no và vui.`] },
+      `Chó học lệnh ${D.TRICKS.herd.name} (${D.TRICKS.herd.sessions} buổi) thì lùa cả đàn về chuồng trong khoảng ${D.TRAIN.herdMs / 1000} giây, và tự làm mỗi tối nếu no và vui.`,
+      `Mèo không học lệnh nhưng cũng giúp được: mèo nhỡ trở lên đang vui (từ ${D.CAT.herdHappy}) thì chạm vào mèo, chọn Nhờ lùa — mỗi lần nó lùa 1 con gần nhất về chuồng.`] },
   { title: 'Kẻ săn mồi', lv: D.PREDATOR.minLevel, art: () => [SPR3?.rat?.left?.[0], SPR3?.hawk?.left?.[0], SPR3?.weasel?.left?.[0], SPR3?.status?.predIcon],
     text: [`Từ cấp ${D.PREDATOR.minLevel}: chuột ăn cám, trộm trứng và cắn con non; diều hâu cắp gà vịt con đang thả rông ban ngày; chồn bắt con ngủ ngoài chuồng lúc nửa đêm.`,
       `Đang chơi thì luôn được báo trước khoảng ${D.PREDATOR.warnMs / 1000} giây trước khi nó ra tay — chạm vào để đuổi là kịp, không ai bị hại.`,
@@ -1533,10 +1534,17 @@ function placeMini() {
   const wrap = $('mini-wrap');
   // đo hết rồi mới ghi: đọc xen kẽ ghi làm trình duyệt phải tính lại bố cục hai lần mỗi nhịp
   const hud = $('hud').getBoundingClientRect(), act = $('actions').getBoundingClientRect();
-  const top = innerWidth - hud.right >= 120 ? hud.top : hud.bottom + 8;   // màn rộng: ngang HUD; màn hẹp: ngay dưới HUD
+  const main = $('main-action').getBoundingClientRect(), nm = $('target-name').getBoundingClientRect();
+  const wide = innerWidth - hud.right >= 120, top = wide ? hud.top : hud.bottom + 8;   // màn rộng: ngang HUD; màn hẹp: ngay dưới HUD
   wrap.style.top = top + 'px';
-  // Cột nút hành động cao tới đây thì bản đồ nhỏ thu lại còn nút Việc cần làm (máy nhỏ, nhiều nút)
-  wrap.classList.toggle('compact', act.height > 0 && act.top < top + 108);
+  wrap.style.setProperty('--mini-top', top + 'px');
+  wrap.classList.toggle('narrow', !wide);   // màn hẹp: nút tốc độ sang mép trái (style.css)
+  // Cột nút cao nhất tới ngay dưới hàng bản đồ nhỏ thu gọn (nút Việc cần làm 42px); dư chip thì danh sách cuộn dọc
+  const floor = main.height ? main.top - 8 : act.bottom;
+  $('chips').style.maxHeight = Math.max(84, floor - (top + 50) - (nm.height ? nm.height + 8 : 0) - 4) + 'px';
+  // Cột nút hành động cao tới đây thì bản đồ nhỏ thu lại còn nút Việc cần làm (máy nhỏ, nhiều nút).
+  // 102px bản đồ + 14px nút 📋 lòi xuống dưới + 8px hở
+  wrap.classList.toggle('compact', act.height > 0 && act.top < top + 124);
 }
 function renderMini(s) {
   $('mini-wrap').hidden = false;

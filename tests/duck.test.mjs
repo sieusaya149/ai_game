@@ -1,5 +1,5 @@
 // Vịt (issue 47): loài mới ở chuồng gia cầm chung với gà, qua API công khai của state.js.
-import test from 'node:test';
+import test, { beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
 import { ANIMALS, LIFE, DAY_MS, MAX_CATCHUP_MS, PRODUCTS, FREE, DIRT } from '../public/data.js';
@@ -8,6 +8,10 @@ import { mapOf } from '../public/farm.js';
 const MIN = 60_000, HOUR = 60 * MIN;
 const store = {};
 globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
+// Math.random có hạt giống cố định (mulberry32), đặt lại đầu mỗi test: kẻ săn mồi, bệnh, con lạc ra cùng kết quả mỗi lần chạy
+const rnd0 = Math.random;
+beforeEach(() => { let a = 47; Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; });
+after(() => { Math.random = rnd0; });
 const NOON = DAY_MS * 0.3;
 const newGame = () => { const s = G.createGame({ name: 'Hùng' }); s.orders = []; s.nextOrderAt = 1e15; s.animals = []; s.time = NOON; s.coins = 1e6; s.exp = 1e6; return s; };
 const bird = (s, type, stage, sex, extra) => {
@@ -96,9 +100,9 @@ test('trứng vịt có phôi: soi, nhặt, ấp nở ra vịt con', () => {
 
 test('vịt dùng luật chung: thả rông ban ngày, chạng vạng về chuồng; chạy bù offline không con nào chết', () => {
   const s = newGame(); const ds = [bird(s, 'vit', 'truong', 'f'), bird(s, 'vit', 'nho', 'm')];
-  run(s, 3 * MIN);
+  run(s, 3 * MIN, calm);   // diều hâu, chuột làm vịt hoảng chạy về chuồng: để test khác lo
   assert.ok(ds.every(d => d.tile), 'ban ngày thả rông');
-  s.time = DAY_MS * 0.78; run(s, 2 * MIN);   // sau 18h
+  s.time = DAY_MS * 0.78; run(s, 2 * MIN, calm);   // sau 18h
   assert.ok(ds.every(d => !d.tile || d.stray), 'tối về chuồng, trừ con lạc (issue 42)');
   // chạy bù offline (ADR 0004): dù đói lả và bệnh, không con vịt nào chết
   const o = newGame(); const od = [bird(o, 'vit', 'truong', 'f'), bird(o, 'vit', 'non', 'm'), bird(o, 'vit', 'truong', 'm', { sick: 2, sickMs: 1 })];

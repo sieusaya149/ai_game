@@ -17,8 +17,9 @@ Người chơi hiện vẫn thấy bản chơi đơn, chạy hoàn toàn trong t
 | [`DESIGN.md`](DESIGN.md) | Thiết kế tổng thể toàn game, thứ tự phase (mục 9), danh sách chủ đề đã grill |
 | [`docs/prd/0001-phase-0-nen-mong.md`](docs/prd/0001-phase-0-nen-mong.md) | PRD Phase 0: user story, quyết định, cách test |
 | [`docs/prd/0002-phase-1-online.md`](docs/prd/0002-phase-1-online.md) | PRD Phase 1 (làng online): tài khoản, vườn online, làng real-time, bạn bè, giúp/trộm, chó canh khách |
+| [`docs/prd/0003-phase-2-vat-nuoi.md`](docs/prd/0003-phase-2-vat-nuoi.md) | PRD Phase 2 (vật nuôi): vòng đời 4 giai đoạn, đực/cái và sinh sản, dơ và tắm, bệnh và thú y, độ thân, bán cho Chú Ba, thả rông và về chuồng, kẻ săn mồi, mèo, dạy lệnh chó, trộm NPC mới, vịt |
 | [`docs/adr/`](docs/adr/) | 0001 nền móng trước online sau · 0002 dữ liệu vườn trình duyệt+server · 0003 hai lịch, đóng băng 8 giờ · 0004 offline không gây chết · 0005 đặt tự do, luật đặt nằm trong `state.js` · 0006 VPS sau ai_gateway · 0007 `ws` · 0008 test qua hai seam · 0009 kinh tế chống lạm phát · 0010–0015 (Phase 1–3) · 0016 đổi phiên chơi chờ bản lưu cuối |
-| [`docs/issues/`](docs/issues/README.md) | Các issue Phase 0 (01–19) và Phase 1 (20–33) kèm báo cáo từng cái |
+| [`docs/issues/`](docs/issues/README.md) | Các issue Phase 0 (01–19), Phase 1 (20–33) và Phase 2 (34–49) kèm báo cáo từng cái; ghi chú phát hành ở cuối issue 33 và 49 |
 | [`README.md`](README.md) | Cách chạy, test, deploy ngắn gọn |
 
 ## Các file và việc được sửa
@@ -27,7 +28,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED` (bán kính theo giai đoạn nằm ở `DOG.guardRadius`, dùng chung với trộm NPC); Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC). Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED` (bán kính theo giai đoạn nằm ở `DOG.guardRadius`, dùng chung với trộm NPC); Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC), `BREED`/`animalPrice` (đực cái, sinh sản), `DIRT`/`MANURE` (dơ, phân chuồng), `SICK`/`VET_ITEMS` (bệnh, thú y), `BOND` (độ thân), `TRADE`/`pigKgPrice` (bán cho Chú Ba), `CAT` (mèo), `CO_UT_QUEST`, `BUILD_PRICES` (nhà mèo...). Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
 | `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `troughOf(map, {pen, id?})`; bản đồ vườn có `pens` (chuồng đầu tiên mỗi loại), `penList`/`penById` (mọi chuồng: `{ id, type, lv, name, rect, gates, trough|null, area, house, ent }`), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
 | `public/migrate.js` | `SAVE_VERSION` (3), `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`: v1→v2, v2→v3); `animalDefaults`/`fillAnimal`: hình dạng con vật v3 và mặc định của nó. Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
@@ -44,7 +45,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/presence.js` | Người khác cùng bản đồ (issue 25): `crowdSplit(me, people, max)`, `sampleTrack(track, t)`, `createPeers()`. Thuần JS, xem mục Server |
 | `server/` | Server Node (ADR 0010), xem mục Server. `server.js` cũ (hỏng) và `scripts/static-server.mjs` đã bị xóa ở issue 20 |
 | `Dockerfile`, `compose.yml`, `.dockerignore` | `node:22-alpine` chạy `server/main.mjs`, nghe cổng 80; container `ai-game` trong network `gateway`, dữ liệu trên volume `data` (`/data/farm.db`) |
-| `tests/` | Unit test `node --test`: seam 1 (`state.js`), seam 3 (`server-*.test.mjs`, helper `tests/helpers/server.mjs`) và `tests/fixtures/` (bản lưu v1 mẫu) |
+| `tests/` | Unit test `node --test`: seam 1 (`state.js`), seam 3 (`server-*.test.mjs`, helper `tests/helpers/server.mjs`) và `tests/fixtures/` (bản lưu v1 và v2 mẫu) |
 | `e2e/`, `playwright*.config.mjs` | E2E và smoke Playwright (seam 2), `e2e/helpers.mjs` |
 
 ## Thời gian
@@ -57,7 +58,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 - **Mùa** (chỉ hiển thị ở Phase 0): mỗi mùa 7 ngày game, Xuân, Hạ, Thu, Đông. `seasonOf(state)`.
 - **Hai lịch (ADR 0003):** lịch game (ngày đêm, mùa, thời tiết) theo `state.time`; lịch ngoài đời (`realDay()` chơi đơn, `serverDay()` online) dành cho nhiệm vụ hằng ngày.
 - **Lịch làng (online, issue 23):** khi vào làng, `sync.js` `syncClock()` đo lệch giờ qua `GET /api/health` (lấy lần khứ hồi ngắn nhất trong 3 lần, đo lại mỗi 5 phút) rồi `useServerTime(offset)`. Với vườn `mode: 'online'` thì ngày, mùa, ngày/đêm, giờ chợ, ngủ đều tính từ `villageCal(now())` (`VILLAGE_EPOCH` = 0h UTC ngày 2026-01-01 = 6:00 sáng ngày 1; `dayOf`, `dayFraction`, `seasonOf`, `clockText` đọc từ đó), nên cả làng cùng ngày/mùa/ban đêm và lịch không dừng khi vườn đóng băng. `state.time`/`state.day` vẫn là giờ vườn cho cây, con vật, thời tiết, bộ đếm. Rời làng thì `useServerTime(null)`.
-- **Chạy bù khi mở lại game:** tối đa `MAX_CATCHUP_MS` = 8 giờ ở tốc độ x1, chia bước ≤ 1000ms; lúc chạy bù không sinh quạ/trộm và (ADR 0004) không có gì làm con vật chết. Phần vắng vượt 8 giờ **không chạy** (đóng băng): ghi vào `frozenMs`, cộng dồn `frozenTotal`.
+- **Chạy bù khi mở lại game:** tối đa `MAX_CATCHUP_MS` = 8 giờ ở tốc độ x1, chia bước ≤ 1000ms; lúc chạy bù không sinh quạ/trộm và (ADR 0004) không có gì làm con vật chết. Phần vắng vượt 8 giờ **không chạy** (đóng băng): ghi vào `frozenMs`, cộng dồn `frozenTotal`. Với vườn online, **giờ làng trong lúc chạy bù trôi theo bước đang mô phỏng** (`loadGame` đặt mốc `catchBase` = giờ ngoài đời lúc bắt đầu phần chạy bù; `dayOf`/`dayFraction` đọc `catchBase + simMs` thay cho `now()`), nên 8 giờ vắng là 24 ngày làng có ngày có đêm (chạng vạng, mèo ra vào, chồn nửa đêm...), không phải cả 8 giờ đứng yên ở giờ lúc mở lại (issue 49 sửa: trước đó server chạy bù lúc làng đang đêm thì mèo ngủ suốt 8 giờ, không bắt được con chuột nào).
 - **Giờ vườn đã chạy** `simMs`: chỉ tăng khi mô phỏng thật sự chạy (kể cả chạy bù và lúc ngủ). Từ Phase 2 tuổi con vật dựa vào đây (`farmHours(state)`).
 
 ## Hình dạng bản lưu v3
@@ -168,7 +169,7 @@ Hình dạng chung cho mọi loài trong `state.animals` (nền cho cả Phase 2
 
 ```js
 Animal = {
-  id, type: 'ga'|'vit'|'heo'|'bo'|'cuu',      // (lát sau: mèo... thêm loài vào ANIMALS + LIFE)
+  id, type: 'ga'|'vit'|'heo'|'bo'|'cuu',      // mèo ('meo') là thú cưng, nằm ở state.cats chứ không ở đây (mục Mèo); loài mới: thêm vào ANIMALS + LIFE
   name,                                       // mặc định tên loài ('Gà'); lát sau đặt tên riêng / "Bông con"
   sex: 'f'|'m',                               // cái / đực. Mặc định theo id: chẵn cái, lẻ đực
   stage: 'non'|'nho'|'truong'|'gia',          // giai đoạn (STAGES), cập nhật mỗi tick theo age
@@ -275,7 +276,7 @@ Luật:
 - Mỗi bước tick: `age += d` (giờ vườn, nên vắng quá 8 giờ thì phần đóng băng không làm già), rồi `stage = stageAt(...)`. Sang giai đoạn mới thì ghi nhật ký + chữ bay; vào trưởng thành thì bắt đầu đếm sản phẩm.
 - **Non**: không đẻ, không sữa, không lông, chưa bán được; uống vitamin được. **Nhỡ**: chưa cho sản phẩm (cừu nhỡ lông ngắn chưa xén), bán được, bò tơ kéo cày được (`animalCan(a, 'plow')`; hành động kéo cày trên ruộng chưa làm), heo nhỡ đói nhanh ×1.5 và lên cân ×2, gà nhỡ bới đất nhiều (world). **Trưởng thành**: như cũ. **Già**: chu kỳ sản phẩm ×2 (đẻ thưa, ít sữa, lông mỏng), đi chậm, hay ngủ gật (world), bò già không kéo cày.
 - Còn `AGING.warnMs` nữa là vào giai đoạn già: event `oldSoon` (🟡, gộp theo loài, cat `old`), một lần.
-- Hết giai đoạn già: con vật ra đi (bỏ khỏi `animals`), event `passed` + `spawn` `angel`; được phép cả lúc chạy bù (ADR 0004). Chưa có mộ (lát 38). Chó không áp dụng (`LIFE.cho.truong = Infinity`).
+- Hết giai đoạn già: con vật ra đi (bỏ khỏi `animals`), event `passed` + `spawn` `angel`, để lại ngôi mộ (`grave`, lát 38); được phép cả lúc chạy bù (ADR 0004). Chó và mèo không áp dụng (`LIFE.cho.gia = LIFE.meo.gia = Infinity`).
 - Vitamin: cộng nửa giai đoạn đang ở (`vitaminBoost`), không vượt đầu giai đoạn trưởng thành.
 - Chó: lớn theo giờ vườn như con vật (`dog.stage`), canh nhà khi trưởng thành/già (`guardOn`).
 
@@ -288,6 +289,14 @@ lifeMarks(a)                      // { gia, end }: mốc già / mốc ra đi c�
 starChance(s, a)                  // xác suất milk/shear ra sữa ngon / lông xoăn (BOND.star): ❤️3+ cao hơn; bò vuốt ve nhiều ngày liền, cừu đang vui thì thêm
 ```
 Đói (hunger ≤ BOND.hungerBelow) hoặc dơ (dirty ≥ BOND.dirtyAbove) thì tụt BOND.lossPerMin điểm/phút, không dưới ❤️1. Cho ăn tận tay, vuốt ve, thuốc thú y cộng độ thân; kết quả perform có ond. Sản phẩm sao: sua_ngon, lông xoăn = len_xoan (PRODUCTS, giá cao hơn).
+
+### Dơ, tắm, dọn chuồng (issue 37)
+- `DIRT`, `MANURE` (data.js). Độ dơ tăng 0→100 trong 3 giờ vườn, ×2 khi trời mưa hoặc chuồng bẩn (`manure[pen] >= 100`); không chạy khi vườn đóng băng. Dơ `>= DIRT.high` (60): mất vui dần, nguy cơ bệnh ×2 (đầu vào lát 38). Heo, bò đầm bùn: dơ 100 ngay, không mất vui, event `wallow`; tắm xong `DIRT.wallowAfterMs` mới lăn lại. Mèo không dơ.
+- `isDirty(a)`, `penDirty(s, pen)`, `dirtyAnimals(s)`, `dirtyPens(s)` (cho Việc cần làm).
+- Hành động `bath` trên con vật: tốn 1 `soap` + 1 nước trong bình; `dirty = 0`, vui +`DIRT.bathHappy`, độ thân qua `addBond(s, a, 'bath')`; result có `bath: id` (main.js phát hoạt cảnh), event `bathed {animal, id}`, bước `bathe` của nhiệm vụ Cô Út. Từ chối (nút mờ kèm lý do): hết xà phòng / bình hết nước.
+- Hành động `muck` trên máng (`{ kind: 'trough', pen }`): `manure[pen] = 0`, nhận `max(1, floor(độ đầy / 25))` `manure` (phân chuồng, kho), event `mucked {pen, qty}`.
+- Ổ cát: gà, vịt tự tắm cát nếu thực thể chuồng có cờ `ent.sand` (chuồng gia cầm cấp 3); dơ không vượt `DIRT.sandCap` (30), trừ khi trời mưa.
+- Vật phẩm: `soap` (supply, bán ở chợ), `manure` (material). Render: `bathPhase(b, now)` (`soap` → `shake` → `sparkle`), `BATH_MS`.
 
 ### Bệnh 4 giai đoạn, thú y, ngôi mộ (issue 38)
 ```js
@@ -396,7 +405,8 @@ praiseCat(state, id)     // khen mèo đang khoe chuột: +happy, +độ thân, 
 - **Đêm:** vừa tối (`isNight`) mèo đi về cửa mèo (`c.inAt` = lúc chui qua, sau `CAT.doorMs`), rồi `scene = 'house'`, `sleep = true`, nằm ở `CAT.houseSpot` trong bản đồ nhà. Sáng chui ra cửa mèo lại vườn.
 - **Cãi nhau với chó:** chó đứng trong `CAT.spatRadius` ô thì thỉnh thoảng (`CAT.spatPerMin`) có event `catSpat`, `c.spatUntil` để vẽ bong bóng. Không đổi chỉ số nào.
 - **Không dạy lệnh, không dơ, không bán, không chết vì già** (`LIFE.meo.gia = Infinity`). Mắc bệnh như vật nuôi (`CAT.sickMul`), uống thuốc/tiêm vắc-xin bằng chung hàm; đổi tên bằng `renameAnimal`.
-- **ADR 0004:** chạy bù offline mèo vẫn bắt chuột (chuột ít đi), không con vật nào chết.
+- **ADR 0004:** chạy bù offline mèo vẫn bắt chuột (chuột ít đi), không con vật nào chết. Server chạy bù vườn online có mèo ra cùng kết quả với `loadGame` ở trình duyệt (cùng hạt giống ngẫu nhiên), kể cả khi khách ghé lúc làng đang đêm (giờ làng trôi theo bước chạy bù, mục Thời gian); test seam 3 ở `tests/server-catchup.test.mjs`.
+- **Lùa 1 con** (`catHerd`, hành động `herd` "Nhờ <tên> lùa 1 con gần nhất về chuồng"): mèo nhỡ trở lên, `happy >= CAT.herdHappy`; sổ tay trang "Lùa về chuồng" có cả đoạn về mèo.
 - Hiển thị: `render.catImg(c, rt)` chọn `SPR3.animal.meo` / `sleepBy.meo` / `catPounceBy` / `catNapBy` (phơi nắng) / `catMouseBy` (ngậm chuột) theo giai đoạn; `SPR3.ratTrophy` (chuột thả xuống khoe), `SPR3.catYarn` (mèo con vờn len), `SPR3.spatBubble`, `SPR3.catDoor` trên nhà, `SPR3.cathouse[cấp-1]`, `SPR3.items.catfood` (cá khô, mua ở chợ).
 ### Trộm NPC: Tí Sún, chồn hương, phạt trộm (issue 46)
 
@@ -433,7 +443,7 @@ skipCoUtQuest(s)         // bỏ qua bước đang mở → R; ok:false khi khô
 - **Nhiệm vụ Cô Út:** mua **con heo đầu tiên** (`buyAnimal`, chưa có heo và chưa có nhiệm vụ) mở chuỗi `CO_UT_QUEST` = tắm → chữa bệnh → vắc-xin; mỗi bước mở khi bước trước xong (làm sai thứ tự không tính), bỏ qua được. Tiến độ ở `s.coUtQuest = null | { step }` (bản lưu cũ `?? null`), xong hoặc bỏ qua hết thì không chạy lại. Heo chỉ mua được từ cấp `ANIMALS.heo.lv` (3). UI: khung `#coutquest` cạnh khung hướng dẫn, nút ✕ bỏ qua bước.
 - **Thông báo:** mọi loại sự kiện vật nuôi đều có mức và khóa gộp trong `EVENT_LEVEL`. 🔴 `sickSevere`, `sickCritical`, `predator`; 🟡 `stray` (con lạc), `oldSoon`, `passed`, `born` (loại tắt/bật mới `birth`), `taken`, `died`; ⚪ `egg`, `cured`, `bathed`, `vaccinated`, `shooed`. Thông báo trình duyệt cho bệnh nặng đã có từ issue 38.
 - **Việc cần làm** (`todoList`) thêm `stray` (💤 con lạc ngủ ngoài), `dirty` (🧼, không tính heo/bò đầm bùn), `muck` (💩 chuồng bẩn) và `bushEgg` (🌿 trứng trong bụi; `egg` chỉ còn trứng không nằm trong bụi), mỗi dòng có số lượng, chạm thì nhân vật đi tới.
-- **Sổ tay:** thêm trang Vòng đời, Tắm, Bệnh và thú y, Lùa về chuồng, Kẻ săn mồi. Mỗi trang có `lv` tùy chọn; trang chỉ hiện khi cấp người chơi ≥ `lv` (Tắm 2, Bệnh = `ANIMALS.heo.lv`, Lùa = `ANIMALS.vit.lv`, Kẻ săn mồi = `PREDATOR.minLevel`), cấp 1 chỉ thấy 10 trang.
+- **Sổ tay:** thêm trang Vòng đời, Tắm, Bệnh và thú y, Lùa về chuồng (rải thóc, chó học Lùa, mèo lùa 1 con), Kẻ săn mồi. Mỗi trang có `lv` tùy chọn; trang chỉ hiện khi cấp người chơi ≥ `lv` (Tắm 2, Bệnh = `ANIMALS.heo.lv`, Lùa = `ANIMALS.vit.lv`, Kẻ săn mồi = `PREDATOR.minLevel`), cấp 1 chỉ thấy 10 trang.
 
 ### Vịt (issue 47)
 
@@ -599,6 +609,7 @@ keepLoot(state, items)            // ghi đồ khách vừa trộm được tron
   - `{ kind: 'bite', act: 'bite', loot: { <món>: n } }` — chó đớp trúng. Chủ được `GUARD.fine` = 30 xu, `stats.chased++`, nhật ký "X bị Mực đớp"; khách nhận `reward = { lose: loot, fine, bite: 1 }` → `guestReward` bỏ hết đồ vừa trộm, trừ xu (không âm) và đặt `stats.robStreak = 0`. Chủ **không mất thêm** gì (phần đã bị trộm vẫn tính). Khách đứng hình `GUARD.biteStunMs` = 3 giây.
   - `{ kind: 'sausage', act: 'sausage' }` — khách ném xúc xích (vật phẩm `sausage`, 30 xu ở chợ Bà Tư, cấp 5). Chó thuộc đủ 6 lệnh (`trickProof`, issue 45) thì **không bao giờ ăn**. Còn lại: chó no dưới `GUARD.sausageHunger` = 50 thì **chắc chắn ăn**, chó đang no vẫn `GUARD.sausageGreed` = 30% tham ăn — phần hên xui quay bằng **hạt giống cố định = mã thao tác**, nên server và trình duyệt chủ ra cùng kết quả. Ăn thì `dog.quiet = at + GUARD.quietMs` (im lặng 60 giây). Kết quả trả `{ ate }`, khách mất 1 xúc xích dù chó có ăn hay không.
   - Cả ba từ chối với `reason: 'no_guard'` khi vườn không có chó đang canh, `'no_item'` khi khách hết xúc xích.
+  - **Ai kiểm cái gì (issue 45 + 49):** khách mới là người di chuyển, nên **"chó có thấy khách không"** do trình duyệt khách tính bằng `dogSees` trên bản đi dạo (`startVisit` giữ nguyên `dog.stage`, `dog.chained`, `dog.cmd` Canh khu của chủ: tâm vùng canh là chỗ gác, bán kính ×`DOG.guardPostMul`). Server **không kiểm vị trí** của thao tác sủa/đớp; nó chỉ kiểm bằng `guestOpApply` những gì không phụ thuộc vị trí: `guardRadius(host) > 0` theo bản lưu chủ (chó con, chó đói, chó đang mải ăn xúc xích thì `no_guard`), nhịp `barking`, mã thao tác. Test seam 3: `tests/server-dog.test.mjs`.
 - **Chủ vườn:** online thì nhận `{ t: 'guestop', op }` → `guestOpApply` → `takeGuestLog` → băng rôn 🔴 "Mực đang sủa ở phía Đông vườn!" kèm **mũi tên** (todo kind `bark`, sprite `SPR2.barkArrow`, tắt sau `GUARD.barkShowMs` = 15 giây) và toast 🟡 khi chó đớp được hay bị ném xúc xích (loại thông báo `guard`). Offline thì server áp dụng thẳng vào bản lưu, chủ về đọc nhật ký.
 - **Chó trong vườn người khác không đi theo khách lạ** (`world.js`): nó quanh quẩn giữ chuồng, chỉ rời chỗ khi đuổi. Lúc đuổi thì chạy `chaseSpeed()`, đớp khi cách khách `GUARD.biteRange` = 11 px, mất dấu `GUARD.loseMs` = 2 giây thì thôi đuổi; màn hình khách rung nhẹ lúc chó sủa và lúc bị đớp.
 - **Nhật ký chó:** `stats.chased` = đã đớp được bao nhiêu người, `stats.barks` = đã sủa mấy lần (issue 32 dùng cho thành tựu và màn "Trong lúc bạn vắng nhà"). `stats.robStreak` = chuỗi trộm chưa bị đớp của chính mình.
@@ -698,6 +709,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'egg', id }
 { kind: 'poop', id }
 { kind: 'trough', pen, id? }   // pen: 'chicken'|'pig'|'pasture'; id = thực thể chuồng (có nhiều chuồng cùng loại). Máng ăn gom theo loại: state.troughs[loại]
+{ kind: 'scale', pen: 'pig' }  // cái cân cạnh máng chuồng heo (PEN_DEFS.pig.scale): cân heo (issue 40)
 { kind: 'gate', id }           // cửa chuồng (id thực thể chuồng); chỉ là target từ chạng vạng (isDusk), cho rải thóc và xem số con đã về
 { kind: 'nest' }
 { kind: 'dog' }           // chó Mực: ở vườn, hay bất cứ bản đồ nào khi đang có lệnh Đi theo
@@ -709,9 +721,10 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'strip', dir }         // mép vườn: mua dải đất 'N'|'S'|'E'|'W'
 { kind: 'door', to }           // cửa/cổng sang 'house'|'village'|'farm'
 { kind: 'building', id }       // theo bản đồ đang đứng. Vườn (cả vườn người khác đang thăm): house, gate, giftbox, guestbook, shed, shipbin, board, well, doghouse (không tương tác).
-                               //   Nhà: bed, wardrobe, (stove, table, plant chỉ để ngắm). Làng: market, smithy, friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
+                               //   Nhà: bed, wardrobe, phone (gọi bác sĩ thú y), (stove, table, plant chỉ để ngắm). Làng: market (Bà Tư), smithy (Ông Sáu),
+                               //   vet (trạm thú y Cô Út), houseC (nhà Chú Ba, lái buôn mua vật nuôi đứng trước nhà), friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck` (và `upgrade` nâng cấp chuồng); cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet train cmd_<lệnh> cmd_stop`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 
@@ -722,6 +735,12 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `sickCritical` | `animal`, `id` | urgent — vừa sang Nguy kịch |
 | `died` | `animal`, `id`, `kind`, `sex`, `x`, `y` | important (`old`) — mất vì bệnh; main đẩy thiên thần vào `world.angels` |
 | `cured` | `animal`, `id` | info |
+| `vaccinated` | `animal`, `id` | info — vừa tiêm vắc-xin |
+| `bathed` | `animal`, `id` | info — vừa tắm xong |
+| `mucked` | `pen`, `qty` | info — vừa xúc phân chuồng |
+| `wallow` | `id` | none — heo, bò lăn bùn (dơ ngay, không mất vui) |
+| `born` | `kind`, `animal`, `id`, `x`, `y` | important (`birth`), gộp theo loài — con mới sinh hoặc nở |
+| `cockcrow` | `id` (gà trống) | none — 6h sáng gà trống gáy (render vẽ bong bóng) |
 | `grave` | `id` (thực thể mộ) | none |
 | `eating` | `kind` ('crow'/'thief'/'tisun'/'civet') | urgent |
 | `predator` | `kind` ('rat'/'hawk'/'weasel'), `id`, `animal?` | urgent — kẻ săn mồi sắp ra tay, còn ~10 giây để đuổi |
@@ -765,6 +784,8 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `sound` | `name` | none |
 | `spawn` | `what` ('chick'/'piglet'/'egg'/'poop'/'crow'/'thief'/'tisun'/'civet'/'angel'/'rat'/'hawk'/'weasel'), `x`, `y` | none |
 
+**Khóa gộp của sự kiện vật nuôi** (`EVENT_LEVEL[type].group(e)`, cùng khóa trong `NOTIFY_WINDOW` thì gộp thành một toast "N con ..."): theo loài `sick:<loài>`, `sick2:<loài>` (sickSevere), `sick3:<loài>` (sickCritical), `died:<loài>`, `passed:<loài>`, `oldSoon:<loài>`, `stray:<loài>`, `cured:<loài>`, `born:<loại>`; theo con `pred:<id>` (predator), `hurt:<id>`, `catTrophy:<id>`, `bathed:<id>`, `vaccinated:<id>`, `grave:<id>`, `wallow:<id>`; theo chuồng `mucked:<pen>`; theo kẻ săn mồi `taken:<pred>`, `shooed:<pred>`; một khóa chung `ratFeed`, `ratEgg`, `trapped`, `catRat`, `catSpat`, `catHerd`, `dogHerd`, `cockcrow`; trộm NPC `loss:tisun`, `loss:civet`; chó `trick:<lệnh>`, `guard:<kẻ bị đuổi>`. Loại tắt/bật được trong cài đặt là `cat` của từng dòng (`NOTIFY_CATS`: thêm `old`, `stray`, `ill`, `pest`, `birth` ở Phase 2).
+
 Tên âm thanh (`sound.js`, `play(name)`, `setMuted(bool)`): `click coin harvest water dig plant spray pop bark oink cluck chirp moo baa slip levelup error eat alarm crow` (`chirp`: gà con kêu, world phát kèm chữ "chiếp").
 
 ## Luật chơi chính (số liệu lấy trong data.js)
@@ -780,10 +801,11 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - Dời khối ruộng (kể cả đang có cây) giữ nguyên trạng thái ô. Cất khối chỉ khi chưa có cây.
 - Cuốc/tưới/thu hoạch/nhổ cỏ bằng công cụ cấp cao làm nhiều ô một lần (`tiles`); ô không hợp lệ trong vùng thì bỏ qua. Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô. Công cụ đang nâng cấp thì hành động bị khóa với lý do.
 
-**Vật nuôi, chó, quạ/trộm**: đói dần; máng còn cám thì tự ăn; tuổi và giai đoạn theo giờ vườn (mục Vòng đời con vật); bệnh hoặc đói (`hunger <= growNeedsHunger`) thì không lên cân/đẻ; gà đẻ trứng xuống đất; ổ ấp; bò/cừu `ready` → vắt sữa/xén lông; heo mang bầu đẻ 1–3 con (không vượt `PEN_CAP`). Chó ỉa bậy, giẫm phải thì trượt chân, càng nhiều phân vật nuôi càng mất vui, chó trưởng thành no và vui thì canh nhà (đuổi quạ và trộm NPC theo `DOG.guardChance`; bán kính phát hiện dùng chung một bộ luật với khách lạ online, xem mục "Chó Mực canh khách lạ"). Quạ tới ô chín khi không có bù nhìn trong 5 ô; ban đêm luật chốt nhiều lắm một vụ trộm NPC (thằng Tèo ≥3 ô chín · Tí Sún ≥3 trứng dưới đất · chồn hương có con ngủ ngoài chuồng — xem mục "Trộm NPC"). Cổng (`gateIn`) là chỗ trộm đi vào. **Đóng băng/chạy bù không sinh quạ**, trộm NPC chỉ lấy trứng hoặc rau và không làm con vật chết hay bị bắt đi, trừ chết vì già (ADR 0004). Chuồng chỉ dời được, luật không đổi.
+**Vật nuôi, chó, quạ/trộm**: đói dần; máng còn cám thì tự ăn; tuổi và giai đoạn theo giờ vườn (mục Vòng đời con vật); bệnh hoặc đói (`hunger <= growNeedsHunger`) thì không lên cân/đẻ; gà đẻ trứng xuống đất; ổ ấp; bò/cừu `ready` → vắt sữa/xén lông; heo mang bầu đẻ 1–3 con (không vượt `penCap`, sức chứa theo loại và cấp chuồng `PEN_TABLE`). Chó ỉa bậy, giẫm phải thì trượt chân, càng nhiều phân vật nuôi càng mất vui, chó trưởng thành no và vui thì canh nhà (đuổi quạ và trộm NPC theo `DOG.guardChance`; bán kính phát hiện dùng chung một bộ luật với khách lạ online, xem mục "Chó Mực canh khách lạ"). Quạ tới ô chín khi không có bù nhìn trong 5 ô; ban đêm luật chốt nhiều lắm một vụ trộm NPC (thằng Tèo ≥3 ô chín · Tí Sún ≥3 trứng dưới đất · chồn hương có con ngủ ngoài chuồng — xem mục "Trộm NPC"). Cổng (`gateIn`) là chỗ trộm đi vào. **Đóng băng/chạy bù không sinh quạ**, trộm NPC chỉ lấy trứng hoặc rau và không làm con vật chết hay bị bắt đi, trừ chết vì già (ADR 0004). Chuồng chỉ dời được, luật không đổi.
 
 **Kinh tế**
-- **Chợ Bà Tư** (làng, 6h–18h): hạt, vật tư, thức ăn, con non, đồ trang trí, mũ/phụ kiện (đồ chưa đủ cấp hiện khóa); bán nông sản đủ giá.
+- **Chợ Bà Tư** (làng, 6h–18h): hạt, vật tư, thức ăn, con non, đồ trang trí, mũ/phụ kiện (đồ chưa đủ cấp hiện khóa); bán nông sản đủ giá. Phase 2 thêm: con non chọn **đực/cái** (`animalPrice`, cái đắt hơn), vịt và mèo (mèo cần nhà mèo), xà phòng `soap` (tắm), bánh thưởng `treat` (dạy chó), cá khô `catfood`, xúc xích `sausage` (ném chó nhà người khác), bẫy chuột `deco_rattrap`, mái che sân `deco_canopy`, hàng rào thấp `deco_lowfence`. Thuốc thú y, vắc-xin **không** bán ở đây (chỉ ở trạm thú y Cô Út).
+- **Chú Ba** (làng, đứng trước nhà `houseC`): lái buôn mua vật nuôi. Người chơi bán ngay tại vườn (hành động `sell` trên con vật, `sellQuote`/`sellAnimal`), Chú Ba tới dắt đi (hoạt cảnh `world.deals`); heo bán theo cân (cái cân cạnh chuồng heo, giá mỗi ký đổi theo ngày `pigKgPrice`).
 - **Thùng giao hàng** (vườn): trả 80% giá chợ lúc 6h sáng. **Nhà kho** (vườn): cất giỏ vào kho, lấy ra.
 - **Tiệm rèn Ông Sáu** (làng): nâng cấp công cụ, giá `TOOLS[k].price`, mất 1 ngày game.
 - **Trạm thú y Cô Út** (làng, cùng giờ chợ): bán thuốc thú y và vắc-xin, kèm bảng điểm danh con đang bệnh. Gọi bác sĩ thú y qua điện thoại trong nhà (`SICK.vetPrice` xu).
@@ -796,7 +818,7 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - **`main.js`**: khởi động (`loadGame()` có save thì vào chơi; không thì `ui.showCreator()` rồi `createGame`); vòng lặp `requestAnimationFrame`: `tick` → di chuyển/AI → tìm target → vẽ → `ui.handleEvents`; lưu 5 giây một lần, khi tab ẩn (`visibilitychange`) và `pagehide` (vườn online: `save()` ghi bản nháp, `sync.js` gửi lên server, xem mục Server). Đang trong chế độ xây dựng thì chỉ lưu bố cục lúc trước khi vào (Xong mới lưu bố cục mới). `api` đưa cho `ui.initUI`: `getState, doAction, changed, newGame, resetGame, buildStart/Done/Cancel/Pick/Store, todoGo, getBattery/setBattery`.
 - **`world.js`**: tìm đường BFS trên lưới của `sceneMap`, target gần nhất (`findTarget`), `hitTest`/`pickEntity`, `goToTarget`, kéo thả chế độ xây dựng (bóng xanh/đỏ, gọi `canPlace`). AI con vật cập nhật 2 lần/giây khi ngoài màn hình (`perf.aiStep`).
 - **`render.js`**: vẽ theo khung nhìn; nền tĩnh chia mảng 16x16 ô, chỉ vẽ lại mảng nào bẩn; cây/công trình/con vật sắp theo `y`; mưa, đêm, chữ bay.
-- **`ui.js`**: HUD (xu, cấp, thể lực, ngày giờ, mùa, thời tiết, bình tưới, tốc độ), nút hành động chính + chip phụ (`Space`/`E`, `1`–`6`), bảng (`openPanel(id)`: `market shed shipbin smithy vet phone pedigree dog bag guide seeds board house achievements log todo map settings`), chế độ xây dựng (`showBuild`, `buildTray`), màn "Trong lúc bạn vắng nhà" (`showAway`), "Bản mới có gì đổi" (`showWhatsNew`), băng rôn gấp và mũi tên (`updateAlerts`), thông báo gộp (`createNotifier`), cài đặt (tắt thông báo, tiết kiệm pin). Mọi bảng không tràn ngang ở 360px và tránh tai thỏ (`env(safe-area-inset-*)`).
+- **`ui.js`**: HUD (xu, cấp, thể lực, ngày giờ, mùa, thời tiết, bình tưới, tốc độ), nút hành động chính + chip phụ (`Space`/`E`, `1`–`6`), bảng (`openPanel(id)`: `market shed shipbin smithy vet phone pedigree dog bag guide seeds board house achievements log todo map settings`), chế độ xây dựng (`showBuild`, `buildTray`), màn "Trong lúc bạn vắng nhà" (`showAway`), "Bản mới có gì đổi" (`showWhatsNew`), băng rôn gấp và mũi tên (`updateAlerts`), thông báo gộp (`createNotifier`), cài đặt (tắt thông báo, tiết kiệm pin). Mọi bảng không tràn ngang ở 360px và tránh tai thỏ (`env(safe-area-inset-*)`). Bố cục góc phải (`placeMini`, chạy theo nhịp HUD): màn hẹp thì bản đồ nhỏ nằm ngay dưới HUD và nút tốc độ sang mép trái cùng hàng (để cạnh bản đồ nhỏ thì che biển chợ Bà Tư); cột nút hành động cao tới bản đồ nhỏ thì bản đồ nhỏ thu còn nút 📋 (`compact`); danh sách chip có `max-height` theo chỗ còn lại và cuộn dọc (con vật có tới 6 chip trên máy 320x640).
 - **Camera**: theo người chơi, không ra ngoài bản đồ hiện tại; cạnh ngắn màn hình thấy khoảng 12 ô.
 - Đồ họa: cần sprite mới thì thêm vào `art2.js` (`SPR2`), `art3.js` (`SPR3`, vật nuôi) hoặc `art.js`, giữ mọi export cũ. Bệnh (lát 38): `SPR3.sickBy[loài][giai đoạn]` (dáng nằm bệnh riêng cho từng loài ở từng giai đoạn), `SPR3.grave`/`graveFlower`, `SPR3.vetClinic`, `SPR3.npcCoUt`, `SPR2.phone`; bong bóng vàng (Mệt) / đỏ nhấp nháy (Bệnh nặng, Nguy kịch) và đồng hồ đếm ngược do `render.js` vẽ. Dạy lệnh chó (lát 45): `SPR3.dogSitBy/dogBegBy/dogHerdBy/dogBarkBy[giai đoạn]`, `trainBar`, `praise`, `trickIcon`, `cmdBubble`, `guardPost`, `sniffMark`, `items.treat`. `art.icon(key)` tra `SPR.items` → `SPR.ripe` → `SPR.product` → `SPR.baby`/`SPR.animal` → `SPR[key]`.
 
@@ -808,7 +830,8 @@ Không có GitHub Actions. Mọi test chạy trên máy local, Chromium ẩn c�
 ```
 npm test            # = node --test (tests/*.test.mjs, gồm cả seam 3 tests/server-*.test.mjs)
 ```
-Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `dogtrick` (vòng đời chó, dạy lệnh, 6 lệnh), `notify`, `todo`, `perf`, `tutorial`, `online-save` (trường online, `checkSaveJump`), `presence` (người khác cùng bản đồ: tên mờ khi đông, nội suy), `visit` (luật khách), `help` (thao tác giúp của khách, giới hạn mỗi ngày, mã thao tác), `steal` (luật trộm: 25% mỗi ô, một lần mỗi người, trần 30% mỗi ngày, bảo vệ người mới, giỏ đầy, thể lực, trộm NPC nhường).
+Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `dogtrick` (vòng đời chó, dạy lệnh, 6 lệnh), `notify`, `todo`, `perf`, `tutorial`, `online-save` (trường online, `checkSaveJump`), `presence` (người khác cùng bản đồ: tên mờ khi đông, nội suy), `visit` (luật khách), `help` (thao tác giúp của khách, giới hạn mỗi ngày, mã thao tác), `steal` (luật trộm: 25% mỗi ô, một lần mỗi người, trần 30% mỗi ngày, bảo vệ người mới, giỏ đầy, thể lực, trộm NPC nhường). Phase 2: `pens` (chuồng 3 cấp, cách ly), `breed` (đực cái, sinh sản, phả hệ), `dirty` (dơ, tắm), `bond` (độ thân), `trade` (bán cho Chú Ba, nghỉ hưu), `free` (thả rông), `herd` (chạng vạng, con lạc, rải thóc), `predator` (kẻ săn mồi), `cat` (mèo), `dog-guard` (một bộ luật chó cho trộm NPC và khách), `thief` (trộm NPC mới, phạt), `duck` (vịt), `coutquest` (nhiệm vụ Cô Út), `todo`/`notify` (mục vật nuôi).
+Luật có ngẫu nhiên (kẻ săn mồi, bệnh, con lạc...) thì test phải **tất định**: hoặc dọn sạch nguồn ngẫu nhiên không liên quan (vd `s.preds = []` mỗi bước), hoặc thay `Math.random` bằng bộ sinh số có hạt giống cố định (mulberry32, mẫu ở `tests/cat.test.mjs` `seeded`, `tests/duck.test.mjs` đặt lại hạt giống đầu mỗi test). Không thống kê "thường thì đúng" bằng `Math.random` thật.
 
 **Seam 2: trình duyệt thật qua Playwright**, chỉ cho những gì seam 1 không thấy (kéo thả, đi qua cửa, chạm để tự đi tới, giao diện 360px):
 ```
@@ -826,7 +849,16 @@ SMOKE_URL=http://127.0.0.1:4173 npm run test:smoke   # đổi địa chỉ (mặ
 - Thao tác: `createCharacter`, `tapPlot` (chạm/click ô ruộng, tự cuộn tới), `tilePoint` (ô → tọa độ màn hình), `startDrag` (kéo bằng chuột hoặc cảm ứng CDP), `bigFarmSave()` (vườn 64x48 đầy công trình, dựng bằng `buyStrip/placeEntity/buyAnimal`).
 - Trang lộ `globalThis.__farm` (`state`, `world`, `scale`, `view`, `dpr`, `perf`) chỉ để **đọc** trạng thái; không dùng nó để đổi luật hay phát đồ.
 - **Mẹo đã biết:** Chromium headless khựng khoảng 1 giây ở lần nhấn phím đầu tiên, nên các spec bấm `page.keyboard.press('Shift')` trước khi test di chuyển.
-- Nhớ hai cỡ màn hình: mỗi spec chạy ở cả desktop và mobile; viết spec dùng chuột lẫn chạm khi cần.
+- Nhớ hai cỡ màn hình: mỗi spec chạy ở cả desktop và mobile; viết spec dùng chuột lẫn chạm khi cần. `e2e/mobile360.spec.mjs` rà thêm 320x640 và 412x915 (chỉ chạy ở project mobile): mỗi màn/bảng kiểm không cuộn ngang, nút trong màn và ≥ 40px, các lớp nổi (HUD, bản đồ nhỏ, joystick, nút hành động, băng rôn) không đè nhau, và giả lập tai thỏ bằng cách đè `--sl/--sr/--st/--sb` (biến CSS lấy từ `env(safe-area-inset-*)`). Màn mới thì thêm vào đây.
+- Cổng e2e: `$env:E2E_PORT=<cổng>` trước `npx playwright test` (DB e2e tự theo cổng), nhiều worktree chạy song song không đụng nhau.
+
+**Dựng tình huống vật nuôi (Phase 2)** bằng bản lưu ghi sẵn (mẫu ở `e2e/predator.spec.mjs`, `petguide.spec.mjs`, `mobile360.spec.mjs`):
+- Con vật: chép con mẫu từ `createGame().animals` rồi đổi `type/stage/age` (`stageStart(loài, giai đoạn)`), `sex`, `name`, `sick/sickMs`, `dirty`, `bond`, `mom/dad`; nhớ `pen` = id thực thể chuồng đúng loài. Đặt `nextProduct: 1e15` cho khỏi đẻ giữa chừng.
+- Thả rông / con lạc: `tile: { c, r }` lấy từ `roamOf(s).tiles`, `x/y` = giữa ô, `tileAt: s.time + 1e9` (đứng yên), `stray: true` + giờ đêm (`s.time = DAY_MS * 0.78`) và `s.duskDay = s.day` (khỏi chạy luật chạng vạng lần nữa). Con lạc ngủ yên một chỗ nên thanh hành động không đổi khi người chơi đứng sát.
+- Kẻ săn mồi: đẩy thẳng vào `s.preds` (`{ kind, state: 'hunt', strikeAt, target, x, y }`); cần cấp ≥ `PREDATOR.minLevel` để luật còn chạy; dưới cấp 5 (vd `exp` của cấp 4) thì không có kẻ săn mồi, trộm NPC ngẫu nhiên chen vào.
+- Mèo: đặt nhà mèo bằng `canPlace`/`placeEntity({ kind: 'cathouse' })` rồi `buyCat(s, sex)` (giờ chợ mở) — hoặc thêm vào `s.cats`. Chó: `Object.assign(s.dog, { stage, age: stageStart('cho', stage), tricks: { sit: 2, ... } })`.
+- Chuồng: `placeEntity(s, { kind: 'pen', pen })`, `buyAnimal(s, type, sex)`; nâng cấp bằng `upgradePen`. Bản lưu v2 thật: `tests/fixtures/v2-farm.json` ghi vào khóa `nongtrai-save-v2` (mẫu `e2e/life.spec.mjs`).
+- Đặt `save.savedAt = Date.now()` ngay trước `seedSave` nếu không muốn chạy bù lúc mở trang (bản dựng từ lúc khai báo test có thể đã cũ vài giây).
 
 **Seam 3: giao thức server (ADR 0011)**, `tests/server-*.test.mjs`, chạy chung trong `npm test`. Bật server thật trong tiến trình test với SQLite tạm, gọi bằng HTTP/WebSocket thật; không gọi hàm nội bộ server, không mock DB. Helper `tests/helpers/server.mjs`:
 - `bootServer(opts?)` → `{ url, dbPath, dir, get(path, init), json(path, body?, init), ws(path = '/ws'), admin(...args), close() }`. Cổng ngẫu nhiên, mỗi lần một thư mục tạm; `close()` tắt server rồi xóa thư mục (dùng `t.after(srv.close)`).
@@ -834,6 +866,8 @@ SMOKE_URL=http://127.0.0.1:4173 npm run test:smoke   # đổi địa chỉ (mặ
   - `ws(path, { cookie }?)` (cookie = mã phiên, gửi như trình duyệt lúc nâng cấp) chờ mở xong, trả `{ raw, send(obj), next(ms) /* tin JSON kế tiếp */, closed /* promise mã đóng */, close() }`.
   - `admin(...args)` chạy `node server/admin.mjs ...args --db <dbPath>` như quản trị, trả `{ code, out, err }`.
 - `runAdmin(...args)`: chạy lệnh quản trị với tham số tự chọn.
+- Server chạy cùng tiến trình test nên `setClock(fn)` và `Math.random` đặt trong test áp dụng cho cả server (mẫu `tests/server-catchup.test.mjs`: cố định giờ, hạt giống, rồi so kết quả chạy bù của server với `loadGame` ở "trình duyệt"). Dòng SQLite do server cũ để lại (vd bản lưu v2 trước Phase 2) dựng bằng cách ghi thẳng file `srv.dbPath` bằng `node:sqlite` (dữ liệu ghi sẵn, không gọi code server).
+- Test seam 3 của Phase 2: `server-catchup` (chạy bù 8 giờ có vật bệnh, kẻ săn mồi, mèo; vườn v2 có trường online lên v3 qua cả khách ghé lẫn chủ đăng nhập lại), `server-dog` (chó canh khách: sủa, đớp, xúc xích; Canh khu của chủ đi tới bản đi dạo của khách và nhân đôi bán kính; chó con không canh nên server từ chối sủa, chó già thấy gần hơn).
 
 Quy tắc: thêm tính năng thì thêm test seam 1 (luật) hoặc seam 3 (giao thức) trước; chỉ thêm e2e cho phần hai seam kia không nhìn thấy. Toàn bộ test cũ phải còn pass.
 
@@ -933,9 +967,10 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
 - Nhận `kicked` (hoặc gửi bị `409`): gửi bản cuối (nếu còn kịp), ngắt, quên "máy này đã vào làng" (`net.forget`, tải lại không tự giành vườn), về màn chọn chế độ với dòng **"Bạn đã đăng nhập ở thiết bị khác."**. Bị `422` thì báo một lần bằng toast, lần sau gửi tiếp.
 - Bản nháp trên máy: `localStorage['nongtrai-online-draft']` = `{ name, rev, save }`, ghi mỗi lần `save()`. Lần vào làng sau, nếu nháp cùng tài khoản, `rev` trùng với server (chưa máy nào ghi thêm) và `savedAt` mới hơn thì dùng nháp (phần chơi lúc mất mạng rồi đóng trang không mất).
 - "Chơi lại từ đầu" khi online: vườn mới thay vườn trên làng, không xóa bản chơi đơn. Đồng hồ và nút x5/x20 như Phase 0 (issue 23 đổi).
+
 ## Quy trình phát hành (DESIGN mục 9, ADR 0006)
 
-> Từ Phase 1 người dùng chốt phát hành **chỉ kiểm tra local** (2026-10-02): bước 1 (và rà 360px, SPEC, ghi chú phát hành) là bắt buộc; bước 2–4 (VPS, smoke live, sao lưu server) bỏ, chỉ dev local, không push/deploy. Mô tả dưới giữ lại làm tài liệu cho lúc nào deploy thật.
+> Luật người dùng chốt tối 2026-10-02: agent làm issue phát hành (33, 49, 63) chỉ làm **phần kiểm tra local** (bước 1, rà 360px, SPEC, ghi chú phát hành ở cuối file issue). **Deploy chỉ người điều phối làm**, ở mốc người dùng đồng ý: `git push` (thường, không force) rồi trên VPS `cd ~/project/ai_game && git pull && docker compose up -d --build`. **Không sao lưu** (bỏ bước 4), **chưa cần smoke live** (bước 3 để sau). Lần đầu lên server Node thì tạo 5 mã mời bằng lệnh quản trị, chỉ ghi trong báo cáo cho người dùng, không ghi vào repo. Subagent không bao giờ push, deploy hay ssh lên VPS.
 
 1. **Local:** `npm test` và `npm run test:e2e` pass hết (không GitHub Actions).
 2. **Deploy lên VPS** `image.huninna.com`: vào `~/project/ai_game`, chạy `git pull && docker compose up -d --build`. Container `ai-game` (`node:22-alpine`, chạy `server/main.mjs` nghe cổng 80, người dùng `node`) nằm trong network `gateway`; Caddy của `ai_gateway` chuyển `game.huninna.com` tới `ai-game:80`. Dữ liệu ở volume `ai-game_data` (`/data`). Khóa gateway lưu trên VPS, không nằm trong repo.
@@ -946,11 +981,3 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
 ## Giữ SPEC.md đúng với code
 
 Mỗi issue/phase thêm hay đổi hàm công khai của `state.js`, target, event, trường bản lưu hoặc vai trò file thì cập nhật SPEC.md trong cùng lần làm. Nguồn sự thật cuối cùng là code (`public/state.js` export) và các test trong `tests/`.
-
-### Dơ, tắm, dọn chuồng (lát 37)
-- `DIRT`, `MANURE` (data.js). Độ dơ tăng 0→100 trong 3 giờ vườn, ×2 khi trời mưa hoặc chuồng bẩn (`manure[pen] >= 100`); không chạy khi vườn đóng băng. Dơ `>= DIRT.high` (60): mất vui dần, nguy cơ bệnh ×2 (đầu vào lát 38). Heo, bò đầm bùn: dơ 100 ngay, không mất vui; tắm xong `DIRT.wallowAfterMs` mới lăn lại.
-- `isDirty(a)`, `penDirty(s, pen)`, `dirtyAnimals(s)`, `dirtyPens(s)` (cho Việc cần làm).
-- Hành động `bath` trên con vật: tốn 1 `soap` + 1 nước trong bình; `dirty = 0`, vui +15, `bond` +0.2 (tối đa 5, lát 39 chuẩn hóa); result có `bath: id` (main.js phát hoạt cảnh), event `bathed {animal, id}`. Từ chối: `Hết xà phòng...` / `Bình hết nước...`.
-- Hành động `muck` trên máng (`{ kind: 'trough', pen }`): `manure[pen] = 0`, nhận `max(1, floor(độ đầy / 25))` `manure` (phân chuồng, kho), event `mucked {pen, qty}`.
-- Ổ cát: gà có tự tắm cát nếu thực thể chuồng có cờ `ent.sand` (lát 35 đặt); dơ không vượt `DIRT.sandCap` (30), trừ khi trời mưa.
-- Vật phẩm: `soap` (supply, bán ở chợ), `manure` (material). Render: `bathPhase(b, now)` (`soap` → `shake` → `sparkle`), `BATH_MS`.

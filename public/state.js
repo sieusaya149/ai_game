@@ -30,6 +30,7 @@ export const UNLOCK_ORDER = Array.from({ length: GRID * GRID }, (_, i) => i).sor
 // ---------- Tiện ích ----------
 let evq = [];            // hàng đợi event; tick() trả ra và xóa
 let catchUp = false;     // đang chạy bù offline: không sinh quạ, trộm NPC chỉ lấy trứng hay rau (ADR 0004)
+let catchBase = null;    // lúc loadGame chạy bù: giờ ngoài đời ứng với simMs = 0, để giờ làng của vườn online trôi theo bước mô phỏng
 const emit = e => evq.push(e);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -327,8 +328,8 @@ export function loadGame(raw) {
   let events = [];
   if (elapsed > 3000) {
     s.threats = [];
-    catchUp = true;
-    try { events = tick(s, elapsed); } finally { catchUp = false; }
+    catchUp = true; catchBase = t - elapsed - (s.simMs || 0);
+    try { events = tick(s, elapsed); } finally { catchUp = false; catchBase = null; }
     s.threats = [];
     evq = [];
     log(s, `Chào mừng trở lại! Nông trại đã chạy thêm ${Math.round(elapsed / MIN)} phút.`);
@@ -432,8 +433,11 @@ export const farmHours = s => (s.simMs || 0) / 3600_000;
 // ---------- Thời gian ----------
 // Online: ngày đêm, ngày, mùa theo lịch làng (giờ server); chơi đơn theo state.time. Đóng băng không làm lịch làng dừng.
 const online = s => s.mode === 'online';
-export const dayOf = s => online(s) ? villageCal(now()).day : s.day;
-export const dayFraction = s => online(s) ? villageCal(now()).frac : (s.time % DAY_MS) / DAY_MS;
+// Giờ làng của vườn online: giờ server, riêng lúc loadGame chạy bù thì là giờ ngoài đời của bước đang mô phỏng
+// (8 giờ vắng = 24 ngày làng có ngày có đêm, không phải cả 8 giờ đứng ở giờ lúc mở lại)
+const villageNow = s => (catchBase != null ? catchBase + (s.simMs || 0) : now());
+export const dayOf = s => online(s) ? villageCal(villageNow(s)).day : s.day;
+export const dayFraction = s => online(s) ? villageCal(villageNow(s)).frac : (s.time % DAY_MS) / DAY_MS;
 const dayFrac = dayFraction;
 // Tốc độ chạy thật: online luôn x1
 export const speedOf = s => online(s) ? 1 : s.speed || 1;
