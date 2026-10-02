@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 import { E2E_DB } from '../playwright.config.mjs';
 import { runAdmin } from '../tests/helpers/server.mjs';
-import { makeSave, closeAway } from './helpers.mjs';
+import { makeSave, closeAway, villageAt } from './helpers.mjs';
 import { QUICK_CHAT } from '../public/data.js';
 
 const uniq = () => 'Lg' + Math.random().toString(36).slice(2, 7);
@@ -12,6 +12,7 @@ const uniq = () => 'Lg' + Math.random().toString(36).slice(2, 7);
 // Một người chơi trong trình duyệt riêng: tài khoản mới, vườn trên server ghi sẵn (mutate chỉnh bản lưu), máy nhớ "đã vào làng"
 async function player(browser, { baseURL, viewport, isMobile, hasTouch }, mutate) {
   const context = await browser.newContext({ baseURL, viewport, isMobile, hasTouch });
+  await villageAt(context);   // chợ chỉ mở ban ngày
   const name = uniq();
   const invite = (await runAdmin('invite', '--db', E2E_DB)).out;
   expect((await context.request.post('/api/register', { data: { name, pin: '123456', invite } })).ok()).toBe(true);

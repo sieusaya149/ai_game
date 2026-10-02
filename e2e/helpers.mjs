@@ -1,6 +1,18 @@
 // Công cụ dựng tình huống cho e2e. Không đụng vào code game.
 import { expect } from '@playwright/test';
 import { createGame, SAVE_KEY, buyStrip, placeEntity, canPlace, buyAnimal, mapOf } from '../public/state.js';
+import { villageCal } from '../public/clock.js';
+import { DAY_MS } from '../public/data.js';
+
+// Lịch làng chạy theo giờ server thật (issue 23): test cần giờ ban ngày thì trả `now` của /api/health lệch tới
+// lúc `frac` (0 = 6h sáng) của ngày làng gần nhất. Chỉ đổi phản hồi mạng, không đụng code game.
+export async function villageAt(context, frac = 0.1) {
+  await context.route('**/api/health', async route => {
+    const res = await route.fetch(), body = await res.json();
+    const shift = ((frac - villageCal(body.now).frac + 1) % 1) * DAY_MS;
+    await route.fulfill({ response: res, json: { ...body, now: body.now + shift } });
+  });
+}
 
 // Bản lưu hợp lệ lấy thẳng từ createGame của game; mutate(s) để chỉnh thêm.
 export function makeSave(mutate, opts = { name: 'Tester' }) {
