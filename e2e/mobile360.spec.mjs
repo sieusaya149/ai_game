@@ -70,14 +70,16 @@ function measure({ insets, minSize }) {
 async function audit(page, label, size, shot) {
   const [w, h] = size;
   mkdirSync('test-results/m360', { recursive: true });
+  // máy bận thì hoạt ảnh và việc tính lại vị trí bản đồ nhỏ xong chậm: đo lại tới khi bố cục ổn định
+  const check = (insets, why) => expect.poll(() => page.evaluate(measure, { insets, minSize: MIN }), { message: why, timeout: 6000, intervals: [200, 300, 500] }).toEqual([]);
   await page.waitForTimeout(350);   // hoạt ảnh trượt lên
   await page.screenshot({ path: `test-results/m360/${w}-${label}.png` });
-  expect(await page.evaluate(measure, { insets: null, minSize: MIN }), `${label} ${w}x${h}`).toEqual([]);
+  await check(null, `${label} ${w}x${h}`);
   // giả lập tai thỏ
   await page.addStyleTag({ content: `:root{--sl:${NOTCH.l}px!important;--sr:${NOTCH.r}px!important;--st:${NOTCH.t}px!important;--sb:${NOTCH.b}px!important}` }).then(h => h.evaluate(e => (e.id = 'fake-notch')));
   await page.waitForTimeout(450);   // HUD tính lại vị trí bản đồ nhỏ
   if (shot) await page.screenshot({ path: `test-results/m360/${w}-${label}-notch.png` });
-  expect(await page.evaluate(measure, { insets: NOTCH, minSize: MIN }), `${label} ${w}x${h} (tai thỏ)`).toEqual([]);
+  await check(NOTCH, `${label} ${w}x${h} (tai thỏ)`);
   await page.evaluate(() => document.getElementById('fake-notch')?.remove());
 }
 

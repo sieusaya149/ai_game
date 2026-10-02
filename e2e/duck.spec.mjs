@@ -15,6 +15,7 @@ const screenOf = (page, x, y) => page.evaluate(([x, y]) => {
 const duck = (s, extra) => ({ ...structuredClone(s.animals[0]), id: s.nextId++, type: 'vit', name: 'Vịt', sex: 'f', stage: 'truong', age: stageStart('vit', 'truong'), hunger: 100, happy: 100, nextProduct: s.time + 1e12, tile: null, ...extra });
 
 test('chợ: mua vịt cái → vào chuồng gia cầm; vịt con đi theo vịt mẹ', async ({ page, context }) => {
+  test.setTimeout(90_000);   // đàn vịt con xếp hàng theo mẹ mất vài chục giây máy ảo
   await open(page, context, makeSave(s => { s.exp = 1e4; s.coins = 1e4; s.time = 1000; s.animals = []; s.troughs.chicken = 20; }));
   await page.evaluate(async () => { (await import('/ui.js')).openPanel('market'); });
   await page.locator('.tab', { hasText: 'Vật nuôi' }).click();
@@ -27,12 +28,13 @@ test('chợ: mua vịt cái → vào chuồng gia cầm; vịt con đi theo vị
   expect(d.sex).toBe('f'); expect(d.stage).toBe('non');
   const pen = await page.evaluate(id => globalThis.__farm.state.farm.ents.find(e => e.id === id)?.pen, d.pen);
   expect(pen).toBe('chicken');
-  // dựng vịt mẹ + 3 vịt con: chúng đi thành hàng theo mẹ (ở trong chuồng, buổi tối nên không thả rông)
+  // dựng vịt mẹ + 3 vịt con: chúng đi thành hàng theo mẹ. Vịt mua lúc 6h sáng là đã ra thả rông (có a.tile),
+  // nên gọi cả nhà về chuồng (tile null) rồi vặn đồng hồ sang tối để không con nào ra lại.
   await page.evaluate(async () => {
     const S = globalThis.__farm.state, M = (await import('/state.js')).mapOf(S), a = M.pens.chicken.area;
     const mom = S.animals.find(x => x.type === 'vit');
-    Object.assign(mom, { stage: 'truong', age: 20 * 60_000, hunger: 100, nextProduct: S.time + 1e12 });
-    for (let i = 0; i < 3; i++) S.animals.push({ ...structuredClone(mom), id: S.nextId++, stage: 'non', age: 0, sex: 'm', x: a.x + 8, y: a.y + 8 });
+    Object.assign(mom, { stage: 'truong', age: 20 * 60_000, hunger: 100, nextProduct: S.time + 1e12, tile: null, stray: false, x: a.x + a.w / 2, y: a.y + a.h / 2 });
+    for (let i = 0; i < 3; i++) S.animals.push({ ...structuredClone(mom), id: S.nextId++, stage: 'non', age: 0, sex: 'm', tile: null, stray: false, x: a.x + 8, y: a.y + 8 });
     S.time = 0.9 * 20 * 60_000;
   });
   await page.waitForTimeout(500);

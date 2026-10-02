@@ -8,16 +8,22 @@ const screenOf = (page, x, y) => page.evaluate(([x, y]) => {
   const f = globalThis.__farm, rc = document.getElementById('game-canvas').getBoundingClientRect();
   return { x: (x * f.scale - f.view.camX) / f.dpr + rc.left, y: (y * f.scale - f.view.camY) / f.dpr + rc.top };
 }, [x, y]);
-// Chạm vào điểm (x, y) của bản đồ; ngoài màn hình thì chạm về phía đó cho nhân vật đi, camera theo, lặp tới khi thấy
+// Chạm vào điểm (x, y) của bản đồ; ngoài màn hình thì chạm về phía đó cho nhân vật đi, camera theo, lặp tới khi thấy.
+// Máy bận thì mỗi vòng nhân vật đi được ít hơn nên để rộng số vòng; chỉ chạm khi điểm nằm trên mặt bản đồ
+// (lớp nổi che mất thì bỏ vòng đó, khỏi lỡ bấm trúng nút).
 async function tap(page, touch, x, y) {
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 30; i++) {
     await page.waitForTimeout(500);   // camera dừng hẳn
+    // lỡ chạm trúng công trình nằm trên đường đi: đóng bảng rồi đi tiếp
+    if (await page.locator('#panel-root:not([hidden])').count()) { await page.locator('#panel-root .close').first().click(); await page.waitForTimeout(250); }
     const p = await screenOf(page, x, y);
     const b = await page.evaluate(() => ({ w: innerWidth, top: document.getElementById('hud').getBoundingClientRect().bottom + 4, bot: document.getElementById('bottombar').getBoundingClientRect().top - 4, mini: document.getElementById('mini-wrap').getBoundingClientRect().toJSON() }));
     const inMini = (px, py) => px > b.mini.left - 14 && px < b.mini.right + 14 && py > b.mini.top - 14 && py < b.mini.bottom + 14;
     const ok = p.x > 4 && p.x < b.w - 4 && p.y > b.top && p.y < b.bot && !inMini(p.x, p.y);
     let tx = p.x, ty = p.y;
     if (!ok) { tx = Math.min(b.w - 20, Math.max(20, p.x)); ty = Math.min(b.bot - 20, Math.max(b.top + 20, p.y)); if (inMini(tx, ty)) ty = b.mini.bottom + 24; }
+    const onMap = await page.evaluate(([px, py]) => document.elementFromPoint(px, py)?.id === 'game-canvas', [tx, ty]);
+    if (!onMap) continue;
     if (touch) await page.touchscreen.tap(tx, ty); else await page.mouse.click(tx, ty);
     if (ok) return;
   }
