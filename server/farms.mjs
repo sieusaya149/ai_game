@@ -5,7 +5,8 @@
 import { randomBytes } from 'node:crypto';
 import { HttpError } from './router.mjs';
 import { migrate } from '../public/migrate.js';
-import { checkSaveJump } from '../public/state.js';
+import { checkSaveJump, loadGame } from '../public/state.js';
+import { now as clock } from '../public/clock.js';
 import { MAX_CATCHUP_MS } from '../public/data.js';
 
 export const FINAL_MS = 3000;    // chờ bản lưu cuối của máy cũ tối đa chừng này
@@ -30,7 +31,32 @@ export async function claimPlay({ db, live }, a) {
   }
   const play = randomBytes(16).toString('base64url');
   db.prepare('INSERT INTO farms (account_id, play) VALUES (?, ?) ON CONFLICT(account_id) DO UPDATE SET play = excluded.play').run(a.id, play);
-  return { play, ...farmOut(rowOf(db, a.id)) };
+  return { play, ...farmOut(catchUp(db, rowOf(db, a.id))) };
+}
+
+// Chạy bù vườn của chủ đang offline bằng chính loadGame (luật trong state.js: tối đa 8 giờ, phần dư đóng băng,
+// vật nuôi không chết). Chạy đồng bộ nên nhiều người đọc cùng lúc cũng chỉ chạy một lần: lần sau savedAt đã là giờ server.
+// Tóm tắt "Trong lúc bạn vắng nhà" cất vào `awayPending` để chủ về thì loadGame ở trình duyệt đưa lại.
+function catchUp(db, r) {
+  if (!r?.save) return r;
+  const raw = JSON.parse(r.save);
+  if (clock() - raw.savedAt <= 3000) return r;   // vắng ngắn quá: không có gì để chạy
+  const s = loadGame(raw);
+  if (!s) return r;
+  if (s.away) s.awayPending = s.away;
+  delete s.away;
+  db.prepare('UPDATE farms SET save = ?, saved_at = ?, updated = ?, rev = rev + 1 WHERE account_id = ?').run(JSON.stringify(s), s.savedAt, Date.now(), r.account_id);
+  return rowOf(db, r.account_id);
+}
+
+// Đọc vườn của người khác (chỉ đọc, đã chạy bù nếu chủ đang offline): { name, farm, savedAt } hoặc 404 no_farm
+export function visitFarm({ db, live }, name) {
+  const key = String(name ?? '').normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
+  const acc = db.prepare('SELECT id, name FROM accounts WHERE name_key = ?').get(key);
+  let r = acc && rowOf(db, acc.id);
+  if (!r?.save) throw new HttpError(404, 'Không có vườn này', { code: 'no_farm' });
+  if (!live.playing(acc.id)) r = catchUp(db, r);
+  return { name: acc.name, farm: JSON.parse(r.save), savedAt: r.saved_at };
 }
 
 export const playOf = (db, accountId) => rowOf(db, accountId)?.play ?? null;

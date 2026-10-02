@@ -219,6 +219,7 @@ export function loadGame(raw) {
   s.guests = Array.isArray(s.guests) ? s.guests : [];
   s.dog.chained = !!s.dog.chained;
   s.frozenMs = 0; delete s.away;
+  const pend = s.awayPending; delete s.awayPending;   // server đã chạy bù lúc chủ vắng: tóm tắt chờ chủ về
   evq = [];
   const t = now(), gone = Math.max(0, t - (s.savedAt || t)), elapsed = Math.min(gone, MAX_CATCHUP_MS);
   let events = [];
@@ -235,6 +236,7 @@ export function loadGame(raw) {
   s.frozenTotal += s.frozenMs;
   const lines = awaySummary(events, s.frozenMs);
   s.away = lines.length || gone >= AWAY_SHOW_MS ? { lines, frozenMs: s.frozenMs, ms: gone } : null;
+  if (pend) s.away = s.away ? { lines: [...pend.lines, ...s.away.lines], frozenMs: pend.frozenMs + s.away.frozenMs, ms: pend.ms + s.away.ms } : pend;
   s.savedAt = t;
   return s;
 }

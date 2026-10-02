@@ -1,6 +1,6 @@
 // Các đường API HTTP JSON. Mỗi issue thêm API thì thêm route ở đây và ghi vào SPEC.md.
 import { SESSION_MS, register, login, accountOf, endSession, tokenOf } from './accounts.mjs';
-import { claimPlay, readFarm, storeFarm } from './farms.mjs';
+import { claimPlay, readFarm, storeFarm, visitFarm } from './farms.mjs';
 import { HttpError } from './router.mjs';
 
 const COOKIE = 'nt_session';
@@ -47,6 +47,8 @@ export function addRoutes(r) {
   r.route('POST', '/api/play', async c => claimPlay(c, mustAccount(c)));
   // Đọc vườn của mình: { farm, rev, savedAt } hoặc 404 no_farm
   r.route('GET', '/api/farm', c => readFarm(c.db, mustAccount(c)));
+  // Đọc vườn của người khác `?name=` (chỉ đọc, đã chạy bù nếu chủ offline): { name, farm, savedAt } hoặc 404 no_farm
+  r.route('GET', '/api/visit', c => { mustAccount(c); return visitFarm(c, c.url.searchParams.get('name')); });
   // Gửi bản lưu { play, save }: 409 play_replaced (phiên cũ) · 400 save_invalid · 422 implausible (số liệu vô lý)
   r.route('POST', '/api/farm', c => storeFarm(c, mustAccount(c), c.body ?? {}));
 }
