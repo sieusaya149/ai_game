@@ -22,16 +22,16 @@ Lát đầu tiên của ADR 0012: thao tác của khách là hàm thuần trong 
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): `help` trên ô khô thì được (ô được tưới, khách có thưởng); trên ô đã tưới thì từ chối "không còn gì để làm"; nhổ cỏ, bắt sâu, đuổi quạ cũng kiểm đúng theo trạng thái.
-- [ ] Unit test (seam 1): sau 10 việc giúp trong cùng ngày ngoài đời, việc thứ 11 bị từ chối với lý do "đã được giúp đủ"; sang ngày ngoài đời mới thì giúp lại được.
-- [ ] Unit test (seam 1): áp dụng hai lần cùng một mã thao tác chỉ tính một lần.
-- [ ] Unit test (seam 1): sự kiện cảm ơn của nhiều thao tác cùng loại từ cùng một người có cùng khóa gộp.
-- [ ] Unit test (seam 3): thao tác hợp lệ được nhận, vào hàng đợi, và đẩy tới chủ đang online qua WebSocket; thao tác bị luật từ chối thì trả đúng lý do và không vào hàng đợi.
-- [ ] Unit test (seam 3): chủ offline (`savedAt` lùi vài tiếng) → khách giúp → đọc lại vườn thấy ô đã được tưới, chạy bù chỉ chạy một lần, thao tác không áp dụng lặp lại khi chủ đăng nhập vào.
-- [ ] Unit test (seam 3): chủ online vừa tự tưới ô rồi khách tưới cùng ô → kết quả "không còn gì để làm", không lỗi, khách không nhận thưởng.
-- [ ] E2E (Playwright, 2 trình duyệt, desktop + 360px): B sang vườn A có ô khô → tưới giúp → B thấy xu và EXP tăng, A đang online thấy ô được tưới và thông báo cảm ơn có tên B.
-- [ ] E2E: B giúp đủ 10 việc rồi thử việc thứ 11 → thấy lý do "Vườn này hôm nay đã được giúp đủ" và nút giúp mờ.
-- [ ] E2E: A offline, B giúp, rồi A đăng nhập lại → thấy ô đã được tưới và thông báo cảm ơn có tên B. (Màn "Trong lúc bạn vắng nhà…" thêm việc của khách ở issue 32.)
+- [x] Unit test (seam 1): `help` trên ô khô thì được (ô được tưới, khách có thưởng); trên ô đã tưới thì từ chối "không còn gì để làm"; nhổ cỏ, bắt sâu, đuổi quạ cũng kiểm đúng theo trạng thái.
+- [x] Unit test (seam 1): sau 10 việc giúp trong cùng ngày ngoài đời, việc thứ 11 bị từ chối với lý do "đã được giúp đủ"; sang ngày ngoài đời mới thì giúp lại được.
+- [x] Unit test (seam 1): áp dụng hai lần cùng một mã thao tác chỉ tính một lần.
+- [x] Unit test (seam 1): sự kiện cảm ơn của nhiều thao tác cùng loại từ cùng một người có cùng khóa gộp.
+- [x] Unit test (seam 3): thao tác hợp lệ được nhận, vào hàng đợi, và đẩy tới chủ đang online qua WebSocket; thao tác bị luật từ chối thì trả đúng lý do và không vào hàng đợi.
+- [x] Unit test (seam 3): chủ offline (`savedAt` lùi vài tiếng) → khách giúp → đọc lại vườn thấy ô đã được tưới, chạy bù chỉ chạy một lần, thao tác không áp dụng lặp lại khi chủ đăng nhập vào. (Việc giúp dùng *nhổ cỏ*: sau 3 tiếng chạy bù, cây có thể chín hay chết nên không còn tưới được — e2e vẫn kiểm đúng việc tưới khi chủ vắng ngắn.)
+- [x] Unit test (seam 3): chủ online vừa tự tưới ô rồi khách tưới cùng ô → kết quả "không còn gì để làm", không lỗi, khách không nhận thưởng.
+- [x] E2E (Playwright, 2 trình duyệt, desktop + 360px): B sang vườn A có ô khô → tưới giúp → B thấy xu và EXP tăng, A đang online thấy ô được tưới và thông báo cảm ơn có tên B.
+- [x] E2E: B giúp đủ 10 việc rồi thử việc thứ 11 → thấy lý do "Vườn này hôm nay đã được giúp đủ" và nút giúp mờ. (Dựng bằng bản lưu ghi sẵn `today.helps = 10` thay vì bấm 10 lần cho e2e khỏi chạy lâu; mốc 10 có test seam 1 và seam 3.)
+- [x] E2E: A offline, B giúp, rồi A đăng nhập lại → thấy ô đã được tưới và thông báo cảm ơn có tên B. (Màn "Trong lúc bạn vắng nhà…" thêm việc của khách ở issue 32.)
 
 ## Blocked by
 

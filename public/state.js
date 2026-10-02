@@ -3,12 +3,12 @@ import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
-  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS,
+  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
 import { migrate, newFarm } from './migrate.js';
-import { now, villageCal } from './clock.js';
+import { now, villageCal, serverDay } from './clock.js';
 
 export { levelInfo, mapOf, reachable, footprint, sceneMap };
 export const SAVE_KEY = 'nongtrai-save-v2';
@@ -1044,12 +1044,13 @@ export function enterScene(s, to) {
 // Khách `me` bước vào vườn `owner`: dựng bản đi dạo từ bản lưu chủ `raw` (server đã chạy bù). Đất, cây, con vật, chó...
 // là bản sao của chủ, không bao giờ lưu lại hay gửi đi. Phần của khách (tên, ngoại hình, giỏ, kho, đơn hàng...) dùng chung
 // đối tượng với `me`; xu, kinh nghiệm, thể lực, bình nước đọc ghi thẳng vào `me`. Trả null nếu không đọc được bản lưu chủ.
-const VISIT_WORLD = ['farm', 'plots', 'animals', 'troughs', 'eggs', 'nest', 'dog', 'poops', 'shipbin', 'time', 'day', 'weather', 'simMs', 'nextId'];
+const VISIT_WORLD = ['farm', 'plots', 'animals', 'troughs', 'eggs', 'nest', 'dog', 'poops', 'shipbin', 'time', 'day', 'weather', 'simMs', 'nextId', 'today', 'guests'];
 const VISIT_LIVE = ['coins', 'exp', 'stamina', 'can', 'selectedSeed'];
 export function startVisit(me, raw, owner) {
   const h = raw && loadGame(structuredClone(raw));
   if (!h) return null;
-  const v = { ...me, threats: [], sit: false, scene: 'visit', visit: { owner, fed: false } };
+  // quạ của chủ đi theo (khách đuổi giúp được); thằng Tèo thì không, bắt trộm là việc của chủ
+  const v = { ...me, threats: (h.threats ?? []).filter(t => t.kind === 'crow'), sit: false, scene: 'visit', visit: { owner, fed: false } };
   for (const k of VISIT_LIVE) Object.defineProperty(v, k, { get: () => me[k], set: x => { me[k] = x; }, enumerable: true });
   for (const k of VISIT_WORLD) v[k] = h[k];
   const a = sceneMap(v).exit;
@@ -1058,9 +1059,13 @@ export function startVisit(me, raw, owner) {
 }
 
 // Khách được làm `id` với target `t` không (t.kind 'build' = chế độ xây dựng): { ok: true } hoặc { ok: false, reason, msg }.
-// Chỉ ra cổng và làm quen với chó: chó lạ phải được cho ăn (đồ trong giỏ của khách) rồi mới chịu cho vuốt ve.
+// Ra cổng, giúp vườn (id 'help_*', issue 28) và làm quen với chó: chó lạ phải được cho ăn (đồ trong giỏ của khách) rồi mới chịu cho vuốt ve.
 export function guestCheck(s, t, id) {
   if (t?.kind === 'build') return no('build', 'Chỉ chủ vườn mới sửa được vườn này');
+  if (id?.startsWith('help_')) {
+    if (helpLeft(s) <= 0) return no('help_full', HELP_FULL);
+    return guestOps(s, t).some(o => o.act === id.slice(5)) ? { ok: true } : no('nothing', NOTHING);
+  }
   if (t?.kind === 'building') {
     const b = sceneMap(s).building(t.id);
     if (b?.guest) return no('private', b.guest);
@@ -1072,6 +1077,11 @@ export function guestCheck(s, t, id) {
 }
 function guestActs(s, t) {
   const why = id => guestCheck(s, t, id).msg ?? null;
+  const help = guestOps(s, t);
+  if (help.length) {   // ô ruộng, con quạ: các việc giúp làm được ở đây (hết lượt thì mờ kèm lý do)
+    const full = helpLeft(s) <= 0 ? HELP_FULL : null;
+    return help.map(o => mk('help_' + o.act, HELP_JOBS[o.act].icon, HELP_JOBS[o.act].label, full));
+  }
   if (t.kind === 'building') {
     const b = sceneMap(s).building(t.id);
     if (b?.id === 'gate') return buildingActs(s, t);
@@ -1081,6 +1091,7 @@ function guestActs(s, t) {
   return [];
 }
 function guestDo(s, t, id, at) {
+  if (id.startsWith('help_')) return helpDo(s, t, id.slice(5), at);
   if (t.kind === 'building') return DO.building(s, t, id, at);   // cổng: ra làng
   const g = s.dog;
   if (id === 'feed') {
@@ -1089,6 +1100,89 @@ function guestDo(s, t, id, at) {
     return res(true, `${g.name} ăn ngon lành, giờ đã quen bạn rồi`, [say(at, 'Gâu gâu! 🦴')], 'bark');
   }
   return res(true, `${g.name} vẫy đuôi rối rít`, [say(at, '❤️')], 'bark');
+}
+
+// ---------- Thao tác của khách trong vườn chủ (issue 28, ADR 0012) ----------
+// Luật khách là hàm thuần: nhận bản lưu chủ `host`, thông tin khách `who` ({ name, level }) và thao tác `op`,
+// trả kết quả hoặc lý do từ chối. Server kiểm tra bằng chính hàm này rồi xếp hàng; trình duyệt chủ áp dụng cũng
+// bằng hàm này. Không có gì ngẫu nhiên nên hai nơi luôn ra cùng kết quả. Mã thao tác `op.id` nhớ trong `host.guests`
+// nên áp dụng hai lần cùng mã thì lần sau không làm gì.
+// Thao tác: { id, kind, act, idx (ô ruộng) | crow (id con quạ), at (giờ ngoài đời) }.
+// Lát này mới có kind 'help'; các issue sau thêm 'gift', 'steal', 'pet', 'sausage' vào KINDS.
+export const HELP_FULL = 'Vườn này hôm nay đã được giúp đủ';
+const NOTHING = 'Ở đây không còn gì để làm';
+const SOUND_OF = { water: 'water', weed: 'pop', catch: 'pop', shoo: 'crow' };
+
+// Mỗi việc giúp: tìm chỗ đang cần giúp trong bản lưu chủ (null = không còn gì để làm) rồi làm
+const plotFit = (s, idx, id) => { const p = s.plots?.[idx]; return p?.unlocked && FIT[id](p) ? p : null; };
+const HELP = {
+  water: { find: (s, o) => plotFit(s, o.idx, 'water'), do: (s, p) => { p.water = 100; } },
+  weed: { find: (s, o) => plotFit(s, o.idx, 'weed'), do: (s, p) => { p.weeds = false; } },
+  // bắt sâu giúp thì chắc tay, không hên xui như chủ tự bắt (server và trình duyệt phải ra cùng kết quả)
+  catch: { find: (s, o) => { const c = s.plots?.[o.idx]?.unlocked && s.plots[o.idx].crop; return c && c.bugs && !c.dead && !c.rotten ? s.plots[o.idx] : null; }, do: (s, p) => { p.crop.bugs = false; } },
+  shoo: { find: (s, o) => (s.threats ?? []).find(t => t.id === o.crow && t.kind === 'crow' && t.state !== 'leaving') ?? null, do: (s, t) => { s.threats.splice(s.threats.indexOf(t), 1); } },
+};
+const KINDS = { help: HELP };
+
+// Số việc giúp vườn này đã nhận hôm nay (ngày ngoài đời) và số lượt còn lại
+export const helpsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.today.helps || 0 : 0);
+export const helpLeft = (s, t = now()) => Math.max(0, GUEST.helpMax - helpsToday(s, t));
+
+// Các thao tác khách làm được lên target `t` ngay lúc này (chưa có mã; không xét giới hạn mỗi ngày)
+export function guestOps(s, t) {
+  if (t?.kind === 'plot') return ['water', 'weed', 'catch'].filter(act => HELP[act].find(s, { idx: t.idx })).map(act => ({ kind: 'help', act, idx: t.idx }));
+  if (t?.kind === 'threat') return HELP.shoo.find(s, { crow: t.id }) ? [{ kind: 'help', act: 'shoo', crow: t.id }] : [];
+  return [];
+}
+
+// Kiểm tra thao tác, không đổi gì: { ok: true, target } hoặc { ok: false, reason, msg }.
+// reason: 'op_invalid' (thao tác lạ) · 'done' (mã này đã áp dụng rồi) · 'help_full' (vườn đã nhận đủ 10 việc hôm nay)
+// · 'nothing' (chỗ đó không còn gì để làm, vd chủ vừa tưới xong)
+export function guestOpCheck(host, who, op) {
+  const job = KINDS[op?.kind]?.[op?.act];
+  if (!host || !op?.id || !job) return no('op_invalid', 'Thao tác này chưa làm được');
+  if ((host.guests ?? []).some(g => g.id === op.id)) return no('done', 'Việc này làm rồi');
+  if (helpLeft(host, op.at ?? now()) <= 0) return no('help_full', HELP_FULL);
+  const target = job.find(host, op);
+  return target ? { ok: true, target } : no('nothing', NOTHING);
+}
+
+// Áp dụng thao tác lên bản lưu chủ: { ok: true, msg, reward: { coins, exp }, event } hoặc lý do từ chối.
+// `event` là lời cảm ơn cho chủ vườn (gộp theo người và loại việc); `reward` là phần của khách (guestReward).
+export function guestOpApply(host, who, op) {
+  const c = guestOpCheck(host, who, op);
+  if (!c.ok) return c;
+  const t = op.at ?? now(), day = serverDay(t), by = String(who?.name ?? 'Người lạ');
+  KINDS[op.kind][op.act].do(host, c.target);
+  if (host.today?.day !== day) host.today = { day, helps: 0, steals: 0, stolen: 0 };
+  host.today.helps++;
+  host.guests = [{ id: op.id, kind: op.kind, act: op.act, by, at: t, seen: false }, ...(host.guests ?? [])].slice(0, GUEST.logMax);
+  return { ok: true, msg: `Đã ${HELP_JOBS[op.act].verb} giúp`, reward: { coins: GUEST.helpCoins, exp: GUEST.helpExp }, event: { type: 'helped', by, act: op.act, at: t } };
+}
+
+// Thưởng của khách (server xác nhận thao tác xong mới cộng) vào bản lưu khách
+export function guestReward(me, reward) {
+  if (!me || !reward) return;
+  addCoins(me, reward.coins || 0);
+  addExp(me, reward.exp || 0);
+}
+
+// Việc khách làm mà chủ chưa được cảm ơn (server áp dụng lúc chủ offline, hoặc vừa nhận qua WebSocket):
+// trả các event theo thứ tự cũ → mới rồi đánh dấu đã xem, nên chỉ cảm ơn một lần.
+export function takeGuestLog(s) {
+  const fresh = (s?.guests ?? []).filter(g => !g.seen);
+  for (const g of fresh) g.seen = true;
+  return fresh.reverse().map(g => ({ type: 'helped', by: g.by, act: g.act, at: g.at }));
+}
+
+// Khách làm một việc giúp: áp dụng ngay trên bản đi dạo (chỉ để thấy liền) và trả kèm `guestOp` để main.js gửi lên server.
+// Thưởng chỉ cộng khi server xác nhận (main.js gọi guestReward).
+const opId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+function helpDo(s, t, act, at) {
+  const op = { id: opId(), kind: 'help', act, ...(t.kind === 'threat' ? { crow: t.id } : { idx: t.idx }), at: now() };
+  const r = guestOpApply(s, { name: s.name, level: level(s) }, op);
+  if (!r.ok) return bad(r.msg, at);
+  return res(true, r.msg, [say(at, HELP_JOBS[act].icon)], SOUND_OF[act], { guestOp: op });
 }
 
 // ---------- Cửa hàng & kinh tế ----------

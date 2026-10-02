@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, guestCheck, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
+  startVisit, guestCheck, guestReward, guestOpApply, takeGuestLog, helpLeft, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -115,6 +115,7 @@ function applyResult(res, target, id) {
   if (res.go) goScene(res.go);
   if (res.buyStrip) askStrip(res.buyStrip);
   if (res.sleep) goSleep();
+  if (res.guestOp) sync?.send({ t: 'guest', op: res.guestOp });   // việc giúp trong vườn người khác (issue 28): server kiểm tra rồi xếp hàng
   if (res.ok && target && /pet|vuot|stroke|love/i.test(id ?? '')) {
     const key = target.kind === 'dog' ? 'dog' : target.kind === 'animal' ? 'a' + target.id : null;
     if (key) world.emotes.set(key, { icon: 'heart', until: now + 1600 });
@@ -181,6 +182,7 @@ async function startOnline(name) {
     playOnline(s);
     const away = s.away; delete s.away;
     ui.showAway(away);
+    ui.afterAway(() => ui.handleEvents(takeGuestLog(s)));   // khách giúp lúc mình vắng (issue 28): cảm ơn một lần, sau màn vắng nhà
     return;
   }
   // tài khoản chưa có vườn: có vườn chơi đơn thì hỏi mang lên, không thì tạo vườn mới
@@ -227,7 +229,32 @@ function liveReset() { peers.clear(); liveMap = null; ui.setLive(!!sync, 0); }
 function liveMsg(m) {
   if (m.t === 'hello' || m.t === 'down') { liveReset(); return; }
   if (m.t === 'visit') { ui.toast(`🟡 ${m.name} vừa ghé thăm vườn của bạn`); return; }   // bạn bè ghé vườn mình (issue 26; nguồn tin: issue 27)
+  if (m.t === 'guest') { guestAck(m); return; }       // server trả lời việc mình vừa giúp (issue 28)
+  if (m.t === 'guestop') { guestDid(m.op); return; }  // khách vừa giúp vườn mình: áp dụng rồi cảm ơn
   if (peers.receive(m, performance.now())) ui.setLive(true, peers.size);
+}
+
+// ---------- Giúp vườn bạn (issue 28, ADR 0012): luật ở state.js, server kiểm tra và xếp hàng ----------
+// Server nhận việc giúp: cộng xu và EXP vào vườn mình (bản đi dạo không tự cộng). Từ chối thì chỉ báo lý do.
+function guestAck(m) {
+  const mine = home ?? state;
+  if (!mine) return;
+  if (!m.ok) { if (m.msg) ui.toast(m.msg); ui.handleEvents([{ type: 'sound', name: 'error' }]); return; }
+  guestReward(mine, m.reward);
+  const p = state.player, t0 = performance.now();
+  for (const [i, text] of [`+${m.reward.coins} xu`, `+${m.reward.exp} EXP`].entries())
+    world.fx.push({ text, color: i ? '#7ad7ff' : '#ffd23f', x: p.x, y: p.y - 14 - i * 10, t0 });
+  ui.handleEvents([{ type: 'sound', name: 'coin' }]);
+  changed();
+}
+// Khách vừa làm gì đó trong vườn mình (chủ đang online): áp dụng bằng chính hàm luật rồi cảm ơn (🟡 gộp theo người và việc)
+function guestDid(op) {
+  const mine = home ?? state;
+  if (!mine || !op) return;
+  guestOpApply(mine, { name: op.by, level: op.level }, op);
+  const evs = takeGuestLog(mine);
+  if (evs.length) ui.handleEvents(evs);
+  changed();
 }
 // mỗi khung hình: đổi bản đồ thì báo join, đi thì gửi vị trí tối đa LIVE.hz lần mỗi giây
 function liveFrame(now) {
@@ -399,7 +426,7 @@ async function visit(name) {
     if (!state || home || state.scene !== 'village') return;
     home = state; state = v;
     begin();
-    ui.setVisit(r.name);
+    ui.setVisit(r.name, helpLeft(v));
   }, FADE_MS);
   return { ok: true };
 }
@@ -662,7 +689,7 @@ function frame(now) {
   const forUI = events.filter(e => e.type === 'sound' || ['important', 'direct'].includes(eventMeta(e)?.level));
   if (forUI.length) ui.handleEvents(forUI);
   if (!home) ui.updateAlerts(state, (x, y) => ({ x: (x * scale - view.camX) / dpr, y: (y * scale - view.camY) / dpr }), now);
-  if (now - lastHud > 250) { lastHud = now; ui.renderHUD(state); }
+  if (now - lastHud > 250) { lastHud = now; ui.renderHUD(state); if (state.visit) ui.setVisit(state.visit.owner, helpLeft(state)); }
   if (joy.el) joy.el.style.display = ui.isBlocking() ? 'none' : '';
   if (now - lastSave > 5000) { lastSave = now; save(); }
 }

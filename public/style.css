@@ -514,9 +514,11 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 .gate-row.pinned { background: #fff0c8; border-color: #e0b24a; }
 
 /* ---------- Thăm vườn người khác (issue 27): thanh tên chủ vườn dưới HUD, chừa chỗ bản đồ nhỏ bên phải; bảng chọn vườn ---------- */
-#visit-bar { align-self: flex-start; max-width: calc(100% - 112px); display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; font-size: 13px; font-weight: 800; }
+#visit-bar { align-self: flex-start; max-width: calc(100% - 112px); display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px 4px 4px 12px; font-size: 13px; font-weight: 800; }
+.visit-row { display: flex; align-items: center; gap: 8px; }
 #visit-bar[hidden], body.building #visit-bar { display: none; }
-.visit-where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visit-where { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#visit-help:not(:empty) { white-space: nowrap; font-weight: 700; padding-bottom: 2px; }   /* bộ đếm lượt giúp (issue 28): dòng riêng cho khỏi cắt mất tên chủ vườn */
 #visit-leave { flex: none; min-height: 40px; }
 .visit-form { display: flex; gap: 8px; margin: 10px 0; }
 .visit-form .name-input { flex: 1; min-width: 0; font-size: 17px; }

@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws';
 import { accountOf, tokenOf } from './accounts.mjs';
 import { playOf } from './farms.mjs';
 import { createPresence } from './presence.mjs';
+import { createGuests } from './guests.mjs';
 
 const HANDLERS = {
   ping: (sock, m) => send(sock, { t: 'pong', id: m.id, now: Date.now() }),
@@ -23,6 +24,7 @@ export const send = (sock, m) => { if (sock.readyState === sock.OPEN) sock.send(
 export function attachLive(server, ctx) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
   const pres = createPresence(ctx, send);   // làng real-time (issue 25): join, pos, chat, emote
+  const guests = createGuests(ctx, send, pres);   // hàng đợi thao tác của khách (issue 28): guest
   server.on('upgrade', (req, socket, head) => {
     if (req.url.split('?')[0] !== '/ws') return socket.destroy();
     wss.handleUpgrade(req, socket, head, sock => wss.emit('connection', sock, req));
@@ -32,7 +34,7 @@ export function attachLive(server, ctx) {
     sock.on('message', data => {
       let m;
       try { m = JSON.parse(data); } catch { return; }   // tin hỏng thì bỏ qua, không ngắt
-      (HANDLERS[m?.t] ?? pres.handlers[m?.t])?.(sock, m, ctx);
+      (HANDLERS[m?.t] ?? pres.handlers[m?.t] ?? guests.handlers[m?.t])?.(sock, m, ctx);
     });
     sock.on('close', () => pres.leave(sock));
   });

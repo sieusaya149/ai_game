@@ -40,6 +40,18 @@ export const MIGRATIONS = [
         friend_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
         created INTEGER NOT NULL, PRIMARY KEY (account_id, friend_id))`);
   },
+  // v5: hàng đợi thao tác của khách trong vườn người khác (issue 28, ADR 0012). `id` là mã thao tác do khách sinh
+  // (duy nhất, nên gửi lại cũng không nhân đôi), `op` là thao tác dạng JSON, `applied` = giờ server lúc server tự
+  // áp dụng vào bản lưu chủ (NULL = đang chờ trình duyệt chủ áp dụng)
+  db => {
+    db.exec(`
+      CREATE TABLE guest_ops (
+        id TEXT PRIMARY KEY,
+        owner_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        guest_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        op TEXT NOT NULL, created INTEGER NOT NULL, applied INTEGER);
+      CREATE INDEX guest_ops_owner ON guest_ops(owner_id, applied)`);
+  },
 ];
 
 // Mở (tạo nếu chưa có) file SQLite và đưa schema lên bản mới nhất

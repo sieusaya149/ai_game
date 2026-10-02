@@ -86,6 +86,8 @@ export function createPresence(ctx, send) {
   };
   return {
     handlers, leave,
+    // Kết nối này đang đứng trong vườn của ai (issue 28: thao tác của khách chỉ nhận khi khách đang ở trong vườn đó)
+    gardenOf(sock) { const [kind, id] = String(sock.pres?.map ?? '').split(':'); return kind === 'farm' ? Number(id) : null; },
     stop() { for (const room of maps.values()) for (const p of room.values()) clearTimeout(p.timer); },
   };
 }

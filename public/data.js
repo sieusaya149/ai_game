@@ -222,6 +222,18 @@ export const ACHIEVEMENTS = [
   { id: 'rich5000',   name: 'Đại gia làng',     desc: 'Kiếm tổng cộng 5.000 xu', stat: 'earned',  goal: 5000, coins: 500 },
 ];
 
+// ---------- Khách giúp vườn (issue 28, ADR 0012) ----------
+// helpMax: mỗi vườn mỗi ngày ngoài đời nhận tối đa bấy nhiêu việc giúp · helpCoins/helpExp: thưởng cho khách mỗi việc
+// logMax: nhật ký khách trong bản lưu chủ giữ bấy nhiêu việc gần nhất (cũng là nơi nhớ mã thao tác đã áp dụng)
+export const GUEST = { helpMax: 10, helpCoins: 3, helpExp: 2, logMax: 60 };
+// Bốn việc giúp: động từ và đơn vị để ghép câu cảm ơn ("Lan đã tưới 3 ô giúp bạn")
+export const HELP_JOBS = {
+  water: { verb: 'tưới', unit: 'ô', icon: '💧', label: 'Tưới giúp' },
+  weed: { verb: 'nhổ cỏ', unit: 'ô', icon: '🌿', label: 'Nhổ cỏ giúp' },
+  catch: { verb: 'bắt sâu', unit: 'ô', icon: '🤏', label: 'Bắt sâu giúp' },
+  shoo: { verb: 'đuổi', unit: 'con quạ', icon: '🪶', label: 'Đuổi quạ giúp' },
+};
+
 // ---------- Thông báo 3 mức (DESIGN §8c) ----------
 // Mọi loại event luật chơi phát ra đều có ở đây. level:
 //   urgent    gấp: băng rôn đỏ + tiếng + rung + mũi tên (hiện từ state qua urgentSpots, không tắt được)
@@ -233,10 +245,11 @@ export const ACHIEVEMENTS = [
 export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
-  levelup: 'Lên cấp', order: 'Đơn hàng mới',
+  levelup: 'Lên cấp', order: 'Đơn hàng mới', help: 'Khách giúp vườn',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
+const helpN = act => HELP_JOBS[act]?.verb ?? 'làm';
 export const EVENT_LEVEL = {
   sick:      { level: 'urgent', group: e => 'sick:' + e.animal, label: 'Con vật bị bệnh' },
   eating:    { level: 'urgent', group: e => 'eating:' + e.kind, label: 'Quạ, trộm đang ăn cây' },
@@ -248,6 +261,7 @@ export const EVENT_LEVEL = {
   thief:     { level: 'important', cat: 'loss', group: () => 'loss:thief', label: 'Trộm hái mất cây', text: (n, e) => n > 1 ? `Thằng Tèo đã hái trộm ${n} cây 😢` : `Thằng Tèo đã hái trộm ${(e.name ?? 'cây').toLowerCase()} 😢` },
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
+  helped:    { level: 'important', cat: 'help', group: e => `helped:${e.by}:${e.act}`, label: 'Khách giúp vườn', text: (n, e) => `${e.by} đã ${helpN(e.act)} ${n} ${HELP_JOBS[e.act]?.unit ?? 'việc'} giúp bạn 🙏` },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },

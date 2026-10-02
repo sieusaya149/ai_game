@@ -8,11 +8,17 @@ import { migrate } from '../public/migrate.js';
 import { checkSaveJump, loadGame } from '../public/state.js';
 import { now as clock } from '../public/clock.js';
 import { MAX_CATCHUP_MS } from '../public/data.js';
+import { runGuestQueue } from './guests.mjs';
 
 export const FINAL_MS = 3000;    // chờ bản lưu cuối của máy cũ tối đa chừng này
 const waiting = new Map();       // phiên cũ đang bị thay → hàm báo "đã nhận bản lưu cuối"
 
 const rowOf = (db, id) => db.prepare('SELECT * FROM farms WHERE account_id = ?').get(id);
+export const farmRow = rowOf;
+// Ghi đè bản lưu của chủ (server tự sửa: chạy bù, hàng đợi khách). savedAt của bản lưu không đổi.
+export function writeFarm(db, accountId, save, t = Date.now()) {
+  db.prepare('UPDATE farms SET save = ?, updated = ?, rev = rev + 1 WHERE account_id = ?').run(JSON.stringify(save), t, accountId);
+}
 const farmOut = r => (r?.save ? { farm: JSON.parse(r.save), rev: r.rev, savedAt: r.saved_at } : { farm: null, rev: r?.rev ?? 0 });
 
 // Cấp phiên chơi mới cho tài khoản `a`. Trả { play, farm (null = chưa có vườn), rev, savedAt }
@@ -31,13 +37,13 @@ export async function claimPlay({ db, live }, a) {
   }
   const play = randomBytes(16).toString('base64url');
   db.prepare('INSERT INTO farms (account_id, play) VALUES (?, ?) ON CONFLICT(account_id) DO UPDATE SET play = excluded.play').run(a.id, play);
-  return { play, ...farmOut(catchUp(db, rowOf(db, a.id))) };
+  return { play, ...farmOut(runGuestQueue(db, catchUpFarm(db, rowOf(db, a.id)))) };
 }
 
 // Chạy bù vườn của chủ đang offline bằng chính loadGame (luật trong state.js: tối đa 8 giờ, phần dư đóng băng,
 // vật nuôi không chết). Chạy đồng bộ nên nhiều người đọc cùng lúc cũng chỉ chạy một lần: lần sau savedAt đã là giờ server.
 // Tóm tắt "Trong lúc bạn vắng nhà" cất vào `awayPending` để chủ về thì loadGame ở trình duyệt đưa lại.
-function catchUp(db, r) {
+export function catchUpFarm(db, r) {
   if (!r?.save) return r;
   const raw = JSON.parse(r.save);
   if (clock() - raw.savedAt <= 3000) return r;   // vắng ngắn quá: không có gì để chạy
@@ -55,7 +61,7 @@ export function visitFarm({ db, live }, name) {
   const acc = db.prepare('SELECT id, name FROM accounts WHERE name_key = ?').get(key);
   let r = acc && rowOf(db, acc.id);
   if (!r?.save) throw new HttpError(404, 'Không có vườn này', { code: 'no_farm' });
-  if (!live.playing(acc.id)) r = catchUp(db, r);
+  if (!live.playing(acc.id)) r = runGuestQueue(db, catchUpFarm(db, r));   // chủ vắng: chạy bù rồi áp dụng việc khách đã làm
   return { name: acc.name, farm: JSON.parse(r.save), savedAt: r.saved_at };
 }
 

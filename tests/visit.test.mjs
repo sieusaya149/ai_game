@@ -68,8 +68,8 @@ test('luật khách: mở nhà, kho, thùng giao hàng, chế độ xây dựng 
   }
   assert.equal(guestCheck(v, { kind: 'build' }).reason, 'build');
   assert.match(guestCheck(v, { kind: 'build' }).msg, /chủ vườn/);
-  // ruộng, con vật, máng, giếng: khách chưa làm được gì (issue 28 trở đi)
-  assert.deepEqual(actionsFor(v, { kind: 'plot', idx: 0 }), []);
+  // ruộng: chỉ có việc giúp (issue 28, xem tests/help.test.mjs); con vật, máng, giếng: khách chưa làm được gì
+  assert.deepEqual(actionsFor(v, { kind: 'plot', idx: 0 }).map(a => a.id), ['help_water']);
   assert.deepEqual(actionsFor(v, { kind: 'animal', id: v.animals[0].id }), []);
   assert.deepEqual(actionsFor(v, { kind: 'building', id: 'well' }), []);
   assert.equal(guestCheck(v, { kind: 'plot', idx: 0 }).reason, 'guest');

@@ -950,12 +950,15 @@ PANELS.friends = {
       h('div', { class: 'row-act' }, btn('🚪 Vào', () => visitGate(g.name), 'green sm gate-go', { 'aria-label': `Vào vườn ${g.name}` }))));
   },
 };
-// Thanh "đang ở vườn của X" + nút về làng; owner = null thì ẩn
-export function setVisit(owner) {
+// Thanh "đang ở vườn của X" + số lượt giúp còn lại hôm nay (issue 28) + nút về làng; owner = null thì ẩn
+export function setVisit(owner, help) {
   const e = $('visit-bar');
   if (!e) return;
   e.hidden = !owner;
-  if (owner) $('visit-owner').textContent = owner;
+  if (!owner) return;
+  $('visit-owner').textContent = owner;
+  const t = help == null ? '' : 'Còn ' + help + ' lượt giúp hôm nay';
+  if ($('visit-help').textContent !== t) $('visit-help').textContent = t;
 }
 
 PANELS.map = {
@@ -1205,10 +1208,15 @@ function nextCelebration() {
   sound.play('levelup');
 }
 // ---------- Màn "Trong lúc bạn vắng nhà…" (away = s.away từ loadGame) ----------
+// Việc để dành tới lúc màn này đóng (vd cảm ơn khách đã giúp lúc chủ vắng, issue 28): màn đang mở thì toast bị che
+let afterAwayFns = [];
+export function afterAway(fn) { if (awayOpen) afterAwayFns.push(fn); else fn(); }
 export function closeAway() {
   awayOpen = false;
   const root = $('away');
   root.hidden = true; root.replaceChildren();
+  const fns = afterAwayFns; afterAwayFns = [];
+  for (const f of fns) f();
   if (newsWait) showWhatsNew(stOk());
 }
 // ---------- "Bản mới có gì đổi" (chỉ save chuyển từ v1, một lần; đợi màn vắng nhà đóng rồi mới hiện) ----------
