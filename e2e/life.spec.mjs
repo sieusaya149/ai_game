@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { makeSave, seedSave, installWarp, timeWarp } from './helpers.mjs';
 import { stageStart, lifeEnd } from '../public/state.js';
-import { AGING } from '../public/data.js';
+import { AGING, DAY_MS } from '../public/data.js';
 
 const MIN = 60_000;
 const V2 = 'nongtrai-save-v2';
@@ -41,6 +41,8 @@ test('mở bản lưu v2 cũ: đủ con vật; tua giờ vườn qua mốc thì 
   expect(await spriteOf(page, chick)).not.toBe(before);
   expect(await page.evaluate(() => globalThis.__farm.state.animals.length)).toBe(old.animals.length);
 
+  await page.evaluate(ms => { globalThis.__farm.state.time = ms; }, DAY_MS * 0.9);   // ban đêm gà về chuồng (ban ngày thả rông chạy lung tung)
+  await page.waitForTimeout(1500);
   // chạm vào con gà: thấy giới tính và giai đoạn trong tên mục tiêu (gà trong chuồng chạy lung tung nên trúng con nào cũng được)
   const touch = test.info().project.name === 'mobile';
   await expect(async () => {

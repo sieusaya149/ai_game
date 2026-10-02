@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { makeSave, seedSave } from './helpers.mjs';
 import { CLUTTER } from '../public/data.js';
 import { bumpLayout } from '../public/farm.js';
+import { DAY_MS } from '../public/data.js';
 import { stageStart, buyStrip, placeEntity, canPlace, buyAnimal, mapOf } from '../public/state.js';
 
 // Vườn có đủ chuồng, chỉ có đúng một con `type` ở tim `bond`, đứng giữa chuồng, người chơi đứng cách `dx,dy` (px)
@@ -47,7 +48,8 @@ test('bò ❤️1: vuốt ve và cho ăn tận tay thì tim bay lên và số ti
 });
 
 test('gà ❤️4: người chơi tới gần thì gà chạy lại', async ({ page, context }) => {
-  await open(page, context, farmWith('ga', 4, 60, 0));
+  const sv = farmWith('ga', 4, 60, 0); sv.time = DAY_MS * 0.76;   // ban đêm gà ở trong chuồng (ban ngày thả rông, issue 41)
+  await open(page, context, sv);
   expect(await dist(page)).toBeGreaterThan(50);
   await expect.poll(() => dist(page), { timeout: 15_000 }).toBeLessThan(32);
 });

@@ -4,9 +4,9 @@ import {
   ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
-  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND,
+  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, FREE,
 } from './data.js';
-import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
+import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal } from './migrate.js';
 import { now } from './clock.js';
@@ -401,6 +401,7 @@ function step(s, d) {
   }
   if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
   for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d);
+  stepFree(s, d);
   stepAnimals(s, d);
   stepEggs(s);
   stepDog(s, d);
@@ -509,6 +510,73 @@ function passAway(s, a, def) {
   log(s, `${def.name} đã già và ra đi thanh thản, hóa thiên thần bay lên trời 😇`);
 }
 
+// ---------- Thả rông ban ngày (ADR 0013) ----------
+// Luật quyết định theo ô: a.tile = { c, r } ô con vật đang đứng (null = trong chuồng). world.js chỉ diễn hoạt tới ô đó.
+// Vùng đi lại = ô trong đất, tới được từ nhà, không phải chuồng và không bị hàng rào thấp chắn (ngoài cổng, trong nhà không tính).
+const roamCache = new WeakMap();
+export function roamOf(s) {
+  const f = s.farm, hit = roamCache.get(f);
+  if (hit && hit.rev === f.rev) return hit;
+  const m = mapOf(s), fence = new Set(m.decos.filter(d => d.kind === 'deco_lowfence').map(d => d.ent.c + ',' + d.ent.r));
+  const pen = (c, r) => m.penList.some(p => c >= p.rect.c && r >= p.rect.r && c < p.rect.c + p.rect.w && r < p.rect.r + p.rect.h);
+  const ok = (c, r) => m.isOwned(c, r) && !m.isSolid(c, r) && !pen(c, r) && !fence.has(c + ',' + r);
+  const seen = new Set(), tiles = [], q = [[Math.floor(m.spawn.x / TS), Math.floor(m.spawn.y / TS)]];
+  if (ok(...q[0])) seen.add(q[0].join(','));
+  for (let h = 0; h < q.length; h++) {
+    const [c, r] = q[h]; tiles.push({ c, r });
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const k = (c + dc) + ',' + (r + dr);
+      if (!seen.has(k) && ok(c + dc, r + dr)) { seen.add(k); q.push([c + dc, r + dr]); }
+    }
+  }
+  tiles.sort((a, b) => a.r - b.r || a.c - b.c);
+  const out = { rev: f.rev, tiles, has: (c, r) => seen.has(c + ',' + r) };
+  roamCache.set(f, out);
+  return out;
+}
+const canRoam = (s, a) => FREE.types.includes(a.type) && !a.sick && s.farm.ents.find(e => e.id === a.pen)?.pen !== 'quarantine';
+const tileMid = t => ({ x: t.c * TS + 8, y: t.r * TS + 8 });
+// Về chuồng: bỏ ô, đứng lại trong chuồng
+function goHome(s, a) {
+  a.tile = null;
+  const pen = animalPen(s, a);
+  if (pen) { const p = penPoint(s, ANIMALS[a.type].pen, pen.id); a.x = p.x; a.y = p.y; }
+}
+// Mổ ruộng ở ô (c, r): con nhỡ trở lên ăn sâu (có lợi); 5% lần mổ mất hạt vừa gieo
+function peck(s, a, c, r) {
+  const i = mapOf(s).plotAt(c, r), p = i >= 0 ? s.plots[i] : null, k = p?.crop;
+  if (!k || k.dead || k.rotten || a.stage === 'non') return;
+  const at = plotCenter(s, i);
+  if (k.bugs) { k.bugs = false; s.stats.pecks = (s.stats.pecks || 0) + 1; fxEv(at.x, at.y, 'Gà mổ sâu 🐛', COL.good); }
+  if (stageOf(k) === 0 && Math.random() < FREE.seedLoss) { p.crop = null; fxEv(at.x, at.y, 'Gà ăn mất hạt 🌱', COL.bad); log(s, 'Gà mổ mất hạt vừa gieo'); }
+}
+function stepFree(s, d) {
+  const roam = roamOf(s), day = !isNight(s);
+  let n = 0;
+  for (const a of s.animals) {
+    if (!day || !roam.tiles.length || !canRoam(s, a) || n >= FREE.max) { if (a.tile) goHome(s, a); continue; }
+    n++;
+    if (a.tile && roam.has(a.tile.c, a.tile.r) && s.time < (a.tileAt || 0)) continue;
+    const from = a.tile ?? (() => { const g = animalPen(s, a)?.gates[0]; return g ? { c: g[0], r: g[1] } : roam.tiles[0]; })();
+    if (!a.tile) Object.assign(a, tileMid(from));   // sáng ra: bước ra từ cửa chuồng
+    const near = roam.tiles.filter(t => Math.max(Math.abs(t.c - from.c), Math.abs(t.r - from.r)) <= FREE.radius);
+    a.tile = { ...pick(near.length ? near : roam.tiles) };
+    a.tileAt = s.time + rnd(...FREE.moveMs);
+    peck(s, a, a.tile.c, a.tile.r);
+  }
+}
+// Ô cỏ để gà thả rông đẻ trứng: gần con mái, thích chỗ sát bụi, đá, gốc cây; mỗi ô một ổ
+function bushSpot(s, a) {
+  const m = mapOf(s), roam = roamOf(s), R = FREE.layRadius, hasEgg = new Set(s.eggs.filter(e => e.tile).map(e => e.tile.c + ',' + e.tile.r));
+  const cover = new Set([...m.trees, ...m.clutter].map(o => o.ent.c + ',' + o.ent.r));
+  const grass = roam.tiles.filter(t => Math.max(Math.abs(t.c - a.tile.c), Math.abs(t.r - a.tile.r)) <= R && m.ground[t.r * m.mw + t.c] === GROUND.GRASS && !hasEgg.has(t.c + ',' + t.r));
+  const nearCover = t => { for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) if (cover.has((t.c + x) + ',' + (t.r + y))) return true; return false; };
+  const cand = grass.filter(nearCover), t = pick(cand.length ? cand : grass);
+  return t ? { x: t.c * TS + 8, y: t.r * TS + 14, tile: { c: t.c, r: t.r } } : null;
+}
+// Trứng đang nằm trong bụi (đã đẻ ở ô thả rông, chưa ai nhặt)
+export const hiddenEggs = s => s.eggs.filter(e => e.tile);
+
 function stepAnimals(s, d) {
   const stink = s.poops.length * DOG.stinkUnhappyPerPoop * (d / MIN);
   for (const a of [...s.animals]) {
@@ -538,7 +606,7 @@ function stepAnimals(s, d) {
     if (a.stage === 'non' || a.stage === 'nho') a.weight = Math.min(w1, (a.weight || w0) + (w1 - w0) * d / stageStart(a.type, 'truong') * (pigNho ? AGING.pigGain : 1));
     if (!animalCan(a, 'product') || a.type === 'heo' || s.time < a.nextProduct) continue;
     if (a.type === 'ga') {
-      if (s.eggs.length < 30) { const e = { id: s.nextId++, x: a.x, y: a.y, laidAt: s.time }; s.eggs.push(e); emit({ type: 'egg' }); spawnEv('egg', e.x, e.y); }
+      if (s.eggs.length < 30) { const e = { id: s.nextId++, x: a.x, y: a.y, laidAt: s.time, ...(a.tile ? bushSpot(s, a) : null) }; s.eggs.push(e); emit({ type: 'egg' }); spawnEv('egg', e.x, e.y); }
       a.nextProduct = s.time + productEvery(a);
     } else if (!a.ready) { a.ready = true; fxEv(a.x, a.y, a.type === 'bo' ? 'Có sữa! 🥛' : 'Có lông! ✂️'); }
   }

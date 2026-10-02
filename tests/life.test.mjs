@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
-import { LIFE, STAGES, AGING, ANIMALS, MAX_CATCHUP_MS, EVENT_LEVEL } from '../public/data.js';
+import { FREE, LIFE, STAGES, AGING, ANIMALS, MAX_CATCHUP_MS, EVENT_LEVEL } from '../public/data.js';
 import { eventMeta } from '../public/notify.js';
 
 const MIN = 60_000, HOUR = 60 * MIN;
@@ -105,13 +105,14 @@ test('cừu nhỡ lông ngắn chưa xén được; bò tơ kéo cày được, 
 });
 
 test('con già cho sản phẩm thưa hơn con trưởng thành', () => {
-  const s = newGame();
+  const s = newGame(); FREE.types = [];   // gà ở yên trong chuồng (không thả rông) để trứng rơi đúng chỗ
   const young = put(s, 'ga', 'truong'), old = put(s, 'ga', 'gia');
   young.x = 10; old.x = 20;
   run(s, 20 * MIN);
   const by = x => s.eggs.filter(e => e.x === x).length;
   assert.ok(by(10) >= 7, `gà trưởng thành đẻ ${by(10)}`);
   assert.ok(by(20) <= Math.ceil(by(10) / AGING.oldEvery), `gà già đẻ ${by(20)}`);
+  FREE.types = ['ga'];
   // bò già cho ít sữa hơn: vắt xong phải chờ lâu gấp đôi
   const cow = put(s, 'bo', 'gia');
   run(s, ANIMALS.bo.every + MIN);

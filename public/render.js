@@ -122,7 +122,13 @@ const decoFallback = kind => once('deco' + kind, () => {
   }
   return c;
 });
-const decoImg = kind => SPR.deco?.[kind] ?? (kind === 'deco_bench' && SPR2?.bench) ?? decoFallback(kind);
+const decoImg = kind => (kind === 'deco_lowfence' ? SPR3?.lowFence?.h : null) ?? SPR.deco?.[kind] ?? (kind === 'deco_bench' && SPR2?.bench) ?? decoFallback(kind);
+
+// Hàng rào thấp nằm cạnh hàng rào khác theo chiều dọc (mà không có hàng xóm ngang) thì vẽ cọc dọc
+const lowFenceAt = (m, e) => {
+  const at = (c, r) => m.decos.some(d => d.kind === 'deco_lowfence' && d.ent.c === c && d.ent.r === r);
+  return (!(at(e.c - 1, e.r) || at(e.c + 1, e.r)) && (at(e.c, e.r - 1) || at(e.c, e.r + 1)) ? SPR3?.lowFence?.v : SPR3?.lowFence?.h) ?? decoImg('deco_lowfence');
+};
 
 // Nội thất dự phòng (khi SPR2 chưa có): khối gỗ đơn giản đúng kích thước sprite thật
 const FURN = { bed: [32, 24, '#e5452f'], wardrobe: [24, 32, '#b07a45'], stove: [24, 24, '#9a9a94'], table: [32, 20, '#c98c4a'],
@@ -557,7 +563,7 @@ export function render(ctx, f) {
   }
 
   // trứng, phân
-  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = eggImg(); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
+  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = (e.tile && SPR3?.eggNest) || eggImg(); blit(im, e.x - im.width / 2, e.y - im.height + 1); });   // trứng trong bụi: vẽ ổ cỏ
   for (const p of farm ? state.poops ?? [] : []) {
     if (p.x == null || !vis(p.x, p.y)) continue;
     add(p.y, () => {
@@ -572,6 +578,7 @@ export function render(ctx, f) {
   // đồ trang trí
   for (const d of m.decos) {
     if (!vis(d.x, d.y)) continue;
+    if (d.kind === 'deco_lowfence') { const fe = lowFenceAt(m, d.ent); add(d.y, () => blit(fe, d.ent.c * TS, d.ent.r * TS)); continue; }   // hàng rào thấp: vẽ theo ô, ngang hay dọc tùy hàng xóm
     const im = decoImg(d.kind);
     add(d.y, () => blit(im, d.x - im.width / 2, d.y - im.height + 1));
   }
