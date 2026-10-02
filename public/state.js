@@ -132,7 +132,8 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name, chained: false, nap: 0, napCheck: 0, quiet: 0, barkAt: 0, barkX: 0, barkY: 0 },
     poops: [], threats: [], orders: [], nextOrderAt: 0,
     // chased/barks: chó đã đớp và đã sủa bao nhiêu lần · robStreak: chuỗi trộm chưa bị đớp (issue 31, 32)
-    stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0, chased: 0, barks: 0, robStreak: 0 },
+    // · helps: số việc mình đã giúp vườn bạn (issue 32)
+    stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0, chased: 0, barks: 0, robStreak: 0, helps: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
     notify: {},   // loại thông báo 🟡 đã tắt: { ripe: false }; thiếu = bật. Mức 🔴 không tắt được
     // Trường cho online (issue 22, không đổi phiên bản v2): chơi đơn hay vườn trên làng, tên tài khoản,
@@ -276,6 +277,8 @@ export function awaySummary(events, frozenMs = 0) {
   if (guard) out.push(`Chó đã đuổi quạ và trộm ${guard} lần`);
   const coins = events.reduce((a, e) => a + (e.type === 'shipped' ? e.coins : 0), 0);
   if (coins) out.push(`Lái buôn trả ${coins} xu`);
+  // thành tựu mở trong lúc chạy bù (vd chó đuổi đủ 20 kẻ trộm lúc chủ vắng, issue 32): không có huy hiệu nên ghi vào đây
+  for (const e of events) if (e.type === 'achievement') out.push(`Thành tựu mới "${e.name}", thưởng ${e.coins} xu`);
   if (frozenMs >= MIN) out.push(`Vườn đã đóng băng ${spanText(frozenMs)}`);
   return out;
 }
@@ -405,6 +408,9 @@ export function urgentSpots(s) {
   // chó vừa sủa báo có khách lạ (issue 31): mũi tên chỉ về chỗ nó thấy, tắt sau GUARD.barkShowMs
   const g = s.dog;
   if (g?.barkAt && now() - g.barkAt < GUARD.barkShowMs) out.push({ key: 'bark', kind: 'bark', x: g.barkX, y: g.barkY, text: `${g.name} đang sủa ở ${barkWhere(s, g.barkX, g.barkY)}!` });
+  // bạn vừa sang trộm (issue 32): mũi tên chỉ về chỗ bị trộm, tắt sau GUEST.robShowMs
+  const r = s.robAt;
+  if (r?.at && now() - r.at < GUEST.robShowMs) out.push({ key: 'rob', kind: 'rob', x: r.x, y: r.y, text: `${r.by} đang trộm ${itemName(r.item).toLowerCase()} trong vườn!` });
   return out;
 }
 // Hướng của chỗ chó sủa so với giữa vườn, để ghép câu "Mực đang sủa ở phía Đông vườn!"
@@ -1416,6 +1422,9 @@ export function guestOpApply(host, who, op) {
   if (op.kind === 'steal') {
     host.today.steals++;
     host.today.stolen += sellPrice(c.item) * c.qty;
+    // chỗ vừa bị trộm: chỗ gấp 🔴 cho mũi tên chỉ hướng (urgentSpots, issue 32)
+    const at = op.act === 'crop' ? plotCenter(host, op.idx) : { x: c.target.x ?? 0, y: c.target.y ?? 0 };
+    host.robAt = { at: t, x: at.x, y: at.y, by, item: c.item, target: op.act === 'crop' ? { kind: 'plot', idx: op.idx } : op.act === 'product' ? { kind: 'animal', id: op.animal } : { kind: 'dog' } };
     return { ok: true, msg: `Trộm được ${c.qty} ${itemName(c.item).toLowerCase()} 😈`, reward: { items: { [c.item]: c.qty }, steal: 1 }, event: { type: 'stolen', by, item: c.item, qty: c.qty, at: t } };
   }
   // chó canh khách (issue 31): sủa báo động, đớp được khách (khách rơi đồ + nộp phạt), khách ném xúc xích
@@ -1430,7 +1439,7 @@ export function guestOpApply(host, who, op) {
     return { ok: true, ate, msg: GUARD_MSG.sausage(dog, ate), reward: { lose: { sausage: 1 } }, event: { type: 'sausaged', by, dog, ate, at: t } };
   }
   host.today.helps++;
-  return { ok: true, msg: `Đã ${HELP_JOBS[op.act].verb} giúp`, reward: { coins: GUEST.helpCoins, exp: GUEST.helpExp }, event: { type: 'helped', by, act: op.act, at: t } };
+  return { ok: true, msg: `Đã ${HELP_JOBS[op.act].verb} giúp`, reward: { coins: GUEST.helpCoins, exp: GUEST.helpExp, help: 1 }, event: { type: 'helped', by, act: op.act, at: t } };
 }
 
 // Thưởng của khách (server xác nhận thao tác xong mới cộng) vào bản lưu khách
@@ -1449,6 +1458,8 @@ export function guestReward(me, reward) {
     me.today.robs = (me.today.robs || 0) + reward.steal;
     me.stats.robStreak = (me.stats.robStreak || 0) + reward.steal;   // chuỗi cho thành tựu "Siêu trộm" (issue 32)
   }
+  if (reward.help) me.stats.helps = (me.stats.helps || 0) + reward.help;   // thành tựu "Hàng xóm tốt bụng" (issue 32)
+  checkAch(me);
 }
 
 // Việc khách làm mà chủ chưa biết (server áp dụng lúc chủ offline, hoặc vừa nhận qua WebSocket):
@@ -1462,6 +1473,36 @@ export function takeGuestLog(s) {
     : g.kind === 'sausage' ? { type: 'sausaged', by: g.by, dog, ate: !!g.ate, at: g.at }
     : g.kind === 'bark' ? { type: 'barked', by: g.by, dog, where: barkWhere(s, s.dog.barkX, s.dog.barkY), x: s.dog.barkX, y: s.dog.barkY, at: g.at }
     : { type: 'helped', by: g.by, act: g.act, at: g.at }));
+}
+
+// Màn "Trong lúc bạn vắng nhà…" phần khách (issue 32): gom việc khách làm mà chủ chưa biết (nhật ký khách chưa xem,
+// gọi trước takeGuestLog) và tin ở cổng `gate` ({ gifts: số quà đang chờ, notes: số lời nhắn chưa đọc }, từ server)
+// thành các mục [{ kind: 'help'|'steal'|'gift'|'note'|'chase', icon, text }]. Không có gì thì không có mục đó.
+export function awayGuests(s, gate = {}) {
+  const fresh = [...(s?.guests ?? [])].filter(g => !g.seen).reverse();   // cũ → mới
+  const out = [], per = kind => {
+    const m = new Map();
+    for (const g of fresh) if (g.kind === kind) m.set(g.by, [...(m.get(g.by) ?? []), g]);
+    return [...m];
+  };
+  const tally = (list, key, val = () => 1) => {
+    const m = new Map();
+    for (const g of list) m.set(key(g), (m.get(key(g)) || 0) + val(g));
+    return [...m];
+  };
+  for (const [by, list] of per('help')) {
+    const jobs = tally(list, g => g.act).map(([act, n]) => `${HELP_JOBS[act]?.verb ?? 'làm'} ${n} ${HELP_JOBS[act]?.unit ?? 'việc'}`);
+    out.push({ kind: 'help', icon: '🤝', text: `${by} đã giúp ${list.length} việc (${jobs.join(', ')})` });
+  }
+  for (const [by, list] of per('steal')) {
+    const items = tally(list, g => g.item, g => g.qty || 0).map(([k, n]) => `${n} ${itemName(k).toLowerCase()}`).join(', ');
+    out.push({ kind: 'steal', icon: '😈', text: `${by} đã trộm ${items}` + (list.length > 1 ? ` (${list.length} lần)` : '') });
+  }
+  if (gate.gifts > 0) out.push({ kind: 'gift', icon: '🎁', text: `${gate.gifts} phần quà mới trong hộp quà ở cổng` });
+  if (gate.notes > 0) out.push({ kind: 'note', icon: '📖', text: `${gate.notes} lời nhắn mới trong sổ lưu bút` });
+  const bit = fresh.filter(g => g.kind === 'bite').length;
+  if (bit) out.push({ kind: 'chase', icon: '🐕', text: `${s.dog?.name ?? DOG.name} đã đuổi được ${bit} người` });
+  return out;
 }
 
 // Khách làm một việc giúp hay một vụ trộm: áp dụng ngay trên bản đi dạo (chỉ để thấy liền) và trả kèm `guestOp`

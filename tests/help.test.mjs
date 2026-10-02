@@ -39,7 +39,7 @@ test('giúp tưới: ô khô thì được (ô được tưới, khách có thư
   const r = guestOpApply(s, guest, op('water', { idx: 0 }));
   assert.equal(r.ok, true);
   assert.equal(s.plots[0].water, 100);
-  assert.deepEqual(r.reward, { coins: GUEST.helpCoins, exp: GUEST.helpExp });
+  assert.deepEqual(r.reward, { coins: GUEST.helpCoins, exp: GUEST.helpExp, help: 1 });   // help: đếm cho thành tựu "Hàng xóm tốt bụng" (issue 32)
   guestReward(me, r.reward);
   assert.equal(me.coins, coins0 + GUEST.helpCoins);
   assert.equal(me.exp, exp0 + GUEST.helpExp);

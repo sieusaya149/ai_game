@@ -27,16 +27,16 @@ Gói các việc khách làm lại cho chủ vườn: thấy khi về, nhận ng
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): mọi loại sự kiện xã hội mới đều có mức và khóa gộp (một test đi qua hết danh sách loại sự kiện, như issue 13).
-- [ ] Unit test (seam 1): trộm và chó sủa là mức 🔴; ghé thăm, cảm ơn, quà, lời nhắn là 🟡; hai thao tác giúp liên tiếp của cùng một người gộp thành một thông báo.
-- [ ] Unit test (seam 1): thành tựu "Hàng xóm tốt bụng" mở ở lần giúp thứ 50, không mở ở 49; "Siêu trộm" mở ở lần trộm thứ 30 liền không bị đớp, và bị đớp ở lần thứ 20 thì phải đếm lại từ 0; "Vườn bất khả xâm phạm" mở khi chó đuổi người thứ 20.
-- [ ] Unit test (seam 1): báo cáo vắng nhà tổng hợp đúng số việc giúp, số vụ trộm (và món), quà, và số người chó đuổi từ hàng đợi khách; khi không có sự kiện nào thì không in mục đó.
-- [ ] Unit test (seam 3): sự kiện 🔴 được đẩy tới chủ đang ở **bản đồ khác** (dựng bằng chủ đang ở bản đồ làng) nhờ kênh riêng theo người chứ không theo bản đồ.
-- [ ] E2E (Playwright, 2 trình duyệt, desktop + 360px): A đang ở làng, B trộm vườn A → A thấy băng rôn đỏ và nút "Về vườn" ngay ở làng.
-- [ ] E2E: A offline, B giúp 2 việc, trộm 1 ô, bị chó đuổi một lần, để lại một quà → A đăng nhập thấy màn "Trong lúc bạn vắng nhà…" liệt kê đủ bốn nhóm với số đúng.
-- [ ] E2E: tắt thông báo 🟡 loại "bạn bè ghé" trong cài đặt thì không còn thấy; thông báo gấp không có công tắc tắt.
-- [ ] E2E: dựng bản lưu giúp 49 lần → giúp thêm 1 lần → thấy thông báo mở thành tựu "Hàng xóm tốt bụng".
-- [ ] Màn vắng nhà dài hơn không tràn ngang, cuộn được trên 360px.
+- [x] Unit test (seam 1): mọi loại sự kiện xã hội mới đều có mức và khóa gộp (một test đi qua hết danh sách loại sự kiện, như issue 13).
+- [x] Unit test (seam 1): trộm và chó sủa là mức 🔴; ghé thăm, cảm ơn, quà, lời nhắn là 🟡; hai thao tác giúp liên tiếp của cùng một người gộp thành một thông báo.
+- [x] Unit test (seam 1): thành tựu "Hàng xóm tốt bụng" mở ở lần giúp thứ 50, không mở ở 49; "Siêu trộm" mở ở lần trộm thứ 30 liền không bị đớp, và bị đớp ở lần thứ 20 thì phải đếm lại từ 0; "Vườn bất khả xâm phạm" mở khi chó đuổi người thứ 20.
+- [x] Unit test (seam 1): báo cáo vắng nhà tổng hợp đúng số việc giúp, số vụ trộm (và món), quà, và số người chó đuổi từ hàng đợi khách; khi không có sự kiện nào thì không in mục đó.
+- [x] Unit test (seam 3): sự kiện 🔴 được đẩy tới chủ đang ở **bản đồ khác** (dựng bằng chủ đang ở bản đồ làng) nhờ kênh riêng theo người chứ không theo bản đồ.
+- [x] E2E (Playwright, 2 trình duyệt, desktop + 360px): A đang ở làng, B trộm vườn A → A thấy băng rôn đỏ và nút "Về vườn" ngay ở làng.
+- [x] E2E: A offline, B giúp 2 việc, trộm 1 ô, bị chó đuổi một lần, để lại một quà → A đăng nhập thấy màn "Trong lúc bạn vắng nhà…" liệt kê đủ bốn nhóm với số đúng. (Việc của B dựng qua giao thức công khai WebSocket/HTTP bằng cookie của B, như ADR 0011; A là trình duyệt thật.)
+- [x] E2E: tắt thông báo 🟡 loại "bạn bè ghé" trong cài đặt thì không còn thấy; thông báo gấp không có công tắc tắt.
+- [x] E2E: dựng bản lưu giúp 49 lần → giúp thêm 1 lần → thấy thông báo mở thành tựu "Hàng xóm tốt bụng".
+- [x] Màn vắng nhà dài hơn không tràn ngang, cuộn được trên 360px. (chỉ giả lập: Playwright 360x740)
 
 ## Blocked by
 

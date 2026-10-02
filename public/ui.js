@@ -844,6 +844,11 @@ PANELS.house = {
   },
 };
 
+// Huy hiệu pixel art của thành tựu xã hội (issue 32), mở / khóa; thành tựu khác dùng emoji
+const achIcon = (a, done, cls = 'ico') => {
+  const b = a?.badge && SPR2?.badges?.[a.badge];
+  return b ? canvasIco(done ? b.on : b.off, cls + ' ach-badge') : h('span', { class: cls + ' emo' }, done ? '🏅' : '🔘');
+};
 PANELS.achievements = {
   title: '🏆 Thành tựu',
   render(body, s) {
@@ -851,7 +856,7 @@ PANELS.achievements = {
     for (const a of D.ACHIEVEMENTS) {
       const val = s.stats?.[a.stat] || 0, done = !!s.achievements?.[a.id] || val >= a.goal;
       list.append(row({
-        icon: h('span', { class: 'ico emo' }, done ? '🏅' : '🔘'), name: a.name, cls: done ? 'done' : '',
+        icon: achIcon(a, done), name: a.name, cls: done ? 'done' : '',
         desc: [a.desc, h('div', { class: 'prog' }, h('i', { style: `width:${Math.min(100, (val / a.goal) * 100)}%` }), h('span', {}, `${Math.min(val, a.goal)}/${a.goal}`))],
         right: done ? h('span', { class: 'tick' }, '✓') : h('span', { class: 'price' }, '🪙 ' + a.coins),
       }));
@@ -1178,15 +1183,20 @@ PANELS.map = {
 };
 let miniKey = '';
 // Bản đồ nhỏ ở góc + nút 📋: vẽ lại theo nhịp HUD. Chấm xuất ra data-dots (điểm ảnh canvas) để kiểm tra.
-function renderMini(s) {
+// Chỗ đặt bản đồ nhỏ theo HUD (HUD lùi xuống khi có băng rôn đỏ thì updateAlerts gọi lại ngay, khỏi chờ nhịp HUD)
+function placeMini() {
   const wrap = $('mini-wrap');
-  wrap.hidden = false;
   // đo hết rồi mới ghi: đọc xen kẽ ghi làm trình duyệt phải tính lại bố cục hai lần mỗi nhịp
-  const items = todoList(s), hud = $('hud').getBoundingClientRect(), act = $('actions').getBoundingClientRect();
+  const hud = $('hud').getBoundingClientRect(), act = $('actions').getBoundingClientRect();
   const top = innerWidth - hud.right >= 120 ? hud.top : hud.bottom + 8;   // màn rộng: ngang HUD; màn hẹp: ngay dưới HUD
   wrap.style.top = top + 'px';
   // Cột nút hành động cao tới đây thì bản đồ nhỏ thu lại còn nút Việc cần làm (máy nhỏ, nhiều nút)
   wrap.classList.toggle('compact', act.height > 0 && act.top < top + 108);
+}
+function renderMini(s) {
+  $('mini-wrap').hidden = false;
+  const items = todoList(s);
+  placeMini();
   const m = drawMini($('mini-cv'), s, items), mm = $('minimap');
   const key = JSON.stringify(m.dots);
   if (key !== miniKey) { miniKey = key; mm.dataset.dots = key; }
@@ -1384,9 +1394,9 @@ export function setOnline(on) {
 }
 // ---------- Sự kiện từ tick() ----------
 function showBadge(ev) {
-  const box = $('badges');
-  const b = h('div', { class: 'badge' },
-    h('div', { class: 'badge-ico' }, '🏆'),
+  const box = $('badges'), a = D.ACHIEVEMENTS.find(x => x.id === ev.id);
+  const b = h('div', { class: 'badge', 'data-id': ev.id ?? '' },
+    h('div', { class: 'badge-ico' }, a?.badge ? achIcon(a, true, 'ico big') : '🏆'),   // thành tựu xã hội: huy hiệu riêng (issue 32)
     h('div', {}, h('div', { class: 'badge-t' }, 'Thành tựu mới!'), h('div', { class: 'badge-n' }, ev.name), ev.coins ? h('div', { class: 'badge-c' }, '+' + fmt(ev.coins) + ' xu') : null));
   box.append(b);
   sound.play('coin');
@@ -1463,14 +1473,16 @@ export function showAway(away) {
   if (!away || awayOpen || creatorOpen) return;
   awayOpen = true;
   const root = $('away'), frozen = l => l.startsWith('Vườn đã đóng băng');
-  const gone = spanOf(away.ms);
+  const guests = away.guests ?? [];   // việc khách làm lúc mình vắng (issue 32): giúp, trộm, quà, lời nhắn, chó đuổi
   root.replaceChildren(h('div', { class: 'away-card', role: 'dialog', 'aria-label': 'Trong lúc bạn vắng nhà' },
     h('div', { class: 'away-ico' }, '🏡'),
     h('h2', {}, 'Trong lúc bạn vắng nhà…'),
-    h('p', { class: 'away-sub' }, `Bạn đã đi ${gone}.`),
+    away.ms ? h('p', { class: 'away-sub' }, `Bạn đã đi ${spanOf(away.ms)}.`) : null,
     away.lines.length
       ? h('ul', { class: 'away-list' }, away.lines.map(l => h('li', { class: frozen(l) ? 'cold' : '' }, h('span', { class: 'ico emo' }, frozen(l) ? '❄️' : '•'), h('span', {}, l))))
-      : h('p', { class: 'mini' }, 'Mọi thứ vẫn yên ổn, không có gì đặc biệt.'),
+      : guests.length ? null : h('p', { class: 'mini' }, 'Mọi thứ vẫn yên ổn, không có gì đặc biệt.'),
+    guests.length ? h('h3', { class: 'away-h' }, 'Khách ghé vườn') : null,
+    guests.length ? h('ul', { class: 'away-list away-guests' }, guests.map(g => h('li', { 'data-kind': g.kind }, h('span', { class: 'ico emo' }, g.icon), h('span', {}, g.text)))) : null,
     away.frozenMs > 0 ? h('p', { class: 'mini' }, 'Vườn chỉ chạy tối đa 8 giờ khi bạn đi vắng, phần còn lại được giữ nguyên.') : null,
     btn('Về làm việc thôi!', () => { sound.play('pop'); closeAway(); }, 'orange big')));
   root.hidden = false;
@@ -1501,7 +1513,7 @@ export function handleEvents(events) {
 // ---------- 🔴 Báo gấp: băng rôn đỏ + tiếng + rung + mũi tên ở mép màn hình ----------
 // Lấy chỗ gấp từ state (S.urgentSpots) nên bản lưu đang có sự cố cũng báo; hiện ở mọi bản đồ.
 const BANNER_MS = 8000;
-let seenUrgent = new Set(), bannerUntil = 0, bannerOff = false, alertEv = null;
+let seenUrgent = new Set(), bannerUntil = 0, bannerOff = false, alertEv = null, barKey = '';
 // Báo gấp đến từ một event chứ không phải chỗ cố định trong vườn (vd có người sang trộm, issue 30)
 function alertNow(text) {
   alertEv = { text, until: performance.now() + BANNER_MS };
@@ -1521,8 +1533,10 @@ function arrowEl(key) {
   }
   return el;
 }
-// toScreen(x, y): toạ độ bản đồ đang đứng → px CSS trên màn hình
-export function updateAlerts(s, toScreen, nowMs = performance.now()) {
+// toScreen(x, y): toạ độ bản đồ đang đứng → px CSS trên màn hình. s = vườn của mình; visiting = đang đứng trong vườn
+// người khác (issue 32): vẫn báo gấp nhưng không có mũi tên (bản đồ đang đứng không phải bản đồ của s).
+// Ở ngoài vườn mình thì băng rôn kèm nút "Về vườn".
+export function updateAlerts(s, toScreen, nowMs = performance.now(), visiting = false) {
   const spots = S.urgentSpots(s), urgent = todoList(s).filter(i => i.level === 'urgent'), keys = new Set(spots.map(p => p.key));
   if (spots.some(p => !seenUrgent.has(p.key))) {
     sound.play('alarm');
@@ -1532,16 +1546,21 @@ export function updateAlerts(s, toScreen, nowMs = performance.now()) {
   seenUrgent = keys;
   if (alertEv && nowMs >= alertEv.until) alertEv = null;
   const bn = $('alert-banner'), spotOn = spots.length > 0 && nowMs < bannerUntil;
-  const on = !bannerOff && (spotOn || !!alertEv);
+  const on = !bannerOff && (spotOn || !!alertEv), out = visiting || s.scene !== 'farm';
   if (on) {
     const text = spotOn
-      ? (spots.length === 1 ? spots[0].text : `${spots.length} sự cố trong vườn!`) + (s.scene === 'farm' ? '' : ' Về vườn ngay!')
+      ? (spots.length === 1 ? spots[0].text : `${spots.length} sự cố trong vườn!`) + (out ? ' Về vườn ngay!' : '')
       : alertEv.text;
     if (bn.textContent !== text) bn.textContent = text;
   }
   bn.hidden = !on;
+  $('alert-home').hidden = !(on && out);
   document.body.classList.toggle('alerting', on);
+  // chữ, nút hay cỡ màn hình đổi thì đo lại chiều cao hàng băng rôn cho HUD lùi xuống vừa đủ
+  const bk = on ? `${bn.textContent}|${out}|${innerWidth}` : '';
+  if (bk !== barKey) { barKey = bk; if (on) document.body.style.setProperty('--alert-h', $('alert-bar').offsetHeight + 'px'); placeMini(); }
   const rootBox = $('alert-arrows');
+  if (visiting) { rootBox.replaceChildren(); return; }
   if (!urgent.length && !rootBox.firstChild) return;   // không có gì gấp: khỏi đo bố cục mỗi khung hình
   const hud = $('hud').getBoundingClientRect(), bar = $('bottombar').getBoundingClientRect();
   const box = { l: 0, t: hud.bottom + 4, r: innerWidth, b: bar.top - 4 };
@@ -1556,7 +1575,7 @@ export function updateAlerts(s, toScreen, nowMs = performance.now()) {
   }
   for (const el of [...rootBox.children]) if (!live.has(el.dataset.key)) el.remove();
 }
-export function dismissBanner() { bannerOff = true; alertEv = null; $('alert-banner').hidden = true; document.body.classList.remove('alerting'); }
+export function dismissBanner() { bannerOff = true; alertEv = null; $('alert-banner').hidden = true; $('alert-home').hidden = true; document.body.classList.remove('alerting'); }
 
 // ---------- Khởi tạo ----------
 export function initUI(a) {
@@ -1565,6 +1584,7 @@ export function initUI(a) {
   $('bb-seed').addEventListener('click', () => { sound.play('click'); openPanel('seeds'); });
   $('main-action').addEventListener('click', () => runAction(cur.actions[0]));
   $('alert-banner').addEventListener('click', dismissBanner);
+  $('alert-home').addEventListener('click', () => { sound.play('click'); api.goHome(); });   // báo gấp lúc ở ngoài vườn (issue 32)
   $('minimap').addEventListener('click', () => { if (!isBlocking()) openPanel('map'); });
   $('todo-btn').addEventListener('click', () => { if (!isBlocking()) openPanel('todo'); });
   $('hud-speed').addEventListener('click', () => {

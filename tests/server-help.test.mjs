@@ -76,7 +76,7 @@ test('thao tác hợp lệ được nhận, vào hàng đợi và đẩy tới c
   const ack = await until(b, 'guest');
   assert.equal(ack.ok, true);
   assert.equal(ack.id, 'help-0001-aaaa');
-  assert.deepEqual(ack.reward, { coins: GUEST.helpCoins, exp: GUEST.helpExp });
+  assert.deepEqual(ack.reward, { coins: GUEST.helpCoins, exp: GUEST.helpExp, help: 1 });
   // chủ đang online: server đẩy thao tác sang trình duyệt chủ (trình duyệt chủ áp dụng rồi gửi bản lưu lên)
   const push = await until(a, 'guestop');
   assert.equal(push.op.id, 'help-0001-aaaa');

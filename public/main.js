@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, guestCheck, guestReward, guestOpApply, takeGuestLog, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
+  startVisit, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -185,8 +185,10 @@ async function startOnline(name) {
     const s = loadGame(r.farm);
     if (!s) { pending = null; ui.showVillage(name, 'Không đọc được vườn trên làng. Báo quản trị giúp nhé.'); return; }
     playOnline(s);
-    const away = s.away; delete s.away;
-    ui.showAway(away);
+    // màn vắng nhà: phần vườn chạy bù (s.away) + việc khách làm lúc mình vắng và tin ở cổng (issue 32).
+    // Vắng ngắn mà có khách thì vẫn hiện, chỉ có phần khách
+    const guests = awayGuests(s, r.gate), away = s.away; delete s.away;
+    ui.showAway(guests.length ? { lines: [], frozenMs: 0, ms: null, ...away, guests } : away);
     ui.afterAway(() => ui.handleEvents(takeGuestLog(s)));   // khách giúp lúc mình vắng (issue 28): cảm ơn một lần, sau màn vắng nhà
     return;
   }
@@ -234,7 +236,8 @@ function liveReset() { peers.clear(); liveMap = null; ui.setLive(!!sync, 0); }
 // tin từ WebSocket (qua sync.js): kết nối (lại) thì vào lại bản đồ ở khung hình tới; rớt thì xóa người khác
 function liveMsg(m) {
   if (m.t === 'hello' || m.t === 'down') { liveReset(); return; }
-  if (m.t === 'visit') { ui.toast(`🟡 ${m.name} vừa ghé thăm vườn của bạn`); return; }   // bạn bè ghé vườn mình (issue 26; nguồn tin: issue 27)
+  // bạn bè ghé vườn mình (issue 26, 27): toast 🟡 gộp theo người, tắt được trong cài đặt (issue 32)
+  if (m.t === 'visit') { ui.netEvent({ type: 'visited', by: m.name }); return; }
   if (m.t === 'guest') { guestAck(m); return; }       // server trả lời việc mình vừa giúp (issue 28)
   if (m.t === 'guestop') { guestDid(m.op); return; }  // khách vừa giúp vườn mình: áp dụng rồi cảm ơn
   // quà, lời nhắn mới ở cổng (issue 29): toast 🟡 gộp, và đếm lại để sprite hộp quà / sổ đổi theo
@@ -388,6 +391,16 @@ const api = {
   people: () => peers.roster(),
   visit,
   revenge,
+  // Nút "Về vườn" trên băng rôn đỏ (issue 32): tự đi về vườn mình. Đang thăm vườn bạn thì đi ra cổng trước
+  // (như nút "Về làng", không bỏ chạy tắt khỏi chó canh), ra tới làng thì đi tiếp tới cổng về vườn nhà.
+  goHome() {
+    if (!state || busy || fading || world.build || world.stun > 0) return false;
+    if (state.visit) { plan = null; homeAfter = performance.now() + 60_000; V.goToTarget(state, world, { kind: 'building', id: 'gate' }); return true; }
+    if (state.scene === 'farm' || !sceneMap(state).doors.some(d => d.to === 'farm')) return false;
+    plan = null;
+    V.goToTarget(state, world, { kind: 'door', to: 'farm' });
+    return true;
+  },
   // Nút "Về làng" lúc thăm vườn: tự đi ra cổng, tới nơi là ra làng như đi bộ ra
   leaveVisit() {
     if (!state?.visit || busy || fading || world.stun > 0) return;
@@ -488,9 +501,12 @@ async function revenge(name) {
 }
 
 // Ra cổng vườn người khác: về lại vườn mình, nhân vật vẫn đứng ở làng đúng chỗ lúc bước vào
+let homeAfter = 0;   // giờ hết hạn của "ra làng xong thì đi tiếp về vườn nhà" (nút Về vườn, issue 32)
 function leaveVisit() {
   state = home; home = null; plan = null;
   begin();
+  if (homeAfter > performance.now()) V.goToTarget(state, world, { kind: 'door', to: 'farm' });
+  homeAfter = 0;
   ui.setVisit(null);
   ui.refreshGate();   // về vườn mình: đếm lại quà, lời nhắn ở cổng
 }
@@ -748,7 +764,8 @@ function frame(now) {
   // 6) sự kiện cho UI, HUD, lưu
   const forUI = events.filter(e => e.type === 'sound' || ['important', 'direct'].includes(eventMeta(e)?.level));
   if (forUI.length) ui.handleEvents(forUI);
-  if (!home) ui.updateAlerts(state, (x, y) => ({ x: (x * scale - view.camX) / dpr, y: (y * scale - view.camY) / dpr }), now);
+  // báo gấp của vườn mình ở mọi bản đồ, cả lúc đang thăm vườn người khác (issue 32)
+  ui.updateAlerts(home ?? state, (x, y) => ({ x: (x * scale - view.camX) / dpr, y: (y * scale - view.camY) / dpr }), now, !!home);
   if (now - lastHud > 250) { lastHud = now; ui.renderHUD(state); if (state.visit) ui.setVisit(state.visit.owner, helpLeft(state)); }
   if (joy.el) joy.el.style.display = ui.isBlocking() ? 'none' : '';
   if (now - lastSave > 5000) { lastSave = now; save(); }

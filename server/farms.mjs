@@ -9,6 +9,7 @@ import { checkSaveJump, loadGame } from '../public/state.js';
 import { now as clock, serverDay } from '../public/clock.js';
 import { MAX_CATCHUP_MS } from '../public/data.js';
 import { runGuestQueue, stealsOf } from './guests.mjs';
+import { gateNews } from './gate.mjs';
 
 export const FINAL_MS = 3000;    // chờ bản lưu cuối của máy cũ tối đa chừng này
 const waiting = new Map();       // phiên cũ đang bị thay → hàm báo "đã nhận bản lưu cuối"
@@ -21,7 +22,8 @@ export function writeFarm(db, accountId, save, t = Date.now()) {
 }
 const farmOut = r => (r?.save ? { farm: JSON.parse(r.save), rev: r.rev, savedAt: r.saved_at } : { farm: null, rev: r?.rev ?? 0 });
 
-// Cấp phiên chơi mới cho tài khoản `a`. Trả { play, farm (null = chưa có vườn), rev, savedAt }
+// Cấp phiên chơi mới cho tài khoản `a`. Trả { play, farm (null = chưa có vườn), rev, savedAt, gate }
+// gate = { gifts, notes }: quà đang chờ, lời nhắn chưa đọc ở cổng, cho màn "Trong lúc bạn vắng nhà…" (issue 32)
 export async function claimPlay({ db, live }, a) {
   const old = rowOf(db, a.id)?.play;
   const socks = old ? live.kick(a.id, old) : [];
@@ -37,7 +39,7 @@ export async function claimPlay({ db, live }, a) {
   }
   const play = randomBytes(16).toString('base64url');
   db.prepare('INSERT INTO farms (account_id, play) VALUES (?, ?) ON CONFLICT(account_id) DO UPDATE SET play = excluded.play').run(a.id, play);
-  return { play, ...farmOut(runGuestQueue(db, catchUpFarm(db, rowOf(db, a.id)))) };
+  return { play, ...farmOut(runGuestQueue(db, catchUpFarm(db, rowOf(db, a.id)))), gate: gateNews({ db }, a) };
 }
 
 // Chạy bù vườn của chủ đang offline bằng chính loadGame (luật trong state.js: tối đa 8 giờ, phần dư đóng băng,

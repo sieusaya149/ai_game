@@ -115,7 +115,9 @@ state = {
   threats: [ { id, kind: 'crow'|'thief', plot, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
   orders: [ { id, who, items, coins, exp } ], nextOrderAt,
   stats: { harvests, bugs, eggs, poops, slips, piglets, hatches, orders, thieves, crows, earned, planted, shipped, bought, slept,
-           chased, barks, robStreak },   // issue 31: chó đã đớp bao nhiêu khách, đã sủa mấy lần; chuỗi trộm chưa bị đớp (issue 32 dùng)
+           chased, barks, robStreak, helps },   // issue 31: chó đã đớp bao nhiêu khách, đã sủa mấy lần; chuỗi trộm chưa bị đớp;
+                                                //   issue 32: helps = số việc mình đã giúp vườn bạn (thành tựu xã hội)
+  robAt?: { at, x, y, by, item, target },     // issue 32: vụ trộm gần nhất trong vườn mình (chỗ gấp 🔴 trong GUEST.robShowMs)
   achievements: { id: true },
   log: [ { t, text } ],                       // mới nhất ở đầu, tối đa 50
   tutorial,                                   // số bước hướng dẫn đã qua (>= TUTORIAL.length là xong)
@@ -177,7 +179,12 @@ checkSaveJump(prev, next, dtMs)   // → R { reason: 'time'|'coins'|'exp' }: ch�
 wealthOf(state), SAVE_JUMP
 resetGame()                       // xóa save v2 và đặt cờ "đã chuyển" (không đụng bản v1)
 loadProblem()                     // → string | null: vì sao lần loadGame gần nhất không đọc được (bản vẫn được giữ)
-awaySummary(events, frozenMs)     // → string[]: các dòng cho màn "Trong lúc bạn vắng nhà"
+awaySummary(events, frozenMs)     // → string[]: các dòng cho màn "Trong lúc bạn vắng nhà" (cả thành tựu mở lúc chạy bù, issue 32)
+awayGuests(state, gate?)          // issue 32 → [{ kind: 'help'|'steal'|'gift'|'note'|'chase', icon, text }]: phần "Khách ghé vườn"
+                                  //   của màn vắng nhà, gom từ nhật ký khách chưa xem (gọi trước takeGuestLog) và gate = { gifts, notes }
+                                  //   (tin ở cổng, POST /api/play trả kèm). Mỗi người một dòng giúp ("Bình đã giúp 2 việc (tưới 1 ô,
+                                  //   nhổ cỏ 1 ô)") và một dòng trộm ("Bình đã trộm 2 bắp"); quà, lời nhắn, "Mực đã đuổi được n người"
+                                  //   (số lần chó đớp). Không có gì thì không có mục đó
 whatsNewDue(state) / markWhatsNew(state)   // màn "Bản mới có gì đổi" cho bản lưu chuyển từ v1 (xem một lần)
 SAVE_KEY
 ```
@@ -275,10 +282,12 @@ guestOpCheck(host, who, op)       // thuần, không đổi gì → { ok: true, 
                                   //   nhỏ để trộm") · 'guest_new' (khách chưa tới cấp 5) · 'robbed' (người này trộm ở đây rồi) ·
                                   //   'full' (giỏ khách đầy) · 'day_full' (vườn đã mất 30% giá trị đồ chín hôm nay)
 guestOpApply(host, who, op)       // kiểm tra rồi áp dụng lên bản lưu chủ → { ok: true, msg, reward, event } | lý do từ chối.
-                                  //   reward = { coins, exp } (giúp) | { items: { <món>: qty }, steal: 1 } (trộm).
+                                  //   reward = { coins, exp, help: 1 } (giúp) | { items: { <món>: qty }, steal: 1 } (trộm).
+                                  //   Trộm còn ghi host.robAt (chỗ bị trộm, cho mũi tên 🔴, issue 32)
                                   //   Cộng host.today.helps (giúp) hay today.steals + today.stolen (trộm) và ghi một dòng vào
                                   //   host.guests (nhớ op.id) nên áp dụng lại cùng mã là no-op
-guestReward(me, reward)           // cộng xu + EXP, bỏ đồ trộm được vào giỏ/kho và cộng me.today.robs (chỉ gọi khi server đã xác nhận)
+guestReward(me, reward)           // cộng xu + EXP, bỏ đồ trộm được vào giỏ/kho và cộng me.today.robs (chỉ gọi khi server đã xác nhận);
+                                  //   issue 32: help → stats.helps++, steal → stats.robStreak++, bite → robStreak = 0, rồi xét thành tựu
 takeGuestLog(state)               // các dòng guests chưa seen → [{ type: 'helped', by, act, at }] / [{ type: 'stolen', by, item, qty, at }]
                                   //   rồi đánh dấu đã xem (báo một lần)
 helpsToday(state, t?)             // số việc giúp vườn này đã nhận hôm nay (ngày ngoài đời theo serverDay)
@@ -332,6 +341,12 @@ keepLoot(state, items)            // ghi đồ khách vừa trộm được tron
 - **Chủ vườn:** online thì nhận `{ t: 'guestop', op }` → `guestOpApply` → `takeGuestLog` → băng rôn 🔴 "Mực đang sủa ở phía Đông vườn!" kèm **mũi tên** (todo kind `bark`, sprite `SPR2.barkArrow`, tắt sau `GUARD.barkShowMs` = 15 giây) và toast 🟡 khi chó đớp được hay bị ném xúc xích (loại thông báo `guard`). Offline thì server áp dụng thẳng vào bản lưu, chủ về đọc nhật ký.
 - **Chó trong vườn người khác không đi theo khách lạ** (`world.js`): nó quanh quẩn giữ chuồng, chỉ rời chỗ khi đuổi. Lúc đuổi thì chạy `chaseSpeed()`, đớp khi cách khách `GUARD.biteRange` = 11 px, mất dấu `GUARD.loseMs` = 2 giây thì thôi đuổi; màn hình khách rung nhẹ lúc chó sủa và lúc bị đớp.
 - **Nhật ký chó:** `stats.chased` = đã đớp được bao nhiêu người, `stats.barks` = đã sủa mấy lần (issue 32 dùng cho thành tựu và màn "Trong lúc bạn vắng nhà"). `stats.robStreak` = chuỗi trộm chưa bị đớp của chính mình.
+
+**Vắng nhà, thông báo và thành tựu xã hội (issue 32).**
+- **Màn "Trong lúc bạn vắng nhà…"** có thêm mục **Khách ghé vườn** (`awayGuests`, `ui.showAway({ ..., guests })`): ai giúp mấy việc, ai trộm món gì bao nhiêu, quà và lời nhắn mới ở cổng, chó đuổi được bao nhiêu người. Vắng ngắn (không có `s.away`) mà có khách thì vẫn hiện, chỉ có phần khách. Màn dài thì cuộn trong khung (`.away-card` `overflow-y: auto`), không tràn ngang.
+- **Thông báo 3 mức cho việc của khách:** 🔴 `stolen`, `barked` (cùng chỗ gấp `rob`, `bark` trong `urgentSpots` / todo) hiện ở **mọi bản đồ**: ở vườn mình có mũi tên chỉ chỗ; ở làng, trong nhà mũi tên chỉ về cửa/cổng; đang thăm vườn bạn thì chỉ có băng rôn (`ui.updateAlerts(mine, toScreen, now, visiting)`). Ở ngoài vườn mình băng rôn có nút **🏡 Về vườn** (`#alert-home` → `api.goHome()`: tự đi tới cửa/cổng về vườn; đang thăm vườn bạn thì đi ra cổng trước rồi đi tiếp). 🟡 `visited` (tin `{ t: 'visit' }` của server, gộp theo người, loại `visit` = "Bạn bè ghé"), `helped` (gộp theo người và việc), `gift`, `note`. Kênh tới chủ là `live.sendTo(accountId)` theo người, không theo bản đồ.
+- **Thành tựu xã hội** (`ACHIEVEMENTS` có `badge`; tiến độ trong `stats`): `helper50` "Hàng xóm tốt bụng" giúp 50 lần (`stats.helps`, bản lưu của người giúp) · `robber30` "Siêu trộm" trộm 30 lần liền không bị chó đớp (`stats.robStreak`, bị đớp về 0) · `guard20` "Vườn bất khả xâm phạm" chó đuổi được 20 kẻ trộm (`stats.chased`, bản lưu chủ). Mở khóa: huy hiệu "Thành tựu mới!" (`#badges .badge[data-id]`) dùng sprite riêng; danh sách 🏆 Thành tựu có huy hiệu khóa/mở và thanh tiến độ. Thành tựu giao 10 đơn hàng đổi tên thành "Giao hàng tận tâm" để không trùng tên.
+- **Sprite:** `SPR2.badges.helper|robber|guard.on|off` (16x18): huân chương xanh có bàn tay xòe + trái tim, huân chương tím có mặt nạ kẻ trộm, khiên gỗ có dấu chân chó; bản khóa xám có ổ khóa.
 
 ### Quà và sổ lưu bút ở cổng (issue 29, ADR 0012)
 ```js
@@ -395,8 +410,9 @@ Chợ Bà Tư thay sạp hàng và nhà kho bán hàng cũ (sạp bị bỏ kh�
 
 ### Thông báo, Việc cần làm, cài đặt
 ```js
-notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, help, gate, guard)
-urgentSpots(state)                // → [{ key, kind, x, y, text }] chỗ đang có chuyện gấp, tính từ trạng thái (không cần event)
+notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, help, gate, guard, visit)
+urgentSpots(state)                // → [{ key, kind, x, y, text }] chỗ đang có chuyện gấp, tính từ trạng thái (không cần event).
+                                  //   kind: crow/thief (đang ăn), sick, bark (chó sủa), rob (bạn vừa trộm, issue 32)
 // notify.js
 eventMeta(event)                  // → { level, cat, group, label } | null (event chưa khai báo mức)
 createNotifier({ show, on, win }) // gộp toast mức 'important' cùng khóa trong NOTIFY_WINDOW
@@ -569,7 +585,7 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
 - `POST /api/logout` → hủy phiên của cookie, xóa cookie. `GET /api/me` → `200 { ok, name }` hoặc `401 no_session` (cookie sai/hết hạn).
 - **Phiên:** cookie `nt_session` (mã ngẫu nhiên 32 byte, `HttpOnly; SameSite=Lax; Path=/; Max-Age=30 ngày`, thêm `Secure` khi `X-Forwarded-Proto: https` do Caddy gửi), hạn 30 ngày từ lúc đăng nhập. Chọn cookie thay vì header để JS trong trang không đọc được mã. Trình duyệt chỉ nhớ `localStorage['nongtrai-online']` = tên (để biết có nên gọi `/api/me` khi mở game, chơi một mình thì không gọi server).
 - **Vườn online (issue 22, ADR 0012, 0016)**, đều cần cookie phiên (thiếu thì `401 no_session`):
-  - `POST /api/play` → `200 { ok, play, farm, rev, savedAt? }`: cấp **phiên chơi** mới cho máy này; `farm` = bản lưu trên server hoặc `null` (chưa có vườn). Nếu máy khác đang giữ phiên và mở WebSocket: server gửi nó `{ t: 'kicked' }`, chờ bản lưu cuối mang phiên cũ (nhận như thường), hoặc nó đóng kết nối, hoặc tối đa `FINAL_MS` = 3 giây, rồi mới đổi phiên và trả vườn. Từ đó phiên cũ bị từ chối.
+  - `POST /api/play` → `200 { ok, play, farm, rev, savedAt?, gate: { gifts, notes } }` (`gate` như `GET /api/gate`, cho màn vắng nhà, issue 32): cấp **phiên chơi** mới cho máy này; `farm` = bản lưu trên server hoặc `null` (chưa có vườn). Nếu máy khác đang giữ phiên và mở WebSocket: server gửi nó `{ t: 'kicked' }`, chờ bản lưu cuối mang phiên cũ (nhận như thường), hoặc nó đóng kết nối, hoặc tối đa `FINAL_MS` = 3 giây, rồi mới đổi phiên và trả vườn. Từ đó phiên cũ bị từ chối.
   - `GET /api/farm` → `200 { ok, farm, rev, savedAt }` hoặc `404 no_farm` ("Chưa có vườn"). Lối đọc công khai vườn của chính mình (test dùng).
   - `POST /api/farm` `{ play, save }` → `200 { ok, rev, savedAt }`. Lỗi: `409 play_replaced` (phiên không phải phiên đang giữ quyền ghi: "Vườn đang được chơi ở thiết bị khác") · `400 save_invalid` (không qua `migrate`, thiếu `coins`/`exp`/`savedAt`/`plots`) · `422 implausible` kèm `reason` (`checkSaveJump` của `state.js` so với bản trước — `dtMs` = max(giờ server đã trôi, min(chênh `savedAt` hai bản, giờ server đã trôi + 8 giờ)) — hoặc `reason: 'steals'` khi `today.robs` khai nhiều vụ trộm hơn số server đã nhận hôm nay, issue 30). Bản đầu tiên của tài khoản (mang vườn chơi đơn lên / vườn mới) nhận nguyên. Server đóng dấu `mode: 'online'`, `account` = tên tài khoản. Bị từ chối thì bản cũ trên server giữ nguyên.
   - `GET /api/visit?name=` (cần đăng nhập) → `200 { ok, name, farm, savedAt }` hoặc `404 no_farm`. Lối đọc công khai vườn người khác (chỉ đọc: chỉ có GET, phương thức khác `405`; issue 27 dùng để thăm vườn). Chủ đang offline (không có WebSocket giữ phiên chơi) thì server chạy bù trước bằng `loadGame` của `state.js` (tối đa 8 giờ, phần dư đóng băng, vật nuôi không chết), lưu lại với `savedAt` = giờ server; chạy đồng bộ nên đọc nhiều lần chỉ chạy một lần. Tóm tắt vắng nhà cất ở `farm.awayPending`, `loadGame` ở trình duyệt chủ biến nó thành `s.away` (gộp thêm phần vắng sau đó nếu có). `POST /api/play` cũng chạy bù trước khi trao vườn cho chủ.
@@ -578,7 +594,7 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
   - `POST /api/friends` `{ name }` hoặc `{ code }` (không phân biệt hoa thường, dấu cách, dấu -) → `200 { ok, name }`. Lỗi: `404 no_such_name` · `404 bad_code` · `409 already_friend` · `400 self`.
   - `POST /api/friends/remove` `{ name }` → `200 { ok }` hoặc `404 not_friend`. Chỉ xóa dòng quan hệ, vườn và tài khoản của ai cũng còn nguyên.
   - `GET /api/gates` → `200 { ok, gates: [{ name, level, friend }] }`: vườn của mọi người chơi khác đã có bản lưu, bạn bè (`friend: true`) ở đầu rồi tới người còn lại, mỗi nhóm theo tên; không có chính mình.
-  - Thông báo ghé vườn: `notifyVisit({ db, live }, visitor, ownerId)` trong `friends.mjs` gửi `{ t: 'visit', name }` tới chủ vườn qua WebSocket nếu `visitor` nằm trong danh sách bạn của chủ vườn. `presence.mjs` gọi khi khách join `farm` của chủ (issue 27). Trình duyệt hiện toast 🟡 "<tên> vừa ghé thăm vườn của bạn".
+  - Thông báo ghé vườn: `notifyVisit({ db, live }, visitor, ownerId)` trong `friends.mjs` gửi `{ t: 'visit', name }` tới chủ vườn qua WebSocket nếu `visitor` nằm trong danh sách bạn của chủ vườn. `presence.mjs` gọi khi khách join `farm` của chủ (issue 27). Trình duyệt hiện toast 🟡 "<tên> vừa ghé thăm vườn của bạn 👋" (event `visited`, tắt được bằng loại "Bạn bè ghé", issue 32).
   - Trình duyệt: `net.friends()`, `net.gates()`, `net.addFriend(who)` (nhập mã dạng ABC-DEF thì thử mã trước, không ra thì thử tên), `net.removeFriend(name)`. Nút 👫 trong cột `#live` (`#live-friends`) hoặc chạm "Cổng bạn bè" trong làng (khi online) mở bảng `friends`: ô nhập tên/mã (`#fr-input`), mã của mình (`#fr-code`), danh sách bạn (`.fr-row`: chấm online/offline, cấp, 🍅 🐛, nút ✖ có hỏi lại), danh sách cổng (`.gate-row`, bạn bè `.pinned` ở đầu). Pixel art đọc `SPR2.friendIcons[on|off|ripe|help]` (canvas), chưa có thì emoji/chấm chữ; cổng vườn vẽ trên bản đồ làng và biển hiệu chờ art của agent Opus.
 - **Quà và sổ lưu bút ở cổng (issue 29, `server/gate.mjs`)**, cần cookie phiên. Bảng `gifts` và `guestbook` (migration v6). Luật (món nào tặng được, giới hạn, chia theo sức chứa giỏ) là hàm thuần của `public/state.js`, server chỉ gọi lại. Quà là hàng đợi nên **chủ offline vẫn nhận**; chủ đang online thì được báo thêm qua WebSocket.
   - `POST /api/gifts` `{ to, item, qty, op }` → `200 { ok }`, hoặc `200 { ok, dup: true }` nếu `op` này đã gửi rồi (mã thao tác tự chứa: gửi lại chỉ tính một lần). Lỗi: `400 bad_op` · `404 no_such_name` · `400 self` · `400 bad_item` / `bad_qty` / `too_many` / `box_full` (theo `giftBoxCheck`).
@@ -602,7 +618,7 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
   - `{ t: 'chat', text }` (`text` phải nằm trong `QUICK_CHAT` của `data.js`) → `{ t: 'chat', id, text }`; `{ t: 'emote', e }` (`e` trong `EMOTES` 👋 ❤️ 😂 😡) → `{ t: 'emote', id, e }`. Câu/biểu cảm lạ → người gửi nhận `{ t: 'error', code: 'chat_invalid' }`, không ai nhận gì; chưa join → `not_joined`.
 - **Hàng đợi thao tác của khách (issue 28, 30, `server/guests.mjs`, ADR 0012)**, cần cookie phiên và phải đang đứng trong vườn người khác (đã `join` `farm` kèm `owner`).
   - `{ t: 'guest', op }` → `{ t: 'guest', id, ok: true, reward }` hoặc `{ t: 'guest', id, ok: false, reason, msg }`. Các dạng `op` nhận được (`id` 8–64 ký tự `A-Za-z0-9_-`):
-    - `{ id, kind: 'help'|'steal', act: 'water'|'weed'|'catch'|'shoo'|'crop'|'egg'|'product', idx | crow | egg | animal }` → `reward` = `{ coins, exp }` khi giúp, `{ items, steal }` khi trộm;
+    - `{ id, kind: 'help'|'steal', act: 'water'|'weed'|'catch'|'shoo'|'crop'|'egg'|'product', idx | crow | egg | animal }` → `reward` = `{ coins, exp, help: 1 }` khi giúp, `{ items, steal }` khi trộm;
     - `{ id, kind: 'bark', act: 'bark', x, y }` (chỗ chó thấy khách, số nguyên trong ±10000) — không có `reward`;
     - `{ id, kind: 'bite', act: 'bite', loot: { <món>: n } }` (tối đa 20 món, `n` nguyên 1..10000, món phải có trong `ITEMS`/`CROPS`/`PRODUCTS`) → `reward` = `{ lose, fine, bite }`;
     - `{ id, kind: 'sausage', act: 'sausage' }` → `reward` = `{ lose: { sausage: 1 } }`.

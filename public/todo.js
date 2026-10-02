@@ -1,7 +1,7 @@
 // Việc cần làm: đọc state, liệt kê việc trong vườn theo loại, mức gấp, số lượng và chỗ gần người chơi nhất. Thuần JS, không DOM.
 // Bảng 📋, bản đồ nhỏ và mũi tên chỉ hướng đều lấy vị trí từ đây.
 import { mapOf } from './state.js';
-import { ANIMALS, HUSBANDRY, GUARD } from './data.js';
+import { ANIMALS, HUSBANDRY, GUARD, GUEST } from './data.js';
 import { now } from './clock.js';
 import { TS } from './layout.js';
 
@@ -14,6 +14,7 @@ const KINDS = [
   { kind: 'crow', kp: 'threat', level: 'urgent', icon: '🪶', label: n => `${n} con quạ đang ăn cây`, spots: s => threats(s, 'crow') },
   { kind: 'thief', kp: 'threat', level: 'urgent', icon: '🧢', label: () => 'Có trộm đang hái cây', spots: s => threats(s, 'thief') },
   { kind: 'bark', level: 'urgent', icon: '🐕', label: () => 'Chó đang sủa, có người lạ', spots: s => barking(s) },
+  { kind: 'rob', level: 'urgent', icon: '😈', label: () => 'Có người đang trộm trong vườn', spots: s => robbing(s) },
   { kind: 'sick', level: 'urgent', icon: '🤒', label: n => `${n} con vật bệnh`, spots: s => animals(s, a => a.sick) },
   { kind: 'hungry', level: 'normal', icon: '🍽️', label: n => `${n} con vật đói`, spots: s => animals(s, a => !a.sick && a.hunger < HUSBANDRY.growNeedsHunger) },
   { kind: 'dry', level: 'normal', icon: '💧', label: n => `${n} ô khô`, spots: s => plots(s, p => alive(p) && p.water < DRY) },
@@ -28,6 +29,9 @@ const KINDS = [
 // Chó vừa sủa báo có khách lạ (issue 31): một chỗ duy nhất, tắt sau GUARD.barkShowMs
 const barking = s => (s.dog?.barkAt && now() - s.dog.barkAt < GUARD.barkShowMs
   ? [{ id: 'dog', x: s.dog.barkX, y: s.dog.barkY, target: { kind: 'dog' } }] : []);
+// Bạn vừa sang trộm (issue 32): chỗ bị trộm, tắt sau GUEST.robShowMs
+const robbing = s => (s.robAt?.at && now() - s.robAt.at < GUEST.robShowMs
+  ? [{ id: 'rob', x: s.robAt.x, y: s.robAt.y, target: s.robAt.target ?? { kind: 'dog' } }] : []);
 const threats = (s, kind) => (s.threats ?? []).filter(t => t.kind === kind && t.state === 'eating' && s.plots[t.plot] && mapOf(s).plotCenter(t.plot))
   .map(t => ({ id: t.id, ...mapOf(s).plotCenter(t.plot), target: { kind: 'threat', id: t.id } }));
 const animals = (s, ok) => (s.animals ?? []).filter(a => a.x != null && ok(a)).map(a => ({ id: a.id, x: a.x, y: a.y, target: { kind: 'animal', id: a.id } }));

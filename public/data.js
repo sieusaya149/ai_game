@@ -241,10 +241,15 @@ export const ACHIEVEMENTS = [
   { id: 'slip5',      name: 'Chân ướt chân ráo', desc: 'Giẫm phải phân chó 5 lần', stat: 'slips', goal: 5,   coins: 30 },
   { id: 'piglets10',  name: 'Heo nái anh hùng', desc: 'Có 10 heo con chào đời',  stat: 'piglets',  goal: 10,  coins: 300 },
   { id: 'hatch5',     name: 'Mẹ gà khéo ấp',    desc: 'Ấp nở 5 gà con',         stat: 'hatches',  goal: 5,   coins: 100 },
-  { id: 'orders10',   name: 'Hàng xóm tốt bụng', desc: 'Giao 10 đơn hàng',      stat: 'orders',   goal: 10,  coins: 200 },
+  { id: 'orders10',   name: 'Giao hàng tận tâm', desc: 'Giao 10 đơn hàng',      stat: 'orders',   goal: 10,  coins: 200 },
   { id: 'thief3',     name: 'Bắt trộm giỏi',    desc: 'Bắt thằng Tèo 3 lần',    stat: 'thieves',  goal: 3,   coins: 150 },
   { id: 'crow10',     name: 'Khắc tinh của quạ', desc: 'Đuổi 10 con quạ',       stat: 'crows',    goal: 10,  coins: 80 },
   { id: 'rich5000',   name: 'Đại gia làng',     desc: 'Kiếm tổng cộng 5.000 xu', stat: 'earned',  goal: 5000, coins: 500 },
+  // Thành tựu xã hội (issue 32): badge = huy hiệu pixel art riêng (SPR2.badges[badge].on / .off)
+  // helps: số việc mình giúp vườn bạn · robStreak: chuỗi trộm chưa bị chó đớp (bị đớp về 0) · chased: chó nhà mình đớp được bao nhiêu kẻ trộm
+  { id: 'helper50',   name: 'Hàng xóm tốt bụng', desc: 'Giúp vườn bạn 50 lần',  stat: 'helps',    goal: 50,  coins: 300, badge: 'helper' },
+  { id: 'robber30',   name: 'Siêu trộm',        desc: 'Trộm 30 lần liền không bị chó đớp', stat: 'robStreak', goal: 30, coins: 300, badge: 'robber' },
+  { id: 'guard20',    name: 'Vườn bất khả xâm phạm', desc: 'Chó đuổi được 20 kẻ trộm', stat: 'chased', goal: 20, coins: 300, badge: 'guard' },
 ];
 
 // ---------- Khách giúp vườn và trộm vườn (issue 28, 30, ADR 0012) ----------
@@ -253,7 +258,8 @@ export const ACHIEVEMENTS = [
 // stealLv: cấp tối thiểu để đi trộm, cũng là cấp tối thiểu để vườn bị trộm (bảo vệ người mới)
 // stealPct: mỗi vụ trộm lấy tối đa bấy nhiêu sản lượng còn lại của ô hay con đó (mỗi người một lần mỗi ô hay mỗi con)
 // dayPct: mỗi vườn mỗi ngày ngoài đời mất tối đa bấy nhiêu tổng giá trị đồ chín · thể lực mỗi vụ: STAMINA.cost.steal
-export const GUEST = { helpMax: 10, helpCoins: 3, helpExp: 2, logMax: 60, stealLv: 5, stealPct: 0.25, dayPct: 0.3 };
+// robShowMs: chỗ vừa bị trộm là chỗ gấp 🔴 (mũi tên chỉ hướng) trong chừng này, giờ ngoài đời (issue 32)
+export const GUEST = { helpMax: 10, helpCoins: 3, helpExp: 2, logMax: 60, stealLv: 5, stealPct: 0.25, dayPct: 0.3, robShowMs: 15_000 };
 // Bốn việc giúp: động từ và đơn vị để ghép câu cảm ơn ("Lan đã tưới 3 ô giúp bạn")
 export const HELP_JOBS = {
   water: { verb: 'tưới', unit: 'ô', icon: '💧', label: 'Tưới giúp' },
@@ -274,7 +280,7 @@ export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
   levelup: 'Lên cấp', order: 'Đơn hàng mới', help: 'Khách giúp vườn', gate: 'Quà và lời nhắn ở cổng',
-  guard: 'Chó canh khách lạ',
+  guard: 'Chó canh khách lạ', visit: 'Bạn bè ghé',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -299,6 +305,8 @@ export const EVENT_LEVEL = {
   stolen:    { level: 'urgent', group: e => `stolen:${e.by}:${e.item}`, label: 'Có người sang trộm', text: (n, e) => `${e.by} đã trộm ${e.qty * n} ${itemName(e.item).toLowerCase()} lúc ${hourText(e.at)} 😤` },
   gift:      { level: 'important', cat: 'gate', group: () => 'gate:gift', label: 'Có quà ở cổng', text: (n, e) => n > 1 ? `${n} món quà mới trong hộp quà ở cổng 🎁` : `${e.name} tặng bạn ${e.qty} ${itemName(e.item).toLowerCase()} 🎁` },
   note:      { level: 'important', cat: 'gate', group: () => 'gate:note', label: 'Lời nhắn mới ở sổ lưu bút', text: (n, e) => n > 1 ? `${n} lời nhắn mới trong sổ lưu bút 📖` : `${e.name} vừa ký sổ lưu bút của bạn 📖` },
+  // bạn bè ghé vườn mình (issue 26, 32): tin từ server, gộp theo người
+  visited:   { level: 'important', cat: 'visit', group: e => 'visit:' + e.by, label: 'Bạn bè ghé', text: (n, e) => `${e.by} vừa ghé thăm vườn của bạn 👋` },
   // chó canh khách lạ (issue 31): sủa là báo gấp 🔴 kèm mũi tên; đớp được và bị ném xúc xích thì toast 🟡
   barked:    { level: 'urgent', group: () => 'barked', label: 'Chó sủa báo có người lạ', text: (n, e) => `${e.dog} đang sủa ở ${e.where}! 🐕` },
   bitten:    { level: 'important', cat: 'guard', group: e => 'bitten:' + e.by, label: 'Chó đớp được khách lạ', text: (n, e) => `${e.dog} đã đớp được ${e.by}, phạt ${e.fine} xu 🐕` },

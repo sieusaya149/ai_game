@@ -1872,6 +1872,101 @@ function sausageGround() {
   });
 }
 
+// ---------- Huy hiệu thành tựu xã hội (issue 32) ----------
+// Ba huy hiệu 16x18, mỗi cái hai bản vẽ riêng: mở (màu) và khóa (xám, có ổ khóa).
+// "Hàng xóm tốt bụng": huân chương tròn xanh lá, bàn tay xòe có trái tim trên lòng bàn tay.
+// "Siêu trộm": huân chương tròn tím ánh trăng, mặt nạ bịt mắt kẻ trộm. "Vườn bất khả xâm phạm": khiên gỗ có dấu chân chó.
+// Bàn tay xòe (11x11, đã có viền): bốn ngón so le, ngón cái chếch trái, tim đỏ giữa lòng bàn tay
+function handHeart(P) {
+  return outline(draw(11, 11, x => {
+    for (const [cx, r0] of [[3, 2], [5, 1], [7, 1], [9, 2]]) R(x, P.s, cx, r0, 1, 5 - r0);
+    R(x, P.s, 3, 5, 7, 4);
+    for (const [px, py] of [[1, 3], [1, 4], [2, 4], [2, 5], [2, 6]]) R(x, P.s, px, py);
+    R(x, P.s, 4, 9, 5, 1);
+    R(x, P.S, 9, 2, 1, 7); R(x, P.S, 4, 8, 6, 1); R(x, P.S, 4, 9, 5, 1);   // bóng bên phải và mép dưới
+    R(x, P.h, 5, 5); R(x, P.h, 7, 5); R(x, P.h, 5, 6, 3, 1); R(x, P.h, 6, 7);
+    R(x, P.H, 5, 5); R(x, P.R, 7, 6); R(x, P.R, 6, 7);
+  }));
+}
+const MASK = [
+  '.ooo...ooo.',
+  'oMmMoooMmMo',
+  'oMeeMMMeeMo',
+  'oMMMMoMMMMo',
+  '.oooo.oooo.',
+];
+const PAW = [
+  '..p.p..',
+  'p.p.p.p',
+  'p.....p',
+  '..ppp..',
+  '.ppppp.',
+  '.ppppp.',
+  '..ppp..',
+];
+const PADLOCK = [
+  '.ooo.',
+  'oIIIo',
+  'oIoIo',
+  'ooooo',
+  'oLLLo',
+  'oLoLo',
+  'ooooo',
+];
+const GREY = ['#4e4a52', '#77727a', '#a19ca2', '#cbc6c8', '#e6e2de'];   // bản khóa: tối → sáng
+const padlock = () => spr(PADLOCK, { o: '#3b2f22', L: '#c9a24a', I: '#aeaebe' });
+// Huân chương tròn: hai dải ruy băng chéo xuống dưới, vành, lòng huân chương; `pal` = { rim: [tối, vừa, sáng], bg, rib: [tối, sáng] }
+function medal(x, pal) {
+  for (const [px, d] of [[4, -1], [10, 1]]) {
+    for (let i = 0; i < 6; i++) { R(x, OUT, px + Math.round(d * i / 3) - 1, 11 + i, 4, 1); R(x, i < 5 ? pal.rib[i % 2 ? 0 : 1] : OUT, px + Math.round(d * i / 3), 11 + i, 2, 1); }
+  }
+  ell(x, OUT, 8, 7.5, 7, 7);
+  ell(x, pal.rim[0], 8, 7.5, 6, 6);
+  ell(x, pal.rim[1], 7.6, 7.1, 5.6, 5.6);
+  ell(x, pal.bg, 8, 7.5, 4.4, 4.4);
+  R(x, pal.rim[2], 4, 3, 2, 1); R(x, pal.rim[2], 3, 4, 1, 2);   // bắt sáng trên-trái
+}
+function helperBadge(on) {
+  const P = on
+    ? { rim: ['#2f6b1f', '#5fb33e', '#bff08a'], bg: '#fff0c8', rib: ['#9e2416', '#e5452f'], hand: { s: '#f0b080', S: '#c98058', h: '#e5452f', H: '#ff9a7a', R: '#9e2416' } }
+    : { rim: [GREY[0], GREY[2], GREY[4]], bg: GREY[3], rib: [GREY[0], GREY[1]], hand: { s: GREY[2], S: GREY[1], h: GREY[1], H: GREY[2], R: GREY[0] } };
+  return draw(16, 18, x => {
+    medal(x, P);
+    x.drawImage(handHeart(P.hand), 3, 2);
+    if (!on) x.drawImage(padlock(), 11, 11);
+  });
+}
+function robberBadge(on) {
+  const P = on
+    ? { rim: ['#3a1d4e', '#6b3a8c', '#c79ae6'], bg: '#dccbf2', rib: ['#2e1a0c', '#6b4020'], mask: { o: OUT, M: '#1e1a22', m: '#5a5068', e: '#fff6e0' } }
+    : { rim: [GREY[0], GREY[2], GREY[4]], bg: GREY[3], rib: [GREY[0], GREY[1]], mask: { o: OUT, M: GREY[1], m: GREY[2], e: GREY[4] } };
+  return draw(16, 18, x => {
+    medal(x, P);
+    x.drawImage(spr(MASK, P.mask), 3, 5);
+    if (on) for (const [sx, sy] of [[10, 4], [6, 11]]) R(x, '#fff6a0', sx, sy);   // ánh trăng lấp lánh
+    if (!on) x.drawImage(padlock(), 11, 11);
+  });
+}
+// Khiên gỗ viền sắt, mép trên thẳng, đáy nhọn; giữa khiên in dấu chân chó
+function guardBadge(on) {
+  const W = on ? RAMP.wood : GREY.slice(0, 4), I = on ? RAMP.iron : GREY;
+  return draw(16, 18, x => {
+    for (let r = 0; r < 17; r++) {
+      const half = r < 10 ? 7 : Math.max(0, 7 - Math.round((r - 9) * 7 / 7.5));
+      if (half <= 0) { R(x, OUT, 7, r, 2, 1); continue; }
+      R(x, OUT, 8 - half - 1, r, half * 2 + 2, 1);
+      if (r === 0 || half < 2) continue;
+      R(x, I[2], 8 - half, r, half * 2, 1);                       // vành sắt
+      if (r > 1 && half > 2) R(x, W[1], 9 - half, r, half * 2 - 2, 1);   // mặt gỗ
+      if (r > 1 && half > 2) R(x, W[2], 9 - half, r, 1, 1);
+    }
+    R(x, I[4], 1, 1, 14, 1); R(x, I[3], 1, 2, 1, 8);              // bắt sáng mép trên và trái
+    for (const px of [5, 10]) R(x, W[0], px, 3, 1, 10);         // ván gỗ dọc
+    x.drawImage(spr(PAW, { p: on ? '#f3ead2' : GREY[4] }), 5, 4);
+    if (!on) x.drawImage(padlock(), 11, 11);
+  });
+}
+
 const dogBark31 = { pup: dogFrames(BARK_PUP), adult: dogFrames(BARK_ADULT) };
 const dogRun31 = { pup: dogFrames(RUN_PUP), adult: dogFrames(RUN_ADULT) };
 const dogNap31 = { pup: napWithZzz(NAP_PUP), adult: napWithZzz(NAP_ADULT) };
@@ -1939,4 +2034,10 @@ export const SPR2 = {
   barkArrow: barkArrow(),
   sausage: sausageIcon(),
   sausageGround: sausageGround(),
+  // huy hiệu thành tựu xã hội (issue 32): mở / khóa
+  badges: {
+    helper: { on: helperBadge(true), off: helperBadge(false) },
+    robber: { on: robberBadge(true), off: robberBadge(false) },
+    guard: { on: guardBadge(true), off: guardBadge(false) },
+  },
 };
