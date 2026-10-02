@@ -28,7 +28,7 @@ function walk(row, v, label) {
 }
 const groups = {
   'Vườn': ['shippingBin', 'bushes', 'rocks', 'stump', 'forest'],
-  'Trong nhà': ['floors', 'wallInner', 'doorMat', 'bed', 'bedSleep', 'wardrobe', 'table', 'stove', 'rug', 'window', 'pottedPlant'],
+  'Trong nhà': ['floors', 'wallInner', 'doorMat', 'bed', 'bedSleep', 'wardrobe', 'table', 'stove', 'rug', 'window', 'pottedPlant', 'phone'],
   'Làng': ['marketStall', 'marketClosed', 'smithy', 'villageHouses', 'friendGate', 'homeGate', 'lampPost', 'bench'],
   'NPC': ['npcBaTu', 'npcBaTuIdle', 'npcOngSau', 'npcOngSauIdle'],
   'Công cụ & HUD': ['tools', 'stamina', 'staminaTired', 'sweat', 'season', 'wood', 'stone', 'guidebook', 'todo', 'alertArrow'],
@@ -50,7 +50,7 @@ tiled('Ghép ô (3x): rừng 8x5 ngẫu nhiên, sàn + tường', 224, 112, x =>
   x.drawImage(SPR2.window, 128, 6); x.drawImage(SPR2.window, 192, 6);
   x.drawImage(SPR2.rug, 136, 60); x.drawImage(SPR2.bed, 114, 26); x.drawImage(SPR2.wardrobe, 200, 8);
   x.drawImage(SPR2.table, 186, 70); x.drawImage(SPR2.stove, 152, 18); x.drawImage(SPR2.pottedPlant, 144, 18);
-  x.drawImage(SPR2.doorMat, 176, 96);
+  x.drawImage(SPR2.doorMat, 176, 96); x.drawImage(SPR2.phone, 168, 18);
 });
 
 // Cỡ thật trên nền cỏ (1x và 2x)

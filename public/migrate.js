@@ -13,6 +13,7 @@ export const animalDefaults = a => ({
   stage: 'non', age: 0,                 // giai đoạn · tuổi = giờ vườn đã sống (ms)
   hunger: 100, happy: 60,
   sick: 0, sickSince: 0, starvingSince: 0,   // sick: 0 khỏe · 1 mệt · 2 bệnh nặng · 3 nguy kịch
+  sickMs: 0, dose: 0, vaccUntil: 0,     // tiến triển bệnh (giờ vườn) · liều thuốc đã uống ở giai đoạn Bệnh nặng · vắc-xin hết hạn lúc simMs này
   dirty: 0,                             // độ dơ 0..100
   bond: 2, bondXp: 0,                   // độ thân ❤️1..5 · điểm ẩn trong tim hiện tại (BOND.perHeart)
   weight: weightAt(a.type, a.stage ?? 'non'),   // kg

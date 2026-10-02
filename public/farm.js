@@ -97,6 +97,9 @@ function build(f) {
     } else if (e.kind === 'bush' || e.kind === 'rock') {   // bụi, đá chưa dọn: chắn đường
       clutter.push({ id: e.id, kind: e.kind, x: px, y: py, v: tileHash(e.c, e.r) % 3, ent: e });
       block(e.c, e.r);
+    } else if (e.kind === 'grave') {   // ngôi mộ: chiếm 1 ô, chắn đường
+      decos.push({ id: e.id, kind: e.flower ? 'grave_flower' : 'grave', x: px + 8, y: py + 14, ent: e });
+      block(e.c, e.r);
     } else if (e.kind === 'deco') {
       decos.push({ id: e.id, kind: e.item, x: px + 8, y: py + 12, ent: e });
     } else {

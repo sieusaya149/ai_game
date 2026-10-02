@@ -4,7 +4,7 @@ import {
   ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
-  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE,
+  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS,
 } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
@@ -417,7 +417,7 @@ export function urgentSpots(s) {
     const c = plotCenter(s, t.plot), crow = t.kind === 'crow';
     out.push({ key: 'threat:' + t.id, kind: t.kind, x: c.x, y: c.y, text: crow ? 'Quạ đang ăn cây!' : 'Có trộm đang hái cây!' });
   }
-  for (const a of s.animals ?? []) if (a.sick) out.push({ key: 'sick:' + a.id, kind: 'sick', x: a.x, y: a.y, text: `${ANIMALS[a.type].name} bị bệnh!` });
+  for (const a of s.animals ?? []) if (a.sick >= 2) out.push({ key: 'sick:' + a.id, kind: 'sick', x: a.x, y: a.y, text: `${ANIMALS[a.type].name} ${a.sick >= 3 ? 'nguy kịch' : 'bệnh nặng'}!` });
   return out;
 }
 
@@ -563,6 +563,47 @@ function passAway(s, a, def) {
   spawnEv('angel', a.x, a.y);
   fxEv(a.x, a.y, 'Lên trời rồi 😇', COL.info);
   log(s, `${def.name} đã già và ra đi thanh thản, hóa thiên thần bay lên trời 😇`);
+  leaveGrave(s, a);
+}
+
+// ---------- Ngôi mộ (issue 38) ----------
+// Thực thể { kind: 'grave', c, r, animal: loài, name?: tên (chỉ con ❤️4+), flower: đã đặt hoa } ở ô trống gần góc Tây-Nam của đất.
+// Qua canPlace nên cùng luật đặt/dời như mọi công trình (không chặn đường, không chồng đồ).
+function graveSpot(s) {
+  const o = s.farm.owned, hx = o.c, hy = o.r + o.h - 1, cand = [];
+  for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) cand.push({ c, r, d: Math.hypot(c - hx, r - hy) });
+  cand.sort((a, b) => a.d - b.d);
+  for (const t of cand) if (canPlace(s, { kind: 'grave' }, t.c, t.r).ok) return t;
+  return null;
+}
+function leaveGrave(s, a) {
+  grieve(s);
+  const t = graveSpot(s);
+  if (!t) return null;
+  const e = { id: s.nextId++, kind: 'grave', c: t.c, r: t.r, animal: a.type, flower: false };
+  if (a.bond >= 4 && a.name) e.name = a.name;
+  s.farm.ents.push(e);
+  bumpLayout(s);
+  emit({ type: 'grave', id: e.id });
+  return e;
+}
+// Có con mất: cả trại buồn một lúc (vui tụt, không lên quá griefCap tới khi hết buồn)
+function grieve(s) {
+  for (const x of s.animals) x.happy = Math.max(0, x.happy - SICK.griefHappy);
+  s.grief = { until: s.time + SICK.griefMs };
+}
+export const grieving = s => !!s.grief && s.time < s.grief.until;
+export const graves = s => s.farm.ents.filter(e => e.kind === 'grave');
+// Đặt hoa (Chậu hoa trong kho) lên mộ: cả trại hết buồn nhanh hơn (phần buồn còn lại co lại)
+export function placeFlower(s, graveId) {
+  const g = s.farm.ents.find(e => e.id === graveId && e.kind === 'grave');
+  if (!g) return R(false, 'Không thấy ngôi mộ', { reason: 'missing' });
+  if (g.flower) return R(false, 'Mộ đã có hoa rồi', { reason: 'done' });
+  if (!take(s, 'deco_flower')) return R(false, 'Cần một chậu hoa (mua ở chợ)', { reason: 'no_item' });
+  g.flower = true;
+  if (grieving(s)) s.grief.until = s.time + (s.grief.until - s.time) * SICK.flowerGriefMul;
+  bumpLayout(s);
+  return R(true, 'Đã đặt hoa lên mộ, cả trại đỡ buồn hơn 🌸');
 }
 
 // ---------- Thả rông ban ngày (ADR 0013) ----------
@@ -724,9 +765,11 @@ function stepAnimals(s, d) {
     if (a.hunger <= BOND.hungerBelow || (a.dirty || 0) >= BOND.dirtyAbove && !DIRT.mud.includes(a.type)) bondShift(a, -BOND.lossPerMin * d / MIN);
     // đói lả -> bệnh
     if (a.hunger <= 0) { if (!a.starvingSince) { a.starvingSince = s.time; emit({ type: 'hungry', animal: def.name }); } } else a.starvingSince = 0;
-    if (!a.sick && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving) || chance(HUSBANDRY.sickChancePerMin * sickFactor(a) * (isDirty(a) ? DIRT.sickMul : 1), d))) {
-      a.sick = 1; a.sickSince = s.time; emit({ type: 'sick', animal: def.name }); fxEv(a.x, a.y, `${def.name} bị bệnh 🤒`, COL.bad); log(s, `${def.name} bị bệnh, cho uống thuốc thú y nhé`);
-    }
+    // nguyên nhân tự mắc: đói lả lâu, dơ, chuồng bẩn, tuổi già (con ❤️4+ ít bệnh hơn); vắc-xin chặn hết
+    if (!a.sick && !vaccinated(s, a) && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving)
+      || chance(HUSBANDRY.sickChancePerMin * sickFactor(a) * (isDirty(a) ? DIRT.sickMul : 1) * (penDirty(s, def.pen) ? SICK.dirtyPenMul : 1) * (a.stage === 'gia' ? SICK.oldChanceMul : 1), d))) fall(s, a, def);
+    if (a.sick && !stepSick(s, a, d, def)) continue;   // mất vì bệnh
+    if (grieving(s)) a.happy = Math.min(a.happy, SICK.griefCap);
     if (a.sick || a.hunger <= HUSBANDRY.growNeedsHunger) continue;
     // con non, nhỡ ăn no thì lên cân dần tới cân lớn hẳn
     const [w0, w1] = WEIGHT[a.type] ?? [1, 1];
@@ -747,7 +790,116 @@ function stepAnimals(s, d) {
       a.nextProduct = s.time + productEvery(a);
     } else if (!a.ready) { a.ready = true; fxEv(a.x, a.y, a.type === 'bo' ? 'Có sữa! 🥛' : 'Có lông! ✂️'); }
   }
+  stepSpread(s, d);
   stepBreeding(s, d);
+}
+
+// ---------- Bệnh 4 giai đoạn, lây, thuốc, vắc-xin (issue 38) ----------
+export const vaccinated = (s, a) => (a.vaccUntil || 0) > (s.simMs || 0);
+const SICK_FLOOR = [0, 0, SICK.toSevere, SICK.toCritical];   // tiến triển tối thiểu của từng giai đoạn bệnh
+export const SICK_NAME = ['Khỏe', 'Mệt', 'Bệnh nặng', 'Nguy kịch'];
+// Thời gian (giờ vườn, đã tính hệ số) còn lại tới khi mất; chỉ có nghĩa ở Nguy kịch (đồng hồ đếm ngược trên đầu)
+export const sickLeft = a => (a.sick >= 3 ? Math.max(0, SICK.deadAt - a.sickMs) : null);
+// Bắt đầu bệnh (Mệt)
+function fall(s, a, def) {
+  a.sick = 1; a.sickSince = s.time; a.sickMs = 0; a.dose = 0; a.spreadAcc = 0;
+  emit({ type: 'sick', animal: def.name, id: a.id }); fxEv(a.x, a.y, `${def.name} bị mệt 🤒`, COL.bad); log(s, `${def.name} bị mệt, cho uống thuốc thú y nhé`);
+}
+function cureAnimal(s, a) {
+  a.sick = 0; a.sickMs = 0; a.dose = 0; a.sickSince = 0; a.starvingSince = 0; a.hunger = Math.max(a.hunger, 30);
+  emit({ type: 'cured', animal: ANIMALS[a.type].name, id: a.id });
+}
+// Tiến triển bệnh một bước. Trả về false nếu con vật đã mất.
+// ADR 0004: đồng hồ gây chết chỉ chạy khi chủ đang chơi (catchUp = false). Chạy bù: dừng ở Bệnh nặng, Nguy kịch hạ về Bệnh nặng, không chết.
+function stepSick(s, a, d, def) {
+  if (a.sick === true) a.sick = 1;
+  a.sickMs = Math.max(a.sickMs || 0, SICK_FLOOR[a.sick] ?? 0);
+  const quar = penTypeOf(s, a) === 'quarantine';
+  let p = a.sickMs + d * (a.stage === 'gia' ? SICK.oldMul : 1) / (quar ? SICK.quarantineMul : 1);
+  if (level(s) < SICK.minLevel) p = Math.min(p, SICK.toSevere - 1);   // người mới: không quá Mệt
+  if (catchUp) p = Math.min(p, SICK.catchUpCap);
+  a.sickMs = p;
+  const to = p >= SICK.toCritical ? 3 : p >= SICK.toSevere ? 2 : 1;
+  if (to !== a.sick) {
+    const up = to > a.sick;
+    a.sick = to; a.dose = 0;
+    if (up && to === 2) { emit({ type: 'sickSevere', animal: def.name, id: a.id }); fxEv(a.x, a.y, `${def.name} bệnh nặng 🔴`, COL.bad); log(s, `${def.name} bệnh nặng rồi, cần 2 liều thuốc hoặc bác sĩ thú y!`); }
+    if (up && to === 3) { emit({ type: 'sickCritical', animal: def.name, id: a.id }); fxEv(a.x, a.y, `${def.name} nguy kịch 🔴`, COL.bad); log(s, `${def.name} nguy kịch! Chỉ bác sĩ thú y cứu được, gọi ngay ở điện thoại trong nhà!`); }
+  }
+  if (!catchUp && p >= SICK.deadAt) { dieOfSick(s, a, def); return false; }
+  return true;
+}
+function dieOfSick(s, a, def) {
+  s.animals.splice(s.animals.indexOf(a), 1);
+  emit({ type: 'died', animal: def.name, id: a.id, kind: a.type, sex: a.sex, x: a.x, y: a.y });
+  spawnEv('angel', a.x, a.y);
+  fxEv(a.x, a.y, 'Lên trời rồi 😇', COL.info);
+  log(s, `${a.name || def.name} đã mất vì bệnh, hóa thiên thần bay lên trời 😇`);
+  leaveGrave(s, a);
+}
+// Con Bệnh nặng ở chuồng thường: mỗi everyMs có p% lây cho một con cùng chuồng (chuồng cách ly không lây)
+function stepSpread(s, d) {
+  for (const a of s.animals) {
+    if (a.sick < 2 || penTypeOf(s, a) === 'quarantine') continue;
+    a.spreadAcc = (a.spreadAcc || 0) + d;
+    while (a.spreadAcc >= SICK.spread.everyMs) {
+      a.spreadAcc -= SICK.spread.everyMs;
+      if (Math.random() >= SICK.spread.p) continue;
+      const mates = s.animals.filter(b => b !== a && b.pen === a.pen && !b.sick && !vaccinated(s, b));
+      if (mates.length) { const b = pick(mates); fall(s, b, ANIMALS[b.type]); }
+    }
+  }
+}
+// Cho uống 1 liều thuốc thú y. Mệt: 1 liều là khỏi · Bệnh nặng: 2 liều · Nguy kịch: chỉ bác sĩ.
+export function giveMedicine(s, id) {
+  const a = s.animals.find(x => x.id === id);
+  if (!a) return R(false, 'Không thấy con vật', { reason: 'missing' });
+  if (!a.sick) return R(false, 'Con này khỏe, không cần thuốc', { reason: 'healthy' });
+  if (a.sick >= 3) return R(false, 'Nguy kịch rồi, thuốc không đủ, phải gọi bác sĩ thú y', { reason: 'critical' });
+  if (!take(s, 'medicine')) return R(false, noItem('medicine'), { reason: 'no_item' });
+  const need = SICK.doses[a.sick];
+  a.dose = (a.dose || 0) + 1;
+  if (a.dose >= need) { cureAnimal(s, a); return R(true, 'Đã khỏi bệnh', { cured: true }); }
+  return R(true, `Đã cho uống ${a.dose}/${need} liều, cần thêm ${need - a.dose} liều nữa`, { cured: false, dose: a.dose });
+}
+// Gọi bác sĩ thú y qua điện thoại ở nhà (đắt): cứu con Bệnh nặng hay Nguy kịch
+export function callVet(s, id) {
+  const a = s.animals.find(x => x.id === id);
+  if (s.scene !== 'house') return R(false, 'Vào nhà dùng điện thoại để gọi bác sĩ nhé', { reason: 'scene' });
+  if (!a) return R(false, 'Không thấy con vật', { reason: 'missing' });
+  if (!a.sick) return R(false, 'Con này khỏe, không cần bác sĩ', { reason: 'healthy' });
+  if (s.coins < SICK.vetPrice) return R(false, 'Chưa đủ xu để mời bác sĩ', { reason: 'coins' });
+  s.coins -= SICK.vetPrice;
+  cureAnimal(s, a); addBond(s, a, 'cure');
+  return R(true, `Bác sĩ thú y đã tới, ${ANIMALS[a.type].name.toLowerCase()} khỏi bệnh (-${SICK.vetPrice} xu)`, { price: SICK.vetPrice });
+}
+// Tiêm vắc-xin cho một con (1 mũi), chống bệnh SICK.vaccineMs giờ vườn
+export function vaccinate(s, id) {
+  const a = s.animals.find(x => x.id === id);
+  if (!a) return R(false, 'Không thấy con vật', { reason: 'missing' });
+  if (a.sick) return R(false, 'Con đang bệnh, tiêm không kịp, cho uống thuốc nhé', { reason: 'sick' });
+  if (!take(s, 'vaccine')) return R(false, noItem('vaccine'), { reason: 'no_item' });
+  a.vaccUntil = (s.simMs || 0) + SICK.vaccineMs;
+  return R(true, `Đã tiêm vắc-xin cho ${ANIMALS[a.type].name.toLowerCase()}`);
+}
+// Tiêm cả chuồng: mỗi con khỏe một mũi; thiếu vắc-xin thì tiêm được tới đâu hay tới đó
+export function vaccinatePen(s, penId) {
+  settlePens(s);
+  let n = 0;
+  for (const a of s.animals.filter(x => x.pen === penId && !x.sick)) { if (!vaccinate(s, a.id).ok) break; n++; }
+  return n ? R(true, `Đã tiêm vắc-xin cho ${n} con`, { n }) : R(false, noItem('vaccine'), { reason: 'no_item' });
+}
+// Chuyển vào / ra chuồng cách ly bằng một hành động (chuồng cách ly còn chỗ / chuồng đúng loài còn chỗ)
+export function isolate(s, id) {
+  settlePens(s);
+  const q = penEnts(s, 'quarantine').find(e => penUse(s, e.id) < penCapOf(e));
+  if (!q) return R(false, penEnts(s, 'quarantine').length ? 'Chuồng cách ly chật rồi' : 'Bạn chưa có chuồng cách ly, xây một cái nhé', { reason: 'no_quarantine' });
+  return moveAnimal(s, id, q.id);
+}
+export function unisolate(s, id) {
+  const a = s.animals.find(x => x.id === id);
+  const e = a && roomyPen(s, ANIMALS[a.type].pen);
+  return e ? moveAnimal(s, id, e.id) : R(false, 'Chuồng thường đã chật rồi', { reason: 'full' });
 }
 
 // ---------- Dơ, tắm, dọn chuồng ----------
@@ -1043,7 +1195,7 @@ function finishUpgrade(s) {
 const mk = (id, icon, text, disabled) => ({ id, icon, label: `${icon} ${text}`, ...(disabled ? { disabled } : {}) });
 export const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const FEED_OF_PEN = { chicken: 'feed_ga', pig: 'feed_heo', pasture: 'hay' };
-const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
+const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở ${VET_ITEMS.includes(k) ? 'trạm thú y Cô Út' : 'chợ'} nhé`;
 
 export function actionsFor(s, t) {
   if (!t) return [];
@@ -1095,7 +1247,12 @@ function animalActs(s, t) {
   A.feed = mk('feed', '🌾', `Cho ăn tận tay (còn ${n})`, n <= 0 ? noItem(def.feed) : a.hunger >= 95 ? 'Bụng no căng rồi' : null);
   A.pet = mk('pet', '🤗', 'Vuốt ve');
   A.bath = mk('bath', '🧼', `Tắm (xà phòng còn ${have(s, 'soap')}, bình ${s.can}/${canMax(s)})`, have(s, 'soap') <= 0 ? noItem('soap') : s.can <= 0 ? 'Bình hết nước, ra giếng múc nhé' : null);
-  if (a.sick) A.medicine = mk('medicine', '💊', `Cho uống thuốc thú y (còn ${have(s, 'medicine')})`, have(s, 'medicine') <= 0 ? noItem('medicine') : null);
+  if (a.sick) A.medicine = mk('medicine', 'medicine', `Cho uống thuốc thú y (còn ${have(s, 'medicine')}${a.sick === 2 ? `, uống ${a.dose || 0}/${SICK.doses[2]} liều` : ''})`, a.sick >= 3 ? 'Nguy kịch, phải gọi bác sĩ thú y ở điện thoại trong nhà' : have(s, 'medicine') <= 0 ? noItem('medicine') : null);
+  // vắc-xin: chỉ mời khi trong túi có sẵn và con chưa được bảo vệ (tiêm cả chuồng thì ở máng)
+  else if (have(s, 'vaccine') > 0 && !vaccinated(s, a)) A.vaccinate = mk('vaccinate', 'vaccine', `Tiêm vắc-xin (còn ${have(s, 'vaccine')})`);
+  // cách ly: chỉ hiện khi con đang bệnh, hoặc đang nằm chuồng cách ly (để đưa về)
+  const quar = penTypeOf(s, a) === 'quarantine';
+  if (a.sick || quar) A.isolate = quar ? mk('unisolate', '🏠', 'Đưa về chuồng thường') : mk('isolate', '🏥', 'Chuyển vào chuồng cách ly');
   if (animalCan(a, 'vitamin') && !a.sick) A.vitamin = mk('vitamin', '💉', `Cho uống vitamin (còn ${have(s, 'vitamin')})`, have(s, 'vitamin') <= 0 ? noItem('vitamin') : null);
   const first = a.sick ? 'medicine' : a.ready ? 'collect' : a.hunger < 40 ? 'feed' : isDirty(a) ? 'bath' : 'pet';
   const list = [A[first], ...Object.entries(A).filter(([k]) => k !== first).map(([, v]) => v)];
@@ -1114,7 +1271,11 @@ function troughActs(s, t) {
     n <= 0 ? noItem(item) : s.troughs[t.pen] >= HUSBANDRY.troughMax ? 'Máng đầy ắp rồi' : null)];
   const muck = mk('muck', '💩', `Xúc phân chuồng (${Math.floor(s.manure[t.pen] ?? 0)}%)`, (s.manure[t.pen] ?? 0) < MANURE.perScoop ? 'Chuồng còn sạch, chưa cần xúc' : null);
   if (penDirty(s, t.pen)) acts.unshift(muck); else acts.push(muck);
-  const up = upgradeInfo(s, t.id ?? mapOf(s).pens[t.pen]?.id);   // chạm vào chuồng (qua máng) cũng nâng cấp được
+  const penId = t.id ?? mapOf(s).pens[t.pen]?.id;
+  const well = s.animals.filter(a => a.pen === penId && !a.sick && !vaccinated(s, a)).length;   // số con tiêm được
+  acts.push(mk('vaccinatePen', 'vaccine', `Tiêm vắc-xin cả chuồng (${well} con, còn ${have(s, 'vaccine')})`,
+    have(s, 'vaccine') <= 0 ? noItem('vaccine') : !well ? 'Cả chuồng đã tiêm hoặc đang bệnh' : null));
+  const up = upgradeInfo(s, penId);   // chạm vào chuồng (qua máng) cũng nâng cấp được
   if (up) acts.push(mk('upgrade', '⬆️', `Nâng chuồng lên cấp ${up.lv} (${fmtXu(up.price)} xu)`, up.error));
   return acts;
 }
@@ -1192,7 +1353,7 @@ const TALK = {
 function buildingActs(s, t) {
   const b = sceneMap(s).building(t.id);
   if (!b) return [];
-  const open = { shed: ['📦', 'Vào nhà kho'], shipbin: ['📮', 'Mở thùng giao hàng'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'], smithy: ['🔨', 'Vào tiệm rèn'] }[b.id];
+  const open = { shed: ['📦', 'Vào nhà kho'], shipbin: ['📮', 'Mở thùng giao hàng'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'], smithy: ['🔨', 'Vào tiệm rèn'], vet: ['💊', 'Vào trạm thú y Cô Út'], phone: ['📞', 'Gọi bác sĩ thú y'] }[b.id];
   if (open) return [mk('open', open[0], open[1])];
   if (b.id === 'market') return [mk('open', '🛒', 'Mua bán ở chợ', marketOpen(s) ? null : CLOSED)];
   if (TALK[b.id]) return [mk('talk', TALK[b.id].icon, TALK[b.id].label)];
@@ -1208,6 +1369,7 @@ function buildingActs(s, t) {
 const benchActs = s => [mk('sit', '🪑', 'Ngồi nghỉ', s.stamina >= STAMINA.max ? 'Bạn còn khỏe lắm, chưa cần nghỉ' : s.sit ? 'Đang ngồi nghỉ rồi' : null)];
 function decoActs(s, t) {
   const e = s.farm.ents.find(x => x.id === t.id);
+  if (e?.kind === 'grave') return [mk('flower', '🌸', e.flower ? 'Mộ đã có hoa' : `Đặt hoa lên mộ (chậu hoa còn ${have(s, 'deco_flower')})`, e.flower ? 'Mộ đã có hoa rồi' : have(s, 'deco_flower') <= 0 ? 'Cần một chậu hoa, mua ở chợ nhé' : null)];
   return e?.item === 'deco_bench' ? benchActs(s) : [];
 }
 
@@ -1348,7 +1510,13 @@ const DO = {
         a.happy = Math.min(100, a.happy + DIRT.bathHappy); 
         emit({ type: 'bathed', animal: def.name, id: a.id });
         return res(true, `${def.name} sạch bong, vui hẳn lên`, [say(at, 'Sạch bong! ✨'), ...heartFx(s, a, at, 'bath')], 'water', { bath: a.id });
-      case 'medicine': take(s, 'medicine'); a.sick = 0; a.sickSince = 0; a.starvingSince = 0; a.hunger = Math.max(a.hunger, 30); return res(true, 'Đã khỏi bệnh', [say(at, 'Khỏe rồi! 💪'), ...heartFx(s, a, at, 'cure')], 'spray');
+      case 'medicine': {
+        const r = giveMedicine(s, a.id);
+        if (!r.ok) return bad(r.msg, at);
+        return res(true, r.msg, r.cured ? [say(at, 'Khỏe rồi! 💪'), ...heartFx(s, a, at, 'cure')] : [say(at, `Thuốc ${r.dose}/${SICK.doses[2]} 💊`)], 'spray');
+      }
+      case 'vaccinate': { const r = vaccinate(s, a.id); return r.ok ? res(true, r.msg, [say(at, 'Tiêm xong! 💉')], 'spray') : bad(r.msg, at); }
+      case 'isolate': case 'unisolate': { const r = id === 'isolate' ? isolate(s, a.id) : unisolate(s, a.id); return r.ok ? res(true, r.msg, [say(at, id === 'isolate' ? 'Cách ly 🏥' : 'Về chuồng 🏠')], 'pop') : bad(r.msg, at); }
       case 'vitamin':
         // lớn vọt thêm một nửa giai đoạn đang ở (không vượt quá đầu giai đoạn trưởng thành)
         take(s, 'vitamin'); a.age = Math.min(stageStart(a.type, 'truong'), a.age + LIFE[a.type][a.stage] * HUSBANDRY.vitaminBoost);
@@ -1397,6 +1565,10 @@ const DO = {
     if (id === 'upgrade') {
       const r = upgradePen(s, t.id ?? mapOf(s).pens[t.pen]?.id);
       return res(r.ok, r.msg, r.ok ? [say(at, `Cấp ${r.lv}! ⬆️`)] : [], r.ok ? 'coin' : 'error');
+    }
+    if (id === 'vaccinatePen') {
+      const r = vaccinatePen(s, t.id ?? mapOf(s).pens[t.pen]?.id);
+      return r.ok ? res(true, r.msg, [say(at, `${r.n} mũi 💉`)], 'spray') : bad(r.msg, at);
     }
     if (id === 'muck') {
       const n = Math.max(1, Math.floor(s.manure[t.pen] / MANURE.perScoop));
@@ -1447,7 +1619,10 @@ const DO = {
     return res(true, '', [], 'click', { open: t.id === 'wardrobe' ? 'house' : t.id });
   },
 
-  deco(s, t, id, at) { return sitDown(s, at); },
+  deco(s, t, id, at) {
+    if (id === 'flower') { const r = placeFlower(s, t.id); return r.ok ? res(true, r.msg, [say(at, '🌸')], 'pop') : bad(r.msg, at); }
+    return sitDown(s, at);
+  },
 
   clutter(s, t, id, at) {
     const i = s.farm.ents.findIndex(x => x.id === t.id), d = CLUTTER[s.farm.ents[i]?.kind];
@@ -1653,6 +1828,7 @@ export function entName(e) {
   if (e.kind === 'pen') return PEN_DEFS[e.pen].name;
   if (e.kind === 'deco') return ITEMS[e.item]?.name ?? 'Đồ trang trí';
   if (e.kind === 'tree') return 'Cây';
+  if (e.kind === 'grave') return e.name ? `Mộ của ${e.name}` : 'Ngôi mộ';
   if (CLUTTER[e.kind]) return CLUTTER[e.kind].name;
   return BUILDING_DEFS[e.kind]?.name ?? 'Công trình';
 }

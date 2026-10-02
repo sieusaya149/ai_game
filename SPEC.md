@@ -106,6 +106,7 @@ state = {
   orders: [ { id, who, items, coins, exp } ], nextOrderAt,
   stats: { harvests, bugs, eggs, poops, slips, piglets, hatches, orders, thieves, crows, earned, planted, shipped, bought, slept },
   achievements: { id: true },
+  grief: null | { until },                    // cả trại đang buồn vì có con mất (theo state.time); xem "Bệnh 4 giai đoạn" (lát 38)
   log: [ { t, text } ],                       // mới nhất ở đầu, tối đa 50
   tutorial,                                   // số bước hướng dẫn đã qua (>= TUTORIAL.length là xong)
   notify: { ripe: false, ... },               // loại thông báo 🟡 đã tắt; thiếu = bật; mức 🔴 không tắt được
@@ -124,6 +125,7 @@ state = {
 | `field` | `plots: [9 chỉ số vào state.plots]` | khối ruộng 3x3; ô thứ k ở `(c + k%3, r + floor(k/3))` |
 | `pen` | `pen: 'chicken'|'pig'|'pasture'|'quarantine'`, `lv?: 1..3` | chuồng, kích thước theo `PEN_DEFS` (không đổi theo cấp); `lv` thiếu = 1; nhiều chuồng mỗi loại, giới hạn theo cấp người chơi (`PEN_TABLE.limit`). Chuồng chó (`doghouse`) cũng có `lv?` |
 | `deco` | `item: 'deco_scarecrow'|'deco_flower'|'deco_lamp'|'deco_bench'` | đồ trang trí 1 ô |
+| `grave` | `animal` (loài), `name?` (chỉ con ❤️4+), `flower: bool` | ngôi mộ 1 ô, con vật mất để lại (lát 38); đặt/dời qua `canPlace` như mọi công trình |
 | `tree` | không | cây cảnh, không dời được |
 | `bush`, `rock` | không | bụi, đá **chưa dọn** trên dải đất mới; chắn đường, dọn bằng tay (`CLUTTER`) |
 
@@ -139,7 +141,8 @@ Animal = {
   stage: 'non'|'nho'|'truong'|'gia',          // giai đoạn (STAGES), cập nhật mỗi tick theo age
   age,                                        // ms GIỜ VƯỜN đã sống (cộng đúng bằng d mỗi bước tick, nên đóng băng thì đứng yên)
   hunger: 0..100, happy: 0..100,
-  sick: 0|1|2|3, sickSince,                   // 0 khỏe · 1 Mệt · 2 Bệnh nặng · 3 Nguy kịch (lát 39). Hiện chỉ dùng 0/1; `if (a.sick)` vẫn đúng
+  sick: 0|1|2|3, sickSince,                   // 0 khỏe · 1 Mệt · 2 Bệnh nặng · 3 Nguy kịch (lát 38); `if (a.sick)` vẫn đúng
+  sickMs, dose, vaccUntil,                    // tiến triển bệnh (ms giờ vườn, đã nhân hệ số) · số liều thuốc đã uống ở giai đoạn này · vắc-xin hết hạn lúc simMs này
   starvingSince,
   dirty: 0..100,                              // độ dơ (lát 37), mặc định 0 = sạch; thêm wallowAt (heo, bò: sau lúc này mới lăn bùn lại)
   bond: 1..5, bondXp: 0..20,                  // độ thân ❤️ (nguồn sự thật) · điểm ẩn trong tim hiện tại (BOND.perHeart), mặc định ❤️2; bondDay/petLast/petStreak: sổ đếm giới hạn mỗi ngày và chuỗi ngày vuốt ve
@@ -153,7 +156,7 @@ Animal = {
 }
 ```
 
-**Thêm trường cho lát sau:** thêm một dòng mặc định vào `animalDefaults` là xong, **không tăng phiên bản** (bản v3 cũ thiếu trường sẽ được điền khi nạp). Chỉ tăng lên v4 khi đổi nghĩa/cấu trúc trường đã có. Đã có `pen: id thực thể chuồng | null` (issue 35; null thì `settlePens` xếp vào chuồng cùng loại còn chỗ). Gợi ý cho các lát sau: vắc-xin `vaccUntil`; nghỉ hưu `retired`; đặt tên `named`.
+**Thêm trường cho lát sau:** thêm một dòng mặc định vào `animalDefaults` là xong, **không tăng phiên bản** (bản v3 cũ thiếu trường sẽ được điền khi nạp). Chỉ tăng lên v4 khi đổi nghĩa/cấu trúc trường đã có. Đã có `pen: id thực thể chuồng | null` (issue 35; null thì `settlePens` xếp vào chuồng cùng loại còn chỗ). Đã thêm sau v3: `sickMs`/`dose`/`vaccUntil` (lát 38), `retired` (lát 40), `tile` (lát 41).
 
 **Chuyển v2→v3** (`v2to3`, thuần): bỏ `adult`; con trưởng thành cũ thành `stage: 'truong'` ở **đầu** giai đoạn (`age = stageStart(type, 'truong')`), con non thành `'non'` (`age = 0`); `sex` theo id chẵn/lẻ (mỗi loài có ít nhất một cặp nếu có ≥ 2 con); `bond: 2`, `dirty: 0`, `sick: true → 1`, các trường khác theo `animalDefaults`. Không con nào bị mất. Chó: `adult` → `stage` tương tự (theo `LIFE.cho`). Bản v2 hỏng (`animals` không phải mảng, con vật loài lạ / không có id) thì ném lỗi, `loadGame` trả `null`, không ghi gì.
 
@@ -240,6 +243,28 @@ lifeMarks(a)                      // { gia, end }: mốc già / mốc ra đi c�
 starChance(s, a)                  // xác suất milk/shear ra sữa ngon / lông xoăn (BOND.star): ❤️3+ cao hơn; bò vuốt ve nhiều ngày liền, cừu đang vui thì thêm
 ```
 Đói (hunger ≤ BOND.hungerBelow) hoặc dơ (dirty ≥ BOND.dirtyAbove) thì tụt BOND.lossPerMin điểm/phút, không dưới ❤️1. Cho ăn tận tay, vuốt ve, thuốc thú y cộng độ thân; kết quả perform có ond. Sản phẩm sao: sua_ngon, lông xoăn = len_xoan (PRODUCTS, giá cao hơn).
+
+### Bệnh 4 giai đoạn, thú y, ngôi mộ (issue 38)
+```js
+giveMedicine(state, animalId)    // cho uống 1 liều `medicine`: Mệt 1 liều là khỏi, Bệnh nặng 2 liều → { ok, msg, cured?, dose?, reason? } ('healthy'|'critical'|'no_item'|'missing')
+callVet(state, animalId)         // gọi bác sĩ thú y ở điện thoại trong nhà (SICK.vetPrice xu, chỉ khi scene === 'house'): cứu con Bệnh nặng và Nguy kịch → { ok, msg, price?, reason? } ('scene'|'healthy'|'coins'|'missing')
+vaccinate(state, animalId)       // tiêm 1 `vaccine`, chống bệnh SICK.vaccineMs (10 giờ vườn) → { ok, msg, reason? } ('sick'|'no_item'|'missing')
+vaccinatePen(state, penId)       // tiêm cho mọi con khỏe trong chuồng, hết vắc-xin thì dừng → { ok, msg, n? }
+vaccinated(state, a)             // đang còn vắc-xin bảo vệ?
+isolate(state, animalId)         // chuyển vào chuồng cách ly còn chỗ (một hành động) → { ok, msg, reason? } ('no_quarantine'|'full')
+unisolate(state, animalId)       // đưa về chuồng thường đúng loài
+sickLeft(a)                      // ms giờ vườn còn lại trước khi mất (chỉ khác null khi Nguy kịch) — render vẽ đếm ngược trên đầu
+SICK_NAME                        // ['Khỏe','Mệt','Bệnh nặng','Nguy kịch']
+graves(state)                    // các thực thể `grave` trong vườn
+grieving(state)                  // cả trại đang buồn vì vừa có con mất
+placeFlower(state, graveId)      // đặt 1 `deco_flower` lên mộ → { ok, msg, reason? } ('missing'|'done'|'no_item'); phần buồn còn lại co còn SICK.flowerGriefMul
+```
+Số liệu ở `SICK` (data.js). **Tiến triển:** `a.sickMs` cộng theo giờ vườn, ×`oldMul` (2) với con già, ÷`quarantineMul` (1.5) khi ở chuồng cách ly (hồi nhanh hơn). Mốc: `toSevere` (1 giờ) → Bệnh nặng, `toCritical` (1 giờ 30) → Nguy kịch, `deadAt` (1 giờ 45) → mất. Dưới cấp `SICK.minLevel` (5) thì chặn ở Mệt (bảo hộ người mới).
+**Nguyên nhân mắc bệnh:** đói lả quá `HUSBANDRY.sickAfterStarving`, hoặc xác suất `HUSBANDRY.sickChancePerMin` ×`sickFactor(a)` (❤️4+ thấp hơn) ×`DIRT.sickMul` (dơ) ×`SICK.dirtyPenMul` (chuồng bẩn) ×`SICK.oldChanceMul` (già). Con đang được vắc-xin thì miễn.
+**Lây:** con Bệnh nặng ở chuồng thường, mỗi `SICK.spread.everyMs` (10 phút) có `SICK.spread.p` (10%) lây cho **một** con cùng chuồng còn khỏe và chưa tiêm. Chuồng cách ly không lây (và con trong đó không thả rông).
+**ADR 0004 (cứng):** khi chạy bù offline (cờ `catchUp` trong state.js, dùng chung cho trình duyệt và server), tiến triển bệnh bị kẹp ở `SICK.catchUpCap` — bệnh **dừng ở Bệnh nặng**, con đang Nguy kịch **hạ về Bệnh nặng**, và không con nào chết vì bệnh hay vì đói. Chết vì già vẫn xảy ra (đã báo trước ở lát 34).
+**Ngôi mộ:** con mất để lại thực thể `grave` ở ô hợp lệ gần góc Tây-Nam của đất (chọn qua `canPlace`, nên không chặn đường, dời được như công trình); con ❤️4+ thì mộ có tên. Cả trại buồn `SICK.griefMs`: vui tụt `griefHappy` ngay và không lên quá `griefCap` tới khi hết buồn; đặt hoa lên mộ thì hết buồn nhanh hơn.
+**Mua bán:** `VET_ITEMS` (`medicine`, `vaccine`) chỉ bán ở **trạm thú y Cô Út** trong làng (công trình `vet`, bảng `PANELS.vet`, cùng giờ mở cửa chợ), không có ở quầy vật tư chợ Bà Tư. Điện thoại trong nhà = đồ đặc `phone` (bảng `PANELS.phone`).
 
 ### Thả rông ban ngày, hàng rào thấp, trứng trong bụi (issue 41, ADR 0013)
 ```js
@@ -390,7 +415,7 @@ arrowTargets(state, items)  arrowFor(point, box, margin)
 todoList(state)                   // → [{ kind, level: 'urgent'|'normal', count, scene: 'farm', x, y, target, spots: [{ key, x, y, target }], icon, label }]
                                   //   xếp theo mức gấp rồi số lượng; (x, y, target) là chỗ gần người chơi nhất
 ```
-Loại việc của `todoList`: `crow`, `thief`, `sick` (gấp); `hungry`, `dry`, `bugs`, `weeds`, `ripe`, `egg`, `trough`, `poop` (thường). Bảng Việc cần làm, bản đồ nhỏ và mũi tên đều đọc từ danh sách này (chạm một dòng thì `main.api.todoGo(kind)` cho nhân vật tự đi tới, kể cả khi đang ở bản đồ khác: ra cửa về vườn rồi đi tiếp).
+Loại việc của `todoList`: `crow`, `thief`, `sick` (con Bệnh nặng trở lên — gấp); `tired` (con mệt), `hungry`, `dry`, `bugs`, `weeds`, `ripe`, `egg`, `trough`, `poop` (thường). Bảng Việc cần làm, bản đồ nhỏ và mũi tên đều đọc từ danh sách này (chạm một dòng thì `main.api.todoGo(kind)` cho nhân vật tự đi tới, kể cả khi đang ở bản đồ khác: ra cửa về vườn rồi đi tiếp).
 
 **Mức và khóa gộp của event** (`EVENT_LEVEL` trong `data.js`): mỗi event có `level`, `group(e)` (khóa gộp), `label`; mức `important` có thêm `cat` (loại tắt được) và `text(n, e)` (chữ đã gộp, ví dụ "5 ô cà chua đã chín"). Mức: `urgent` 🔴 (băng rôn đỏ, âm thanh, rung, mũi tên; không tắt được) · `important` 🟡 (toast nhỏ, tự gộp) · `info` ⚪ (chỉ ghi nhật ký) · `direct` (hiện ngay không gộp) · `none` (hiệu ứng/âm thanh, không thông báo). **Thêm event mới thì khai báo trong `EVENT_LEVEL`**, thiếu thì `eventMeta` trả `null`.
 
@@ -423,7 +448,12 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 
 | `type` | Trường | Mức |
 |---|---|---|
-| `sick` | `animal` | urgent |
+| `sick` | `animal`, `id` | important (`ill`) — con vật vừa chuyển sang Mệt |
+| `sickSevere` | `animal`, `id` | urgent — vừa sang Bệnh nặng (main.js xin quyền + gửi thông báo trình duyệt) |
+| `sickCritical` | `animal`, `id` | urgent — vừa sang Nguy kịch |
+| `died` | `animal`, `id`, `kind`, `sex`, `x`, `y` | important (`old`) — mất vì bệnh; main đẩy thiên thần vào `world.angels` |
+| `cured` | `animal`, `id` | info |
+| `grave` | `id` (thực thể mộ) | none |
 | `eating` | `kind` ('crow'/'thief') | urgent |
 | `ripe` | `crop` | important (`ripe`) |
 | `rotten`, `dead` | `crop` | important (`spoil`) |
@@ -465,7 +495,8 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - **Chợ Bà Tư** (làng, 6h–18h): hạt, vật tư, thức ăn, con non, đồ trang trí, mũ/phụ kiện (đồ chưa đủ cấp hiện khóa); bán nông sản đủ giá.
 - **Thùng giao hàng** (vườn): trả 80% giá chợ lúc 6h sáng. **Nhà kho** (vườn): cất giỏ vào kho, lấy ra.
 - **Tiệm rèn Ông Sáu** (làng): nâng cấp công cụ, giá `TOOLS[k].price`, mất 1 ngày game.
-- **Bảng đơn hàng** (vườn): tối đa 3 đơn, thưởng ×`rewardMul`. **Nhà**: giường (ngủ), tủ đồ (đổi ngoại hình). Làng có ghế đá (hồi thể lực) và cổng bạn bè ("Sắp ra mắt: thăm bạn bè").
+- **Trạm thú y Cô Út** (làng, cùng giờ chợ): bán thuốc thú y và vắc-xin, kèm bảng điểm danh con đang bệnh. Gọi bác sĩ thú y qua điện thoại trong nhà (`SICK.vetPrice` xu).
+- **Bảng đơn hàng** (vườn): tối đa 3 đơn, thưởng ×`rewardMul`. **Nhà**: giường (ngủ), tủ đồ (đổi ngoại hình), điện thoại (gọi bác sĩ thú y). Làng có ghế đá (hồi thể lực) và cổng bạn bè ("Sắp ra mắt: thăm bạn bè").
 - Lên cấp thưởng `level × 20` xu. Thành tựu thưởng xu. Mua **dải đất** (`LAND_STRIPS`: giá và cấp tăng dần, mọi hướng cộng chung).
 - Phase 0 giá chợ chưa biến động. Kinh tế chống lạm phát (ADR 0009) làm ở Phase 4.
 
@@ -476,7 +507,7 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - **`render.js`**: vẽ theo khung nhìn; nền tĩnh chia mảng 16x16 ô, chỉ vẽ lại mảng nào bẩn; cây/công trình/con vật sắp theo `y`; mưa, đêm, chữ bay.
 - **`ui.js`**: HUD (xu, cấp, thể lực, ngày giờ, mùa, thời tiết, bình tưới, tốc độ), nút hành động chính + chip phụ (`Space`/`E`, `1`–`6`), bảng (`openPanel(id)`: `market shed shipbin smithy bag guide seeds board house achievements log todo map settings`), chế độ xây dựng (`showBuild`, `buildTray`), màn "Trong lúc bạn vắng nhà" (`showAway`), "Bản mới có gì đổi" (`showWhatsNew`), băng rôn gấp và mũi tên (`updateAlerts`), thông báo gộp (`createNotifier`), cài đặt (tắt thông báo, tiết kiệm pin). Mọi bảng không tràn ngang ở 360px và tránh tai thỏ (`env(safe-area-inset-*)`).
 - **Camera**: theo người chơi, không ra ngoài bản đồ hiện tại; cạnh ngắn màn hình thấy khoảng 12 ô.
-- Đồ họa: cần sprite mới thì thêm vào `art2.js` (`SPR2`) hoặc `art.js`, giữ mọi export cũ. `art.icon(key)` tra `SPR.items` → `SPR.ripe` → `SPR.product` → `SPR.baby`/`SPR.animal` → `SPR[key]`.
+- Đồ họa: cần sprite mới thì thêm vào `art2.js` (`SPR2`), `art3.js` (`SPR3`, vật nuôi) hoặc `art.js`, giữ mọi export cũ. Bệnh (lát 38): `SPR3.sickBy[loài][giai đoạn]` (dáng nằm bệnh riêng cho từng loài ở từng giai đoạn), `SPR3.grave`/`graveFlower`, `SPR3.vetClinic`, `SPR3.npcCoUt`, `SPR2.phone`; bong bóng vàng (Mệt) / đỏ nhấp nháy (Bệnh nặng, Nguy kịch) và đồng hồ đếm ngược do `render.js` vẽ. `art.icon(key)` tra `SPR.items` → `SPR.ripe` → `SPR.product` → `SPR.baby`/`SPR.animal` → `SPR[key]`.
 
 ## Test và dựng tình huống (ADR 0008)
 
@@ -486,7 +517,7 @@ Không có GitHub Actions. Mọi test chạy trên máy local, Chromium ẩn c�
 ```
 npm test            # = node --test (tests/*.test.mjs, gồm cả seam 3 tests/server-*.test.mjs)
 ```
-Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `notify`, `todo`, `perf`, `tutorial`.
+Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `notify`, `todo`, `perf`, `tutorial`.
 
 **Seam 2: trình duyệt thật qua Playwright**, chỉ cho những gì seam 1 không thấy (kéo thả, đi qua cửa, chạm để tự đi tới, giao diện 360px):
 ```

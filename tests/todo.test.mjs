@@ -43,7 +43,7 @@ test('ô đã chín không tính là khô; ô chưa trồng gì không tính là
 test('con vật bệnh là gấp, con vật đói là thường; mỗi loại ghi số lượng', () => {
   const s = newGame();
   const mk = (o) => ({ id: s.nextId++, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: false, x: 100, y: 100, ...o });
-  s.animals.push(mk({ sick: true }), mk({ sick: true, hunger: 0 }), mk({ hunger: 10 }), mk({ hunger: 80 }));
+  s.animals.push(mk({ sick: 2 }), mk({ sick: 2, hunger: 0 }), mk({ hunger: 10 }), mk({ hunger: 80 }));
   const sick = get(s, 'sick'), hungry = get(s, 'hungry');
   assert.equal(sick.level, 'urgent'); assert.equal(sick.count, 2);
   assert.equal(hungry.level, 'normal'); assert.equal(hungry.count, 1, 'con bệnh đã tính ở dòng bệnh');
@@ -77,7 +77,7 @@ test('xếp theo mức gấp rồi số lượng', () => {
   const s = newGame();
   for (const i of [0, 1, 2, 3]) crop(s, i, { progress: 1 });                    // 4 ô chín
   crop(s, 4); s.plots[4].water = 0;                                              // 1 ô khô
-  s.animals.push({ id: s.nextId++, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: true, x: 1, y: 1 });
+  s.animals.push({ id: s.nextId++, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: 2, x: 1, y: 1 });
   assert.deepEqual(kinds(s), ['sick', 'ripe', 'dry', 'trough']);   // máng gà trống cũng là 1 việc thường
 });
 
@@ -111,7 +111,7 @@ test('mũi tên chỉ hướng lấy chỗ từ danh sách việc gấp', () => 
   const s = newGame();
   crop(s, 0, { progress: 1 });
   s.threats = [{ id: 7, kind: 'crow', plot: 0, x: 0, y: 0, state: 'eating' }];
-  s.animals.push({ id: 5, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: true, x: 40, y: 50 });
+  s.animals.push({ id: 5, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: 2, x: 40, y: 50 });
   const urgent = todoList(s).filter(i => i.level === 'urgent');
   const t = arrowTargets(s, urgent), c = G.mapOf(s).plotCenter(0);
   assert.equal(t.length, 2);

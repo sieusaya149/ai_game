@@ -527,7 +527,8 @@ function frame(now) {
   for (const e of events) if (e.type === 'cockcrow') world.emotes.set('a' + e.id, { icon: 'crow', until: now + 2600 });
   // con vật già ra đi: thiên thần bay lên
   world.angels = (world.angels ?? []).filter(g => now - g.t0 < R.ANGEL_MS);
-  if (state.scene === 'farm') for (const e of events) if (e.type === 'passed' && e.x != null) world.angels.push({ x: e.x, y: e.y, t0: now });
+  if (state.scene === 'farm') for (const e of events) if ((e.type === 'passed' || e.type === 'died') && e.x != null) world.angels.push({ x: e.x, y: e.y, t0: now });
+  for (const e of events) if (e.type === 'sickSevere') browserNotify(`${e.animal} bệnh nặng rồi!`, 'Cho uống 2 liều thuốc hoặc gọi bác sĩ thú y nhé.');
   world.baths = (world.baths ?? []).filter(b => now - b.t0 < R.BATH_MS);
   world.grains = (world.grains ?? []).filter(g => now - g.t0 < R.GRAIN_MS);
   if (state.scene === 'farm') for (const e of events) if (e.type === 'wallow') world.baths.push({ id: e.id, t0: now, wallow: true });
@@ -545,6 +546,18 @@ function frame(now) {
   if (now - lastHud > 250) { lastHud = now; ui.renderHUD(state); }
   if (joy.el) joy.el.style.display = ui.isBlocking() ? 'none' : '';
   if (now - lastSave > 5000) { lastSave = now; save(); }
+}
+
+// Thông báo trình duyệt khi có con vào Bệnh nặng: xin quyền một lần (nhớ đã hỏi), chỉ gửi khi tab đang ẩn
+let askedNotify = false;
+function browserNotify(title, body) {
+  try {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default' && !askedNotify && !localStorage.getItem('nongtrai-asked-notify')) {
+      askedNotify = true; localStorage.setItem('nongtrai-asked-notify', '1');
+      Notification.requestPermission();
+    } else if (Notification.permission === 'granted' && document.hidden) new Notification(title, { body, tag: 'sick' });
+  } catch { /* trình duyệt không cho: bỏ qua */ }
 }
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });

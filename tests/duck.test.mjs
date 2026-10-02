@@ -96,10 +96,14 @@ test('vịt dùng luật chung: thả rông ban ngày, chạng vạng về chu�
   assert.ok(ds.every(d => d.tile), 'ban ngày thả rông');
   s.time = DAY_MS * 0.78; run(s, 2 * MIN);   // sau 18h
   assert.ok(ds.every(d => !d.tile || d.stray), 'tối về chuồng, trừ con lạc (issue 42)');
-  const o = newGame(); const od = [bird(o, 'vit', 'truong', 'f'), bird(o, 'vit', 'non', 'm'), bird(o, 'vit', 'truong', 'm')];
-  o.troughs.chicken = 100;
-  G.tick(o, Math.min(MAX_CATCHUP_MS, 3 * HOUR));
-  assert.ok(od.every(d => o.animals.includes(d)), 'không con nào chết');
+  // chạy bù offline (ADR 0004): dù đói lả và bệnh, không con vịt nào chết
+  const o = newGame(); const od = [bird(o, 'vit', 'truong', 'f'), bird(o, 'vit', 'non', 'm'), bird(o, 'vit', 'truong', 'm', { sick: 2, sickMs: 1 })];
+  o.troughs.chicken = 100; G.tick(o, 1);
+  o.savedAt = Date.now() - Math.min(MAX_CATCHUP_MS, 3 * HOUR);
+  store[G.SAVE_KEY] = JSON.stringify(o);
+  const l = G.loadGame();
+  assert.ok(od.every(d => l.animals.some(x => x.id === d.id)), 'không con nào chết');
+  assert.ok(l.animals.every(x => (x.sick ?? 0) <= 2), 'chạy bù không ai tới nguy kịch');
 });
 
 test('vịt cũng lạc ban đêm và lùa về chuồng được như gà (issue 42)', () => {
@@ -142,13 +146,15 @@ test('vịt dơ dần, tắm sạch được; có ổ cát ở chuồng cấp 3 
   assert.ok(e.dirty <= DIRT.sandCap, `tắm cát: ${e.dirty}`);
 });
 
-test('vịt bệnh thì chậm lại và chữa bằng thuốc như gà', () => {
-  const s = newGame(); const d = bird(s, 'vit', 'truong', 'f', { nextProduct: 1e15 });
-  d.sick = true; d.sickSince = s.time;
+test('vịt bệnh thì chậm lại và chữa bằng thuốc, tiêm vắc-xin được như gà (issue 38)', () => {
+  const s = newGame(); const d = bird(s, 'vit', 'truong', 'f', { nextProduct: 1e15, sick: 1, sickMs: 0, sickSince: s.time });
   s.inv.medicine = 1;
   const r = G.perform(s, { kind: 'animal', id: d.id }, 'medicine');
   assert.ok(r.ok, r.msg);
-  assert.ok(!d.sick);
+  assert.equal(d.sick, 0);
+  s.inv.vaccine = 1;
+  assert.ok(G.perform(s, { kind: 'animal', id: d.id }, 'vaccinate').ok);
+  assert.ok(G.vaccinated(s, d), 'vịt đã tiêm thì miễn bệnh');
 });
 
 test('bán vịt trưởng thành cho Chú Ba theo giá loài; vịt có độ thân như gà', () => {

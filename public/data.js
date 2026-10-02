@@ -126,6 +126,26 @@ export const AGING = {
   pigHungry: 1.5,     // heo nhỡ ăn khỏe: đói nhanh ×1.5 ...
   pigGain: 2,         // ... và tăng cân nhanh ×2
 };
+// ---------- Bệnh 4 giai đoạn (Phase 2, issue 38) ----------
+// a.sick: 0 khỏe · 1 mệt · 2 bệnh nặng · 3 nguy kịch; a.sickMs = tiến triển bệnh (giờ vườn, con già nhân đôi tốc độ).
+// Mất khi sickMs >= deadAt. Chạy bù offline: bệnh dừng ở Bệnh nặng, không chuyển Nguy kịch, không chết (ADR 0004).
+export const SICK = {
+  toSevere: HOUR, toCritical: HOUR + 30 * MIN, deadAt: HOUR + 45 * MIN,
+  oldMul: 2,                          // con già: bệnh tiến triển nhanh gấp đôi
+  quarantineMul: 1.5,                 // chuồng cách ly: hồi bệnh nhanh ×1.5 (bệnh tiến triển chậm lại chừng đó)
+  catchUpCap: HOUR + 10 * MIN,        // chạy bù: tiến triển không vượt mức này (còn trong Bệnh nặng); Nguy kịch hạ về mức này
+  spread: { everyMs: 10 * MIN, p: 0.1 },   // con Bệnh nặng: mỗi 10 phút 10% lây một con cùng chuồng
+  doses: [0, 1, 2],                   // số liều thuốc để chữa: Mệt 1, Bệnh nặng 2, Nguy kịch chỉ bác sĩ
+  vaccineMs: 10 * HOUR,               // vắc-xin chống bệnh chừng này giờ vườn
+  minLevel: 5,                        // dưới cấp này bệnh không vượt quá Mệt
+  vetPrice: 300,                      // gọi bác sĩ thú y qua điện thoại ở nhà
+  oldChanceMul: 2,                    // con già dễ mắc bệnh gấp đôi
+  dirtyPenMul: 2,                     // chuồng bẩn dễ bệnh gấp đôi
+  griefMs: 30 * MIN, griefHappy: 15, griefCap: 40,   // có con mất: cả trại buồn (vui không quá griefCap) chừng này lâu
+  flowerGriefMul: 1 / 3,              // đặt hoa lên mộ: phần buồn còn lại co còn chừng này
+};
+// Chỉ bán ở trạm thú y Cô Út trong làng (không có ở quầy vật tư chợ Bà Tư)
+export const VET_ITEMS = ['medicine', 'vaccine'];
 // ---------- Đực/cái và sinh sản (Phase 2, issue 36) ----------
 export const BREED = {
   femaleMul: 1.3,          // con cái đắt hơn con đực chừng 30%
@@ -213,7 +233,8 @@ export const ITEMS = {
   pesticide:  { name: 'Thuốc trừ sâu',     kind: 'supply', price: 15, lv: 1, desc: 'Diệt sâu và chữa cây bệnh ngay lập tức.' },
   growth:     { name: 'Thuốc tăng trưởng', kind: 'supply', price: 30, lv: 2, desc: 'Cây lớn vọt thêm 50% thời gian. Tối đa 2 lần mỗi cây.' },
   fertilizer: { name: 'Phân bón',          kind: 'supply', price: 12, lv: 1, desc: 'Bón trước khi chín: +50% sản lượng, lớn nhanh hơn.' },
-  medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 3, desc: 'Chữa khỏi vật nuôi bị bệnh.' },
+  medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 3, desc: 'Mệt: 1 liều là khỏi. Bệnh nặng: 2 liều. Nguy kịch: phải gọi bác sĩ thú y.' },
+  vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 60, lv: 3, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
   soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
   manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Hố ủ phân sẽ dùng sau.' },
@@ -359,12 +380,12 @@ export const ACHIEVEMENTS = [
 export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
-  levelup: 'Lên cấp', order: 'Đơn hàng mới', old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài',
+  levelup: 'Lên cấp', order: 'Đơn hàng mới', old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài', ill: 'Con vật mệt',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
 export const EVENT_LEVEL = {
-  sick:      { level: 'urgent', group: e => 'sick:' + e.animal, label: 'Con vật bị bệnh' },
+  sick:      { level: 'important', cat: 'ill', group: e => 'sick:' + e.animal, label: 'Con vật mệt', text: (n, e) => `${n} con ${animalN(e.animal)} bị mệt 🤒` },
   eating:    { level: 'urgent', group: e => 'eating:' + e.kind, label: 'Quạ, trộm đang ăn cây' },
   ripe:      { level: 'important', cat: 'ripe', group: e => 'ripe:' + e.crop, label: 'Cây chín', text: (n, e) => `${n} ô ${cropN(e.crop)} đã chín 🌾` },
   rotten:    { level: 'important', cat: 'spoil', group: e => 'rotten:' + e.crop, label: 'Cây héo', text: (n, e) => `${n} ô ${cropN(e.crop)} đã héo 🥀` },
@@ -377,6 +398,11 @@ export const EVENT_LEVEL = {
   oldSoon:   { level: 'important', cat: 'old', group: e => 'oldSoon:' + e.animal, label: 'Con vật sắp già', text: (n, e) => `${n} con ${animalN(e.animal)} sắp già, chuẩn bị hoặc bán đi nhé 👵` },
   passed:    { level: 'important', cat: 'old', group: e => 'passed:' + e.animal, label: 'Con vật già ra đi', text: (n, e) => `${n} con ${animalN(e.animal)} đã già và ra đi thanh thản 😇` },
   stray:     { level: 'important', cat: 'stray', group: e => 'stray:' + e.animal, label: 'Con lạc chưa về chuồng', text: (n, e) => `${n} con ${animalN(e.animal)} lạc, chưa về chuồng 💤` },
+  sickSevere:   { level: 'urgent', group: e => 'sick2:' + e.animal, label: 'Con vật bệnh nặng' },
+  sickCritical: { level: 'urgent', group: e => 'sick3:' + e.animal, label: 'Con vật nguy kịch' },
+  died:      { level: 'important', cat: 'old', group: e => 'died:' + e.animal, label: 'Con vật mất vì bệnh', text: (n, e) => `${n} con ${animalN(e.animal)} đã mất vì bệnh 😇` },
+  cured:     { level: 'info', group: e => 'cured:' + e.animal, label: 'Con vật khỏi bệnh' },
+  grave:     { level: 'none', group: e => 'grave:' + e.id, label: 'Ngôi mộ mới' },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
   born:      { level: 'info', group: e => 'born:' + e.kind, label: 'Con vật chào đời' },
   cockcrow:  { level: 'none', group: () => 'cockcrow', label: 'Gà trống gáy' },
