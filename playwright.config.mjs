@@ -4,9 +4,10 @@ import { defineConfig } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const PORT = 4173;
+// Đổi cổng/DB bằng biến môi trường để chạy song song nhiều bản (vd worktree khác): E2E_PORT, E2E_DB
+const PORT = Number(process.env.E2E_PORT) || 4173;
 // SQLite riêng cho e2e, nằm ngoài repo (lệnh quản trị trong test dùng cùng đường dẫn này)
-export const E2E_DB = join(tmpdir(), 'ai-game-e2e.db');
+export const E2E_DB = process.env.E2E_DB || join(tmpdir(), `ai-game-e2e-${PORT}.db`);
 
 export const projects = [
   { name: 'desktop', use: { viewport: { width: 1280, height: 800 } } },
