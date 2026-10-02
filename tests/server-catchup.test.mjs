@@ -2,12 +2,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
-import { createGame, loadGame, tick } from '../public/state.js';
+import { createGame, loadGame, tick, canPlace, placeEntity, upgradePen, catHouses, buyCat, cats, stageStart, vaccinate } from '../public/state.js';
 import { setClock } from '../public/clock.js';
-import { MAX_CATCHUP_MS, SICK, PREDATOR } from '../public/data.js';
+import { MAX_CATCHUP_MS, SICK, PREDATOR, DAY_MS } from '../public/data.js';
 import { TS } from '../public/layout.js';
-import { serverDay } from '../public/clock.js';
+import { serverDay, villageCal } from '../public/clock.js';
 import { readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 
 const H = 3600_000, T = Date.now();
 // ngẫu nhiên (sâu, bệnh) cố định để so được kết quả hai lần chạy
@@ -137,6 +138,30 @@ test('chạy bù vườn lưu bằng bản v2 có trường online: thành v3, g
   for (const k of ['chased', 'barks', 'robStreak', 'helps']) assert.equal(f.stats[k], v2.stats[k], k);
   assert.equal(f.mode, 'online'); assert.equal(f.account, 'Lan');
 });
+
+// Issue 49: dòng vườn do server Phase 1 ghi vẫn là JSON bản v2 trong SQLite (server cũ không migrate lên v3).
+// Chủ đăng nhập lại (POST /api/play) sau khi deploy Phase 2 là lúc nó lên v3, không cần ai ghé trước, không mất gì.
+// Dựng dòng cũ đó bằng cách ghi thẳng file SQLite như server cũ để lại (dữ liệu ghi sẵn, không đụng code server).
+test('chủ đăng nhập lại: dòng vườn bản v2 server cũ để lại lên v3 ngay lúc nhận phiên chơi, đủ từng con vật, chó, đồ', async t => {
+  const { srv, user } = await setup(t);
+  const v2 = JSON.parse(readFileSync(new URL('./fixtures/v2-farm.json', import.meta.url), 'utf8'));
+  Object.assign(v2, { tutorial: 99, mode: 'online', account: 'Lan', savedAt: T - 2 * H });
+  const u = await user('Lan');
+  assert.equal((await u.save((await u.play()).body.play, createGame({ name: 'Lan' }))).status, 200);
+  const db = new DatabaseSync(srv.dbPath);
+  db.prepare("UPDATE farms SET save = ?, saved_at = ? WHERE account_id = (SELECT id FROM accounts WHERE name = 'Lan')").run(JSON.stringify(v2), v2.savedAt);
+  assert.equal(JSON.parse(db.prepare('SELECT save FROM farms').get().save).v, 2, 'trong DB đang là bản v2');
+  db.close();
+  const f = (await u.play()).body.farm;
+  assert.equal(f.v, 3);
+  assert.deepEqual(f.animals.map(a => [a.id, a.type, a.name]), v2.animals.map(a => [a.id, a.type, a.name]), 'đủ từng con, đúng loài, đúng tên');
+  assert.ok(f.animals.every(a => a.stage && a.sex), 'mỗi con có giai đoạn và giới tính');
+  assert.ok(f.animals.length >= 1 && v2.animals.some(a => !a.adult), 'bản v2 có cả con non lẫn con lớn');
+  assert.equal(f.dog.name, v2.dog.name);
+  assert.equal(f.coins >= v2.coins - 300, true, 'xu còn (chạy bù 2 giờ có thể tiêu chút cám)');
+  for (const k of Object.keys(v2.inv)) assert.ok(k in f.inv, `kho còn ${k}`);
+  assert.deepEqual(f.plots.filter(p => p.unlocked).map(p => p.idx), v2.plots.filter(p => p.unlocked).map(p => p.idx));
+});
 // Tiêu chí seam 3 đã hoãn của issue 38 và 43 (lúc đó nhánh phase2 chưa có server): server chạy bù 8 giờ theo ADR 0004
 const more = (s, extra) => { const a = { ...structuredClone(s.animals[0]), id: s.nextId++, ...extra }; s.animals.push(a); return a; };
 test('server chạy bù 8 giờ (issue 38): con Bệnh nặng và Nguy kịch vẫn sống, Nguy kịch hạ về Bệnh nặng', async t => {
@@ -171,4 +196,47 @@ test('server chạy bù 8 giờ (issue 43): có chuột, diều hâu, chồn th�
   assert.equal(f.preds.some(p => p.kind !== 'rat'), false, 'diều hâu, chồn bỏ đi tay không');
   assert.ok(f.troughs.chicken < 20, 'cám trong máng có hao');
   assert.ok(f.preds.filter(p => p.kind === 'rat').length <= PREDATOR.rat.max, 'chuột không sinh quá trần');
+});
+
+// Issue 44 (việc sót sau gộp): server chạy bù vườn có mèo. Mèo vẫn bắt chuột, không chết, không mất, không nguy kịch,
+// kết quả khớp với loadGame chạy ở trình duyệt (cùng hạt giống ngẫu nhiên)
+const seeded = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+const withCats = s => {
+  Object.assign(s, { time: DAY_MS * 0.3, coins: 1e6, exp: 5000 });   // ban ngày (chợ mở), đã qua bảo hộ người mới
+  const o = s.farm.owned;
+  let at = null;
+  for (let r = o.r; r < o.r + o.h && !at; r++) for (let c = o.c; c < o.c + o.w && !at; c++) if (canPlace(s, { kind: 'cathouse' }, c, r).ok) at = { c, r };
+  assert.equal(placeEntity(s, { kind: 'cathouse' }, at.c, at.r).ok, true);
+  assert.equal(upgradePen(s, catHouses(s)[0].id).ok, true);   // nhà mèo cấp 2: 2 con
+  assert.equal(buyCat(s, 'f').ok, true); assert.equal(buyCat(s, 'm').ok, true);
+  const [hunter, old] = cats(s);
+  Object.assign(hunter, { stage: 'truong', age: stageStart('meo', 'truong'), hunger: 45 });
+  s.inv.vaccine = 1; assert.equal(vaccinate(s, hunter.id).ok, true);   // mèo săn khỏe suốt 8 giờ: bệnh thì nằm nghỉ, không săn
+  Object.assign(old, { stage: 'gia', age: stageStart('meo', 'gia'), hunger: 0, sick: 2, sickMs: SICK.toSevere });
+  const c = Math.floor(hunter.x / TS), r = Math.floor(hunter.y / TS);
+  for (let i = 0; i < 4; i++) s.preds.push({ id: s.nextId++, kind: 'rat', state: 'hunt', since: s.time, warned: false, strikeAt: s.time + 1e9, tile: { c: c + i, r }, x: (c + i) * TS + 8, y: r * TS + 8, tileAt: s.time + 1e9, target: null });
+};
+// Khách ghé lúc làng đang đêm: giờ làng trong lúc chạy bù phải trôi theo giờ đã mô phỏng (8 giờ = 24 ngày làng),
+// không đứng yên ở giờ lúc đọc (trước đây cả 8 giờ bị tính là đêm: mèo ngủ suốt, không bắt được con chuột nào)
+test('server chạy bù 8 giờ có mèo (issue 44): mèo vẫn bắt chuột, không con mèo nào chết hay mất, khớp với chơi đơn', async t => {
+  const { user, owner } = await setup(t);
+  const night = T + ((0.9 - villageCal(T).frac + 1) % 1) * DAY_MS;
+  setClock(() => night);
+  const { s } = await owner('Lan', 8 * H + (night - T), withCats);
+  const ids = cats(s).map(c => c.id);
+  const b = await user('Bình');
+  Math.random = seeded(44);
+  const f = (await b.visit('Lan')).body.farm;
+  assert.deepEqual(f.cats.map(c => c.id), ids, 'đủ hai con mèo');
+  assert.ok(f.stats.rats > 0, `mèo bắt được chuột lúc chạy bù (${f.stats.rats} con)`);
+  assert.ok(f.cats.every(c => (c.sick ?? 0) <= 2), 'mèo bệnh không tới nguy kịch');
+  assert.ok(f.cats.every(c => !c.trophy), 'chạy bù không có màn mang chuột tới khoe');
+  assert.ok(f.preds.filter(p => p.kind === 'rat').length <= PREDATOR.rat.max, 'chuột không sinh quá trần');
+  assert.ok(!(f.awayPending?.lines ?? []).some(l => /chết|lên trời/.test(l)), 'không báo chết');
+  // cùng bản lưu, cùng hạt giống, chạy bù ở trình duyệt (bản lưu online) ra đúng như server
+  const c = structuredClone(s); Object.assign(c, { mode: 'online', account: 'Lan', savedAt: night - 8 * H });
+  Math.random = seeded(44);
+  const l = loadGame(c);
+  assert.equal(l.stats.rats, f.stats.rats);
+  assert.deepEqual(l.cats.map(x => [x.id, x.stage, x.sick, x.scene]), f.cats.map(x => [x.id, x.stage, x.sick, x.scene]));
 });

@@ -34,14 +34,14 @@ Yêu cầu: không tràn ngang, nút đủ to để bấm, tránh vùng tai th�
 
 ## Acceptance criteria
 
-- [ ] E2E ở 360x740, 320x640, 412x915 mở từng bảng trên: không cuộn ngang, nút nằm trong màn hình và đủ lớn, các lớp nổi không đè nhau (mở rộng `e2e/mobile360.spec.mjs`).
-- [ ] Giả lập tai thỏ bằng cách đè biến `env(safe-area-inset-*)`: mọi nút nằm trong vùng an toàn. Ghi rõ phần chưa thử máy thật.
-- [ ] `SPEC.md` không còn chỗ nào mâu thuẫn với PRD 0003 và các ADR; một agent mới chỉ đọc `SPEC.md` là biết file nào được sửa, gọi API nào, test ở đâu; hợp đồng API khớp với code.
-- [ ] Unit, test giao thức server và e2e pass hết trên máy local trước khi deploy. Ghi lại số test pass. Có test riêng xác nhận chạy bù offline không gây chết (ADR 0004).
-- [ ] Deploy xong, container `ai-game` ở trạng thái chạy.
-- [ ] Smoke live pass.
-- [ ] Bản lưu v2 thật chuyển sang v3 không mất gì (nếu chưa mở được bằng trình duyệt thật thì ghi rõ và dùng fixture v2).
-- [ ] Mọi issue 34–48 ở trạng thái ✅. Ghi chú phát hành Phase 2 được thêm vào cuối file này.
+- [x] E2E ở 360x740, 320x640, 412x915 mở từng bảng trên: không cuộn ngang, nút nằm trong màn hình và đủ lớn, các lớp nổi không đè nhau (mở rộng `e2e/mobile360.spec.mjs`).
+- [x] Giả lập tai thỏ bằng cách đè biến `env(safe-area-inset-*)`: mọi nút nằm trong vùng an toàn. Ghi rõ phần chưa thử máy thật.
+- [x] `SPEC.md` không còn chỗ nào mâu thuẫn với PRD 0003 và các ADR; một agent mới chỉ đọc `SPEC.md` là biết file nào được sửa, gọi API nào, test ở đâu; hợp đồng API khớp với code.
+- [ ] Unit, test giao thức server và e2e pass hết trên máy local trước khi deploy. Ghi lại số test pass. Có test riêng xác nhận chạy bù offline không gây chết (ADR 0004). *(unit + seam 3 pass hết; e2e mới chạy các spec liên quan, còn chờ chạy cả bộ sau khi gộp bản sửa fixture chó, xem ghi chú phát hành)*
+- [ ] Deploy xong, container `ai-game` ở trạng thái chạy. *(người điều phối deploy)*
+- [ ] Smoke live pass. *(theo luật người dùng: chưa cần smoke live)*
+- [x] Bản lưu v2 thật chuyển sang v3 không mất gì (nếu chưa mở được bằng trình duyệt thật thì ghi rõ và dùng fixture v2). *(dùng fixture v2, xem ghi chú phát hành)*
+- [ ] Mọi issue 34–48 ở trạng thái ✅. Ghi chú phát hành Phase 2 được thêm vào cuối file này. *(ghi chú đã thêm; trạng thái trong `docs/issues/README.md` do người điều phối cập nhật)*
 
 ## Blocked by
 
@@ -60,3 +60,38 @@ Yêu cầu: không tràn ngang, nút đủ to để bấm, tránh vùng tai th�
 - [46](46-trom-npc-moi.md)
 - [47](47-vit.md)
 - [48](48-huong-dan-thong-bao-vat-nuoi.md)
+
+## Ghi chú phát hành Phase 2 (kiểm tra local, 2026-10-02)
+
+**Số test**
+- Unit + giao thức server (`npm test`, seam 1 và seam 3): **519/519 pass**.
+- E2E (1 worker, `E2E_PORT=4340`), mới chạy các spec liên quan tới đợt này:
+  - `mobile360` (chỉ project mobile, 3 cỡ 360x740 / 320x640 / 412x915): **84/84 pass**.
+  - `petguide` 12/12, `catchup` 4/4, `accounts` 10/10, `online` 12/12, `visit` 4/4, `live` 6/6, `steal` 6/6, `away` 4/4.
+  - `social` 6/8: hai lượt (desktop + mobile) của test "B … bị chó đuổi" hỏng vì fixture chó còn `adult: true` (v3 cần `stage: 'truong'`). Lỗi đã biết; bản sửa fixture chó nằm ở nhánh gộp, chưa kéo sang nhánh này.
+  - **Chưa chạy cả bộ e2e**: chờ gộp bản sửa fixture chó rồi chạy một lượt, ghi số tại đây.
+
+**Đã sửa trong đợt này**
+- Giờ làng của vườn online đứng yên trong lúc `loadGame` chạy bù (mèo ngủ suốt 8 giờ nếu mở đúng lúc làng đang đêm). `state.js` nay cho giờ làng trôi theo bước mô phỏng (`catchBase`).
+- Máy 360px: nút tốc độ (chơi một mình) che biển "Chợ Bà Tư". Màn hẹp: nút tốc độ chuyển sang mép trái, cùng hàng với bản đồ nhỏ.
+- Máy 320x640 / 360x740: con vật có tới 6 chip làm cột nút leo lên đè nút 📋 và HUD. Danh sách chip nay có `max-height` theo chỗ còn lại và cuộn dọc. Bản đồ nhỏ thu gọn tính cả phần nút 📋 lòi xuống.
+- Sổ tay, trang "Lùa về chuồng": thêm mèo (Nhờ lùa).
+- Test vịt "luật chung" hết chập chờn: Math.random có hạt giống, chạy với `calm`.
+
+**Test mới**
+- Seam 3:
+  - Server chạy bù 8 giờ có mèo (mèo vẫn bắt chuột, không chết, không mất, khớp với chơi đơn).
+  - Dòng vườn bản v2 thô trong SQLite lên v3 khi chủ đăng nhập (đủ con vật, chó, đồ, ô đất).
+  - Canh khu online (issue 45): khách thấy chỗ gác, tầm nhìn gấp đôi, sủa ghi vào vườn chủ.
+  - Vòng đời chó với khách online.
+- E2E `mobile360` (Phase 2): thanh hành động con vật; hộp bán / nghỉ hưu / đổi tên; soi trứng; báo động kẻ săn mồi + bảng Việc cần làm; trạm thú y, điện thoại, phả hệ; trang sổ tay mới; dạy chó + minigame + chọn ô Canh khu; hộp phạt trộm; nâng cấp chuồng + khay chuồng cách ly; biển chợ và chữ "Đóng cửa" không bị che ở cổng làng, trước quầy, ghế đá.
+
+**Chỉ giả lập, chưa thử thật**
+- Tai thỏ: chỉ giả lập bằng cách đè `--sl/--sr/--st/--sb`, chưa thử trên máy thật.
+- Bản lưu v2: chưa mở bằng trình duyệt có bản lưu v2 thật. Đã dùng fixture v2 (e2e và seam 3, gồm dòng vườn v2 thô trong SQLite). Bản v2 thật cần xem lại sau khi deploy.
+- Ở 320px, đứng tại cổng làng thì biển chợ còn nằm ngoài mép phải. Test chỉ kiểm phần chữ nằm trong màn hình.
+
+**Deploy, smoke**
+- Deploy: **người điều phối deploy** (`git push` rồi `git pull && docker compose up -d --build` trên VPS). Không sao lưu SQLite.
+- Smoke live: chưa làm (theo luật người dùng, chưa cần).
+- Chập chờn đã thấy: `petguide` "Cô Út" ở desktop hỏng một lần, chạy lại thì pass.

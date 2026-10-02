@@ -134,7 +134,11 @@ kbd {
   max-width: 100%; padding: 4px 12px; border-radius: 14px; font-size: 13px; font-weight: 800; text-align: right;
   background: rgba(60, 35, 10, 0.85); color: var(--cream); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
-#chips { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+/* Nhiều nút trên màn thấp (con vật có tới 6 chip): danh sách cuộn dọc, không leo lên bản đồ nhỏ / HUD.
+   ui.js placeMini đặt max-height theo chỗ thật; đệm + lề âm để bóng của chip không bị cắt */
+#chips { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  padding: 2px 8px 8px; margin: -2px -8px -8px; scrollbar-width: thin; }
+#chips > .chip { flex-shrink: 0; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px 0 8px; border-radius: 19px; cursor: pointer;
   background: linear-gradient(#fffaf0, var(--cream-2)); border: 3px solid var(--wood); color: var(--ink);
@@ -352,7 +356,10 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 #minimap { display: block; width: 102px; height: 102px; padding: 0; border: 3px solid var(--wood); border-radius: 14px; overflow: hidden; cursor: pointer; background: #25491a; box-shadow: 0 3px 0 var(--wood-d), 0 6px 10px rgba(0, 0, 0, 0.25); }
 #minimap:active { transform: translateY(2px); }
 #mini-cv { display: block; width: 96px; height: 96px; image-rendering: pixelated; }
-#hud-speed { position: absolute; top: 0; right: calc(100% + 6px); min-width: 64px; min-height: 40px; }   /* ngay trái bản đồ nhỏ */
+#hud-speed { position: absolute; top: 0; right: calc(100% + 6px); min-width: 64px; min-height: 40px; }   /* màn rộng: ngay trái bản đồ nhỏ */
+/* Màn hẹp (bản đồ nhỏ nằm dưới HUD): nút tốc độ sang mép trái cùng hàng. Đặt cạnh hay dưới bản đồ nhỏ
+   thì che biển "Chợ Bà Tư" của chợ làng (chợ nằm sát mép phải ở máy 320-360px) */
+#mini-wrap.narrow #hud-speed { position: fixed; top: var(--mini-top); right: auto; left: calc(8px + var(--sl)); }
 #todo-btn { position: absolute; left: -14px; bottom: -14px; width: 42px; height: 42px; padding: 0; display: grid; place-items: center; border-radius: 50%; cursor: pointer; border: 3px solid var(--wood-d);
   background: linear-gradient(#fffaf0, var(--cream-2)); box-shadow: 0 3px 0 var(--wood-d), 0 5px 8px rgba(0, 0, 0, 0.25); }
 #todo-btn:active { transform: translateY(2px); }
