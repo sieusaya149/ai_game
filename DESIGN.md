@@ -753,6 +753,7 @@ Cây lâu năm, trồng một lần, thu hoạch nhiều lần.
 | Lên ❤️5 với một cư dân | +10 |
 | Lên cấp thành thạo 3 cho một loại cây | +5 |
 | Nhiệm vụ hằng ngày | +1–2 |
+| Uy tín shop 🏪 cao (mục 8.6) | +2 mỗi tuần ở 🏪4, +5 mỗi tuần ở 🏪5 |
 
 - **Tiêu ở "Tiệm Danh Giá":** kiểu nhà đặc biệt, màu lông hiếm cho thú cưng, đồ trang trí độc quyền, danh hiệu dưới tên nhân vật, bản thiết kế máy cấp cao.
 - **Quy tắc:** không đổi qua lại với xu, không trộm được, không tặng được. Chế độ offline vẫn kiếm được từ mọi nguồn trừ giúp bạn bè.
@@ -794,7 +795,8 @@ Mọi mốc giờ trong mục này tính theo **giờ ngoài đời (giờ Việ
 - **Độ hot 🔥:** tăng khi làm việc thật trong vườn trước người xem (thu hoạch, khoe hàng ★ / "✅ An toàn", tắm heo, vuốt ve gà, nút "📣 Rao hàng"); đứng yên thì tụt, lặp một việc thì tăng ít dần. Thỉnh thoảng hiện **câu hỏi của người xem** ("Trứng này gà ta không shop?"), chọn đúng câu trả lời có sẵn thì độ hot tăng mạnh.
 - **Giỏ live:** tối đa 6 món, giá 50%–200%. Bạn xem bấm "🛒 Mua", hàng vào hộp quà ở cổng vườn họ, không phí giao. Người xem NPC đông theo độ hot, tự mua món giá ≤ giá gốc; mùa dịch trả tới **150%** cho hàng "✅ An toàn". Hết live hàng chưa bán về kho.
 - **Người xem:** bấm 🔴 LIVE ở cổng vườn hoặc danh sách bạn bè → vào vườn như đi thăm (đi lại, giúp vườn như issue 28), thả ❤️ / biểu cảm (có giới hạn), chat bằng câu có sẵn cho live. Ở lại đủ **3 phút** nhận 1 mã giảm giá, tối đa 3 mã mỗi ngày.
-- **Uy tín người bán (live + chợ phiên):** tự tính theo chất lượng hàng bán ra — tăng khi bán hàng ★ / "✅ An toàn" / con giống khỏe, giảm khi bán hàng héo, thối, con bệnh (khách NPC chê "Trứng hư rồi shop ơi 😤"). Uy tín cao thì live đông người xem NPC hơn, sạp chợ phiên đông khách NPC hơn; hiện cạnh tên ở sạp, live, danh sách bạn bè. *(Cách gộp với Tiếng tăm ⭐ ở mục 8.5: đang bàn, xem mục 11.)*
+- **Uy tín shop 🏪 (1–5, dùng chung cho live + chợ phiên):** là một **mức đánh giá**, tính theo chất lượng ~20 lần bán gần nhất — tăng khi bán hàng ★ / "✅ An toàn" / con giống khỏe, giảm khi bán hàng héo, thối, con bệnh (khách NPC chê "Trứng hư rồi shop ơi 😤"). Uy tín cao thì live đông người xem NPC hơn, sạp chợ phiên đông khách NPC hơn; hiện cạnh tên ở sạp, live, danh sách bạn bè.
+  - **Tách riêng với Tiếng tăm ⭐** (mục 8.5): ⭐ là thứ để tiêu, không bao giờ bị trừ; 🏪 lên xuống theo hàng bán. Liên kết duy nhất: 🏪 cao thì mỗi tuần được thưởng thêm ⭐ (bảng ở 8.5).
 
 #### Hợp tác xã
 - Mỗi **tuần ngoài đời** một chỉ tiêu chung 2–3 món theo mùa game đang chạy (ví dụ 500 bắp cải + 200 trứng + 50 sữa), góp ở nhà hợp tác xã trong làng.
@@ -969,7 +971,7 @@ Làm **nền móng trước, online sau**. Đặt công trình tự do và nhi�
 | M | Online | Hosting & đối tượng chơi ✅ · tài khoản & thiết bị ✅ · bạn bè ✅ · thăm vườn ✅ · giúp/trộm ✅ · WebSocket ✅ · ai giữ dữ liệu ✅ · chế độ offline ✅ | ✅ |
 | N | Tiến trình & mục tiêu | Đường cong cấp ✅ · mở khóa ✅ · nhiệm vụ ✅ · thành tựu ✅ · lễ hội ✅ · sổ sưu tầm ✅ | ✅ |
 | O | UI/UX & hiệu năng | Thông báo 3 mức ✅ · bảng Việc cần làm ✅ · bản đồ nhỏ ✅ · hiệu năng ✅ · hướng dẫn người mới ✅ | ✅ |
-| Q | Chợ & sự kiện làng (mục 8.6) | Bán gì cho nhau ✅ · chợ online + 2 gói giao ✅ · chợ phiên (giờ, giá, sạp, NPC, chơi đơn) ✅ · mùa dịch ✅ · livestream (lúc nào, độ hot, giỏ live, người xem, giới hạn) ✅ · uy tín người bán ✅ · gộp uy tín với Tiếng tăm ⭐ 🔶 · hợp tác xã ✅ · mã giảm giá ✅ · xe hàng rong ✅ · thi nông sản ✅ · sự kiện diệt chuột/rắn/sâu ✅ | 🔶 |
+| Q | Chợ & sự kiện làng (mục 8.6) | Bán gì cho nhau ✅ · chợ online + 2 gói giao ✅ · chợ phiên (giờ, giá, sạp, NPC, chơi đơn) ✅ · mùa dịch ✅ · livestream (lúc nào, độ hot, giỏ live, người xem, giới hạn) ✅ · uy tín shop 🏪 ✅ · 🏪 tách riêng Tiếng tăm ⭐, 🏪 cao thưởng ⭐ ✅ · hợp tác xã ✅ · mã giảm giá ✅ · xe hàng rong ✅ · thi nông sản ✅ · sự kiện diệt chuột/rắn/sâu ✅ | ✅ |
 | P | Kỹ thuật & triển khai | Thứ tự phase ✅ · quy trình mỗi phase ✅ · chia agent/file + model ✅ · chuyển save cũ ✅ (mục 7) · test local + live từ máy local ✅ | ✅ |
 
 ## 10. Câu hỏi còn mở
