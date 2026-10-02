@@ -1,7 +1,7 @@
 // Mô hình dữ liệu + luật chơi. Thuần JS, không DOM (localStorage có bọc try/catch).
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
-  ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
+  ANIMALS, PEN_CAP, HUSBANDRY, DOG, GUARD, WALK_SPEED, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
 } from './data.js';
@@ -127,9 +127,12 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     shipbin: { items: {} },   // thùng giao hàng: lái buôn lấy hết lúc 6h sáng
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
-    dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name, chained: false },   // chained: xích chó (online)
+    // chained: xích chó · nap/napCheck: giấc ngủ gật ban đêm (giờ vườn) · quiet: đang mải ăn xúc xích (giờ ngoài đời)
+    // · barkAt/barkX/barkY: lần sủa gần nhất và chỗ thấy khách lạ (issue 31)
+    dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name, chained: false, nap: 0, napCheck: 0, quiet: 0, barkAt: 0, barkX: 0, barkY: 0 },
     poops: [], threats: [], orders: [], nextOrderAt: 0,
-    stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0 },
+    // chased/barks: chó đã đớp và đã sủa bao nhiêu lần · robStreak: chuỗi trộm chưa bị đớp (issue 31, 32)
+    stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0, chased: 0, barks: 0, robStreak: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
     notify: {},   // loại thông báo 🟡 đã tắt: { ripe: false }; thiếu = bật. Mức 🔴 không tắt được
     // Trường cho online (issue 22, không đổi phiên bản v2): chơi đơn hay vườn trên làng, tên tài khoản,
@@ -399,7 +402,15 @@ export function urgentSpots(s) {
     out.push({ key: 'threat:' + t.id, kind: t.kind, x: c.x, y: c.y, text: crow ? 'Quạ đang ăn cây!' : 'Có trộm đang hái cây!' });
   }
   for (const a of s.animals ?? []) if (a.sick) out.push({ key: 'sick:' + a.id, kind: 'sick', x: a.x, y: a.y, text: `${ANIMALS[a.type].name} bị bệnh!` });
+  // chó vừa sủa báo có khách lạ (issue 31): mũi tên chỉ về chỗ nó thấy, tắt sau GUARD.barkShowMs
+  const g = s.dog;
+  if (g?.barkAt && now() - g.barkAt < GUARD.barkShowMs) out.push({ key: 'bark', kind: 'bark', x: g.barkX, y: g.barkY, text: `${g.name} đang sủa ở ${barkWhere(s, g.barkX, g.barkY)}!` });
   return out;
+}
+// Hướng của chỗ chó sủa so với giữa vườn, để ghép câu "Mực đang sủa ở phía Đông vườn!"
+function barkWhere(s, x, y) {
+  const v = mapOf(s).view, dx = x - (v.x0 + v.x1) / 2, dy = y - (v.y0 + v.y1) / 2;
+  return `phía ${DIR_NAME[Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'W' : 'E') : (dy < 0 ? 'N' : 'S')]} vườn`;
 }
 
 // ---------- Tick ----------
@@ -548,9 +559,52 @@ function stepDog(s, d) {
       s.poops.push(p); spawnEv('poop', p.x, p.y);
     }
   }
+  // ngủ gật (issue 31): ban đêm cứ GUARD.napEvery lại quay một lần, trúng thì ngủ GUARD.napMs
+  // → chừng GUARD.napRate thời gian ban đêm. Ban ngày khỏi quay: dogAsleep đã xét ban đêm rồi.
+  if (isNight(s) && s.time >= (g.napCheck || 0)) {
+    g.napCheck = s.time + GUARD.napEvery;
+    if (Math.random() < GUARD.napRate) g.nap = s.time + GUARD.napMs;
+  }
 }
 
 const guardOn = s => s.dog.adult && s.dog.hunger > 40 && s.dog.happy > 50;
+
+// ---------- Chó canh khách lạ (issue 31, DESIGN §6.1, ADR 0013) ----------
+// Luật thuần ở mức ô: chó thấy khách đứng chỗ nào. `world.js` chỉ diễn hoạt phần chạy đuổi cho đẹp.
+export const dogAsleep = s => !!s?.dog && isNight(s) && (s.time || 0) < (s.dog.nap || 0);
+export const dogQuiet = (s, t = now()) => t < (s?.dog?.quiet || 0);   // đang mải ăn xúc xích thì quên sủa
+// Bán kính canh (số ô; 0 = không canh): chó con 4, trưởng thành 6; vui < 50 còn một nửa; đói < 30 thì nằm bẹp;
+// ngủ gật chỉ thấy khách sát bên 1 ô; bị xích thì chỉ với tới GUARD.chainRadius ô quanh chuồng.
+export function guardRadius(s, t = now()) {
+  const g = s?.dog;
+  if (!g || g.hunger < GUARD.hungryStop || dogQuiet(s, t)) return 0;
+  const chain = g.chained ? GUARD.chainRadius : Infinity;
+  if (dogAsleep(s)) return Math.min(GUARD.napRadius, chain);
+  const r = g.adult ? GUARD.radius.adult : GUARD.radius.pup;
+  return Math.min(g.happy < GUARD.sadHappy ? r / 2 : r, chain);
+}
+// Vùng chó chạy được khi bị xích: { x, y, r } theo điểm ảnh bản đồ. null = thả rông, chạy khắp vườn.
+export function guardArea(s) {
+  if (!s?.dog?.chained) return null;
+  const h = mapOf(s).dogHome;
+  return { x: h.x, y: h.y, r: GUARD.chainRadius * TS };
+}
+// Tâm vùng canh: bị xích thì tính từ chuồng chó, thả rông thì từ chính con chó
+const guardCenter = s => (s.dog.chained ? mapOf(s).dogHome : s.dog);
+// Chó có phát hiện khách đang đứng ở `pos` (điểm ảnh bản đồ) không
+export function dogSees(s, pos, t = now()) {
+  const r = guardRadius(s, t);
+  if (!r || !pos || pos.x == null) return false;
+  const c = guardCenter(s);
+  return c?.x != null && Math.hypot(pos.x - c.x, pos.y - c.y) <= r * TS;
+}
+export const walkSpeed = () => WALK_SPEED;                    // px/s của người đi bộ
+export const chaseSpeed = () => WALK_SPEED * GUARD.chaseMul;  // chó đuổi nhanh gấp 1.3 lần
+// Chủ vườn chọn xích chó hay thả rông (nút trên chuồng chó / trên chó)
+export function setChained(s, on) {
+  s.dog.chained = !!on;
+  return R(true, on ? `Đã xích ${s.dog.name} vào chuồng` : `Đã thả ${s.dog.name} chạy rông`);
+}
 
 function stepThreats(s, d) {
   const busy = new Set(s.threats.map(t => t.plot));
@@ -778,7 +832,9 @@ function dogActs(s) {
   const n = have(s, 'dogfood'), g = s.dog;
   const feed = mk('feed', '🦴', `Cho ${g.name} ăn (còn ${n})`, n <= 0 ? noItem('dogfood') : g.hunger >= 95 ? `${g.name} no rồi` : null);
   const pet = mk('pet', '🤗', `Vuốt ve ${g.name}`);
-  return g.hunger < 50 ? [feed, pet] : [pet, feed];
+  // xích hay thả rông (issue 31): xích thì chỉ canh 3 ô quanh chuồng, thả thì đuổi khắp vườn
+  const chain = mk('chain', '⛓️', g.chained ? `Thả ${g.name} chạy rông` : `Xích ${g.name} vào chuồng`);
+  return g.hunger < 50 ? [feed, pet, chain] : [pet, feed, chain];
 }
 
 function threatActs(s, t) {
@@ -985,6 +1041,7 @@ const DO = {
   dog(s, t, id, at) {
     const g = s.dog;
     if (id === 'feed') { take(s, 'dogfood'); g.hunger = 100; return res(true, `${g.name} ăn ngon lành`, [say(at, 'Gâu gâu! 🦴')], 'bark'); }
+    if (id === 'chain') { const r = setChained(s, !g.chained); return res(true, r.msg, [say(at, g.chained ? '⛓️' : '🏃')], 'click'); }
     g.happy = Math.min(100, g.happy + HUSBANDRY.petHappy);
     return res(true, `${g.name} vẫy đuôi rối rít`, [say(at, '❤️')], 'bark');
   },
@@ -1141,6 +1198,7 @@ export function guestCheck(s, t, id) {
     if (b?.id === 'gate' || GATE_BOXES.includes(b?.id)) return { ok: true };
   }
   if (t?.kind === 'dog' && id === 'feed') return (s.basket.dogfood || 0) > 0 ? { ok: true } : no('no_food', `Trong giỏ không có ${itemName('dogfood').toLowerCase()}`);
+  if (t?.kind === 'dog' && id === 'sausage') return guestOpCheck(s, meAsGuest(s), { id: 'xem-thu', kind: 'sausage', act: 'sausage' });
   if (t?.kind === 'dog' && id === 'pet') return s.visit?.fed ? { ok: true } : no('stranger', `${s.dog.name} chưa quen bạn, cho ăn trước đã 🦴`);
   return no('guest', 'Khách chỉ đi dạo, chưa làm được việc này');
 }
@@ -1158,12 +1216,14 @@ function guestActs(s, t) {
     if (b?.id === 'gate' || GATE_BOXES.includes(b?.id)) return buildingActs(s, t);
     return b?.guest ? buildingActs(s, t).map(a => ({ ...a, disabled: b.guest })) : [];
   }
-  if (t.kind === 'dog') return [mk('pet', '🤗', `Vuốt ve ${s.dog.name}`, why('pet')), mk('feed', '🦴', `Cho ${s.dog.name} ăn (giỏ còn ${s.basket.dogfood || 0})`, why('feed'))];
+  if (t.kind === 'dog') return [mk('pet', '🤗', `Vuốt ve ${s.dog.name}`, why('pet')), mk('feed', '🦴', `Cho ${s.dog.name} ăn (giỏ còn ${s.basket.dogfood || 0})`, why('feed')),
+    mk('sausage', 'sausage', `Ném xúc xích cho ${s.dog.name} (còn ${haveItem(s, 'sausage')})`, why('sausage'))];
   return [];
 }
 function guestDo(s, t, id, at) {
   if (id.startsWith('help_')) return helpDo(s, t, id.slice(5), at);
   if (id === 'steal') return stealDo(s, t, at);
+  if (id === 'sausage') return sausageDo(s, at);
   if (t.kind === 'building') return DO.building(s, t, id, at);   // cổng: ra làng
   const g = s.dog;
   if (id === 'feed') {
@@ -1235,7 +1295,38 @@ const STEAL = {
     do: (s, a) => { a.ready = false; a.nextProduct = s.time + ANIMALS[a.type].every; },
   },
 };
-const KINDS = { help: HELP, steal: STEAL };
+// ---------- Chó canh khách: sủa, đớp, xúc xích (issue 31) ----------
+// Ba thao tác này không có mục tiêu trong vườn (mục tiêu là chính con chó), nên `find` chỉ kiểm chó có canh được không.
+// `sausage` có phần hên xui 30%: quay bằng hạt giống cố định = mã thao tác, nên server và trình duyệt chủ ra cùng kết quả.
+const seedOf = id => {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); }
+  h ^= h >>> 16; h = Math.imul(h, 2246822507); h ^= h >>> 13; h = Math.imul(h, 3266489909); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+};
+const guardDog = (s, t) => (s?.dog && guardRadius(s, t) > 0 ? s.dog : null);
+const GUARD_OPS = {
+  bark: {
+    find: (s, o) => guardDog(s, o.at),
+    do: (s, g, by, qty, o) => { g.barkAt = o.at ?? now(); g.barkX = o.x ?? s.dog.x; g.barkY = o.y ?? s.dog.y; s.stats.barks = (s.stats.barks || 0) + 1; },
+  },
+  bite: {
+    find: (s, o) => guardDog(s, o.at),
+    do: (s, g, by) => { s.stats.chased = (s.stats.chased || 0) + 1; addCoins(s, GUARD.fine); log(s, `${by} bị ${g.name} đớp, nộp phạt ${GUARD.fine} xu`); },
+  },
+  sausage: {
+    // chó no dưới GUARD.sausageHunger thì chắc chắn ăn; chó đang no vẫn GUARD.sausageGreed tham ăn
+    find: s => s?.dog ?? null,
+    do: (s, g, by, qty, o) => { if (ateSausage(g, o)) g.quiet = (o.at ?? now()) + GUARD.quietMs; },
+  },
+};
+const ateSausage = (g, o) => g.hunger < GUARD.sausageHunger || seedOf(String(o.id)) < GUARD.sausageGreed;
+const GUARD_MSG = {
+  bark: dog => `${dog} sủa vang`,
+  bite: dog => `${dog} đớp trúng! Rơi hết đồ và mất ${GUARD.fine} xu 😖`,
+  sausage: (dog, ate) => (ate ? `${dog} vồ lấy xúc xích, mải ăn quên sủa 🌭` : `${dog} ngửi ngửi rồi lờ đi 🌭`),
+};
+const KINDS = { help: HELP, steal: STEAL, bark: GUARD_OPS, bite: GUARD_OPS, sausage: GUARD_OPS };
 
 // Số việc giúp vườn này đã nhận hôm nay (ngày ngoài đời) và số lượt còn lại
 export const helpsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.today.helps || 0 : 0);
@@ -1280,12 +1371,21 @@ export function guestOpCheck(host, who, op) {
   if ((host.guests ?? []).some(g => g.id === op.id)) return no('done', 'Việc này làm rồi');
   if (op.kind === 'steal' && NO_STEAL[op.act]) return no('cant_steal', NO_STEAL[op.act]);
   const job = KINDS[op.kind]?.[op.act];
-  if (!job) return no('op_invalid', 'Thao tác này chưa làm được');
+  if (!job || (KINDS[op.kind] === GUARD_OPS && op.kind !== op.act)) return no('op_invalid', 'Thao tác này chưa làm được');
   const t = op.at ?? now();
   if (op.kind === 'steal') return stealCheck(host, who, op, job, t);
+  if (KINDS[op.kind] === GUARD_OPS) return guardOpCheck(host, who, op, job, t);
   if (helpLeft(host, t) <= 0) return no('help_full', HELP_FULL);
   const target = job.find(host, op);
   return target ? { ok: true, target } : no('nothing', NOTHING);
+}
+// Sủa, đớp, ném xúc xích: chỉ cần vườn có chó đang canh (riêng xúc xích thì chó đói mấy cũng ăn được)
+function guardOpCheck(host, who, op, job, t) {
+  const target = job.find(host, op);
+  if (!target) return no('no_guard', 'Vườn này không có chó canh');
+  if (op.kind === 'sausage' && (who?.sausage ?? 0) < 1) return no('no_item', `Trong giỏ không có ${itemName('sausage').toLowerCase()}`);
+  if (op.kind === 'bark' && t - (host.dog.barkAt || -Infinity) < GUARD.barkEvery) return no('barking', `${host.dog.name} đang sủa rồi`);
+  return { ok: true, target };
 }
 function stealCheck(host, who, op, job, t) {
   if (hostLevel(host) < GUEST.stealLv) return no('host_new', STEAL_SMALL);
@@ -1307,15 +1407,27 @@ export function guestOpApply(host, who, op) {
   const c = guestOpCheck(host, who, op);
   if (!c.ok) return c;
   const t = op.at ?? now(), day = serverDay(t), by = String(who?.name ?? 'Người lạ');
-  KINDS[op.kind][op.act].do(host, c.target, by, c.qty);
+  KINDS[op.kind][op.act].do(host, c.target, by, c.qty, op);
   if (host.today?.day !== day) host.today = { day, helps: 0, steals: 0, stolen: 0, robs: 0 };
   const entry = { id: op.id, kind: op.kind, act: op.act, by, lv: who?.level ?? 1, at: t, seen: false };
   if (op.kind === 'steal') Object.assign(entry, { item: c.item, qty: c.qty });
   host.guests = [entry, ...(host.guests ?? [])].slice(0, GUEST.logMax);
+  const dog = host.dog.name;
   if (op.kind === 'steal') {
     host.today.steals++;
     host.today.stolen += sellPrice(c.item) * c.qty;
     return { ok: true, msg: `Trộm được ${c.qty} ${itemName(c.item).toLowerCase()} 😈`, reward: { items: { [c.item]: c.qty }, steal: 1 }, event: { type: 'stolen', by, item: c.item, qty: c.qty, at: t } };
+  }
+  // chó canh khách (issue 31): sủa báo động, đớp được khách (khách rơi đồ + nộp phạt), khách ném xúc xích
+  if (op.kind === 'bark') return { ok: true, msg: GUARD_MSG.bark(dog), event: { type: 'barked', by, dog, where: barkWhere(host, c.target.barkX, c.target.barkY), x: c.target.barkX, y: c.target.barkY, at: t } };
+  if (op.kind === 'bite') {
+    entry.fine = GUARD.fine;
+    return { ok: true, msg: GUARD_MSG.bite(dog), reward: { lose: { ...(op.loot ?? {}) }, fine: GUARD.fine, bite: 1 }, event: { type: 'bitten', by, dog, fine: GUARD.fine, at: t } };
+  }
+  if (op.kind === 'sausage') {
+    const ate = ateSausage(host.dog, op);
+    entry.ate = ate;
+    return { ok: true, ate, msg: GUARD_MSG.sausage(dog, ate), reward: { lose: { sausage: 1 } }, event: { type: 'sausaged', by, dog, ate, at: t } };
   }
   host.today.helps++;
   return { ok: true, msg: `Đã ${HELP_JOBS[op.act].verb} giúp`, reward: { coins: GUEST.helpCoins, exp: GUEST.helpExp }, event: { type: 'helped', by, act: op.act, at: t } };
@@ -1327,10 +1439,15 @@ export function guestReward(me, reward) {
   addCoins(me, reward.coins || 0);
   addExp(me, reward.exp || 0);
   for (const [k, n] of Object.entries(reward.items ?? {})) give(me, k, n);
+  // bị chó đớp (issue 31): rơi hết đồ vừa trộm, nộp phạt (không âm xu) và chuỗi "trộm không bị đớp" về 0
+  for (const [k, n] of Object.entries(reward.lose ?? {})) takeItem(me, k, Math.min(n, haveItem(me, k)));
+  if (reward.fine) me.coins = Math.max(0, me.coins - reward.fine);
+  if (reward.bite) me.stats.robStreak = 0;
   if (reward.steal) {   // số vụ chính mình đi trộm hôm nay (server dùng để chặn bản lưu khai khống)
     const day = serverDay(now());
     if (me.today?.day !== day) me.today = { day, helps: 0, steals: 0, stolen: 0, robs: 0 };
     me.today.robs = (me.today.robs || 0) + reward.steal;
+    me.stats.robStreak = (me.stats.robStreak || 0) + reward.steal;   // chuỗi cho thành tựu "Siêu trộm" (issue 32)
   }
 }
 
@@ -1339,15 +1456,18 @@ export function guestReward(me, reward) {
 export function takeGuestLog(s) {
   const fresh = (s?.guests ?? []).filter(g => !g.seen);
   for (const g of fresh) g.seen = true;
-  return fresh.reverse().map(g => (g.kind === 'steal'
-    ? { type: 'stolen', by: g.by, item: g.item, qty: g.qty, at: g.at }
+  const dog = s?.dog?.name ?? DOG.name;
+  return fresh.reverse().map(g => (g.kind === 'steal' ? { type: 'stolen', by: g.by, item: g.item, qty: g.qty, at: g.at }
+    : g.kind === 'bite' ? { type: 'bitten', by: g.by, dog, fine: g.fine ?? GUARD.fine, at: g.at }
+    : g.kind === 'sausage' ? { type: 'sausaged', by: g.by, dog, ate: !!g.ate, at: g.at }
+    : g.kind === 'bark' ? { type: 'barked', by: g.by, dog, where: barkWhere(s, s.dog.barkX, s.dog.barkY), x: s.dog.barkX, y: s.dog.barkY, at: g.at }
     : { type: 'helped', by: g.by, act: g.act, at: g.at }));
 }
 
 // Khách làm một việc giúp hay một vụ trộm: áp dụng ngay trên bản đi dạo (chỉ để thấy liền) và trả kèm `guestOp`
 // để main.js gửi lên server. Thưởng và đồ trộm được chỉ cộng khi server xác nhận (main.js gọi guestReward).
 const opId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
-const meAsGuest = s => ({ name: s.name, level: level(s), room: room(s) });
+const meAsGuest = s => ({ name: s.name, level: level(s), room: room(s), sausage: haveItem(s, 'sausage') });
 function helpDo(s, t, act, at) {
   const op = { id: opId(), kind: 'help', act, ...(t.kind === 'threat' ? { crow: t.id } : { idx: t.idx }), at: now() };
   const r = guestOpApply(s, meAsGuest(s), op);
@@ -1367,6 +1487,48 @@ function stealDo(s, t, at) {
   if (!r.ok) return bad(r.msg, at);
   spend(s, STAMINA.cost.steal);
   return res(true, r.msg, [say(at, '😈')], 'pop', { guestOp: op });
+}
+
+// ---------- Khách đối phó với chó canh (issue 31) ----------
+// Ba thao tác chạy trên trình duyệt của khách: ném xúc xích (khách bấm), chó sủa và chó đớp (world.js phát hiện).
+// Cả ba áp dụng ngay trên bản đi dạo để khách thấy liền rồi trả `guestOp` cho main.js gửi lên server.
+// Đồ khách đã trộm được trong lượt thăm này (chỉ ghi khi server đã xác nhận, nên không bao giờ rơi đồ chưa có).
+// Bị chó đớp là rơi hết chỗ này.
+export function keepLoot(v, items) {
+  if (!v?.visit || !items) return;
+  const loot = (v.visit.loot ??= {});
+  for (const [k, n] of Object.entries(items)) loot[k] = (loot[k] || 0) + n;
+}
+// Chỉ KIỂM bằng luật rồi xem trước ngay trên con chó của bản đi dạo. Không áp dụng cả thao tác ở đây: trong bản
+// đi dạo thì `coins`, `stats`, `log` là của khách chứ không phải của chủ, nên phần ghi sổ của chủ (xu phạt,
+// số người đã đuổi, dòng nhật ký) để server và trình duyệt chủ làm bằng guestOpApply.
+function guestGuardOp(s, kind, extra) {
+  const op = { id: opId(), kind, act: kind, at: now(), ...extra };
+  if (!guestOpCheck(s, meAsGuest(s), op).ok) return null;
+  const g = s.dog, dog = g.name;
+  if (kind === 'bark') { g.barkAt = op.at; g.barkX = op.x; g.barkY = op.y; }
+  const ate = kind === 'sausage' && ateSausage(g, op);
+  if (ate) g.quiet = op.at + GUARD.quietMs;
+  return { ok: true, ate, msg: GUARD_MSG[kind](dog, ate), guestOp: op };
+}
+function sausageDo(s, at) {
+  const r = guestGuardOp(s, 'sausage');
+  if (!r) return bad(`Không ném được xúc xích cho ${s.dog.name}`, at);
+  // khúc xúc xích chỉ mất khi server xác nhận (guestReward), như mọi thao tác khách khác
+  return res(true, r.msg, [say(at, '🌭')], 'pop', { guestOp: r.guestOp, ate: r.ate });
+}
+// Chó vừa phát hiện khách: báo cho chủ kèm chỗ thấy. Đang trong thời gian nghỉ giữa hai lần sủa thì trả null.
+export function barkOp(s) {
+  if (s?.scene !== 'visit') return null;
+  return guestGuardOp(s, 'bark', { x: Math.round(s.player.x), y: Math.round(s.player.y) });
+}
+// Chó đuổi kịp và đớp được khách: rơi hết đồ vừa trộm, nộp phạt, đứng hình GUARD.biteStunMs
+export function biteOp(s) {
+  if (s?.scene !== 'visit' || s.visit.bitten) return null;
+  const r = guestGuardOp(s, 'bite', { loot: { ...(s.visit.loot ?? {}) } });
+  if (!r) return null;
+  s.visit.bitten = true; s.visit.loot = {};
+  return { ...r, stunMs: GUARD.biteStunMs };
 }
 
 // ---------- Cửa hàng & kinh tế ----------

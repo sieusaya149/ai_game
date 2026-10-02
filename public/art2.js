@@ -1486,6 +1486,397 @@ const floors = [0, 1].map(floorV);
 const villageHouses = [villageHouseA(), villageHouseB()];
 const baTu = npc(BATU, BATU_PAL), ongSau = npc(ONGSAU, ONGSAU_PAL);
 
+// ---------- Chó canh khách (issue 31) ----------
+// Chó con và chó trưởng thành có sprite RIÊNG cho từng tư thế (sủa / chạy / ngủ gật).
+// Giữ đúng bảng màu con chó ở art.js: lông vàng cam #d98a3a, mảng kem #fbe7c6.
+
+const DOGP = {
+  o: OUT,
+  k: '#2a2a2a',   // mắt, mũi
+  q: '#a8641f',   // lông trong bóng
+  Q: '#d98a3a',   // lông chính
+  L: '#f0a855',   // lông bắt sáng (trên-trái)
+  W: '#fbe7c6',   // mảng kem
+  w: '#dcc49c',   // kem trong bóng
+  e: '#8a4a18',   // tai cụp (chó con)
+  t: '#e5452f',   // lưỡi
+  n: '#f4a0a8',   // lưỡi nhạt
+};
+
+// Chó trưởng thành sủa: thân dài, chân cao, tai dựng, đuôi dựng. 17x15, chân sát đáy.
+const BARK_ADULT = [
+  [ // mõm ngậm, lấy hơi
+    '.o...o......o....',
+    'oLo.oLo....oLo...',
+    'oQLoQLo....oQo...',
+    'oQQQQQQo..oQQo...',
+    'oQkQQkQo..oQo....',
+    'oWWQQQQo.oQo.....',
+    'kWWWQQQoooQo.....',
+    'ooWWQQQQQQQo.....',
+    '.ooQQQQQQQQQQo...',
+    '..oQQQQQQQQQQQo..',
+    '..oQWWQQQQQQQQo..',
+    '..oQWWQQQQQQQQo..',
+    '..oQo.oQo..oQo...',
+    '..oQo.oQo..oQo...',
+    '..oo..oo...oo....',
+  ],
+  [ // há mõm, ngẩng đầu
+    '.o...o......o....',
+    'oLo.oLo....oLo...',
+    'oQLoQLo....oQo...',
+    'oQQQQQQoo.oQQo...',
+    'oQkQQkQoo.oQo....',
+    'kWWWQQQQooQo.....',
+    'ootWQQQQQQQo.....',
+    '.oWWoQQQQQQQQo...',
+    '..ooQQQQQQQQQQo..',
+    '..oQQQQQQQQQQQo..',
+    '..oQWWQQQQQQQQo..',
+    '..oQWWQQQQQQQo...',
+    '..oQo.oQo..oQo...',
+    '..oQo.oQo..oQo...',
+    '..oo..oo...oo....',
+  ],
+  [ // há to nhất, lưỡi thò ra
+    '.o...o......o....',
+    'oLo.oLo....oLo...',
+    'oQLoQLo...ooQo...',
+    'oQQQQQQoo.oQQo...',
+    'kQkQQkQoo.oQo....',
+    'oWWWQQQQooQo.....',
+    'ottWQQQQQQQo.....',
+    'otnoQQQQQQQQQo...',
+    'oWWoQQQQQQQQQQo..',
+    '.ooQQQQQQQQQQQo..',
+    '..oQWWQQQQQQQQo..',
+    '..oQWWQQQQQQQo...',
+    '..oQo.oQo..oQo...',
+    '..oQo.oQo..oQo...',
+    '..oo..oo...oo....',
+  ],
+];
+
+// Chó con sủa: đầu to, thân tròn mập, tai cụp, chân ngắn. 12x11.
+const BARK_PUP = [
+  [ // mõm ngậm
+    '..oooo......',
+    '.oQLLQo.o...',
+    'oeQQQQeooQo.',
+    'oekQQkeoQQo.',
+    'oeWWWWeQQQo.',
+    'oowWWwoQQQQo',
+    '.ooWWooQQQQo',
+    '..oQQQQQQQQo',
+    '..oQWWQQQQQo',
+    '..oQo.oQoQo.',
+    '..oo..oo.oo.',
+  ],
+  [ // há mõm
+    '..oooo......',
+    '.oQLLQo.o...',
+    'oeQQQQeooQo.',
+    'oekQQkeoQQo.',
+    'oeWWWWeQQQo.',
+    'ootwWtoQQQQo',
+    '.oWWWWoQQQQo',
+    '..oQQQQQQQQo',
+    '..oQWWQQQQQo',
+    '..oQo.oQoQo.',
+    '..oo..oo.oo.',
+  ],
+  [ // há to, lưỡi hồng
+    '..oooo..o...',
+    '.oQLLQooQo..',
+    'oeQQQQeoQQo.',
+    'oekQQkeQQQo.',
+    'oeWWWWeQQQo.',
+    'oottttoQQQQo',
+    '.onnnnoQQQQo',
+    '..oWWQQQQQQo',
+    '..oQWWQQQQQo',
+    '..oQo.oQoQo.',
+    '..oo..oo.oo.',
+  ],
+];
+
+// Chó trưởng thành chạy đuổi: thân chồm về trước, chân duỗi xa, tai và đuôi bay ngược. 19x14.
+const RUN_ADULT = [
+  [ // bốn chân duỗi hết cỡ
+    '....o...o..........',
+    '...oLo.oLo....ooo..',
+    '..oQLoQLo....oQQQo.',
+    '..oQQQQQQo..oQQoo..',
+    '..oQkQQkQo.oQQo....',
+    '.oWWQQQQQoooQo.....',
+    'kWWWQQQQQQQQQo.....',
+    'ooWWQQQQQQQQQQQo...',
+    '.ooQQQQQQQQQQQQQo..',
+    '..oQWWWQQQQQQQQQo..',
+    '.ooQQWWQQQQQQQQQo..',
+    'oQQo..oQo....oQQQo.',
+    'oQo....oQo..oQo.oQo',
+    'oo......oo..oo...oo',
+  ],
+  [ // thu chân về dưới bụng
+    '....o...o..........',
+    '...oLo.oLo...ooo...',
+    '...oQLoQLo..oQQQo..',
+    '...oQQQQQQo.oQQoo..',
+    '...oQkQQkQooQQo....',
+    '..oWWQQQQQQQQo.....',
+    '.kWWWQQQQQQQQo.....',
+    '.ooWWQQQQQQQQQQo...',
+    '..ooQQQQQQQQQQQQo..',
+    '...oQWWWQQQQQQQQo..',
+    '...oQQWWQQQQQQQQo..',
+    '....oQoQo..oQoQo...',
+    '....oQoQo..oQoQo...',
+    '.....oooo...oooo...',
+  ],
+  [ // duỗi ngược lại, chân trước chạm đất
+    '...o...o...........',
+    '..oLo.oLo.....ooo..',
+    '.oQLoQLo.....oQQQo.',
+    '.oQQQQQQo...oQQoo..',
+    '.oQkQQkQo..oQQo....',
+    'oWWQQQQQQoooQo.....',
+    'kWWQQQQQQQQQQo.....',
+    'oWWQQQQQQQQQQQQo...',
+    'ooQQQQQQQQQQQQQQo..',
+    '.oQWWWQQQQQQQQQQo..',
+    '.oQQWWQQQQQQQQQQo..',
+    '..oQQo..oQQo..oQQo.',
+    '...oQo...oQo...oQo.',
+    '...oo.....oo....oo.',
+  ],
+];
+
+// Chó con chạy: chân ngắn nên sải ngắn, thân tròn nảy lên xuống. 13x11.
+const RUN_PUP = [
+  [
+    '..oooo.......',
+    '.oQLLQo..oo..',
+    'oeQQQQeooQQo.',
+    'oekQQkeoQQo..',
+    'oeWWWWeQQQo..',
+    'oowWWwQQQQQo.',
+    '.ooWWoQQQQQQo',
+    '..oQQQQQQQQQo',
+    '.ooQWWQQQQQQo',
+    'oQo..oQo.oQQo',
+    'oo....oo..ooo',
+  ],
+  [
+    '..oooo.......',
+    '.oQLLQo...o..',
+    'oeQQQQeo.oQo.',
+    'oekQQkeooQQo.',
+    'oeWWWWeQQQQo.',
+    'oowWWwQQQQQQo',
+    '.ooWWoQQQQQQo',
+    '..oQQQQQQQQQo',
+    '..oQWWQQQQQQo',
+    '..oQoQo.oQoQo',
+    '..oooo..ooooo',
+  ],
+  [
+    '..oooo.......',
+    '.oQLLQo..oo..',
+    'oeQQQQeooQQo.',
+    'oekQQkeoQQo..',
+    'oeWWWWeQQQo..',
+    'oowWWwQQQQQo.',
+    '.ooWWoQQQQQQo',
+    '..oQQQQQQQQQo',
+    '..oQWWQQQQQQo',
+    '..oQQo..oQQQo',
+    '..ooo....oooo',
+  ],
+];
+
+// Nằm ngủ gật: thấp và rộng hơn tư thế đứng, mắt nhắm là một gạch tối.
+// Chó lớn duỗi dài, chó con cuộn tròn thành cục.
+const NAP_ADULT = [
+  '.o...o.............',
+  'oQo.oQo...ooooo....',
+  'oQQQQQQo.oQQQQQoo..',
+  'oQkkQQQQoQQQQQQQQo.',
+  'oWWQQQQQQQQQQQQQQQo',
+  'oWWWQQQQQQQQQQQQLQo',
+  '.oWWWQQQQQQQQQQQoQo',
+  '.ooWWWQQQQQQQQQQooo',
+  '..ooooooooooooooo..',
+];
+// Chó con cuộn tròn thành cục, đuôi vòng sát mình.
+const NAP_PUP = [
+  '..oooo......',
+  '.oQLLQooooo.',
+  'oeQQQQoQQQQo',
+  'oekkQQQQQQQo',
+  'oWWWQQQQQQLo',
+  '.oWWQQQQQoQo',
+  '.ooWQQQQQoQo',
+  '..oQQQQQQQoo',
+  '..ooooooooo.',
+];
+// 💤 nhỏ: hai chữ Z xiên bay chéo lên, xanh nhạt, viền sẫm.
+const ZZZ31 = [
+  '................',
+  '.........zzzzz..',
+  '............z...',
+  '.zzzz......z....',
+  '...z......z.....',
+  '..z......zzzzz..',
+  '.zzzz...........',
+  '................',
+];
+const zzzImg = () => outline(spr(ZZZ31, { z: '#bfe6ff' }), OUT);
+
+// Ghép thân chó nằm với 💤 bay lên ở phía trên (thân vẽ sau nên luôn nằm trên chữ Z).
+function napWithZzz(rows) {
+  const body = spr(rows, DOGP), z = zzzImg();
+  const w = Math.max(body.width, z.width + 1), h = body.height + 6;
+  return draw(w, h, x => {
+    x.drawImage(z, w - z.width, 0);
+    x.drawImage(body, 0, h - body.height);
+  });
+}
+
+const dogFrames = rows => { const left = rows.map(r => spr(r, DOGP)); return { left, right: left.map(flip) }; };
+
+// Bong bóng thoại "GÂU GÂU!" — chữ pixel 5x5, dấu mũ 2 hàng, đuôi chỉ xuống-trái.
+const GLYPH = {
+  G: ['.###.', '#....', '#..##', '#...#', '.###.'],
+  A: ['.###.', '#...#', '#####', '#...#', '#...#'],
+  U: ['#...#', '#...#', '#...#', '#...#', '.###.'],
+  '!': ['#', '#', '#', '.', '#'],
+};
+const HAT31 = ['..#..', '.#.#.'];
+
+function barkBubble() {
+  const INK = '#3b2412', CRE = '#fff6e0', W = 48, H = 18, BH = 13;
+  const put = (x, g, gx, gy) => g.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === '#') R(x, INK, gx + i, gy + j); }));
+  return draw(W, H, x => {
+    // thân bong bóng bo góc
+    R(x, OUT, 1, 0, W - 2, BH);
+    R(x, OUT, 0, 1, W, BH - 2);
+    R(x, CRE, 2, 1, W - 4, BH - 2);
+    R(x, CRE, 1, 2, W - 2, BH - 4);
+    // đuôi chỉ xuống-trái
+    [[8, 7], [7, 6], [6, 4], [5, 3], [4, 2], [4, 0]].forEach(([x0, w], i) => {
+      R(x, OUT, x0 - 1, BH - 1 + i, w + 2, 1);
+      if (w) R(x, CRE, x0, BH - 1 + i, w, 1);
+    });
+    // chữ GÂU GÂU!
+    let gx = 4;
+    for (const ch of 'GÂU GÂU!') {
+      if (ch === ' ') { gx += 3; continue; }
+      const base = ch === 'Â' ? 'A' : ch;
+      put(x, GLYPH[base], gx, 5);
+      if (ch === 'Â') put(x, HAT31, gx, 2);
+      gx += GLYPH[base][0].length + 1;
+    }
+  });
+}
+
+// Xích buộc ở chuồng chó: cọc sắt bên trái + 6 mắt xích võng xuống,
+// mắt xích xen kẽ dọc / ngang và chừa lỗ tối ở giữa cho dễ đọc ở cỡ 1x.
+function dogChain() {
+  const I = RAMP.iron;
+  const c = draw(18, 10, x => {
+    // cọc đóng vào vách chuồng
+    R(x, I[2], 1, 1, 3, 7);
+    R(x, I[4], 1, 1, 1, 3);
+    R(x, I[3], 1, 4, 1, 4);
+    R(x, I[1], 3, 2, 1, 6);
+    R(x, I[4], 1, 1, 3, 1);
+    const pos = [[5, 2], [7, 3], [9, 4], [11, 5], [13, 5], [15, 4]];
+    pos.forEach(([px, py], i) => {
+      if (i % 2 === 0) {            // mắt dọc
+        R(x, I[3], px, py - 1, 2, 3);
+        R(x, I[4], px, py - 1, 1, 1);
+        R(x, I[1], px + 1, py + 1, 1, 1);
+      } else {                      // mắt ngang
+        R(x, I[3], px - 1, py, 3, 2);
+        R(x, I[4], px - 1, py, 1, 1);
+        R(x, I[1], px + 1, py + 1, 1, 1);
+      }
+      R(x, I[0], px, py, 1, 1);     // lỗ giữa mắt xích
+    });
+  });
+  return outline(c);
+}
+
+// Đứng hình: 3 ngôi sao vàng quay quanh một vòng ellipse, 3 khung lệch nhau 1/3 vòng.
+function stunFrame(i) {
+  const c = draw(21, 10, x => {
+    const list = [0, 1, 2].map(k => {
+      const a = (i / 3 + k / 3) * Math.PI * 2;
+      return { px: Math.round(10 + Math.cos(a) * 8), py: Math.round(5 + Math.sin(a) * 3), back: Math.sin(a) < 0 };
+    }).sort((a, b) => a.py - b.py);
+    for (const s of list) {
+      const main = s.back ? '#d9b52f' : '#f7d547';
+      R(x, main, s.px - 1, s.py); R(x, main, s.px + 1, s.py);
+      R(x, main, s.px, s.py - 1); R(x, main, s.px, s.py + 1);
+      R(x, s.back ? '#f7d547' : '#fff0a0', s.px, s.py);
+    }
+  });
+  return outline(c);
+}
+
+// Mũi tên chỉ hướng chó sủa: cùng khuôn với alertArrow nhưng vàng-cam.
+const barkArrow = () => spr(ARROW, { o: OUT, w: '#fff0a0', r: '#f7d547', R: '#f59a23' });
+
+// Bảng màu xúc xích: D nếp thắt, M đỏ nâu tối, C giữa, L bắt sáng trên-trái.
+const SAUS = { o: OUT, D: '#8e3d26', M: '#b4583a', C: '#d0805a', L: '#e8a070' };
+
+// Xúc xích trong giỏ: khúc cong nhìn ngang, 14x14 như các icon vật phẩm khác.
+// Vẽ theo một cung tròn, bán kính phình ở giữa và thót ở hai đầu cho ra dáng khúc thịt.
+function sausageIcon() {
+  const pt = t => { const a = Math.PI * (1 + t * 0.52); return [11.6 + Math.cos(a) * 8.6, 11 + Math.sin(a) * 8.6]; };
+  const c = draw(14, 14, x => {
+    const band = (col, k, ox, oy) => {
+      for (let i = 0; i <= 40; i++) {
+        const t = i / 40, r = k * Math.sin(Math.PI * t) ** 0.35, [px, py] = pt(t);
+        ell(x, col, px + ox, py + oy, r, r);
+      }
+    };
+    band(SAUS.M, 2.2, 0, 0);
+    band(SAUS.C, 1.3, -0.5, -0.6);
+    band(SAUS.L, 0.35, -1.1, -1.2);
+    // thắt nút hai đầu: nếp lõm rồi mẩu thịt nhỏ thò ra
+    [0, 1].forEach(t => {
+      const [px, py] = pt(t), dx = t ? 0.9 : -0.9, dy = t ? -0.9 : 0.9;
+      ell(x, SAUS.D, px, py, 1, 1);
+      ell(x, SAUS.M, px + dx, py + dy, 0.8, 0.8);
+    });
+  });
+  return outline(c);
+}
+
+// Xúc xích rơi dưới đất: nhìn từ trên-chéo nên bẹt, ngắn và thót hai đầu, kèm bóng đổ nhạt.
+const SAUSAGE_GROUND = [
+  '..ooooooo..',
+  '.oLLCCCMMo.',
+  'oDLCCCMMMDo',
+  '.oDMMMMMDo.',
+  '.ooooooooo.',
+];
+function sausageGround() {
+  const body = spr(SAUSAGE_GROUND, SAUS);
+  return draw(11, 7, x => {
+    shadow(x, 5, 5, 4, 1.4, 0.26);
+    x.drawImage(body, 0, 0);
+  });
+}
+
+const dogBark31 = { pup: dogFrames(BARK_PUP), adult: dogFrames(BARK_ADULT) };
+const dogRun31 = { pup: dogFrames(RUN_PUP), adult: dogFrames(RUN_ADULT) };
+const dogNap31 = { pup: napWithZzz(NAP_PUP), adult: napWithZzz(NAP_ADULT) };
+const stunStars31 = [0, 1, 2].map(stunFrame);
+
 export const SPR2 = {
   // vườn
   shippingBin: shippingBin(),
@@ -1538,4 +1929,14 @@ export const SPR2 = {
   todo: todoIcon(),
   giftIcon: giftIcon(),
   alertArrow: alertArrow(),
+  // chó canh khách (issue 31)
+  dogBark: dogBark31,
+  dogRun: dogRun31,
+  dogNap: dogNap31,
+  barkBubble: barkBubble(),
+  dogChain: dogChain(),
+  stunStars: stunStars31,
+  barkArrow: barkArrow(),
+  sausage: sausageIcon(),
+  sausageGround: sausageGround(),
 };

@@ -867,8 +867,14 @@ function timeLabel(t) {
 }
 // Nhật ký khách (issue 28, 30): ai đã giúp, ai đã trộm gì lúc mấy giờ. Dòng trộm có nút "Sang trộm lại 😤"
 // đi thẳng qua làng tới vườn kẻ trộm; kẻ trộm chưa tới cấp 5 hay vườn mình còn nhỏ thì nút mờ kèm lý do.
-const guestLine = g => (g.kind === 'steal'
-  ? `${g.by} đã trộm ${g.qty} ${D.itemName(g.item).toLowerCase()} lúc ${D.hourText(g.at)} 😤`
+const DOG_LINE = {
+  bark: (g, dog) => `${dog} sủa vang đuổi ${g.by} lúc ${D.hourText(g.at)} 🐕`,
+  bite: (g, dog) => `${g.by} bị ${dog} đớp lúc ${D.hourText(g.at)}, nộp phạt ${g.fine ?? D.GUARD.fine} xu 🐕`,
+  sausage: (g, dog) => `${g.by} ném xúc xích cho ${dog} lúc ${D.hourText(g.at)}: ${g.ate ? 'nó mải ăn quên sủa' : 'nó không thèm'} 🌭`,
+};
+const GUEST_ICO = { steal: '😈', bark: '🐕', bite: '🐕', sausage: '🌭' };
+const guestLine = (g, dog) => (DOG_LINE[g.kind] ? DOG_LINE[g.kind](g, dog)
+  : g.kind === 'steal' ? `${g.by} đã trộm ${g.qty} ${D.itemName(g.item).toLowerCase()} lúc ${D.hourText(g.at)} 😤`
   : `${g.by} đã ${D.HELP_JOBS[g.act]?.verb ?? 'giúp'} giúp bạn lúc ${D.hourText(g.at)} 🙏`);
 function revengeWhy(s, g) {
   if (s.mode !== 'online') return 'Chỉ sang vườn người khác được khi đang chơi trong làng';
@@ -892,8 +898,8 @@ PANELS.log = {
       for (const g of guests) {
         const why = g.kind === 'steal' ? revengeWhy(s, g) : null;
         body.append(h('div', { class: 'row guest-row' + (g.kind === 'steal' ? ' stolen' : ''), 'data-by': g.by },
-          h('div', { class: 'row-ico' }, g.kind === 'steal' ? '😈' : '🙏'),
-          h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, guestLine(g))),
+          h('div', { class: 'row-ico' }, GUEST_ICO[g.kind] ?? '🙏'),
+          h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, guestLine(g, s.dog?.name ?? D.DOG.name))),
           g.kind === 'steal' && h('div', { class: 'row-act' },
             btn('😤 Sang trộm lại', () => goRevenge(g.by), 'red sm nosound revenge', { disabled: !!why, title: why ?? `Sang vườn ${g.by}` }))));
       }
@@ -1486,6 +1492,7 @@ export function handleEvents(events) {
       case 'levelup': celebQueue.push(e.level); if (!celebOpen) nextCelebration(); break;
       case 'achievement': showBadge(e); break;
       case 'stolen': alertNow(D.EVENT_LEVEL.stolen.text(1, e)); break;   // có người trộm vườn mình (issue 30)
+      case 'barked': alertNow(D.EVENT_LEVEL.barked.text(1, e)); break;    // chó sủa báo có khách lạ (issue 31)
     }
     notifier(e, Date.now());
   }
@@ -1508,7 +1515,7 @@ function arrowEl(key) {
   if (!el) {
     el = h('canvas', { class: 'alert-arrow', width: 12, height: 12 });
     el.dataset.key = key;
-    const src = SPR2?.alertArrow;
+    const src = (key.startsWith('bark:') && SPR2?.barkArrow) || SPR2?.alertArrow;   // mũi tên chỉ hướng chó sủa (issue 31)
     if (src) el.getContext('2d').drawImage(src, 0, 0); else { const c = el.getContext('2d'); c.fillStyle = '#e5452f'; c.fillRect(0, 3, 12, 6); }
     box.append(el);
   }

@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, guestCheck, guestReward, guestOpApply, takeGuestLog, helpLeft, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
+  startVisit, guestCheck, guestReward, guestOpApply, takeGuestLog, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -86,7 +86,12 @@ function updateCamera(dt, snap) {
   if (snap) { cam.x = tx; cam.y = ty; return; }
   const k = 1 - Math.exp(-dt * 9);
   cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
+  // chó sủa / đớp: rung màn hình nhẹ một chút (issue 31)
+  const left = shakeUntil - performance.now();
+  if (left > 0) { const a = 2 * left / SHAKE_MS; cam.x += (Math.random() - 0.5) * a * 2; cam.y += (Math.random() - 0.5) * a * 2; }
 }
+const SHAKE_MS = 400;
+let shakeUntil = 0;
 
 // ---------- API cho ui.js ----------
 function changed() { dirty = true; }
@@ -243,13 +248,16 @@ function guestAck(m) {
   const mine = home ?? state;
   if (!mine) return;
   if (!m.ok) { if (m.msg) ui.toast(m.msg); ui.handleEvents([{ type: 'sound', name: 'error' }]); return; }
-  guestReward(mine, m.reward);
+  const r = m.reward;   // chó sủa thì không có phần thưởng gì cả
+  guestReward(mine, r);
+  keepLoot(state, r?.items);   // đồ vừa trộm: bị chó đớp là rơi hết (issue 31)
   const p = state.player, t0 = performance.now();
-  const lines = m.reward.items
-    ? Object.entries(m.reward.items).map(([k, n]) => [`+${n} ${itemName(k)}`, '#5cd65c'])
-    : [[`+${m.reward.coins} xu`, '#ffd23f'], [`+${m.reward.exp} EXP`, '#7ad7ff']];
+  const lines = r?.items ? Object.entries(r.items).map(([k, n]) => [`+${n} ${itemName(k)}`, '#5cd65c'])
+    : r?.lose || r?.fine   // bị chó đớp hay vừa ném xúc xích: mất đồ, mất xu
+      ? [...Object.entries(r.lose ?? {}).map(([k, n]) => [`-${n} ${itemName(k)}`, '#ff6b6b']), ...(r.fine ? [[`-${r.fine} xu`, '#ff6b6b']] : [])]
+      : r?.coins != null ? [[`+${r.coins} xu`, '#ffd23f'], [`+${r.exp} EXP`, '#7ad7ff']] : [];
   for (const [i, [text, color]] of lines.entries()) world.fx.push({ text, color, x: p.x, y: p.y - 14 - i * 10, t0 });
-  ui.handleEvents([{ type: 'sound', name: m.reward.items ? 'pop' : 'coin' }]);
+  if (lines.length) ui.handleEvents([{ type: 'sound', name: r.items ? 'pop' : r.fine ? 'error' : 'coin' }]);
   changed();
 }
 // Khách vừa làm gì đó trong vườn mình (chủ đang online): áp dụng bằng chính hàm luật rồi báo
@@ -257,11 +265,35 @@ function guestAck(m) {
 function guestDid(op) {
   const mine = home ?? state;
   if (!mine || !op) return;
-  guestOpApply(mine, { name: op.by, level: op.level, room: op.room }, op);
+  // `sausage` = số xúc xích khách đang có, server điền sẵn: thiếu thì luật tưởng khách tay không (issue 31)
+  guestOpApply(mine, { name: op.by, level: op.level, room: op.room, sausage: op.sausage }, op);
   const evs = takeGuestLog(mine);
   if (evs.length) ui.handleEvents(evs);
   changed();
 }
+// ---------- Chó canh khách (issue 31): world phát hiện, luật ở state.js, server xác nhận ----------
+// Chó sủa: báo cho chủ vườn (kèm chỗ thấy mình) và rung nhẹ màn hình của khách.
+function dogBark() {
+  const r = barkOp(state);
+  if (!r) return;
+  sync?.send({ t: 'guest', op: r.guestOp });
+  ui.handleEvents([{ type: 'sound', name: 'bark' }]);
+  shakeUntil = performance.now() + SHAKE_MS;
+  try { navigator.vibrate?.(120); } catch { /* máy không rung */ }
+}
+// Chó đớp trúng: đứng hình 3 giây, rơi hết đồ vừa trộm và nộp phạt (server xác nhận thì guestAck trừ)
+function dogBite() {
+  const r = biteOp(state);
+  if (!r) return;
+  sync?.send({ t: 'guest', op: r.guestOp });
+  world.stun = r.stunMs; world.path = null; world.pending = null; busy = null; world.busy = false;
+  world.fx.push({ text: 'GÂU! 🐕', color: '#ff6b6b', x: state.player.x, y: state.player.y - 16, t0: performance.now() });
+  ui.toast(r.msg);
+  ui.handleEvents([{ type: 'sound', name: 'bark' }]);
+  shakeUntil = performance.now() + SHAKE_MS;
+  changed();
+}
+
 // mỗi khung hình: đổi bản đồ thì báo join, đi thì gửi vị trí tối đa LIVE.hz lần mỗi giây
 function liveFrame(now) {
   if (!sync || !state) return;
@@ -690,6 +722,8 @@ function frame(now) {
   }
   const res = V.update(state, world, dt);
   for (const r of res.results) applyResult(r);
+  if (res.bark) dogBark();     // chó trong vườn người khác vừa phát hiện mình (issue 31)
+  if (res.bite) dogBite();
   if (busy && now - busy.t0 >= actionMs()) finishAction();
   if (res.arrived && !busy) autoAct(res.arrived);
   if (res.door) goScene(res.door.to);

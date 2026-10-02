@@ -4,7 +4,7 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip } from './state.js';
+import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
@@ -180,6 +180,37 @@ export function animalImg(type, adult, face, frame) {
   return adult ? im : scaled(im, 0.62);
 }
 export const dogImg = (adult, face, frame) => animalImg('dog', adult, face, frame);
+// Chó canh khách (issue 31): ngủ gật, sủa, chạy đuổi — mỗi tư thế chó con và chó trưởng thành có sprite riêng.
+// Thiếu sprite thì về tư thế đi bộ hiện có.
+const dogSet = (key, adult) => SPR2?.[key]?.[adult ? 'adult' : 'pup'];
+function guardImg(adult, face, rt, nap, now) {
+  if (nap) return dogSet('dogNap', adult) ?? dogImg(adult, face, 0);
+  const set = rt.bark ? dogSet(rt.run ? 'dogRun' : 'dogBark', adult) : null;
+  const frames = set?.[face];
+  if (frames?.length) return frames[Math.floor(now / 110) % frames.length];
+  return dogImg(adult, face, rt.walking ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0);
+}
+// Sao quay quanh đầu lúc đứng hình; chưa có sprite thì vẽ tạm ba chấm vàng
+function stunStars(ctx, blit, x, y, now) {
+  const set = SPR2?.stunStars;
+  if (set?.length) { const im = set[Math.floor(now / 140) % set.length]; return blit(im, x - im.width / 2, y - im.height); }
+  for (let i = 0; i < 3; i++) {
+    const a = now / 220 + i * 2.1;
+    ctx.fillStyle = '#f7d547';
+    ctx.fillRect(Math.round(x + Math.cos(a) * 8) - 1, Math.round(y - 3 + Math.sin(a) * 3) - 1, 2, 2);
+  }
+}
+// Bong bóng "GÂU GÂU!" trên đầu chó; chưa có sprite thì vẽ tạm bằng chữ
+function barkBubble(ctx, blit, x, y) {
+  const im = SPR2?.barkBubble;
+  if (im) return blit(im, x - im.width / 2, y - im.height);
+  ctx.font = `bold 9px ${FONT}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillStyle = '#fff6e0';
+  const w = ctx.measureText('GÂU GÂU!').width + 6;
+  ctx.fillRect(Math.round(x - w / 2), Math.round(y - 12), Math.round(w), 12);
+  ctx.fillStyle = '#3b2412'; ctx.fillText('GÂU GÂU!', Math.round(x), Math.round(y - 2));
+}
 export function crowImg(face, frame) {
   const set = SPR.crow ?? crowFallback();
   return set[face][frame % set[face].length];
@@ -537,6 +568,13 @@ export function render(ctx, f) {
       if (im) add(b.npc.y, () => blit(im, b.npc.x - 8, b.npc.y - 24));
     }
     if (b.id === 'market' && SPR2?.marketClosed && !marketOpen(state)) add((b.foot.r + b.foot.h) * TS + 0.5, () => blit(SPR2.marketClosed, b.x + 12, b.y + 22));
+    if (b.id === 'doghouse' && farm && state.dog?.chained) {   // sợi xích buộc ở chuồng (issue 31)
+      const ch = SPR2?.dogChain;
+      add((b.foot.r + b.foot.h) * TS + 0.5, () => {
+        if (ch) blit(ch, b.x + img.width / 2 - ch.width / 2, b.y + img.height - 4);
+        else { ctx.fillStyle = '#767686'; for (let i = 0; i < 6; i++) ctx.fillRect(Math.round(b.x + 4 + i * 3), Math.round(b.y + img.height - 3 + (i % 2)), 2, 2); }
+      });
+    }
   }
   for (const [pen, p] of Object.entries(m.pens)) {
     const tr = p.trough, n = state.troughs?.[pen] ?? 0;
@@ -625,16 +663,22 @@ export function render(ctx, f) {
     else if (night > 0.6 && !rt.walking) icon = statusIcon('zzz');
     bub(a.x, a.y - im.height - 1, icon, 'a' + a.id);
   }
-  // chó
+  // chó (issue 31: ngủ gật 💤, sủa "GÂU GÂU!", chạy đuổi khách lạ, khúc xúc xích dưới đất)
   const dog = state.dog;
   if (farm && dog.x != null && vis(dog.x, dog.y)) {
     const rt = wd.rt.get('dog') ?? {};
-    const im = dogImg(dog.adult, rt.face ?? 'right', rt.walking ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0);
+    const face = rt.face ?? 'right', nap = dogNapping(state), quiet = dogQuiet(state);
+    const im = guardImg(dog.adult, face, rt, nap, now);
     if (im) {
-      add(dog.y, () => blit(im, dog.x - im.width / 2, dog.y - im.height + 1));
+      add(dog.y, () => {
+        if (quiet) blit(SPR2?.sausageGround ?? SPR.items?.dogfood, dog.x - 4, dog.y - 5);   // khúc xúc xích nó đang gặm
+        blit(im, dog.x - im.width / 2, dog.y - im.height + 1);
+      });
+      if (rt.bark) add(dog.y + 0.5, () => barkBubble(ctx, blit, dog.x, dog.y - im.height - 2));
       const emote = wd.emotes.get('dog');
-      const icon = emote && emote.until > now ? statusIcon(emote.icon) : dog.hunger < 30 ? statusIcon('hungry') : null;
-      bub(dog.x, dog.y - im.height - 1, icon, 'dog');
+      // đang ngủ gật thì 💤 đã nằm sẵn trong sprite, khỏi thêm bong bóng nữa
+      const icon = emote && emote.until > now ? statusIcon(emote.icon) : nap || dog.hunger >= 30 ? null : statusIcon('hungry');
+      if (!rt.bark) bub(dog.x, dog.y - im.height - 1, icon, 'dog');
     }
   }
   // quạ & thằng Tèo
@@ -665,6 +709,7 @@ export function render(ctx, f) {
         const sw = SPR2?.sweat?.[Math.floor(now / 350) % 2];
         if (sw) blit(sw, p.x + 4, p.y - 29);
       }
+      if (wd.stun > 0) stunStars(ctx, blit, p.x, p.y - 25, now);   // bị chó đớp / trượt phân: đứng hình, sao quay quanh đầu
     });
   }
   // người khác cùng bản đồ (issue 25, đã nội suy): người gần vẽ cả nhân vật, người xa (làng đông) chỉ hiện tên mờ ở phần chữ
