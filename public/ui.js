@@ -40,18 +40,18 @@ const btn = (label, onClick, cls = '', extra = {}) => h('button', { class: 'btn 
 const EMOJI = {
   cai: '🥬', carot: '🥕', lua: '🌾', cachua: '🍅', bap: '🌽', dau: '🍓', bingo: '🎃', duahau: '🍉',
   trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊',
-  feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴',
+  feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴', catfood: '🐟',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧', deco_rattrap: '🪤', deco_canopy: '⛱️',
   wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩',
-  ga: '🐔', vit: '🦆', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕',
+  ga: '🐔', vit: '🦆', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕', meo: '🐈', cathouse: '🏠',
 };
-const ITEM3 = { soap: 'soapBar', manure: 'manure', medicine: 'medicine', vaccine: 'vaccine', treat: 'treat', deco_rattrap: 'ratTrap' };
+const ITEM3 = { soap: 'soapBar', manure: 'manure', medicine: 'medicine', vaccine: 'vaccine', treat: 'treat', deco_rattrap: 'ratTrap', catfood: 'catfood' };
 const iconCache = new Map();
 function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
   let u = null;
   try { u = art.icon(key) || null; } catch { u = null; }
-  if (!u) try { u = ({ trung_phoi: SPR3?.eggFertile, trung_vit_phoi: SPR3?.eggDuckFertile, trung_vit: SPR3?.eggDuck, vit: SPR3?.animal?.vit?.non?.left?.[0] }[key] ?? SPR2?.[key])?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
+  if (!u) try { u = ({ trung_phoi: SPR3?.eggFertile, trung_vit_phoi: SPR3?.eggDuckFertile, trung_vit: SPR3?.eggDuck, vit: SPR3?.animal?.vit?.non?.left?.[0], meo: SPR3?.animal?.meo?.truong?.left?.[0], cathouse: SPR3?.cathouse?.[0] }[key] ?? SPR2?.[key])?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
   if (!u) try { u = SPR3?.items?.[ITEM3[key]]?.toDataURL?.() || null; } catch { u = null; }   // xà phòng, phân chuồng vẽ ở art3
   iconCache.set(key, u);
   return u;
@@ -123,6 +123,13 @@ export function buildTray(s, b) {
       cards.push(card({ kind: 'pen', pen }, penIco(pen), low ? PEN_NAME2[pen] : `${PEN_NAME2[pen]} ${n}/${max}`,
         low ? `Cần cấp ${lv}` : full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : `🪙 ${fmt(D.PEN_PRICES[pen])}`, low || full));
     }
+    // nhà mèo (issue 44): không phải chuồng có rào nhưng xây ở cùng khay
+    for (const kind of Object.keys(D.BUILD_PRICES)) {
+      const lv = S.penLevel(kind), low = level(s) < lv, n = s.farm.ents.filter(e => e.kind === kind).length, max = S.penLimit(s, kind), nx = S.penNextLevel(s, kind);
+      const full = !low && n >= max;
+      cards.push(card({ kind }, ico(kind), low ? PEN_NAME2[kind] : `${PEN_NAME2[kind]} ${n}/${max}`,
+        low ? `Cần cấp ${lv}` : full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : `🪙 ${fmt(D.BUILD_PRICES[kind])}`, low || full));
+    }
   } else {
     for (const k of Object.keys(s.inv || {})) if (s.inv[k] > 0 && D.ITEMS[k]?.kind === 'deco') cards.push(card({ kind: 'deco', item: k }, ico(k), D.ITEMS[k].name, `Có ×${s.inv[k]}`));
     empty = 'Chưa có đồ trang trí. Mua ở Chợ Bà Tư nhé.';
@@ -132,7 +139,7 @@ export function buildTray(s, b) {
     h('div', { class: 'bt-tabs' }, tab('field', 'Ruộng'), tab('pen', 'Chuồng'), tab('deco', 'Trang trí')),
     cards.length ? h('div', { class: 'bt-list' }, cards) : h('div', { class: 'bt-empty' }, empty));
 }
-const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu', quarantine: 'Chuồng cách ly' };
+const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu', quarantine: 'Chuồng cách ly', cathouse: 'Nhà mèo' };
 const penIco = pen => (pen === 'quarantine' ? h('span', { class: 'ico emo' }, '🏥') : ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]));
 // Nút Cất cho món đang chạm (label = tên món, null = ẩn)
 export function buildSel(label, up) {   // label: món cất được (nút Cất); up: S.upgradeInfo của chuồng đang chọn (nút Nâng cấp)
@@ -548,7 +555,7 @@ const section = t => h('h3', { class: 'sec' }, t);
 const coinTag = n => h('span', { class: 'price' }, '🪙 ' + fmt(n));
 
 // ---------- Chợ Bà Tư ----------
-const PEN_NAME = { chicken: 'chuồng gà', pig: 'chuồng heo', pasture: 'bãi cỏ' };
+const PEN_NAME = { chicken: 'chuồng gà', pig: 'chuồng heo', pasture: 'bãi cỏ', cathouse: 'nhà mèo' };
 async function buyItem(id, qty) {
   const r = res(S.buy(st(), id, qty), 'coin');
   if (!r?.ok) return;
@@ -588,12 +595,14 @@ PANELS.market = {
       for (const [type, a] of Object.entries(D.ANIMALS).sort((x, y) => x[1].lv - y[1].lv)) {
         const n = S.penCount(s, a.pen), cap = S.penCap(s, a.pen);
         const locked = a.lv > lv, full = n >= cap;
+        // mèo là thú cưng: bắt chuột, không bán được, phải có nhà mèo trước
+        const what = a.pet ? 'thú cưng bắt chuột · không bán' : `${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`;
         list.append(row({
           icon: ico(type), name: a.baby, locked,
-          desc: [`Trưởng thành sau ${D.stageStart(type, 'truong') / MIN} phút ·${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`],
+          desc: [`Trưởng thành sau ${D.stageStart(type, 'truong') / MIN} phút · ${what}`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`],
           right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + a.lv)
             : h('div', { class: 'sexbuy' }, ['m', 'f'].map(sex => h('div', { class: 'sexopt' }, coinTag(D.animalPrice(type, sex)),
-              btn(full ? (cap ? 'Đầy' : 'Chưa có chuồng') : (sex === 'm' ? 'Mua ♂ đực' : 'Mua ♀ cái'), () => res(S.buyAnimal(st(), type, sex), 'coin')?.ok && (flags.bought = true), 'green sm', { disabled: shut || full || s.coins < D.animalPrice(type, sex), 'data-sex': sex })))),
+              btn(full ? (cap ? 'Đầy' : a.pet ? 'Chưa có nhà mèo' : 'Chưa có chuồng') : (sex === 'm' ? 'Mua ♂ đực' : 'Mua ♀ cái'), () => res(S.buyAnimal(st(), type, sex), 'coin')?.ok && (flags.bought = true), 'green sm', { disabled: shut || full || s.coins < D.animalPrice(type, sex), 'data-sex': sex })))),
         }));
       }
       return;

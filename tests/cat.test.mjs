@@ -220,8 +220,12 @@ test('tối mèo vào nhà ngủ qua cửa mèo, sáng ra lại ra vườn', () 
   seeded(109, () => G.tick(s, MIN));
   assert.equal(cat.scene, 'farm');
   assert.equal(cat.sleep, false);
-  // tua tới ban đêm
-  seeded(110, () => { while (!G.isNight(s)) G.tick(s, MIN); G.tick(s, MIN); });
+  // tua tới ban đêm: mèo đi tới cửa mèo trên nhà trước, chui qua rồi mới vào bản đồ nhà
+  seeded(110, () => { while (!G.isNight(s)) G.tick(s, 1000); });
+  const door = mapOf(s).catDoor;
+  assert.equal(cat.scene, 'farm', 'vừa tối thì mèo còn đang đi về');
+  assert.deepEqual({ x: cat.tx, y: cat.ty }, { x: door.x, y: door.y }, 'mèo đi về phía cửa mèo');
+  seeded(110, () => G.tick(s, CAT.doorMs + 1000));
   assert.equal(cat.scene, 'house', 'tối mèo ngủ trong bản đồ nhà');
   assert.equal(cat.sleep, true);
   assert.deepEqual(G.catsIn(s, 'house').map(c => c.id), [cat.id]);
@@ -230,6 +234,21 @@ test('tối mèo vào nhà ngủ qua cửa mèo, sáng ra lại ra vườn', () 
   seeded(111, () => { while (G.isNight(s)) G.tick(s, MIN); G.tick(s, MIN); });
   assert.equal(cat.scene, 'farm');
   assert.deepEqual(G.catsIn(s, 'farm').map(c => c.id), [cat.id]);
+});
+
+test('luật chỉ chọn ô cho mèo đi tuần và vồ chuột, bước đi là việc của world.js (không nhảy cóc)', () => {
+  const s = newGame();
+  const cat = addCat(s, 'truong', { hunger: 100 });
+  const x0 = cat.x, y0 = cat.y;
+  seeded(120, () => G.tick(s, 1000));
+  assert.ok(cat.tile, 'luật đã chọn ô đi tuần');
+  assert.deepEqual({ x: cat.tx, y: cat.ty }, { x: cat.tile.c * TS + 8, y: cat.tile.r * TS + 8 });
+  assert.deepEqual({ x: cat.x, y: cat.y }, { x: x0, y: y0 }, 'luật không dời mèo tới đó ngay');
+  // tới lượt rình: nhắm đúng ô con chuột
+  const [c0, r0] = tileNear(s), rat = putRat(s, c0, r0);
+  Object.assign(cat, { hunger: 45, huntAt: s.time });
+  seeded(121, () => G.tick(s, 1000));
+  assert.deepEqual({ x: cat.tx, y: cat.ty }, { x: rat.x, y: rat.y }, 'mèo lao tới ô con chuột');
 });
 
 test('mèo với chó thỉnh thoảng cãi nhau: vui thôi, không đổi chỉ số nào', () => {

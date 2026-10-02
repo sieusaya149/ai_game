@@ -4,7 +4,7 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR3, muddy } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear } from './state.js';
+import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
@@ -246,6 +246,18 @@ export function dogPoseImg(dog, pose, face, frame) {
   const set = pose && SPR3?.[DOG_POSE[pose]]?.[dog.stage];
   return set ? set[face][frame % set[face].length] : dogImg(dog, face, frame);
 }
+// Mèo (issue 44): mỗi dáng một bộ art riêng theo giai đoạn ở art3 (vồ, phơi nắng, ngậm chuột); thiếu art thì về dáng đứng.
+// rt = dữ liệu chạy của world.js (hướng, đang đi, đang vồ, đã tới chỗ khoe)
+export function catImg(c, rt = {}) {
+  const st = c.stage ?? 'truong', face = rt.face ?? 'left', base = { type: 'meo', stage: st, sex: c.sex };
+  const fr = Math.floor((rt.anim ?? 0) * (rt.walking ? (rt.run ? 10 : 7) : 2)) % 2;
+  const pose = key => { const set = SPR3?.[key]?.[st]; return set ? set[face][fr % set[face].length] : null; };
+  if (c.sick >= 2 || c.sleep) return animalImg(base, face, 0, c.sleep);
+  if (rt.pounceT) return pose('catPounceBy') ?? animalImg(base, face, 0);
+  if (c.sun) return pose('catNapBy') ?? animalImg(base, face, 0, true);
+  if (c.trophy && !rt.shown) return pose('catMouseBy') ?? animalImg(base, face, 0);
+  return animalImg(base, face, rt.walking ? fr : 0);
+}
 export function crowImg(face, frame) {
   const set = SPR.crow ?? crowFallback();
   return set[face][frame % set[face].length];
@@ -284,6 +296,7 @@ export function buildingImg(b) {
   if (b.sprite === 'well') return wellImg();
   if (b.sprite === 'board') return boardImg();
   if (b.sprite === 'doghouse' && SPR3?.doghouse) return SPR3.doghouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.doghouse[0];   // chuồng chó 3 cấp
+  if (b.sprite === 'cathouse' && SPR3?.cathouse) return SPR3.cathouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.cathouse[0];   // nhà mèo 3 cấp
   return SPR[b.sprite] ?? SPR2?.[b.sprite] ?? null;
 }
 export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h: i.height }; }
@@ -500,6 +513,8 @@ function drawBuild(ctx, state, m, b, now) {
   if (di) ctx.drawImage(di, Math.round(dc.x + dx - di.width / 2), Math.round(dc.y + dy - di.height + 1));
   const ni = g.what?.kind === 'deco' && decoImg(g.what.item);   // món mới đặt: vẽ mờ theo ngón tay
   if (ni) ctx.drawImage(ni, Math.round(g.c * TS + 8 - ni.width / 2), Math.round(g.r * TS + 13 - ni.height));
+  const ci = g.what?.kind === 'cathouse' && SPR3?.cathouse?.[0];   // nhà mèo mới xây
+  if (ci) ctx.drawImage(ci, Math.round(g.c * TS - 5), Math.round(g.r * TS - 8));
   ctx.globalAlpha = 1;
 }
 
@@ -562,6 +577,8 @@ export function render(ctx, f) {
   const small = { non: 0.6, nho: 0.8 };
   for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, Math.round((a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : 6) * (small[a.stage] ?? 1)));
   if (farm && state.dog.x != null && vis(state.dog.x, state.dog.y)) shadow(state.dog.x, state.dog.y, 6);
+  const cats = catsIn(state, m.scene);
+  for (const c of cats) if (c.x != null && vis(c.x, c.y)) shadow(c.x, c.y, Math.round(5 * (small[c.stage] ?? 1)));
   for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
   for (const p of preds) if (p.x != null && vis(p.x, p.y, 40) && p.kind !== 'hawk') shadow(p.x, p.y, p.kind === 'rat' ? 4 : 6);
 
@@ -805,6 +822,32 @@ export function render(ctx, f) {
         ctx.drawImage(ti, bx + Math.round((bb.width - w) / 2), by + 2, w, hh);
       });
     }
+  }
+  // cửa mèo trên nhà: mèo ra vào tự do (chỉ hiện khi đã nuôi mèo hoặc đã xây nhà mèo)
+  const cd = farm && m.catDoor, cdi = SPR3?.catDoor;
+  if (cd && cdi && (cats.length || state.cats?.length || catHouses(state).length) && vis(cd.x, cd.y)) add(cd.y + 7, () => blit(cdi, cd.x - cdi.width / 2, cd.y - cdi.height + 1));
+  // mèo (issue 44): ban ngày ngoài vườn, ban đêm ngủ trong nhà
+  for (const c of cats) {
+    if (c.x == null || !vis(c.x, c.y)) continue;
+    const rt = wd.rt.get('c' + c.id) ?? {};
+    const im = catImg(c, rt);
+    if (!im) continue;
+    add(c.y, () => {
+      blit(im, c.x - im.width / 2, c.y - im.height + 1);
+      const side = rt.face === 'right' ? 1 : -1;
+      // mèo con vờn cuộn len cạnh chân
+      const yn = rt.yarn && SPR3?.catYarn?.[rt.face ?? 'left'];
+      if (yn) { const f = yn[Math.floor(now / 260) % yn.length]; blit(f, c.x + side * (im.width / 2 + 1) - (side < 0 ? f.width : 0), c.y - f.height + 1); }
+      // tới chỗ người chơi rồi: thả con chuột xuống trước mặt để khoe
+      const tp = c.trophy && rt.shown && SPR3?.ratTrophy;
+      if (tp) blit(rt.face === 'right' ? derived(tp, 'flip', () => flip(tp)) : tp, c.x + side * (im.width / 2) - (side < 0 ? tp.width : 0), c.y - tp.height + 2);
+    });
+    // cãi nhau với chó: bong bóng ồn ào trên đầu (vui thôi, không hại gì)
+    const sb = state.time < (c.spatUntil || 0) && SPR3?.spatBubble?.left;
+    if (sb) { const f = sb[Math.floor(now / 200) % sb.length]; add(c.y + 1, () => blit(f, c.x - f.width / 2, c.y - im.height - f.height - 2)); }
+    const emote = wd.emotes.get('c' + c.id);
+    const icon = emote && emote.until > now ? statusIcon(emote.icon) : c.sick ? statusIcon('sick') : c.sleep ? statusIcon('zzz') : c.hunger < 15 ? statusIcon('hungry') : null;
+    if (!sb) bub(c.x, c.y - im.height - 1, icon, 'c' + c.id, c.sick >= 2 ? 'bad' : c.sick ? 'warn' : null);
   }
   // quạ & trộm NPC (thằng Tèo, Tí Sún, chồn hương)
   for (const t of threats) {

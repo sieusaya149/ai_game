@@ -2201,6 +2201,16 @@ function treat() {
     R(x, '#8a5420', 5, 6); R(x, '#8a5420', 7, 5);
   });
 }
+// cá khô cho mèo (issue 44): con cá phơi khô màu vàng nâu, mắt tròn, đuôi chẻ
+function catfood() {
+  return draw(12, 12, x => {
+    ell(x, OUT, 5, 6, 4.2, 2.6); R(x, OUT, 8, 3, 3, 7);                          // viền thân + đuôi
+    ell(x, '#c98a3a', 5, 6, 3.2, 1.7); R(x, '#c98a3a', 9, 4, 1, 1); R(x, '#c98a3a', 9, 8, 1, 1); R(x, '#c98a3a', 8, 5, 1, 3);
+    R(x, '#f0c070', 3, 5, 4, 1); R(x, '#e4a850', 2, 6, 1, 1);                     // lưng sáng
+    R(x, '#8a5420', 4, 7, 4, 1); R(x, '#8a5420', 6, 5); R(x, '#8a5420', 7, 6);     // vảy, bụng tối
+    R(x, '#fff6dc', 2, 5); R(x, '#3b2412', 3, 5);                                  // mắt
+  });
+}
 function sausage() {
   return draw(12, 12, x => {
     for (let i = 0; i < 8; i++) { const y = 7 - Math.round(Math.sin((i / 7) * Math.PI) * 2); ell(x, OUT, 2 + i, y, 1.8, 1.8); }
@@ -2877,7 +2887,7 @@ export const SPR3 = {
   ratTrapFull: ratTrapFull(),
   canopy: canopy(),
   vetClinic: vetClinic(),
-  items: { soapBar: soapBar(), vaccine: vaccine(), medicine: medicine(), treat: treat(), sausage: sausage(), manure: manure(), feedSack: feedSack() },
+  items: { soapBar: soapBar(), vaccine: vaccine(), medicine: medicine(), treat: treat(), catfood: catfood(), sausage: sausage(), manure: manure(), feedSack: feedSack() },
   status: {
     heart1: heartN(1), heart2: heartN(2), heart3: heartN(3), heart4: heartN(4), heart5: heartN(5),
     dirtyIcon: dirtyIcon(), strayIcon: strayIcon(), warn: warn(),

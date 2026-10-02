@@ -133,8 +133,8 @@ function applyResult(res, target, id) {
   if (res.punish) ui.askPunish(res.punish).then(() => changed());   // bắt được trộm: hộp thoại chọn kiểu phạt
   if (res.buyStrip) askStrip(res.buyStrip);
   if (res.sleep) goSleep();
-  if (res.ok && target && (/pet|vuot|stroke|love/i.test(id ?? '') || (target.kind === 'animal' && id === 'feed'))) {
-    const key = target.kind === 'dog' ? 'dog' : target.kind === 'animal' ? 'a' + target.id : null;
+  if (res.ok && target && (/pet|vuot|stroke|love|praise/i.test(id ?? '') || ((target.kind === 'animal' || target.kind === 'cat') && id === 'feed'))) {
+    const key = target.kind === 'dog' ? 'dog' : target.kind === 'animal' ? 'a' + target.id : target.kind === 'cat' ? 'c' + target.id : null;
     if (key) world.emotes.set(key, { icon: 'heart', until: now + 1600 });
   }
   changed();

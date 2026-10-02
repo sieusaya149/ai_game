@@ -231,7 +231,8 @@ export const CAT = {
   spatRadius: 4,              // ô: phải đứng gần chó mới cãi nhau được
   moveMs: [5000, 12000],      // đổi ô sau khoảng này
   roamRadius: 6,              // ô kế tiếp cách ô hiện tại tối đa chừng này
-  houseSpot: { x: 44, y: 62 },   // chỗ mèo nằm ngủ trong bản đồ nhà (cạnh giường)
+  houseSpot: { x: 34, y: 78 },   // chỗ mèo nằm ngủ trong bản đồ nhà (dưới chân giường)
+  doorMs: 20_000,             // tối: mèo đi về cửa mèo trên nhà trong chừng này rồi mới chui vào nhà
 };
 
 // ---------- Dạy lệnh cho chó (issue 45) ----------

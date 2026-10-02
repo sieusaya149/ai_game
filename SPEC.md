@@ -103,6 +103,8 @@ state = {
   dog: { stage, age, hunger, happy, x, y, nextPoop, name,     // stage/age như con vật, theo LIFE.cho
          tricks: { <lệnh>: số buổi đã đạt }, trainDay, session,   // dạy lệnh (issue 45); session = buổi đang mở
          cmd: null | { id, spot?, until?, list? }, herdDay, scene },   // lệnh đang thi hành · ngày đã tự lùa · bản đồ chó đang đứng
+  cats: [ { id, type: 'meo', name, sex, pet: true, stage, age, hunger, happy, sick, sickSince, sickMs, dose, vaccUntil, bond, bondXp,   // mèo (issue 44)
+          scene: 'farm'|'house', sleep, sun, x, y, tx, ty, tile, tileAt, inAt, huntAt, trophy: null | { until }, spatUntil } ],
   poops: [ { id, x, y, at } ],
   threats: [ { id, kind: 'crow'|'thief'|'tisun'|'civet', plot, at?, target?, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
                                               // quạ/Tèo nhắm ô ruộng `plot`; Tí Sún và chồn hương nhắm điểm `at` (chồn hương kèm `target` = id con vật)
@@ -340,6 +342,26 @@ PRED_NAME                // { rat: 'Chuột', hawk: 'Diều hâu', weasel: 'Ch�
 - **ADR 0004 (cứng):** khi chạy bù offline (`catchUp`) **chuột chỉ ăn cám và trộm trứng** — không cắn con non; diều hâu, chồn **không tới** (con đã có sẵn trong bản lưu thì bỏ đi tay không), nên **không con nào chết**. Vết thương đang có bị kẹp ở `rat.hurtCapMs`. Chạy bù cũng không sinh chuột quá 8.
 - Hiển thị: `render.js` vẽ `SPR3.rat`/`ratEat`/`ratFlee`, `SPR3.hawk`/`hawkDive`/`hawkCarry` (+ `hawkShadow` in trên mặt đất), `SPR3.weasel`/`weaselCatch`, băng gạc `SPR3.hurtPatch` trên con non bị cắn, bẫy `SPR3.ratTrap`/`ratTrapShut`/`ratTrapFull`, mái che `SPR3.canopy`; bong bóng cảnh báo `SPR3.status.warn` trên đầu kẻ săn mồi sắp ra tay, `SPR3.status.hurtIcon` trên con bị thương.
 
+### Mèo bắt chuột (issue 44, ADR 0004 + 0013)
+```js
+cats(state)              // → state.cats (thú cưng, không nằm trong state.animals)
+catOf(state, id)         // → con mèo theo id | null
+catsIn(state, scene)     // → mèo đang ở bản đồ 'farm' (ban ngày) hay 'house' (ban đêm)
+catTrophies(state)       // → mèo đang ngậm chuột tới khoe (c.trophy)
+catHouses(state) · catCap(state)   // → các nhà mèo đã xây · tổng chỗ (PEN_TABLE.cathouse.cap theo cấp)
+buyCat(state, sex)       // mua ở chợ Bà Tư: reason 'closed' | 'level' | 'no_pen' (chưa có nhà mèo) | 'full' | 'sex' | 'coins'; buyAnimal(s, 'meo', sex) gọi vào đây
+catHunting(state, c)     // → mèo này đang chịu săn không (ngoài vườn, thức, đói vừa phải)
+catHerd(state, id)       // lùa 1 con ngoài chuồng gần mèo nhất; reason 'stage' | 'mood' (happy < CAT.herdHappy) | 'none'
+praiseCat(state, id)     // khen mèo đang khoe chuột: +happy, +độ thân, trophy = null; reason 'none' khi chưa có gì để khoe
+```
+- **Nhà mèo:** `{ kind: 'cathouse' }` đặt bằng `placeEntity` (giá `BUILD_PRICES.cathouse`, cấp/giới hạn theo `PEN_TABLE.cathouse`), nâng cấp bằng `upgradePen`. Cửa mèo là `mapOf(s).catDoor` trên nhà (`BUILDING_DEFS.house.catDoor`), chỗ nhà mèo là `mapOf(s).catHome`.
+- **Săn (luật trừu tượng):** mỗi `CAT.huntEvery` một lượt rình, nhắm con chuột gần nhất theo ô, trúng với `CAT.catchChance[giai đoạn]` × hệ số đói (đói trong `CAT.bestHunger` = 1, ngoài khoảng = `CAT.offBand`). No hơn `CAT.lazyFull` thì `c.sun = true` (nằm phơi nắng, không săn); mèo con không săn; mèo già chỉ săn khi `hunger < CAT.oldHungry`. Trưởng thành ≈ 1 con chuột mỗi 10 phút vườn. Trúng: chuột biến mất, `stats.rats++`, event `catRat`, rồi `c.trophy = { until }` + event `catTrophy` (chạy bù offline thì vẫn bớt chuột nhưng không có màn khoe).
+- **Luật chỉ chọn ô:** luật đặt `c.tile` và `c.tx/c.ty` (ô đi tuần, ô con chuột bị vồ, cửa mèo); `world.js` kéo `c.x/c.y` tới đó. Đang có `trophy` thì `world.js` cho mèo ngậm chuột chạy tới đứng cạnh người chơi rồi thả chuột xuống khoe; chạm vào mèo thì `praise` là hành động chính.
+- **Đêm:** vừa tối (`isNight`) mèo đi về cửa mèo (`c.inAt` = lúc chui qua, sau `CAT.doorMs`), rồi `scene = 'house'`, `sleep = true`, nằm ở `CAT.houseSpot` trong bản đồ nhà. Sáng chui ra cửa mèo lại vườn.
+- **Cãi nhau với chó:** chó đứng trong `CAT.spatRadius` ô thì thỉnh thoảng (`CAT.spatPerMin`) có event `catSpat`, `c.spatUntil` để vẽ bong bóng. Không đổi chỉ số nào.
+- **Không dạy lệnh, không dơ, không bán, không chết vì già** (`LIFE.meo.gia = Infinity`). Mắc bệnh như vật nuôi (`CAT.sickMul`), uống thuốc/tiêm vắc-xin bằng chung hàm; đổi tên bằng `renameAnimal`.
+- **ADR 0004:** chạy bù offline mèo vẫn bắt chuột (chuột ít đi), không con vật nào chết.
+- Hiển thị: `render.catImg(c, rt)` chọn `SPR3.animal.meo` / `sleepBy.meo` / `catPounceBy` / `catNapBy` (phơi nắng) / `catMouseBy` (ngậm chuột) theo giai đoạn; `SPR3.ratTrophy` (chuột thả xuống khoe), `SPR3.catYarn` (mèo con vờn len), `SPR3.spatBubble`, `SPR3.catDoor` trên nhà, `SPR3.cathouse[cấp-1]`, `SPR3.items.catfood` (cá khô, mua ở chợ).
 ### Trộm NPC: Tí Sún, chồn hương, phạt trộm (issue 46)
 
 ```js
@@ -513,6 +535,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'dog' }           // chó Mực: ở vườn, hay bất cứ bản đồ nào khi đang có lệnh Đi theo
 { kind: 'threat', id }
 { kind: 'pred', id }           // chuột, diều hâu, chồn: chạm để đuổi (issue 43)
+{ kind: 'cat', id }            // mèo (issue 44): ở vườn ban ngày, trong nhà ban đêm
 { kind: 'deco', id }           // đồ trang trí trong vườn (ghế đá: ngồi nghỉ)
 { kind: 'clutter', id }        // bụi / đá chưa dọn: Dọn bụi, Đập đá
 { kind: 'strip', dir }         // mép vườn: mua dải đất 'N'|'S'|'E'|'W'
@@ -520,7 +543,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'building', id }       // theo bản đồ đang đứng. Vườn: house, gate, shed, shipbin, board, well, doghouse (không tương tác).
                                //   Nhà: bed, wardrobe, (stove, table, plant chỉ để ngắm). Làng: market, smithy, friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck` (và `upgrade` nâng cấp chuồng); cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet train cmd_<lệnh> cmd_stop`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck` (và `upgrade` nâng cấp chuồng); cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet train cmd_<lệnh> cmd_stop`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 
@@ -539,6 +562,10 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `ratFeed` | `pen` | important (`pest`) — chuột ăn mất một phần cám |
 | `ratEgg` | — | important (`pest`) — chuột trộm mất một quả trứng |
 | `trapped` | `id` (thực thể bẫy) | info — bẫy chuột sập |
+| `catRat` | `id`, `cat` | info — mèo bắt được một con chuột (cả lúc chạy bù) |
+| `catTrophy` | `id` | info — mèo ngậm chuột tới khoe người chơi |
+| `catSpat` | `id` | info — mèo với chó cãi nhau (vui thôi) |
+| `catHerd` | `id`, `animal` | info — mèo lùa một con về chuồng |
 | `shooed` | `pred`, `id` | info — đã đuổi được kẻ săn mồi |
 | `ripe` | `crop` | important (`ripe`) |
 | `rotten`, `dead` | `crop` | important (`spoil`) |

@@ -1620,7 +1620,7 @@ function mkCat(s, stage = 'non', extra = {}) {
     stage, age: stageStart('meo', stage), hunger: 100, happy: 60,
     sick: 0, sickSince: 0, sickMs: 0, dose: 0, vaccUntil: 0,
     bond: 2, bondXp: 0,
-    scene: 'farm', sleep: false, sun: false, x: h.x, y: h.y, tile: null, tileAt: 0,
+    scene: 'farm', sleep: false, sun: false, x: h.x, y: h.y, tx: h.x, ty: h.y, tile: null, tileAt: 0, inAt: 0,
     huntAt: s.time + CAT.huntEvery, trophy: null, spatUntil: 0,
     ...extra,
   };
@@ -1659,7 +1659,7 @@ function catStrike(s, c) {
   const at = c.tile ?? { c: Math.floor(c.x / TS), r: Math.floor(c.y / TS) };
   const p = rats.reduce((best, r) => (far(r.tile, at) < far(best.tile, at) ? r : best));
   c.tile = { ...p.tile };
-  Object.assign(c, tileMid(c.tile));
+  goTile(c, c.tile);
   c.tileAt = s.time + rnd(...CAT.moveMs);
   if (Math.random() >= CAT.catchChance[c.stage] * mul) return;
   s.preds.splice(s.preds.indexOf(p), 1);
@@ -1682,8 +1682,10 @@ function catWalk(s, c) {
   const near = roam.tiles.filter(t => far(t, from) <= CAT.roamRadius);
   c.tile = { ...pick(near.length ? near : roam.tiles) };
   c.tileAt = s.time + rnd(...CAT.moveMs);
-  Object.assign(c, tileMid(c.tile));
+  goTile(c, c.tile);
 }
+// Luật chỉ chọn ô; world.js cho mèo đi tới (tx, ty) cho đẹp, như chuột (ADR 0013)
+const goTile = (c, t) => { const m = tileMid(t); c.tx = m.x; c.ty = m.y; };
 function stepCats(s, d) {
   s.cats ??= [];
   const night = isNight(s), m = mapOf(s);
@@ -1704,12 +1706,17 @@ function stepCats(s, d) {
     if (!c.sick && !vaccinated(s, c) && chance(HUSBANDRY.sickChancePerMin * CAT.sickMul * sickFactor(c) * (c.stage === 'gia' ? SICK.oldChanceMul : 1), d)) fall(s, c, def);
     if (c.sick) stepSick(s, c, d, def);
     if (c.trophy && s.time >= c.trophy.until) c.trophy = null;
-    // tối vào nhà ngủ qua cửa mèo, sáng ra lại ra vườn
-    const want = night ? 'house' : 'farm';
+    // tối đi về cửa mèo trên nhà, chui qua (sau CAT.doorMs) rồi ngủ trong nhà; sáng chui ra lại vườn
+    const want = night ? 'house' : 'farm', out = m.catDoor ?? m.catHome ?? m.spawn;
+    if (want === 'house' && (c.scene ?? 'farm') === 'farm') {
+      if (!c.inAt) { c.inAt = s.time + CAT.doorMs; c.tx = out.x; c.ty = out.y; c.tile = null; c.trophy = null; c.sun = false; }
+      if (s.time < c.inAt) continue;   // đang đi về cửa mèo: không săn, không cãi nhau
+    }
+    c.inAt = 0;
     if ((c.scene ?? 'farm') !== want) {
       c.scene = want; c.tile = null;
-      const out = m.catDoor ?? m.catHome ?? m.spawn;
-      Object.assign(c, want === 'house' ? CAT.houseSpot : { x: out.x, y: out.y + 8 });
+      const at = want === 'house' ? CAT.houseSpot : { x: out.x, y: out.y + 8 };
+      Object.assign(c, at, { tx: at.x, ty: at.y });
     }
     c.sleep = want === 'house';
     c.sun = !c.sleep && c.stage !== 'non' && !c.sick && catHuntMul(c) === 0;   // lười thì nằm phơi nắng
