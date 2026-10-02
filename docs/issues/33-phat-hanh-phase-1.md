@@ -45,9 +45,9 @@ Quy trình ở `DESIGN.md` mục 9:
 - [x] Thử tay trên điện thoại thật có tai thỏ (ghi rõ nếu chỉ giả lập bằng cách đè `env(safe-area-inset-*)`). — **chỉ giả lập** (đè `--sl/--sr/--st/--sb` trong `e2e/mobile360.spec.mjs`), chưa thử máy thật.
 - [x] `SPEC.md` không còn chỗ nào mâu thuẫn với PRD 0002 và các ADR; một agent mới chỉ đọc `SPEC.md` biết file nào được sửa, gọi API nào, test ở đâu. Hợp đồng API khớp với code.
 - [x] Unit test (seam 1 và seam 3) và e2e pass hết trên máy local trước khi deploy. Ghi lại số test pass. — số liệu ở ghi chú phát hành bên dưới.
-- [ ] Deploy xong, container `ai-game` ở trạng thái Up, file SQLite còn nguyên sau khi khởi động lại container. — deploy một lần chung với Phase 2, sau khi gộp `phase2` vào `main`.
+- [x] Deploy xong, container `ai-game` ở trạng thái Up, file SQLite còn nguyên sau khi khởi động lại container. — deploy chung với Phase 2 (`807d8ba`, rồi `c423beb`); dữ liệu còn nguyên qua lần tạo lại container thứ hai.
 - [ ] Lệnh sao lưu chạy được trên VPS và cho ra file đọc lại được. — bỏ (người dùng chốt tối 2026-10-02: không sao lưu).
-- [ ] Smoke live pass với tài khoản test và tài khoản đó đã bị xóa sau khi chạy (đăng nhập lại bằng nó thất bại). — chưa làm (người dùng chốt tối 2026-10-02: chưa cần smoke).
+- [x] Smoke live pass với tài khoản test và tài khoản đó đã bị xóa sau khi chạy (đăng nhập lại bằng nó thất bại). — smoke online 3/3 trên bản thật, tài khoản `zzsmoke…` đã xóa bằng `delete-account`.
 - [ ] Một người chơi thật (không phải tài khoản test) đăng ký bằng mã mời, mang vườn cũ lên làng không mất gì. — chờ người dùng thử sau deploy (5 mã mời tạo lúc deploy).
 - [x] Mọi issue 20–32 ở trạng thái ✅.
 

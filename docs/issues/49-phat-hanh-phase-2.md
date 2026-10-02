@@ -37,11 +37,11 @@ Yêu cầu: không tràn ngang, nút đủ to để bấm, tránh vùng tai th�
 - [x] E2E ở 360x740, 320x640, 412x915 mở từng bảng trên: không cuộn ngang, nút nằm trong màn hình và đủ lớn, các lớp nổi không đè nhau (mở rộng `e2e/mobile360.spec.mjs`).
 - [x] Giả lập tai thỏ bằng cách đè biến `env(safe-area-inset-*)`: mọi nút nằm trong vùng an toàn. Ghi rõ phần chưa thử máy thật.
 - [x] `SPEC.md` không còn chỗ nào mâu thuẫn với PRD 0003 và các ADR; một agent mới chỉ đọc `SPEC.md` là biết file nào được sửa, gọi API nào, test ở đâu; hợp đồng API khớp với code.
-- [ ] Unit, test giao thức server và e2e pass hết trên máy local trước khi deploy. Ghi lại số test pass. Có test riêng xác nhận chạy bù offline không gây chết (ADR 0004). *(unit + seam 3 pass hết; e2e mới chạy các spec liên quan, còn chờ chạy cả bộ sau khi gộp bản sửa fixture chó, xem ghi chú phát hành)*
-- [ ] Deploy xong, container `ai-game` ở trạng thái chạy. *(người điều phối deploy)*
-- [ ] Smoke live pass. *(theo luật người dùng: chưa cần smoke live)*
+- [x] Unit, test giao thức server và e2e pass hết trên máy local trước khi deploy. Ghi lại số test pass. Có test riêng xác nhận chạy bù offline không gây chết (ADR 0004). *(unit 529/529, e2e đầy đủ 336 pass / 0 hỏng trên nhánh phát hành, xem ghi chú phát hành)*
+- [x] Deploy xong, container `ai-game` ở trạng thái chạy. *(`c423beb`, healthy)*
+- [x] Smoke live pass. *(3/3: 2 smoke Phase 0 + smoke online hai người chơi; tài khoản test `zzsmoke…` đã xóa)*
 - [x] Bản lưu v2 thật chuyển sang v3 không mất gì (nếu chưa mở được bằng trình duyệt thật thì ghi rõ và dùng fixture v2). *(dùng fixture v2, xem ghi chú phát hành)*
-- [ ] Mọi issue 34–48 ở trạng thái ✅. Ghi chú phát hành Phase 2 được thêm vào cuối file này. *(ghi chú đã thêm; trạng thái trong `docs/issues/README.md` do người điều phối cập nhật)*
+- [x] Mọi issue 34–48 ở trạng thái ✅. Ghi chú phát hành Phase 2 được thêm vào cuối file này.
 
 ## Blocked by
 
@@ -95,3 +95,12 @@ Yêu cầu: không tràn ngang, nút đủ to để bấm, tránh vùng tai th�
 - Deploy: **người điều phối deploy** (`git push` rồi `git pull && docker compose up -d --build` trên VPS). Không sao lưu SQLite.
 - Smoke live: chưa làm (theo luật người dùng, chưa cần).
 - Chập chờn đã thấy: `petguide` "Cô Út" ở desktop hỏng một lần, chạy lại thì pass.
+
+### Deploy và smoke live (sáng 2026-10-03, người điều phối)
+
+- **Bản deploy:** Phase 1 + Phase 2, cùng art 2× cho toàn game, bộ smoke online và test ổn định online. Lần deploy đầu là `807d8ba`; lần hai `c423beb` sửa lỗi đăng xuất. Đây là lần đầu server Node chạy trên VPS, volume `ai-game_data` mới tạo. Container `ai-game` healthy.
+- **Test trên máy local trước deploy:** unit 529/529, e2e đầy đủ 336 pass, 0 hỏng (84 bỏ qua là spec chỉ chạy một cỡ màn hình).
+- **Smoke live lần 1:** smoke online hỏng ở bước đăng xuất rồi "Vào làng". Đây là lỗi thật của game, chỉ lộ ra khi mạng có độ trễ: đăng xuất chạy sau bản lưu cuối nên `GET /api/me` vẫn đọc phiên cũ, rồi `/api/play` bị 401 và người chơi kẹt ở màn chọn chế độ. Đã sửa ở `c423beb`, kèm e2e giả lập mạng chậm.
+- **Smoke live lần 2:** 3/3 pass. Tài khoản test đã xóa, làng thật không còn tài khoản `zzsmoke…`.
+- **Mã mời:** đã tạo 5 mã cho người dùng (chỉ báo trong chat, không ghi vào repo).
+- **Chỉ giả lập, chưa thử máy thật:** tai thỏ, máy chậm, bản lưu v2 thật mở bằng trình duyệt thật (đã dùng fixture và dòng v2 thô trong SQLite).

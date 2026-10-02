@@ -76,7 +76,7 @@ Nguồn: [PRD 0003](../prd/0003-phase-2-vat-nuoi.md).
 | 46 | [Trộm NPC mới](46-trom-npc-moi.md) | 42, 45 | ✅ |
 | 47 | [Vịt](47-vit.md) | 41 | ✅ |
 | 48 | [Hướng dẫn và thông báo vật nuôi](48-huong-dan-thong-bao-vat-nuoi.md) | 38, 42, 43 | ✅ |
-| 49 | [Phát hành Phase 2](49-phat-hanh-phase-2.md) | 34–48 | ⬜ |
+| 49 | [Phát hành Phase 2](49-phat-hanh-phase-2.md) | 34–48 | ✅ |
 
 **Làm song song được:** sau 34 thì 35, 37, 39; sau 35 thì 36, 41.
 
