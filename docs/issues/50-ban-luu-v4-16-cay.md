@@ -6,6 +6,8 @@
 
 ## What to build
 
+> **Đã làm trước (2026-10-02):** pixel art 16 cây × 5 giai đoạn + bệnh/héo/chết theo dáng từng cây đã có trong `public/art4.js` (`SPR4.crop[id]`, `SPR4.produce` cho 8 cây mới), và `cropImg` đã dùng cho 8 cây cũ. Issue này chỉ còn thêm 8 cây mới vào bảng số liệu và nối hình.
+
 Đây là lát dọn đường cho cả Phase 3. Về luật chơi, người chơi cũ gần như chưa thấy gì mới ngoài 8 loại cây thêm và hình cây đẹp hơn. Bên dưới, bản lưu đã có chỗ cho mọi hệ thống sau.
 
 - **Bản lưu v4 và bước chuyển v3→v4:**
