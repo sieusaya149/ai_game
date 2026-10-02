@@ -401,6 +401,20 @@ body.alerting #hud { top: calc(50px + var(--st)); }
 .dialog-btns { display: flex; gap: 10px; }
 .dialog-btns .btn { flex: 1; }
 
+/* ---------- Minigame dạy lệnh cho chó ---------- */
+.dialog.train { width: min(360px, 100%); }
+.train-dog { display: block; margin: 0 auto 8px; width: 96px; height: 80px; image-rendering: pixelated; }
+.train-wrap { position: relative; margin: 4px 0 8px; }
+.train-bar, .train-zone, .train-mark, .train-praise { background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; }
+.train-bar { position: relative; height: 26px; border-radius: 13px; background-color: #f3e3c2; border: 3px solid var(--wood); overflow: hidden; }
+.train-bar.good { box-shadow: 0 0 0 3px var(--green, #4caf50); }
+.train-bar.bad { box-shadow: 0 0 0 3px #b3261e; }
+.train-zone { position: absolute; top: 0; bottom: 0; background-color: #8fd65a; border-left: 2px solid #3d8c2a; border-right: 2px solid #3d8c2a; }
+.train-mark { position: absolute; top: 0; bottom: 0; width: 7px; margin-left: -3px; background-color: #e8541f; box-shadow: 0 0 0 1px #7a2a08; }
+.train-praise { position: absolute; top: -26px; width: 28px; height: 28px; margin-left: -14px; opacity: 0; transition: opacity 0.12s, transform 0.5s; pointer-events: none; }
+.train-praise.on { opacity: 1; transform: translateY(-6px); }
+.train-score { font-size: 14px; font-weight: 900; color: var(--wood); margin-bottom: 10px; }
+
 /* ---------- Màn hình nhỏ ---------- */
 /* Điện thoại: đồng hồ HUD xuống hai dòng (mùa + thời tiết / ngày giờ) để hàng thứ hai vừa 320px; nút nào cũng >= 40px */
 @media (max-width: 440px) {

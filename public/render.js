@@ -4,9 +4,9 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR3, muddy } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss } from './state.js';
+import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
-import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE } from './data.js';
+import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
 
@@ -226,6 +226,12 @@ const angelFallback = () => once('angel', () => {
   return c;
 });
 export const dogImg = (dog, face, frame, sleep) => animalImg({ type: 'dog', stage: dog.stage, sex: 'm' }, face, frame, sleep);
+// Dáng chó theo động tác lệnh (issue 45): mỗi giai đoạn một bộ art riêng; thiếu art thì về dáng đứng
+const DOG_POSE = { sit: 'dogSitBy', beg: 'dogBegBy', herd: 'dogHerdBy', bark: 'dogBarkBy' };
+export function dogPoseImg(dog, pose, face, frame) {
+  const set = pose && SPR3?.[DOG_POSE[pose]]?.[dog.stage];
+  return set ? set[face][frame % set[face].length] : dogImg(dog, face, frame);
+}
 export function crowImg(face, frame) {
   const set = SPR.crow ?? crowFallback();
   return set[face][frame % set[face].length];
@@ -604,7 +610,13 @@ export function render(ctx, f) {
 
   // trứng, phân
   // trứng trong bụi: vẽ ổ cỏ (đã soi thì vẽ như trứng đã soi)
-  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = (e.tile && !e.candled && (e.sp === 'vit' ? SPR3?.eggNestDuck : SPR3?.eggNest)) || eggImgOf(e); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
+  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => {
+    const im = (e.tile && !e.candled && (e.sp === 'vit' ? SPR3?.eggNestDuck : SPR3?.eggNest)) || eggImgOf(e);
+    blit(im, e.x - im.width / 2, e.y - im.height + 1);
+    // chó vừa đánh hơi ra (lệnh Tìm trứng): treo dấu mùi cho dễ thấy
+    const sn = e.found && SPR3?.sniffMark;
+    if (sn) { const f = sn.left[Math.floor(now / 320) % sn.left.length]; blit(f, e.x - f.width / 2, e.y - im.height - f.height - 1); }
+  });
   for (const p of farm ? state.poops ?? [] : []) {
     if (p.x == null || !vis(p.x, p.y)) continue;
     add(p.y, () => {
@@ -723,16 +735,33 @@ export function render(ctx, f) {
       ctx.globalAlpha = 1;
     });
   }
-  // chó
+  // chỗ chó đang gác (lệnh Canh khu)
+  const post = farm && dogPost(state);
+  if (post && SPR3?.guardPost) {
+    const px = post.c * TS + 8, py = post.r * TS + 14;
+    if (vis(px, py)) add(py, () => blit(SPR3.guardPost, px - SPR3.guardPost.width / 2, py - SPR3.guardPost.height));
+  }
+  // chó (đi theo chủ thì vẽ cả ở làng, trong nhà)
   const dog = state.dog;
-  if (farm && dog.x != null && vis(dog.x, dog.y)) {
+  if ((dog.scene ?? 'farm') === m.scene && dog.x != null && vis(dog.x, dog.y)) {
     const rt = wd.rt.get('dog') ?? {};
-    const im = dogImg(dog, rt.face ?? 'right', rt.walking ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0, !rt.walking && rt.nap);
+    const moving = rt.walking || rt.pose === 'herd';
+    const im = rt.pose ? dogPoseImg(dog, rt.pose, rt.face ?? 'right', Math.floor(rt.anim * (rt.pose === 'herd' ? 9 : 3)))
+      : dogImg(dog, rt.face ?? 'right', moving ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0, !moving && rt.nap);
     if (im) {
       add(dog.y, () => blit(im, dog.x - im.width / 2, dog.y - im.height + 1));
       const emote = wd.emotes.get('dog');
       const icon = emote && emote.until > now ? statusIcon(emote.icon) : dog.hunger < 30 ? statusIcon('hungry') : null;
       bub(dog.x, dog.y - im.height - 1, icon, 'dog');
+      // bong bóng lệnh đang thi hành
+      const tr = dog.cmd && TRICKS[dog.cmd.id], bb = SPR3?.cmdBubble, ti = tr && SPR3?.trickIcon?.[dog.cmd.id];
+      if (tr && bb && ti) add(dog.y + 1, () => {
+        // lòng bong bóng 12x10 (5 hàng dưới là đuôi nhọn): thu icon 16x16 cho vừa
+        const bx = Math.round(dog.x + im.width / 2 - 2), by = Math.round(dog.y - im.height - bb.height - 1);
+        const w = Math.min(12, ti.width), hh = Math.min(10, ti.height);
+        blit(bb, bx, by);
+        ctx.drawImage(ti, bx + Math.round((bb.width - w) / 2), by + 2, w, hh);
+      });
     }
   }
   // quạ & thằng Tèo

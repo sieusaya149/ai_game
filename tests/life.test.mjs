@@ -58,7 +58,7 @@ test('mỗi loài qua đúng từng mốc của bảng tuổi thọ', () => {
   assert.equal(LIFE.ga.truong, 20 * HOUR); assert.equal(LIFE.heo.gia, 6 * HOUR); assert.equal(LIFE.bo.truong, 45 * HOUR);
 });
 
-test('chó lớn theo giờ vườn nhưng không bao giờ già hay chết vì già', () => {
+test('chó lớn theo giờ vườn, có tuổi già nhưng không bao giờ chết vì già', () => {
   const s = newGame();
   assert.equal(s.dog.stage, 'non');
   s.dog.age = 30 * MIN - 500;
@@ -69,8 +69,8 @@ test('chó lớn theo giờ vườn nhưng không bao giờ già hay chết vì 
   assert.equal(s.dog.stage, 'truong');
   s.dog.age = 1e13;   // vài trăm năm giờ vườn
   const ev = quiet(() => G.tick(s, 5000));
-  assert.equal(s.dog.stage, 'truong');
-  assert.equal(G.lifeEnd('cho'), Infinity);
+  assert.equal(s.dog.stage, 'gia', 'chó có tuổi già (phát hiện trộm chậm hơn)');
+  assert.equal(G.lifeEnd('cho'), Infinity, 'nhưng không bao giờ ra đi');
   assert.ok(!ev.some(e => e.type === 'passed' || e.type === 'oldSoon'));
 });
 
@@ -174,7 +174,8 @@ test('hết giai đoạn già thì con vật ra đi, hóa thiên thần (cả l�
   const l = quiet(() => G.loadGame());
   assert.equal(l.animals.length, 0);
   assert.ok(l.away.lines.some(x => /1 con bò đã già và ra đi/.test(x)));
-  assert.equal(l.dog.stage, 'truong');
+  assert.equal(l.dog.stage, 'gia');
+  assert.ok(l.dog, 'chó già vẫn còn đó, không ra đi');
 });
 
 test('chạm vào con vật thấy giai đoạn; mua con vật thì là con non', () => {

@@ -5,6 +5,7 @@ import * as D from './data.js';
 import * as sound from './sound.js';
 import { SPR2 } from './art2.js';
 import { SPR3 } from './art3.js';
+import * as R from './render.js';
 import { createNotifier, arrowTargets, arrowFor } from './notify.js';
 import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
@@ -44,7 +45,7 @@ const EMOJI = {
   wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩',
   ga: '🐔', vit: '🦆', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕',
 };
-const ITEM3 = { soap: 'soapBar', manure: 'manure', medicine: 'medicine', vaccine: 'vaccine' };
+const ITEM3 = { soap: 'soapBar', manure: 'manure', medicine: 'medicine', vaccine: 'vaccine', treat: 'treat' };
 const iconCache = new Map();
 function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
@@ -804,6 +805,11 @@ const GUIDE = [
       'Vịt con lon ton đi thành hàng sau vịt mẹ. Vịt nhỡ đi khắp trại ban ngày như gà, tối tự về chuồng.',
       `Vịt mái trưởng thành đẻ trứng vịt (${D.PRODUCTS.trung_vit.price} xu, đắt hơn trứng gà); vịt già đẻ thưa dần. Có vịt cồ thì trứng có phôi, ấp nở ra vịt con.`,
       'Thả rông thì vịt hay đẻ giấu trong bụi — nhớ đi một vòng vườn nhặt trứng. Chuyện vịt bơi ở hồ để dành phần sau nhé.'] },
+  { title: 'Chó Mực và dạy lệnh', art: () => [SPR3?.animal?.cho?.non?.left?.[0], SPR3?.animal?.cho?.nho?.left?.[0], SPR3?.animal?.cho?.truong?.left?.[0], SPR3?.animal?.cho?.gia?.left?.[0], SPR3?.items?.treat],
+    text: ['Chó con nghịch và ỉa nhiều, chó nhỡ sủa lung tung nhưng đã học được lệnh, chó trưởng thành canh nhà đuổi trộm, chó già ngủ nhiều và nhìn xa kém hơn. Chó không bao giờ ra đi vì già.',
+      `Chạm vào chó, chọn Dạy lệnh. Mỗi ngày game một buổi, mỗi buổi tốn 1 ${D.ITEMS.treat.name.toLowerCase()} (mua ở chợ Bà Tư). Bấm Khen đúng lúc kim chạy vào vạch xanh là đạt.`,
+      `Chó vui thì học nhanh gấp đôi; chó đói hay buồn thì hay bỏ dở giữa chừng (vẫn mất bánh). Phải thuộc lệnh ${D.TRICKS.sit.name} trước rồi mới học lệnh khác.`,
+      `Sáu lệnh: ${Object.values(D.TRICKS).map(t => `${t.icon} ${t.name} (${t.sessions})`).join(' · ')}. Thuộc đủ cả sáu thì chó không ăn xúc xích của người lạ.`] },
 ];
 let guidePage = 0;
 function guideIcon() {
@@ -860,6 +866,115 @@ PANELS.pedigree = {
     }
   },
 };
+
+// ---------- Dạy lệnh cho chó Mực (issue 45) ----------
+// Minigame chỉ gửi vào luật kết quả "đạt / không đạt"; mọi tiến độ do state.js quyết.
+const trickIco = id => {
+  let u = null;
+  try { u = SPR3?.trickIcon?.[id]?.toDataURL?.() || null; } catch { u = null; }
+  return u ? h('img', { class: 'ico', src: u, alt: '', draggable: false }) : h('span', { class: 'ico emo' }, D.TRICKS[id].icon);
+};
+async function doTrain(id) {
+  const r = S.trainStart(st(), id);
+  if (!r.ok) { res(r); return; }
+  commit();
+  if (r.quit) { pushToast(r.msg, 'bad'); sound.play('error'); return; }
+  const pass = await showTrain(id);
+  res(S.trainResult(st(), id, pass), pass ? 'pop' : null);
+}
+function doCommand(id) {
+  closePanel();
+  api?.doAction({ kind: 'dog' }, 'cmd_' + id);
+}
+PANELS.dog = {
+  title: '🐕 Dạy lệnh cho chó',
+  render(body, s) {
+    const g = s.dog, n = have(s, 'treat');
+    body.append(h('div', { class: 'note' },
+      `Mỗi ngày game dạy được một buổi, mỗi buổi tốn 1 bánh thưởng (đang có ${n}). ${g.name} đang vui ${Math.round(g.happy)}/100 — vui thì học nhanh, đói hay buồn thì hay bỏ dở giữa chừng.`));
+    const list = h('div', { class: 'list' });
+    body.append(list);
+    for (const t of S.trickList(s)) {
+      const right = t.done
+        ? (t.auto ? h('span', { class: 'tick' }, '✓') : btn('Ra lệnh', () => doCommand(t.id), 'green sm', { 'data-cmd': t.id }))
+        : btn(`Dạy buổi ${t.step + 1}`, () => doTrain(t.id), 'green', { disabled: !t.can.ok, 'data-train': t.id });
+      list.append(row({
+        icon: trickIco(t.id), name: `${t.name} · ${t.sessions} buổi`, locked: !t.done && !t.can.ok && t.can.reason === 'base',
+        desc: [t.desc, h('br'), t.done ? (t.auto ? `${g.name} tự làm, không cần ra lệnh` : `Đã thuộc ${t.icon}`) : `Đã học ${t.step}/${t.sessions} buổi${t.can.ok ? '' : ' · ' + t.can.msg}`],
+        right,
+      }));
+    }
+  },
+};
+// Minigame "bấm đúng lúc": kim chạy qua lại trên thanh, bấm Khen khi kim nằm trong vạch xanh.
+// Đạt TRAIN.need lượt trúng trong TRAIN.rounds lượt là xong buổi.
+export function showTrain(trickId) {
+  const T = D.TRAIN, tr = D.TRICKS[trickId], g = st().dog;
+  return new Promise(resolve => {
+    const root = $('dialog-root');
+    let raf = 0, hits = 0, round = 1, zone = 0.1, t0 = performance.now(), live = true;
+    const done = v => { live = false; cancelAnimationFrame(raf); root.hidden = true; root.replaceChildren(); dialogResolve = null; resolve(v); };
+    dialogResolve = () => done(hits >= T.need);
+    const mark = h('div', { class: 'train-mark', id: 'train-mark' });
+    const zoneEl = h('div', { class: 'train-zone', id: 'train-zone' });
+    const bar = h('div', { class: 'train-bar', id: 'train-bar' }, zoneEl, mark);
+    const star = h('div', { class: 'train-praise' });
+    const wrap = h('div', { class: 'train-wrap' }, bar, star);
+    const score = h('div', { class: 'train-score', id: 'train-score' });
+    const pup = h('canvas', { class: 'train-dog', id: 'train-dog', width: 48, height: 40 });
+    // dùng pixel art làm nền cho thanh, vạch khen, kim và dấu khen
+    const skin = (el, im) => { try { const u = im?.toDataURL?.(); if (u) el.style.backgroundImage = `url(${u})`; } catch { /* chưa có art thì dùng màu CSS */ } };
+    skin(bar, SPR3?.trainBar?.track); skin(zoneEl, SPR3?.trainBar?.zone); skin(mark, SPR3?.trainBar?.mark);
+    const newRound = () => {   // viền xanh/đỏ của lượt trước giữ nguyên tới khi bấm lượt sau
+      zone = 0.06 + Math.random() * (0.88 - T.zone);
+      zoneEl.style.left = (zone * 100) + '%'; zoneEl.style.width = (T.zone * 100) + '%';
+      t0 = performance.now();
+    };
+    const setScore = () => { score.textContent = `Lượt ${Math.min(round, T.rounds)}/${T.rounds} · Khen trúng ${hits}/${T.need}`; };
+    const pos = () => { const u = ((performance.now() - t0) % (T.sweepMs * 2)) / T.sweepMs; return u <= 1 ? u : 2 - u; };
+    const drawPup = pose => {
+      const c = pup.getContext('2d');
+      c.imageSmoothingEnabled = false; c.clearRect(0, 0, pup.width, pup.height);
+      const im = R.dogPoseImg(g, pose, 'right', Math.floor(performance.now() / 260));
+      if (im) c.drawImage(im, Math.round((pup.width - im.width * 2) / 2), pup.height - im.height * 2, im.width * 2, im.height * 2);
+    };
+    let pose = 'beg', poseUntil = 0;
+    const loop = () => {
+      if (!live) return;
+      const p = pos();
+      mark.style.left = (p * 100) + '%';
+      if (performance.now() > poseUntil) { pose = Math.floor(performance.now() / 1800) % 2 ? 'sit' : 'beg'; }
+      drawPup(pose);
+      raf = requestAnimationFrame(loop);
+    };
+    const praise = ok => {
+      pose = ok ? 'sit' : 'bark'; poseUntil = performance.now() + 700;
+      bar.classList.remove('good', 'bad');
+      void bar.offsetWidth;
+      bar.classList.add(ok ? 'good' : 'bad');
+      if (ok) { skin(star, SPR3?.praise?.left?.[0]); star.style.left = mark.style.left; star.classList.add('on'); setTimeout(() => star.classList.remove('on'), 650); }
+    };
+    const tap = () => {
+      if (!live || round > T.rounds) return;
+      const p = pos(), ok = p >= zone && p <= zone + T.zone;
+      if (ok) hits++;
+      sound.play(ok ? 'pop' : 'error');
+      praise(ok);
+      round++;
+      setScore();
+      if (round > T.rounds) { setTimeout(() => done(hits >= T.need), 650); return; }
+      newRound();
+    };
+    root.replaceChildren(h('div', { class: 'dialog train' },
+      h('div', { class: 'dialog-text' }, `${g.name} đang tập lệnh ${tr.name} ${tr.icon} — bấm Khen đúng lúc kim chạy vào vạch xanh!`),
+      pup, wrap, score,
+      h('div', { class: 'dialog-btns' },
+        btn('Thôi', () => done(false), 'plain'),
+        btn('👏 Khen!', tap, 'green', { id: 'train-hit' }))));
+    root.hidden = false;
+    newRound(); setScore(); loop();
+  });
+}
 
 // ---------- Chọn hạt ----------
 PANELS.seeds = {

@@ -5,6 +5,7 @@ import {
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS,
+  TRICKS, TRICK_BASE, TRAIN,
 } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
@@ -126,7 +127,7 @@ export function animalPen(s, a) {
   return m.penById[a.pen] ?? m.pens[ANIMALS[a.type].pen] ?? null;
 }
 const isRipe = p => p.crop && !p.crop.dead && !p.crop.rotten && p.crop.progress >= 1;
-const nextPoopAt = s => s.time + rnd(...DOG.poopEvery);
+const nextPoopAt = s => s.time + rnd(...DOG.poopEvery) * (s.dog?.stage === 'non' ? DOG.poopPupMul : 1);   // chó con ỉa nhiều hơn
 
 // Con vật mới ở đầu giai đoạn `stage`. Các trường còn lại lấy mặc định của bản lưu v3 (migrate.js animalDefaults).
 function mkAnimal(s, type, stage, x, y, extra) {
@@ -197,7 +198,10 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     shipbin: { items: {} },   // thùng giao hàng: lái buôn lấy hết lúc 6h sáng
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, manure: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], clutch: [], nest: { egg: false, hatchAt: 0, sp: null, mom: null, dad: null },
-    dog: { stage: START.dogStage, age: stageStart('cho', START.dogStage), hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name },
+    dog: {
+      stage: START.dogStage, age: stageStart('cho', START.dogStage), hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name,
+      tricks: {}, trainDay: 0, session: null, cmd: null, herdDay: 0, scene: 'farm',   // dạy lệnh và lệnh đang thi hành (issue 45)
+    },
     poops: [], threats: [], orders: [], nextOrderAt: 0,
     stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
@@ -716,6 +720,7 @@ function stepFree(s, d) {
   for (const a of s.animals) {
     if (a.stray && a.tile && !day && canRoam(s, a)) { n++; continue; }   // ngủ ngoài tới sáng
     if (a.stray) a.stray = false;
+    if (s.time < (a.homeUntil || 0)) { if (a.tile) goHome(s, a); continue; }   // chó vừa lùa về: ở yên trong chuồng một lúc
     if (!day || !roam.tiles.length || !canRoam(s, a) || n >= FREE.max) { if (a.tile) goHome(s, a); continue; }
     n++;
     const mom = duckMom(s, a);
@@ -1030,9 +1035,12 @@ function stepDog(s, d) {
   const st = stageAt('cho', g.age);
   if (st !== g.stage) {
     g.stage = st;
-    if (st === 'nho') log(s, `${g.name} đã thành chó nhỡ, sủa lung tung cả ngày`);
+    if (st === 'nho') log(s, `${g.name} đã thành chó nhỡ, sủa lung tung cả ngày và học được lệnh rồi đó`);
     if (st === 'truong') { toast(`${g.name} đã lớn thành chó canh nhà 🐕`); log(s, `${g.name} đã trưởng thành`); }
+    if (st === 'gia') { toast(`${g.name} già rồi, ngủ nhiều và nhìn xa kém hơn 👴`); log(s, `${g.name} đã già, canh trộm không còn thính như xưa`); }
   }
+  stepHerd(s);
+  autoHerd(s);
   if (s.time >= g.nextPoop) {
     g.nextPoop = nextPoopAt(s);
     if (s.poops.length < DOG.maxPoops) {
@@ -1043,6 +1051,153 @@ function stepDog(s, d) {
 }
 
 const guardOn = s => (s.dog.stage === 'truong' || s.dog.stage === 'gia') && s.dog.hunger > 40 && s.dog.happy > 50;
+
+// ---------- Vòng đời chó và dạy lệnh bằng minigame (issue 45) ----------
+// Minigame chỉ gửi vào luật một kết quả "đạt / không đạt"; luật quyết định tiến độ (ADR 0013).
+export const trickProgress = (s, id) => s.dog.tricks?.[id] ?? 0;
+export const knowsTrick = (s, id) => !!TRICKS[id] && trickProgress(s, id) >= TRICKS[id].sessions;
+export const knownTricks = s => Object.keys(TRICKS).filter(id => knowsTrick(s, id));
+// Thuộc đủ 6 lệnh thì chó không ăn xúc xích của người lạ nữa (lát 46 dùng luật này)
+export const trickProof = s => knownTricks(s).length >= Object.keys(TRICKS).length;
+// Danh sách lệnh cho bảng dạy chó
+export const trickList = s => Object.entries(TRICKS).map(([id, t]) => ({ id, ...t, step: trickProgress(s, id), done: knowsTrick(s, id), can: canTrain(s, id) }));
+
+export function canTrain(s, id) {
+  const t = TRICKS[id], g = s.dog;
+  if (!t) return R(false, 'Không có lệnh này', { reason: 'unknown' });
+  if (!TRAIN.stages.includes(g.stage)) {
+    return R(false, g.stage === 'non' ? `${g.name} còn bé quá, đợi nó lớn thêm chút nhé` : `${g.name} già rồi, chỉ thích nằm ngủ thôi`, { reason: 'stage' });
+  }
+  if (knowsTrick(s, id)) return R(false, `${g.name} thuộc lệnh ${t.name} rồi`, { reason: 'learned' });
+  if (id !== TRICK_BASE && !knowsTrick(s, TRICK_BASE)) return R(false, `Dạy lệnh ${TRICKS[TRICK_BASE].name} trước đã, rồi mới tới lệnh khác`, { reason: 'base' });
+  if (g.trainDay === s.day) return R(false, `Hôm nay dạy một buổi rồi, mai học tiếp nhé`, { reason: 'daily' });
+  if (!have(s, TRAIN.treat)) return R(false, noItem(TRAIN.treat), { reason: 'no_item' });
+  return R(true, `Dạy ${g.name} lệnh ${t.name}`);
+}
+// Mở một buổi dạy: trừ 1 bánh thưởng, ghi sổ "đã dạy hôm nay".
+// quit = chó đói hay buồn nên bỏ giữa chừng: buổi đó không tính, bánh thưởng vẫn mất.
+export function trainStart(s, id) {
+  const c = canTrain(s, id);
+  if (!c.ok) return c;
+  const g = s.dog;
+  take(s, TRAIN.treat);
+  g.trainDay = s.day;
+  const moody = g.hunger < TRAIN.quitHunger || g.happy < TRAIN.quitHappy;
+  if (moody && Math.random() < TRAIN.quitChance) {
+    g.session = null;
+    log(s, `${g.name} đang đói và buồn, học nửa buổi rồi bỏ chạy`);
+    return R(true, `${g.name} bỏ buổi học giữa chừng, cho nó ăn và vuốt ve rồi mai dạy lại nhé`, { trick: id, quit: true });
+  }
+  g.session = { trick: id };
+  return R(true, `${g.name} hào hứng chờ học lệnh ${TRICKS[id].name}`, { trick: id, quit: false });
+}
+// Chốt kết quả một buổi: pass = đạt. Chó vui thì học nhanh (một buổi đạt ăn hai buổi).
+export function trainResult(s, id, pass) {
+  const g = s.dog, t = TRICKS[id];
+  if (!t || g.session?.trick !== id) return R(false, 'Chưa mở buổi dạy nào', { reason: 'no_session' });
+  g.session = null;
+  if (!pass) {
+    log(s, `${g.name} chưa hiểu lệnh ${t.name}, buổi này chưa tính`);
+    return R(true, `${g.name} chưa hiểu, mai thử lại nhé`, { trick: id, step: 0, progress: trickProgress(s, id), need: t.sessions, learned: false });
+  }
+  const step = g.happy >= TRAIN.fastHappy ? 2 : 1;
+  g.tricks = { ...g.tricks, [id]: Math.min(t.sessions, trickProgress(s, id) + step) };
+  g.happy = Math.min(100, g.happy + TRAIN.happyGain);
+  const learned = knowsTrick(s, id);
+  if (learned) {
+    emit({ type: 'trick', trick: id, name: t.name });
+    log(s, `${g.name} học xong lệnh ${t.name} ${t.icon}`);
+  }
+  return R(true, learned ? `${g.name} đã thuộc lệnh ${t.name}!` : `Giỏi lắm! ${t.name} ${trickProgress(s, id)}/${t.sessions} buổi`,
+    { trick: id, step, progress: trickProgress(s, id), need: t.sessions, learned });
+}
+
+// Chỗ chó đang gác (lệnh Canh khu), hay null
+export const dogPost = s => (s.dog.cmd?.id === 'guard' && s.dog.cmd.spot ? s.dog.cmd.spot : null);
+// Bán kính phát hiện trộm (ô): nhỡ 4, trưởng thành 6, già 4; ×2 tại chỗ đang gác
+export const guardRadius = (s, dog = s.dog) => (DOG.guardRadius[dog.stage] ?? 0) * (dogPost(s) ? DOG.guardPostMul : 1);
+// Chó có phát hiện kẻ lạ ở điểm (x, y) không? Đang gác thì tính từ chỗ gác.
+export function dogSees(s, x, y) {
+  const r = guardRadius(s);
+  if (!r) return false;
+  const post = dogPost(s), at = post ? { x: post.c * TS + 8, y: post.r * TS + 8 } : s.dog;
+  if (at.x == null) return false;
+  return Math.hypot(at.x - x, at.y - y) <= r * TS;
+}
+
+// Các con đang ở ngoài chuồng: thả rông, con lạc, và bò/cừu đi lạc khỏi chuồng
+export function outOfPen(s) {
+  const m = mapOf(s);
+  return s.animals.filter(a => {
+    if (a.tile) return true;
+    const r = (m.penById[a.pen] ?? animalPen(s, a))?.area;
+    return !!r && a.x != null && (a.x < r.x || a.y < r.y || a.x > r.x + r.w || a.y > r.y + r.h);
+  });
+}
+// Một con được chó lùa về tới chuồng
+function bringHome(s, a) {
+  if (a.tile) passGate(s, a.id);
+  else { a.stray = false; goHome(s, a); }
+  a.homeUntil = s.time + TRAIN.stayMs;
+}
+// Lệnh Lùa: luật chốt ngay danh sách phải về, rồi đưa về dần trong TRAIN.herdMs. world.js chỉ diễn hoạt chó chạy vòng.
+function herdStart(s, auto = false) {
+  const g = s.dog, list = outOfPen(s);
+  if (!list.length) return R(false, 'Cả đàn đang trong chuồng cả rồi', { reason: 'none' });
+  g.cmd = { id: 'herd', until: s.time + TRAIN.herdMs, list: list.map(a => a.id) };
+  if (auto) emit({ type: 'dogHerd', n: list.length });
+  log(s, `${g.name} chạy vòng lùa ${list.length} con về chuồng`);
+  snd('bark');
+  return R(true, `${g.name} lùa ${list.length} con về chuồng 🐑`, { n: list.length });
+}
+function stepHerd(s) {
+  const g = s.dog, c = g.cmd;
+  if (c?.id !== 'herd') return;
+  const n = c.list.length, left = Math.max(0, c.until - s.time);
+  const back = s.time >= c.until ? n : n - Math.ceil(left / TRAIN.herdMs * n);
+  for (let i = 0; i < back && i < n; i++) {
+    const a = s.animals.find(x => x.id === c.list[i]);
+    if (a) bringHome(s, a);
+  }
+  if (s.time >= c.until) g.cmd = null;
+}
+// Tối nào chó no và vui cũng tự lùa đàn về (mỗi ngày game một lần)
+function autoHerd(s) {
+  const g = s.dog;
+  if (!knowsTrick(s, 'herd') || !isDusk(s) || g.herdDay === s.day) return;
+  if (g.hunger < TRAIN.autoHunger || g.happy < TRAIN.autoHappy) return;
+  g.herdDay = s.day;
+  herdStart(s, true);
+}
+// Lệnh Tìm trứng: đánh hơi mọi quả trứng còn giấu trong bụi, đánh dấu để dễ tìm
+function sniffEggs(s) {
+  const g = s.dog, list = hiddenEggs(s).filter(e => !e.found);
+  if (!list.length) return R(false, `${g.name} hít hít một hồi, không còn quả trứng nào trong bụi`, { reason: 'none', n: 0 });
+  for (const e of list) e.found = true;
+  log(s, `${g.name} đánh hơi thấy ${list.length} quả trứng giấu trong bụi`);
+  snd('bark');
+  return R(true, `${g.name} tìm thấy ${list.length} quả trứng trong bụi 👃`, { n: list.length });
+}
+// Ra lệnh cho chó. 'stop' = cho nghỉ. Canh khu nhận ô gác (thiếu thì lấy ô người chơi đang đứng).
+export function commandDog(s, id, spot) {
+  const g = s.dog;
+  if (id === 'stop') { g.cmd = null; g.scene = 'farm'; return R(true, `${g.name} được nghỉ, chạy chơi tiếp`); }
+  const t = TRICKS[id];
+  if (!t || !knowsTrick(s, id)) return R(false, `${g.name} chưa học lệnh này`, { reason: 'unknown' });
+  if (t.auto) return R(false, `${g.name} tự làm việc này rồi, không cần ra lệnh`, { reason: 'auto' });
+  if (id === 'egg') return sniffEggs(s);
+  if (id === 'herd') return herdStart(s);
+  if (id === 'guard') {
+    const p = spot ?? { c: Math.floor(s.player.x / TS), r: Math.floor(s.player.y / TS) };
+    g.cmd = { id: 'guard', spot: { c: p.c, r: p.r } };
+    snd('bark');
+    return R(true, `${g.name} ra gác chỗ đó, canh trộm xa gấp đôi 🛡️`, { spot: g.cmd.spot });
+  }
+  g.cmd = { id };
+  if (id === 'follow') g.scene = s.scene;
+  snd('bark');
+  return R(true, id === 'sit' ? `${g.name} ngồi im thin thít 🪑` : `${g.name} lon ton đi theo bạn 🚶`);
+}
 
 function stepThreats(s, d) {
   const busy = new Set(s.threats.map(t => t.plot));
@@ -1070,7 +1225,9 @@ function stepThreats(s, d) {
       if (!p.crop) { t.state = 'leaving'; t.since = s.time; } // cây đã biến mất
       else if (s.time >= t.arriveAt) {
         t.state = 'eating'; t.since = s.time; emit({ type: 'eating', kind: t.kind });
-        if (guardOn(s) && Math.random() < DOG.guardChance) {
+        // chó phải nhìn thấy mới đuổi được (bán kính theo giai đoạn, ×2 tại chỗ gác); học Đuổi chim thì tự tìm quạ ở bất cứ đâu
+        const at = plotCenter(s, t.plot);
+        if (guardOn(s) && (dogSees(s, at.x, at.y) || (crow && knowsTrick(s, 'bird'))) && Math.random() < DOG.guardChance) {
           t.state = 'leaving'; t.since = s.time; s.stats[crow ? 'crows' : 'thieves']++; emit({ type: 'guard', who: crow ? 'crow' : 'thief' });
           log(s, `${s.dog.name} sủa vang, đuổi ${who.toLowerCase()} đi rồi`); snd('bark');
         }
@@ -1297,7 +1454,13 @@ function dogActs(s) {
   const n = have(s, 'dogfood'), g = s.dog;
   const feed = mk('feed', '🦴', `Cho ${g.name} ăn (còn ${n})`, n <= 0 ? noItem('dogfood') : g.hunger >= 95 ? `${g.name} no rồi` : null);
   const pet = mk('pet', '🤗', `Vuốt ve ${g.name}`);
-  return g.hunger < 50 ? [feed, pet] : [pet, feed];
+  const out = g.hunger < 50 ? [feed, pet] : [pet, feed];
+  // dạy lệnh và ra lệnh (issue 45)
+  const list = trickList(s), left = list.filter(t => !t.done);
+  if (left.length) out.push(mk('train', '🎓', `Dạy lệnh cho ${g.name} (còn ${have(s, TRAIN.treat)} bánh thưởng)`, left.some(t => t.can.ok) ? null : left[0].can.msg));
+  if (g.cmd) out.push(mk('cmd_stop', '✋', `Cho ${g.name} nghỉ`));
+  for (const t of list) if (t.done && !t.auto) out.push(mk('cmd_' + t.id, t.icon, `Lệnh: ${t.name}`));
+  return out;
 }
 
 function threatActs(s, t) {
@@ -1594,6 +1757,13 @@ const DO = {
   dog(s, t, id, at) {
     const g = s.dog;
     if (id === 'feed') { take(s, 'dogfood'); g.hunger = 100; return res(true, `${g.name} ăn ngon lành`, [say(at, 'Gâu gâu! 🦴')], 'bark'); }
+    if (id === 'train') return res(true, `Chọn lệnh muốn dạy ${g.name}`, [], 'pop', { open: 'dog' });
+    if (id === 'cmd_guard') return res(true, `Chạm vào chỗ muốn ${g.name} gác`, [say(at, '🛡️ Chọn chỗ gác')], 'pop', { pickSpot: 'guard' });
+    if (id === 'cmd_stop' || id.startsWith('cmd_')) {
+      const tid = id === 'cmd_stop' ? 'stop' : id.slice(4);
+      const r = commandDog(s, tid);
+      return res(r.ok, r.msg, r.ok ? [say(at, tid === 'stop' ? '✋' : `${TRICKS[tid].icon} ${TRICKS[tid].name}!`)] : []);
+    }
     g.happy = Math.min(100, g.happy + HUSBANDRY.petHappy);
     return res(true, `${g.name} vẫy đuôi rối rít`, [say(at, '❤️')], 'bark');
   },
@@ -1655,6 +1825,10 @@ export function enterScene(s, to) {
   s.scene = to; s.sit = false;
   const m = sceneMap(s), a = m.arrive[from] ?? m.spawn;
   Object.assign(s.player, { x: a.x, y: a.y, dir: a.dir ?? 0 });
+  // lệnh Đi theo: chó lẽo đẽo sang bản đồ mới luôn; không thì nó ở lại vườn
+  const g = s.dog;
+  if (g.cmd?.id === 'follow' && knowsTrick(s, 'follow')) { g.scene = to; Object.assign(g, { x: a.x, y: a.y + 6 }); }
+  else if (g.scene && g.scene !== 'farm') g.scene = 'farm';
   return R(true, '', { scene: to });
 }
 
