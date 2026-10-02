@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>HD Bà Tư và Ông Sáu</title>
+<style>
+  body { margin: 0; padding: 12px; background: #8fbf6a; font: 13px sans-serif; color: #2a1a10; }
+  h2 { margin: 14px 0 4px; font-size: 16px; }
+  .row { display: flex; align-items: flex-end; gap: 6px; margin: 2px 0; }
+  .lab { width: 60px; font-weight: bold; }
+  .cell { display: flex; flex-direction: column; align-items: center; font-size: 10px; }
+  canvas.v { image-rendering: pixelated; background: #9fcd78; outline: 1px solid #6f9a4c; }
+  pre { color: #900; }
+</style>
+</head>
+<body>
+<div id="out"></div>
+<script type="module">
+import { SPR2 } from './art2.js';
+let SPR6 = {}, err = '';
+try { ({ SPR6 } = await import('./art6.js')); } catch (e) { err = String(e && e.stack || e); }
+const out = document.getElementById('out');
+const Z = Number(new URLSearchParams(location.search).get('z')) || 4;
+// Ô 32x48 nhân Z: bộ cũ 16x24 phóng 2Z, bộ mới phóng Z, cùng cỡ trên màn hình như trong game.
+const big = (im, z = Z) => {
+  const c = document.createElement('canvas'); c.className = 'v';
+  c.width = 32 * z; c.height = 48 * z;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  if (im) x.drawImage(im, 0, 0, 32 * z, 48 * z);
+  return c;
+};
+const cell = (im, label, z) => { const d = document.createElement('div'); d.className = 'cell'; d.append(big(im, z), label); return d; };
+const dirN = ['xuống', 'trái', 'phải', 'lên'];
+const cells = (set, idle) => {
+  const r = [];
+  for (const d of [0, 1, 2, 3]) for (let k = 0; k < (set?.[d]?.length || 0); k++) {
+    if ((d === 1 || d === 2) && k === 2) continue;
+    r.push([set[d][k], dirN[d] + ' ' + k]);
+  }
+  (idle || []).forEach((im, i) => r.push([im, 'đứng yên ' + i]));
+  return r;
+};
+const row = (lab, list, z) => {
+  const d = document.createElement('div'); d.className = 'row';
+  const l = document.createElement('div'); l.className = 'lab'; l.textContent = lab; d.append(l);
+  const sel = new URLSearchParams(location.search).get('sel')?.split(',').map(Number);
+  list.forEach(([im, t], i) => { if (!sel || z === 1 || sel.includes(i)) d.append(cell(im, t, z)); });
+  out.append(d);
+};
+if (err) { const p = document.createElement('pre'); p.textContent = err; out.append(p); }
+const only = new URLSearchParams(location.search).get('k');
+for (const [name, k] of [['Bà Tư', 'npcBaTu'], ['Ông Sáu', 'npcOngSau']].filter(e => !only || e[1] === only)) {
+  const h = document.createElement('h2'); h.textContent = name; out.append(h);
+  if (!new URLSearchParams(location.search).has('new')) row('Cũ', cells(SPR2[k], SPR2[k + 'Idle']));
+  row('Mới', cells(SPR6[k], SPR6[k + 'Idle']));
+}
+// Cỡ gần thật trong game (mỗi điểm bộ cũ = 2 điểm màn hình)
+const h = document.createElement('h2'); h.textContent = 'Cỡ trong game (×2 bộ cũ)'; out.append(h);
+const small = [];
+for (const k of ['npcBaTu', 'npcOngSau']) {
+  small.push([SPR2[k]?.[0]?.[0], 'cũ'], [SPR6[k]?.[0]?.[0], 'mới']);
+  small.push([SPR2[k]?.[1]?.[0], 'cũ'], [SPR6[k]?.[1]?.[0], 'mới']);
+  small.push([SPR2[k]?.[3]?.[0], 'cũ'], [SPR6[k]?.[3]?.[0], 'mới']);
+}
+row('', small, 1);
+window.__ready = true;
+</script>
+</body>
+</html>

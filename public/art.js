@@ -466,7 +466,7 @@ function wreath(dir) {
     [x0, 5, [...Array(x1 - x0 + 1)].map((_, i) => (i % 2 ? 'd' : 'g')).join('')]].map(([x, y, s]) => [x, y, [s]]);
 }
 
-function hatOverlay(hat, dir) {
+export function hatOverlay(hat, dir) {
   if (hat === 1) return [[0, 0, NON]];
   if (hat === 2) return [[0, 1, dir === 0 ? CAP_F : dir === 3 ? CAP_B : CAP_S]];
   if (hat === 3) return [[dir === 1 ? 8 : 9, 1, BOW]];
@@ -475,7 +475,7 @@ function hatOverlay(hat, dir) {
   return [];
 }
 
-function accOverlay(acc, dir) {
+export function accOverlay(acc, dir) {
   if (acc === 1) {
     if (dir === 0) return [[3, 9, ['kkkkkkkkkk']], [3, 10, ['kKKk..kKKk']]];
     if (dir === 1) return [[3, 8, ['kKKkkkk']], [3, 9, ['kkkk']]];
@@ -488,10 +488,10 @@ function accOverlay(acc, dir) {
   return [];
 }
 
-const SKINS = ['#ffd7b0', '#f1b98c', '#c98b5f'];
-const HAIR_COLORS = ['#3b2412', '#7a4a22', '#d9a441', '#b8402e', '#2b2b3a'];
-const SHIRTS = ['#e5452f', '#3f8ce0', '#4caf50', '#f7c843', '#b36ad6', '#ff8fb1'];
-const PANTS = ['#3a4a8a', '#5c3a1a', '#2a2a2a', '#4f7a3a'];
+export const SKINS = ['#ffd7b0', '#f1b98c', '#c98b5f'];
+export const HAIR_COLORS = ['#3b2412', '#7a4a22', '#d9a441', '#b8402e', '#2b2b3a'];
+export const SHIRTS = ['#e5452f', '#3f8ce0', '#4caf50', '#f7c843', '#b36ad6', '#ff8fb1'];
+export const PANTS = ['#3a4a8a', '#5c3a1a', '#2a2a2a', '#4f7a3a'];
 
 const lookCache = new Map();
 // Trả về frames[hướng][khung] cho một bộ ngoại hình. Khung 16x24, chân chạm hàng dưới cùng.

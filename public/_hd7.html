@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>HD NPC so sánh</title>
+<style>
+  body { margin: 0; padding: 12px; background: #8fbf6a; font: 13px sans-serif; color: #2a1a10; }
+  h2 { margin: 14px 0 4px; font-size: 16px; }
+  .row { display: flex; align-items: flex-end; gap: 6px; margin: 2px 0; }
+  .lab { width: 92px; font-weight: bold; }
+  .cell { display: flex; flex-direction: column; align-items: center; font-size: 10px; }
+  canvas.v { image-rendering: pixelated; background: #9fcd78; outline: 1px solid #6f9a4c; }
+</style>
+</head>
+<body>
+<div id="out"></div>
+<script type="module">
+import { SPR3 } from './art3.js';
+let SPR7 = {}, err = '';
+try { ({ SPR7 } = await import('./art7.js')); } catch (e) { err = String(e && e.stack || e); }
+const out = document.getElementById('out');
+const Z = Number(new URLSearchParams(location.search).get('z')) || 4;
+const big = (im, s) => {
+  const c = document.createElement('canvas'); c.className = 'v';
+  c.width = 32 * Z; c.height = 48 * Z;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  if (im) { const k = s ?? (32 * Z / im.width); x.drawImage(im, 0, 0, im.width * k, im.height * k); }
+  return c;
+};
+const cell = (im, label) => { const d = document.createElement('div'); d.className = 'cell'; d.append(big(im), label); return d; };
+const dirN = ['xuống', 'trái', 'phải', 'lên'];
+function walkCells(set) {
+  const r = [];
+  if (!set) return r;
+  for (const d of [0, 1, 2, 3]) for (let k = 0; k < set[d].length; k++) {
+    if ((d === 1 || d === 2) && k === 2) continue;
+    r.push([set[d][k], dirN[d] + ' ' + k]);
+  }
+  return r;
+}
+const only = new URLSearchParams(location.search).get('only');
+function block(name, key, extra) {
+  if (only && only !== key) return;
+  const h = document.createElement('h2'); h.textContent = name; out.append(h);
+  for (const [lab, S] of [['Cũ', SPR3], ['Mới', SPR7]]) {
+    const row = document.createElement('div'); row.className = 'row';
+    const l = document.createElement('div'); l.className = 'lab'; l.textContent = lab; row.append(l);
+    const items = [...walkCells(S[key]), ...(S[key + 'Idle'] ?? []).map((im, i) => [im, 'idle ' + i]), ...(extra ? extra(S) : [])];
+    const pick = new URLSearchParams(location.search).get('f')?.split(',').map(Number);
+    items.forEach(([im, t], i) => { if (!pick || pick.includes(i)) row.append(cell(im, t)); });
+    out.append(row);
+  }
+}
+block('Cô Út (trạm thú y)', 'npcCoUt');
+block('Chú Ba (lái heo)', 'npcChuBa');
+block('Tí Sún (trộm trứng)', 'npcTiSun', S => [
+  ...(S.npcTiSunSneak?.left ?? []).map((im, i) => [im, 'rón rén trái ' + i]),
+  ...(S.npcTiSunSneak?.right ?? []).map((im, i) => [im, 'rón rén phải ' + i]),
+  [S.npcTiSunCaught, 'bị bắt'],
+]);
+if (err) { const p = document.createElement('pre'); p.textContent = err; out.append(p); }
+window.__ready = true;
+</script>
+</body>
+</html>

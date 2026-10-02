@@ -1,0 +1,88 @@
+<!doctype html><meta charset="utf-8"><title>HD10 cây trồng</title>
+<style>
+  body { margin: 0; padding: 10px; background: #3f6e2c; font: 12px sans-serif; color: #fff; }
+  h2 { margin: 10px 0 6px; font-size: 14px; }
+  table { border-collapse: collapse; }
+  th { font-weight: normal; padding: 2px 4px; text-align: left; vertical-align: middle; }
+  td { padding: 3px 4px; vertical-align: bottom; background: #63402a; border: 1px solid #3f6e2c; }
+  canvas { image-rendering: pixelated; display: block; }
+  .pair { display: flex; gap: 4px; align-items: flex-end; }
+  .pair div { text-align: center; font-size: 10px; }
+  #report { white-space: pre; font: 12px monospace; background: #222; padding: 6px; margin-top: 8px; }
+  .bad { color: #ff8080; }
+</style>
+<body>
+<h2>Cây trồng: Cũ (SPR4, x4) | Mới (SPR10, 2x vẽ cùng cỡ màn hình)</h2>
+<table id="grid"></table>
+<h2>Nông sản: Cũ (12x12, x4) | Mới (24x24, x2)</h2>
+<div id="produce" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+<div id="report"></div>
+<script type="module">
+import { SPR } from './art.js';
+import { SPR4, CROP4_IDS } from './art4.js';
+import { SPR10 } from './art10.js';
+import { CROPS } from './data.js';
+const Q = new URLSearchParams(location.search);
+const NAMES = { ...Object.fromEntries(Object.entries(CROPS).map(([k, v]) => [k, v.name])), hanhla: 'Hành lá', dauphong: 'Đậu phộng', raumuong: 'Rau muống', dualeo: 'Dưa leo', khoailang: 'Khoai lang', ot: 'Ớt', suhao: 'Su hào', bapcai: 'Bắp cải' };
+const soil = SPR.soil?.tilledWet ?? SPR.plot;
+const S = +(Q.get('s') || 4), ids = Q.get('ids') ? Q.get('ids').split(',') : CROP4_IDS;
+const COLS = ['s0 hạt', 's1 mầm', 's2 cây non', 's3 ra hoa', 's4 chín', 'bệnh', 'héo', 'chết'];
+const grid = document.getElementById('grid');
+grid.insertAdjacentHTML('beforeend', '<tr><th></th>' + COLS.map(c => `<th>${c}</th>`).join('') + '</tr>');
+// k = 1 bộ cũ, 2 bộ mới (art gấp đôi, vẽ vào ô đất 16 px phóng đôi)
+function plot(im, k, H) {
+  const c = document.createElement('canvas'); c.width = 16 * k; c.height = H * k;
+  c.style.width = 16 * S + 'px'; c.style.height = H * S + 'px';
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  x.drawImage(soil, 0, (H - 16) * k, 16 * k, 16 * k);
+  x.drawImage(im, (16 * k - im.width) / 2, (H - 16) * k + 15 * k - im.height);
+  return c;
+}
+const lab = (t, cv) => { const d = document.createElement('div'); d.append(cv, t); return d; };
+const report = [], bad = [];
+const chk = (name, o, n) => {
+  if (!n) { report.push(`${name}: THIẾU`); bad.push(name); return; }
+  const ok = n.width === 2 * o.width && n.height === 2 * o.height;
+  if (!ok) bad.push(name);
+  report.push(`${ok ? 'ok ' : 'SAI'} ${name}: cũ ${o.width}x${o.height} → mới ${n.width}x${n.height}`);
+};
+for (const id of CROP4_IDS) {
+  const o = SPR4.crop[id], n = SPR10.crop[id];
+  o.stages.forEach((im, i) => chk(`crop.${id}.stages[${i}]`, im, n?.stages?.[i]));
+  for (const k of ['sick', 'rotten', 'dead']) chk(`crop.${id}.${k}`, o[k], n?.[k]);
+  if (!ids.includes(id)) continue;
+  const olds = [...o.stages, o.sick, o.rotten, o.dead], news = n ? [...n.stages, n.sick, n.rotten, n.dead] : [];
+  if (Q.get('rows')) {   // phóng to: hàng Cũ rồi hàng Mới
+    for (const [t, list, k] of [['Cũ', olds, 1], ['Mới', news, 2]]) {
+      const tr = document.createElement('tr');
+      tr.insertAdjacentHTML('beforeend', `<th>${NAMES[id] ?? id}<br><small>${t}</small></th>`);
+      olds.forEach((im, i) => { if (Q.get('cols') && !Q.get('cols').split(',').includes(String(i))) return; const td = document.createElement('td'); if (list[i]) td.append(plot(list[i], k, Math.max(16, im.height + 1))); tr.append(td); });
+      grid.append(tr);
+    }
+    continue;
+  }
+  const tr = document.createElement('tr');
+  tr.insertAdjacentHTML('beforeend', `<th>${NAMES[id] ?? id}<br><small>${id}</small></th>`);
+  olds.forEach((im, i) => {
+    const H = Math.max(16, im.height + 1), td = document.createElement('td'), p = document.createElement('div'); p.className = 'pair';
+    p.append(lab('Cũ', plot(im, 1, H)));
+    if (news[i]) p.append(lab('Mới', plot(news[i], 2, H)));
+    td.append(p); tr.append(td);
+  });
+  grid.append(tr);
+}
+for (const [id, im] of Object.entries(SPR4.produce)) {
+  const nw = SPR10.produce?.[id];
+  chk(`produce.${id}`, im, nw);
+  const p = document.createElement('div'); p.className = 'pair';
+  const mk = (src, k) => { const c = document.createElement('canvas'); c.width = c.height = 12 * k; c.style.width = c.style.height = 12 * S + 'px'; const x = c.getContext('2d'); x.fillStyle = '#e8d8b0'; x.fillRect(0, 0, c.width, c.height); x.drawImage(src, 0, 0); return c; };
+  p.append(lab('Cũ', mk(im, 1)));
+  if (nw) p.append(lab('Mới', mk(nw, 2)));
+  const d = document.createElement('div'); d.append(p, NAMES[id]); document.getElementById('produce').append(d);
+}
+const rep = document.getElementById('report');
+rep.textContent = `Kiểm cỡ: ${report.length - bad.length}/${report.length} khóa đúng 2x` + (bad.length ? `\nSAI/THIẾU: ${bad.join(', ')}` : '') + (Q.get('full') ? '\n' + report.join('\n') : '');
+if (bad.length) rep.classList.add('bad');
+window.__report = { total: report.length, bad };
+window.__ready = true;
+</script>

@@ -4,6 +4,7 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
+import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -13,28 +14,49 @@ const FONT = "'Nunito', system-ui, sans-serif";
 
 // ---------- Tiện ích ảnh (tô màu, thu nhỏ; có nhớ tạm) ----------
 const imgCache = new WeakMap();
+// make(ảnh, k) dựng ảnh dẫn xuất (k = 1 bộ cũ, 2 bản 2x: cỡ tính theo ảnh cũ nhân k để bản 2x đúng gấp đôi);
+// ảnh gốc có bản 2x thì dựng luôn bản 2x bằng cùng phép và nối hai bản (hd.js)
 function derived(img, key, make) {
   let m = imgCache.get(img);
   if (!m) imgCache.set(img, m = new Map());
-  if (!m.has(key)) m.set(key, make());
+  if (!m.has(key)) {
+    const v = make(img, 1), h = hdOf(img);
+    if (h) linkPair(v, make(h, 2));
+    m.set(key, v);
+  }
   return m.get(key);
 }
 function tinted(img, color, alpha) {
-  return derived(img, `t${color}${alpha}`, () => {
-    const c = mkCanvas(img.width, img.height), x = c.getContext('2d');
-    x.drawImage(img, 0, 0);
+  return derived(img, `t${color}${alpha}`, im => {
+    const c = mkCanvas(im.width, im.height), x = c.getContext('2d');
+    x.drawImage(im, 0, 0);
     x.globalCompositeOperation = 'source-atop';
     x.globalAlpha = alpha; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
     return c;
   });
 }
 function scaled(img, f) {
-  return derived(img, `s${f}`, () => {
-    const c = mkCanvas(Math.max(1, Math.round(img.width * f)), Math.max(1, Math.round(img.height * f))), x = c.getContext('2d');
+  return derived(img, `s${f}`, (im, k) => {
+    const c = mkCanvas(Math.max(1, Math.round(img.width * f)) * k, Math.max(1, Math.round(img.height * f)) * k), x = c.getContext('2d');
     x.imageSmoothingEnabled = false;
-    x.drawImage(img, 0, 0, c.width, c.height);
+    x.drawImage(im, 0, 0, c.width, c.height);
     return c;
   });
+}
+// Kiểu A: scale chẵn (main.js) thì mỗi điểm art 2x = scale/2 điểm màn hình, đều. Ép ?scale= lẻ thì cả thế giới dùng bộ cũ.
+let HD = true;
+// Con vật dơ (art3.muddy): ảnh có bản 2x thì vết bùn vẽ bằng hàm 2x của art9 (muddyHD) cho cùng ảnh dơ
+function dirty(img, lv) {
+  const v = muddy(img, lv), h = hdOf(img);
+  if (h && hdFn.muddyHD && !hdOf(v)) linkPair(v, hdFn.muddyHD(h, lv));
+  return v;
+}
+// Vẽ sprite ở toạ độ thế giới (ctx đã đặt phép biến đổi camera): có bản 2x thì vẽ bản đó vào đúng khung của ảnh cũ
+function put(ctx, img, x, y) {
+  if (!img) return;
+  const h = HD && hdOf(img);
+  if (h) ctx.drawImage(h, Math.round(x), Math.round(y), img.width, img.height);
+  else ctx.drawImage(img, Math.round(x), Math.round(y));
 }
 const memo = {};
 const once = (k, fn) => memo[k] ??= fn();
@@ -161,21 +183,22 @@ const furnFallback = k => once('furn' + k, () => {
 const sprite2 = k => SPR2?.[k] ?? furnFallback(k);
 
 // Lớp nền trong nhà: sàn gỗ, vách sau (2 ô), vách hai bên + dưới, khe cửa sáng, rồi thảm/cửa sổ (props)
-function interiorLayer(m) {
-  const { mw, mh, W, H, ground } = m, c = mkCanvas(W, H), x = c.getContext('2d');
+function interiorLayer(m, R = 1) {
+  const { mw, mh, W, H, ground } = m, c = mkCanvas(W * R, H * R), x = c.getContext('2d');
   x.imageSmoothingEnabled = false;
+  x.scale(R, R);
   const floors = SPR2?.floors ?? [SPR2?.floorWood].filter(Boolean);
   for (let r = 0; r < mh; r++) for (let col = 0; col < mw; col++) {
     const px = col * TS, py = r * TS;
     if (ground[r * mw + col] === GROUND.FLOOR) {
-      if (floors.length) x.drawImage(floors[Math.floor(hash(col, r) * floors.length)], px, py);
+      if (floors.length) put(x, floors[Math.floor(hash(col, r) * floors.length)], px, py);
       else { rect(x, '#a06a3a', px, py, TS, TS); rect(x, '#4a2c14', px, py + 15, TS, 1); }
     } else if (r < 2) {
-      if (r === 0) { if (SPR2?.wallInner) x.drawImage(SPR2.wallInner, px, 0); else { rect(x, '#ead4a8', px, 0, TS, 24); rect(x, '#8a5a2b', px, 24, TS, 8); } }
+      if (r === 0) { if (SPR2?.wallInner) put(x, SPR2.wallInner, px, 0); else { rect(x, '#ead4a8', px, 0, TS, 24); rect(x, '#8a5a2b', px, 24, TS, 8); } }
     } else { rect(x, '#2e1a0c', px, py, TS, TS); rect(x, '#5c3a1a', px + 1, py + 1, TS - 2, TS - 2); rect(x, '#8a5a2b', px + 1, py + 1, TS - 2, 1); }
   }
   for (const d of m.doors) { rect(x, '#5c3a1a', d.x, d.y, d.w, 3); rect(x, '#f3e3b0', d.x, d.y + 3, d.w, d.h - 3); rect(x, '#9bd06a', d.x, d.y + d.h - 5, d.w, 5); }
-  for (const p of m.props ?? []) x.drawImage(sprite2(p.sprite), p.x, p.y);
+  for (const p of m.props ?? []) put(x, sprite2(p.sprite), p.x, p.y);
   return c;
 }
 
@@ -205,8 +228,8 @@ const sp3Key = a => (a.sex === 'm' && MALE[a.type] && SPR3?.animal?.[MALE[a.type
 export function animalImg(a, face, frame, sleep, run) {
   const stage = a.stage ?? 'truong', key = sp3Key(a);
   // bệnh nặng trở lên: nằm bẹp một chỗ, dáng bệnh riêng của từng loài ở từng giai đoạn
-  if (a.sick >= 2) { const z = SPR3?.sickBy?.[key]?.[stage]; if (z) return face === 'right' ? derived(z, 'flip', () => flip(z)) : z; }
-  if (sleep) { const z = SPR3?.sleepBy?.[key]?.[stage]; if (z) return face === 'right' ? derived(z, 'flip', () => flip(z)) : z; }
+  if (a.sick >= 2) { const z = SPR3?.sickBy?.[key]?.[stage]; if (z) return face === 'right' ? derived(z, 'flip', flip) : z; }
+  if (sleep) { const z = SPR3?.sleepBy?.[key]?.[stage]; if (z) return face === 'right' ? derived(z, 'flip', flip) : z; }
   if (run) { const r = SPR3?.run?.[key]?.[stage]; if (r) return r[face][frame % r[face].length]; }   // đang bị lùa: dáng chạy hoảng
   const set3 = SPR3?.animal?.[key]?.[stage];
   if (set3) return set3[face][frame % set3[face].length];
@@ -226,10 +249,10 @@ export function bathPhase(b, now) {
   return e < 1200 ? { name: 'soap', t: e / 1200 } : e < 2000 ? { name: 'shake', t: (e - 1200) / 800 } : e < BATH_MS ? { name: 'sparkle', t: (e - 2000) / 1000 } : null;
 }
 // Con cái mang thai: thân nở ra một chút (bụng to)
-const bellied = img => derived(img, 'belly', () => {
-  const c = mkCanvas(Math.round(img.width * 1.2), img.height), x = c.getContext('2d');
+const bellied = img => derived(img, 'belly', (im, k) => {
+  const c = mkCanvas(Math.round(img.width * 1.2) * k, im.height), x = c.getContext('2d');
   x.imageSmoothingEnabled = false;
-  x.drawImage(img, 0, 0, c.width, c.height);
+  x.drawImage(im, 0, 0, c.width, c.height);
   return c;
 });
 export const GRAIN_MS = 2800;   // nắm thóc rải ở cửa chuồng còn trên đất chừng này ms
@@ -357,19 +380,24 @@ function layerOf(m) {
   layers.set(m, L);
   return L;
 }
+// Lớp nền dựng ở độ phân giải R (1, hoặc 2 khi có sprite nền 2x), vẽ ra đúng cỡ bản đồ
+let staticR = null;
+const staticRes = () => (HD ? (staticR ??= hdFn.landHD || [SPR2?.forest?.[0], SPR.mud, SPR.tuft, SPR.flowers?.[0], SPR2?.floors?.[0], SPR2?.floorWood, SPR2?.wallInner].some(hdOf) ? 2 : 1) : 1);
 // Vẽ nền của bản đồ m phần trong hình chữ nhật (x0,y0)-(x1,y1) điểm ảnh bản đồ; ctx đã đặt phép biến đổi camera
 export function drawStatic(ctx, m, x0, y0, x1, y1) {
-  const L = layerOf(m);
-  if (m.interior) { ctx.drawImage(L.canvas ??= interiorLayer(m), 0, 0); return; }
-  for (const i of chunksIn(m.mw, m.mh, x0, y0, x1, y1)) ctx.drawImage(L.cv[i] ??= outdoorChunk(m, i, L.cw), (i % L.cw) * CHUNK_PX, Math.floor(i / L.cw) * CHUNK_PX);
+  const L = layerOf(m), R = staticRes();
+  if (L.r !== R) { L.r = R; L.canvas = null; if (L.cv) L.cv.fill(null); }
+  if (m.interior) { ctx.drawImage(L.canvas ??= interiorLayer(m, R), 0, 0, m.W, m.H); return; }
+  for (const i of chunksIn(m.mw, m.mh, x0, y0, x1, y1)) ctx.drawImage(L.cv[i] ??= outdoorChunk(m, i, L.cw, R), (i % L.cw) * CHUNK_PX, Math.floor(i / L.cw) * CHUNK_PX, CHUNK_PX, CHUNK_PX);
 }
-function outdoorChunk(m, ci, cw) {
+function outdoorChunk(m, ci, cw, R = 1) {
   chunkDraws++;
   const { ground, solid, fences, mw: MW, mh: MH, W, H, mud: MUD } = m;
   const ox = (ci % cw) * CHUNK_PX, oy = Math.floor(ci / cw) * CHUNK_PX;
   const gAt = (c, r) => (c < 0 || r < 0 || c >= MW || r >= MH) ? -1 : ground[r * MW + c];
   const isRoad = (c, r) => { const g = gAt(c, r); return g === GROUND.ROAD || g === -1; };
-  const land = paint(CHUNK_PX, CHUNK_PX, (qx, qy) => {
+  // nền 2x (art12.landHD, cùng luật đường đất/cỏ) khi lớp nền dựng ở R = 2
+  const land = R === 2 && hdFn.landHD ? hdFn.landHD(m, ox, oy, CHUNK_PX, CHUNK_PX) : paint(CHUNK_PX, CHUNK_PX, (qx, qy) => {
     const px = qx + ox, py = qy + oy;
     if (px >= W || py >= H) return null;
     const tc = px >> 4, tr = py >> 4, lx = px & 15, ly = py & 15;
@@ -428,36 +456,38 @@ function outdoorChunk(m, ci, cw) {
     return col;
   });
 
-  const staticCanvas = mkCanvas(CHUNK_PX, CHUNK_PX);
+  const staticCanvas = mkCanvas(CHUNK_PX * R, CHUNK_PX * R);
   const x = staticCanvas.getContext('2d');
   x.imageSmoothingEnabled = false;
-  x.drawImage(land, 0, 0);
+  x.scale(R, R);
+  x.drawImage(land, 0, 0, CHUNK_PX, CHUNK_PX);
   x.translate(-ox, -oy);   // từ đây vẽ theo toạ độ bản đồ, phần ngoài mảng tự bị cắt
   // các ô của mảng này (thêm 1 ô quanh cho hình lố ra ngoài ô)
   const c0 = Math.max(0, (ox >> 4) - 1), c1 = Math.min(MW - 1, ((ox + CHUNK_PX) >> 4)), r0 = Math.max(0, (oy >> 4) - 1), r1 = Math.min(MH - 1, ((oy + CHUNK_PX) >> 4));
   // rừng ngoài đất: lát ô cây liền nhau, chọn biến thể theo băm toạ độ (chưa có art thì giữ màu xanh phẳng ở trên)
   const fv = SPR2?.forest;
-  if (fv?.length) for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (ground[r * MW + c] === GROUND.FOREST) x.drawImage(fv[tileHash(c, r) % fv.length], c * TS, r * TS);
+  if (fv?.length) for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (ground[r * MW + c] === GROUND.FOREST) put(x, fv[tileHash(c, r) % fv.length], c * TS, r * TS);
 
   // vũng bùn chuồng heo
   const mudHere = MUD && MUD.x < ox + CHUNK_PX && MUD.x + MUD.w > ox && MUD.y < oy + CHUNK_PX && MUD.y + MUD.h > oy;
-  if (mudHere && SPR.mud) x.drawImage(SPR.mud, MUD.x, MUD.y);
+  if (mudHere && SPR.mud) put(x, SPR.mud, MUD.x, MUD.y);
   else if (mudHere) {
     x.fillStyle = '#3f2a16'; x.beginPath(); x.ellipse(MUD.x + MUD.w / 2, MUD.y + MUD.h / 2, MUD.w / 2, MUD.h / 2, 0, 0, 7); x.fill();
     x.fillStyle = '#54381d'; x.beginPath(); x.ellipse(MUD.x + MUD.w / 2, MUD.y + MUD.h / 2, MUD.w / 2 - 2, MUD.h / 2 - 2, 0, 0, 7); x.fill();
     x.fillStyle = '#7d5a36'; x.fillRect(MUD.x + 10, MUD.y + 6, 6, 1); x.fillRect(MUD.x + 22, MUD.y + 12, 5, 1);
   }
 
-  // hàng rào, xếp theo hàng để chồng lớp đúng
-  for (const f of fences.filter(f => f.c >= c0 && f.c <= c1 && f.r >= r0 && f.r <= r1).sort((a, b) => a.r - b.r || a.c - b.c)) fenceTile(x, f.kind, f.c * TS, f.r * TS, f.lv);
+  // hàng rào, xếp theo hàng để chồng lớp đúng (nền 2x thì vẽ bằng art11.fenceTileHD, cùng chữ ký)
+  const fence = R === 2 && hdFn.fenceTileHD || fenceTile;
+  for (const f of fences.filter(f => f.c >= c0 && f.c <= c1 && f.r >= r0 && f.r <= r1).sort((a, b) => a.r - b.r || a.c - b.c)) fence(x, f.kind, f.c * TS, f.r * TS, f.lv);
 
   // cỏ và hoa lác đác
   const nearRoad = (c, r) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => gAt(c + a, r + b) === GROUND.ROAD);
   for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
     if (ground[r * MW + c] !== GROUND.GRASS || solid[r * MW + c] || nearRoad(c, r)) continue;
     const h = hash(c * 7 + 3, r * 13 + 5), ox = Math.floor(hash(c, r + 99) * 10) + 1, oy = Math.floor(hash(c + 50, r) * 11) + 2;
-    if (h < 0.11) x.drawImage(SPR.tuft, c * TS + ox, r * TS + oy);
-    else if (h < 0.15) x.drawImage(SPR.flowers[Math.floor(hash(c + 9, r + 9) * SPR.flowers.length)], c * TS + ox, r * TS + oy);
+    if (h < 0.11) put(x, SPR.tuft, c * TS + ox, r * TS + oy);
+    else if (h < 0.15) put(x, SPR.flowers[Math.floor(hash(c + 9, r + 9) * SPR.flowers.length)], c * TS + ox, r * TS + oy);
   }
   return staticCanvas;
 }
@@ -546,13 +576,13 @@ function drawBuild(ctx, state, m, b, now) {
   // vẽ mờ công trình ở chỗ mới
   ctx.globalAlpha = 0.6;
   const bd = m.buildings.find(x => x.ent === e && x.ent.kind !== 'pen'), im = bd && buildingImg(bd);
-  if (im) ctx.drawImage(im, Math.round(bd.x + dx), Math.round(bd.y + dy));
+  if (im) put(ctx, im, bd.x + dx, bd.y + dy);
   const dc = m.decos.find(x => x.ent === e), di = dc && decoImg(dc.kind);
-  if (di) ctx.drawImage(di, Math.round(dc.x + dx - di.width / 2), Math.round(dc.y + dy - di.height + 1));
+  if (di) put(ctx, di, Math.round(dc.x + dx - di.width / 2), Math.round(dc.y + dy - di.height + 1));
   const ni = g.what?.kind === 'deco' && decoImg(g.what.item);   // món mới đặt: vẽ mờ theo ngón tay
-  if (ni) ctx.drawImage(ni, Math.round(g.c * TS + 8 - ni.width / 2), Math.round(g.r * TS + 13 - ni.height));
+  if (ni) put(ctx, ni, Math.round(g.c * TS + 8 - ni.width / 2), Math.round(g.r * TS + 13 - ni.height));
   const ci = g.what?.kind === 'cathouse' && SPR3?.cathouse?.[0];   // nhà mèo mới xây
-  if (ci) ctx.drawImage(ci, Math.round(g.c * TS - 5), Math.round(g.r * TS - 8));
+  if (ci) put(ctx, ci, g.c * TS - 5, g.r * TS - 8);
   ctx.globalAlpha = 1;
 }
 
@@ -569,13 +599,15 @@ function talk(ctx, who, x, y, dpr, now) {
     const bx = Math.round(x - w / 2), by = Math.round(y - h - 5 * dpr);
     const nine = SPR2?.chatBubble, tail = SPR2?.chatTail;
     if (nine) {
-      const c = Math.floor(nine.width / 3), k = Math.max(1, Math.round(dpr * 2)), cc = c * k, sw = nine.width - 2 * c, sh = nine.height - 2 * c;
-      const part = (sx, sy, sW, sH, dx, dy, dW, dH) => ctx.drawImage(nine, sx, sy, sW, sH, dx, dy, dW, dH);
+      const c = Math.floor(nine.width / 3), k = Math.max(2, 2 * Math.round(dpr)), cc = c * k, sw = nine.width - 2 * c, sh = nine.height - 2 * c;
+      // k chẵn (theo dpr): bản 2x mỗi điểm = k/2 điểm màn hình, đều
+      const nh = HD && hdOf(nine), th = HD && hdOf(tail);
+      const part = (sx, sy, sW, sH, dx, dy, dW, dH) => (nh ? ctx.drawImage(nh, sx * 2, sy * 2, sW * 2, sH * 2, dx, dy, dW, dH) : ctx.drawImage(nine, sx, sy, sW, sH, dx, dy, dW, dH));
       const iw = w - 2 * cc, ih = h - 2 * cc;
       part(0, 0, c, c, bx, by, cc, cc); part(c, 0, sw, c, bx + cc, by, iw, cc); part(c + sw, 0, c, c, bx + w - cc, by, cc, cc);
       part(0, c, c, sh, bx, by + cc, cc, ih); part(c, c, sw, sh, bx + cc, by + cc, iw, ih); part(c + sw, c, c, sh, bx + w - cc, by + cc, cc, ih);
       part(0, c + sh, c, c, bx, by + h - cc, cc, cc); part(c, c + sh, sw, c, bx + cc, by + h - cc, iw, cc); part(c + sw, c + sh, c, c, bx + w - cc, by + h - cc, cc, cc);
-      if (tail) ctx.drawImage(tail, Math.round(x - tail.width * k / 2), by + h - k, tail.width * k, tail.height * k);
+      if (tail) ctx.drawImage(th || tail, Math.round(x - tail.width * k / 2), by + h - k, tail.width * k, tail.height * k);
     } else {
       const lw = Math.max(1, Math.round(2 * dpr));
       ctx.fillStyle = '#3b2412';
@@ -593,7 +625,7 @@ function talk(ctx, who, x, y, dpr, now) {
     const { e, age } = who.emote, rise = age * 18 * dpr, im = SPR2?.emotes?.[e];
     ctx.globalAlpha = age < 0.7 ? 1 : Math.max(0, (1 - age) / 0.3);
     const bob = Math.sin(now / 150) * dpr;
-    if (im) { const k = Math.max(1, Math.round(dpr * 2)); ctx.drawImage(im, Math.round(x - im.width * k / 2), Math.round(y - im.height * k - rise + bob), im.width * k, im.height * k); }
+    if (im) { const k = Math.max(2, 2 * Math.round(dpr)); ctx.drawImage((HD && hdOf(im)) || im, Math.round(x - im.width * k / 2), Math.round(y - im.height * k - rise + bob), im.width * k, im.height * k); }
     else { ctx.font = `${Math.round(20 * dpr)}px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(e, x, y - rise + bob); }
     ctx.globalAlpha = 1;
   }
@@ -610,6 +642,7 @@ export function render(ctx, f) {
   const quality = f.battery ? 0 : f.quality ?? 1;   // lượng hạt: 1 = đủ, thấp hơn khi FPS tụt, 0 = tắt (tiết kiệm pin)
   const sparkles = quality >= 0.75 ? 2 : quality >= 0.4 ? 1 : 0;
 
+  HD = Number.isInteger(scale / 2);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
   const m = sceneMap(state), indoor = !!m.interior, farm = !!m.garden;   // ngoài vườn mới vẽ con vật, chó, quạ, trứng, phân
@@ -618,7 +651,9 @@ export function render(ctx, f) {
   ctx.setTransform(scale, 0, 0, scale, -camX, -camY);
   drawStatic(ctx, m, camX / scale, camY / scale, (camX + width) / scale, (camY + height) / scale);
 
-  const blit = (img, x, y) => { if (img) ctx.drawImage(img, Math.round(x), Math.round(y)); };
+  const blit = (img, x, y) => put(ctx, img, x, y);
+  // người (người chơi, người khác, thằng Tèo): khung theo ngoại hình, có bản 2x (art5) thì put() tự dùng
+  const person = (look, dir, k, wx, wy) => blit(charFrames(look)[dir][k], wx, wy);
   // Biển "đã về" trên cửa chuồng: SPR3.homeBoard nếu có, không thì tấm gỗ vẽ tạm. Còn con chưa về thì chữ đỏ.
   const homeSign = (g, h) => {
     const im = SPR3?.homeBoard, x = Math.round(g.x), y = Math.round(g.y) - 12;
@@ -810,7 +845,7 @@ export function render(ctx, f) {
     const wal = !bath && (wd.baths ?? []).some(b => b.id === a.id && b.wallow && now - b.t0 < WALLOW_MS);
     // dơ: bùn bám đúng dáng con vật, dơ nhiều thì ruồi bay quanh; đang tắm thì hiện sạch
     const lv = bath ? 0 : a.dirty >= 80 ? 3 : a.dirty >= 55 ? 2 : a.dirty >= 30 ? 1 : 0;
-    const body = lv ? muddy(im, lv) : im;
+    const body = lv ? dirty(im, lv) : im;
     const shake = ph?.name === 'shake' ? Math.round(Math.sin(now / 38) * 2) : 0;
     add(a.y, () => {
       const bx = a.x - im.width / 2 + shake, by = a.y - im.height + 1 + dy;
@@ -914,7 +949,7 @@ export function render(ctx, f) {
         const bx = Math.round(dog.x + im.width / 2 - 2), by = Math.round(dog.y - im.height - bb.height - 1);
         const w = Math.min(12, ti.width), hh = Math.min(10, ti.height);
         blit(bb, bx, by);
-        ctx.drawImage(ti, bx + Math.round((bb.width - w) / 2), by + 2, w, hh);
+        ctx.drawImage((HD && hdOf(ti)) || ti, bx + Math.round((bb.width - w) / 2), by + 2, w, hh);
       });
     }
   }
@@ -935,7 +970,7 @@ export function render(ctx, f) {
       if (yn) { const f = yn[Math.floor(now / 260) % yn.length]; blit(f, c.x + side * (im.width / 2 + 1) - (side < 0 ? f.width : 0), c.y - f.height + 1); }
       // tới chỗ người chơi rồi: thả con chuột xuống trước mặt để khoe
       const tp = c.trophy && rt.shown && SPR3?.ratTrophy;
-      if (tp) blit(rt.face === 'right' ? derived(tp, 'flip', () => flip(tp)) : tp, c.x + side * (im.width / 2) - (side < 0 ? tp.width : 0), c.y - tp.height + 2);
+      if (tp) blit(rt.face === 'right' ? derived(tp, 'flip', flip) : tp, c.x + side * (im.width / 2) - (side < 0 ? tp.width : 0), c.y - tp.height + 2);
     });
     // cãi nhau với chó: bong bóng ồn ào trên đầu (vui thôi, không hại gì)
     const sb = state.time < (c.spatUntil || 0) && SPR3?.spatBubble?.left;
@@ -962,8 +997,8 @@ export function render(ctx, f) {
       const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
       // Tí Sún rón rén lúc đang lục trứng; lúc đi thì dùng bộ khung đi riêng của nó
       const im = t.kind === 'tisun'
-        ? (t.state === 'eating' ? tisunImg('sneak', face, Math.floor(now / 280)) : null) ?? tisunImg('walk', face, k, dir) ?? wd.teoFrames()[dir][k]
-        : wd.teoFrames()[dir][k];
+        ? (t.state === 'eating' ? tisunImg('sneak', face, Math.floor(now / 280)) : null) ?? tisunImg('walk', face, k, dir) ?? charFrames(TEO_LOOK)[dir][k]
+        : charFrames(TEO_LOOK)[dir][k];
       add(t.y, () => { blit(im, t.x - 8, t.y - 23); if (t.kind === 'thief') teoGear(blit, state, t, face); });
     }
     // bong bóng báo trộm: nhấp nháy trên đầu kẻ đang ra tay
@@ -989,13 +1024,13 @@ export function render(ctx, f) {
   }
   // người chơi
   {
-    const p = state.player, frames = wd.playerFrames(state.look);
+    const p = state.player;
     const dir = p.dir ?? 0;
     const fr = wd.moving ? [1, 0, 2, 0][Math.floor(wd.walkT * 8) % 4] : 0;
-    const im = frames[dir][dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr];
+    const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
     const shake = wd.stun > 0 ? (Math.floor(now / 60) % 2 ? 1 : -1) : 0;
     if (!wd.sleeping) add(p.y, () => {
-      blit(im, p.x - 8 + shake, p.y - 23);
+      person(state.look, dir, k, p.x - 8 + shake, p.y - 23);
       if (state.stamina <= 0) {   // hết thể lực: thở hồng hộc, mồ hôi bên đầu
         const sw = SPR2?.sweat?.[Math.floor(now / 350) % 2];
         if (sw) blit(sw, p.x + 4, p.y - 29);
@@ -1006,11 +1041,11 @@ export function render(ctx, f) {
   // người khác cùng bản đồ (issue 25, đã nội suy): người gần vẽ cả nhân vật, người xa (làng đông) chỉ hiện tên mờ ở phần chữ
   for (const o of f.peers ?? []) {
     if (!o.full || !vis(o.x, o.y)) continue;
-    const frames = wd.playerFrames(o.look), dir = o.dir ?? 0;
+    const dir = o.dir ?? 0;
     const fr = o.moving ? [1, 0, 2, 0][Math.floor(now / 125) % 4] : 0;
-    const im = frames[dir][dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr];
+    const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
     shadow(o.x, o.y, 6);
-    add(o.y, () => blit(im, o.x - 8, o.y - 23));
+    add(o.y, () => person(o.look, dir, k, o.x - 8, o.y - 23));
   }
 
   items.sort((a, b) => a.y - b.y);
@@ -1024,9 +1059,9 @@ export function render(ctx, f) {
     const bx = Math.round(b.x - 6), by = Math.round(b.y - 15 + bob);
     const blink = b.tone === 'bad' ? 0.55 + 0.45 * Math.abs(Math.sin(now / 240)) : 1;   // đỏ thì nhấp nháy
     ctx.globalAlpha = 0.92 * blink;
-    ctx.drawImage(b.tone === 'warn' ? tinted(SPR.bubble, '#f7d547', 0.55) : b.tone === 'bad' ? tinted(SPR.bubble, '#e5452f', 0.6) : SPR.bubble, bx, by);
+    put(ctx, b.tone === 'warn' ? tinted(SPR.bubble, '#f7d547', 0.55) : b.tone === 'bad' ? tinted(SPR.bubble, '#e5452f', 0.6) : SPR.bubble, bx, by);
     ctx.globalAlpha = 1;
-    ctx.drawImage(b.icon, Math.round(bx + 6.5 - b.icon.width / 2), Math.round(by + 5.5 - b.icon.height / 2));
+    put(ctx, b.icon, Math.round(bx + 6.5 - b.icon.width / 2), Math.round(by + 5.5 - b.icon.height / 2));
   }
   if (wd.build) drawBuild(ctx, state, m, wd.build, now);
   const tg = f.target;

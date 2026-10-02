@@ -10,6 +10,10 @@ import { createNotifier, arrowTargets, arrowFor } from './notify.js';
 import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
 import * as net from './net.js';
+import { hdOf, charFrames } from './hd.js';
+
+// Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
+const hd = im => (im && hdOf(im)) || im;
 
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n || 0).toLocaleString('vi-VN');
@@ -51,9 +55,9 @@ const iconCache = new Map();
 function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
   let u = null;
-  try { u = art.icon(key) || null; } catch { u = null; }
-  if (!u) try { u = ({ trung_phoi: SPR3?.eggFertile, trung_vit_phoi: SPR3?.eggDuckFertile, trung_vit: SPR3?.eggDuck, vit: SPR3?.animal?.vit?.non?.left?.[0], meo: SPR3?.animal?.meo?.truong?.left?.[0], cathouse: SPR3?.cathouse?.[0] }[key] ?? SPR2?.[key])?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
-  if (!u) try { u = SPR3?.items?.[ITEM3[key]]?.toDataURL?.() || null; } catch { u = null; }   // xà phòng, phân chuồng vẽ ở art3
+  try { const A = art.SPR, src = A.items[key] || A.ripe[key] || A.product[key] || A.baby[key]?.left[0] || A.animal[key]?.left[0] || A[key]; u = (hdOf(src) ? hdOf(src).toDataURL() : art.icon(key)) || null; } catch { u = null; }
+  if (!u) try { u = ({ trung_phoi: SPR3?.eggFertile, trung_vit_phoi: SPR3?.eggDuckFertile, trung_vit: SPR3?.eggDuck, vit: SPR3?.animal?.vit?.non?.left?.[0], meo: SPR3?.animal?.meo?.truong?.left?.[0], cathouse: SPR3?.cathouse?.[0] }[key] ?? SPR2?.[key]); u = hd(u)?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
+  if (!u) try { u = hd(SPR3?.items?.[ITEM3[key]])?.toDataURL?.() || null; } catch { u = null; }   // xà phòng, phân chuồng vẽ ở art3
   iconCache.set(key, u);
   return u;
 }
@@ -196,6 +200,7 @@ function pushToast(text, cls = '', key = '', icon = null) {
 }
 // Pixel art (canvas) thành thẻ <canvas> dùng được trong DOM
 function canvasIco(src, cls = 'ico') {
+  src = hd(src);
   const c = h('canvas', { class: cls, width: src.width, height: src.height });
   c.getContext('2d').drawImage(src, 0, 0);
   return c;
@@ -237,7 +242,7 @@ export function askPunish(info) {
     };
     dialogResolve = () => done('pay');
     // ảnh kẻ bị bắt: Tí Sún có dáng "bị bắt" riêng, thằng Tèo dùng nhân vật dựng sẵn
-    const face = info.kind === 'tisun' ? R.tisunImg('caught') : art.character(R.TEO_LOOK)?.[0]?.[0];
+    const face = hd(info.kind === 'tisun' ? R.tisunImg('caught') : charFrames(R.TEO_LOOK)?.[0]?.[0]);
     const pic = face && h('canvas', { class: 'thumb', width: face.width, height: face.height });
     if (pic) pic.getContext('2d').drawImage(face, 0, 0);
     const line = o => btn([spriteIcon(SPR3?.punishIcon?.[o.id]) ?? o.icon, ' ', o.label],
@@ -254,6 +259,7 @@ export function askPunish(info) {
 // Sprite 16x16 thành <canvas> nhỏ cho nút bấm; chưa có art thì trả null để dùng emoji
 function spriteIcon(im) {
   if (!im) return null;
+  im = hd(im);
   const c = h('canvas', { class: 'ico', width: im.width, height: im.height });
   c.getContext('2d').drawImage(im, 0, 0);
   return c;
@@ -287,7 +293,7 @@ export function askRename(id) {
 
 // ---------- Xem trước nhân vật ----------
 function makePreview(getLook, scale = 6) {
-  const c = h('canvas', { class: 'preview', width: 16, height: 24 });
+  const c = h('canvas', { class: 'preview', width: 32, height: 48 });   // khung 2x, CSS giữ cỡ cũ
   c.style.width = 16 * scale + 'px';
   c.style.height = 24 * scale + 'px';
   const g = c.getContext('2d');
@@ -297,10 +303,10 @@ function makePreview(getLook, scale = 6) {
   const draw = () => {
     if (t > 3 && !c.isConnected) return clearInterval(iv);
     try {
-      const frames = art.character(getLook());
-      const d = DIRS[Math.floor(t / 10) % 4];
-      g.clearRect(0, 0, 16, 24);
-      g.drawImage(frames[d][[0, 1, 0, 2][t % 4]], 0, 0);
+      const frames = charFrames(getLook());
+      const d = DIRS[Math.floor(t / 10) % 4], im = frames[d][[0, 1, 0, 2][t % 4]];
+      g.clearRect(0, 0, 32, 48);
+      g.drawImage(hd(im), 0, 0, 32, 48);
     } catch { /* art chưa sẵn sàng */ }
     t++;
   };
@@ -309,8 +315,8 @@ function makePreview(getLook, scale = 6) {
   return c;
 }
 function thumb(look) {
-  const c = h('canvas', { class: 'thumb', width: 16, height: 24 });
-  try { const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(art.character(look)[0][0], 0, 0); } catch {}
+  const c = h('canvas', { class: 'thumb', width: 32, height: 48 });
+  try { const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(hd(charFrames(look)[0][0]), 0, 0, 32, 48); } catch {}
   return c;
 }
 
@@ -360,11 +366,13 @@ function drawAvatar(look) {
   const key = JSON.stringify(look);
   if (key === lastAvatar) return;
   try {
-    const src = art.character(look)[0][0];
+    const old = charFrames(look)[0][0], src = hdOf(old);
     const c = $('hud-avatar'), g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, c.width, c.height);
-    g.drawImage(src, 0, 0, 16, 15, 0, 0, 44, 41); // đầu + vai, phóng to
+    // bản 2x: cắt mặt 22x22, phóng x2 cho vừa 44 (điểm đều); thiếu thì như cũ: đầu + vai
+    if (src) g.drawImage(src, 5, 4, 22, 22, 0, 0, 44, 44);
+    else g.drawImage(old, 0, 0, 16, 15, 0, 0, 44, 41);
     lastAvatar = key;
   } catch { /* chờ art */ }
 }
@@ -386,9 +394,8 @@ export function renderHUD(s) {
   if (memo.get('hud-tired') !== tired) {
     memo.set('hud-tired', tired);
     $('hud-stamina').classList.toggle('tired', tired);
-    const ic = SPR2?.[tired ? 'staminaTired' : 'stamina'], cx = $('hud-stam-ico').getContext('2d');
-    cx.clearRect(0, 0, 12, 12);
-    if (ic) cx.drawImage(ic, 0, 0);
+    const ic = hd(SPR2?.[tired ? 'staminaTired' : 'stamina']), cv = $('hud-stam-ico'), cx = cv.getContext('2d');
+    if (ic) { cv.width = ic.width; cv.height = ic.height; cx.drawImage(ic, 0, 0); } else cx.clearRect(0, 0, cv.width, cv.height);
   }
   $('bb-build').style.display = s.scene && s.scene !== 'farm' ? 'none' : '';   // chế độ xây dựng chỉ có ở vườn
   renderMini(s);
@@ -407,9 +414,8 @@ export function renderHUD(s) {
   if (memo.get('hud-season') !== se.key) {
     memo.set('hud-season', se.key);
     setText('hud-season', se.name);
-    const ic = SPR2?.season?.[se.key], cx = $('hud-season-ico').getContext('2d');
-    cx.clearRect(0, 0, 12, 12);
-    if (ic) cx.drawImage(ic, 0, 0);
+    const ic = hd(SPR2?.season?.[se.key]), cv = $('hud-season-ico'), cx = cv.getContext('2d');
+    if (ic) { cv.width = ic.width; cv.height = ic.height; cx.drawImage(ic, 0, 0); } else cx.clearRect(0, 0, cv.width, cv.height);
   }
   $('hud-clock').title = `Mùa ${se.name}, ngày ${se.dayIn}/7`;
   let night = false;
@@ -732,7 +738,7 @@ PANELS.shipbin = {
 // ---------- Tiệm rèn Ông Sáu ----------
 // Icon công cụ theo cấp (SPR2.tools.<tên>[cấp-1], canvas 16x16); chưa có art thì emoji
 function toolIco(k, lv) {
-  const src = SPR2?.tools?.[k]?.[lv - 1];
+  const src = hd(SPR2?.tools?.[k]?.[lv - 1]);
   if (!src) return h('span', { class: 'ico emo big' }, D.TOOLS[k].icon);
   const c = h('canvas', { class: 'ico big tool-ico', width: src.width, height: src.height });
   c.getContext('2d').drawImage(src, 0, 0);
@@ -929,19 +935,22 @@ let guidePage = 0;
 const guidePages = s => GUIDE.filter(p => !p.lv || level(s) >= p.lv);
 function guideIcon() {
   const c = h('canvas', { class: 'guide-ico', width: 12, height: 12 });
-  if (spr().guidebook) c.getContext('2d').drawImage(spr().guidebook, 0, 0);
+  const gb = hd(spr().guidebook);
+  if (gb) { c.width = gb.width; c.height = gb.height; c.getContext('2d').drawImage(gb, 0, 0); }
   return c;
 }
 // Xếp các sprite thành một hàng trong canvas 160x56, mỗi cái vừa ô của nó
 function guideArt(list) {
   const W = 160, H = 56, items = list.filter(Boolean);
-  const cv = h('canvas', { class: 'guide-art', width: W, height: H }), g = cv.getContext('2d');
+  // canvas gấp đôi (CSS quyết định cỡ hiện): sprite có bản 2x thì vẽ bản đó, điểm 2x vẫn nguyên số
+  const cv = h('canvas', { class: 'guide-art', width: W * 2, height: H * 2 }), g = cv.getContext('2d');
   g.imageSmoothingEnabled = false;
+  g.scale(2, 2);
   const slot = W / Math.max(1, items.length);
   items.forEach((im, i) => {
     const k = Math.min((H - 4) / im.height, (slot - 6) / im.width), z = k >= 1 ? Math.floor(k) : k;
     const w = Math.round(im.width * z), hh = Math.round(im.height * z);
-    g.drawImage(im, Math.round(slot * i + (slot - w) / 2), Math.round((H - hh) / 2), w, hh);
+    g.drawImage(hd(im), Math.round(slot * i + (slot - w) / 2), Math.round((H - hh) / 2), w, hh);
   });
   return cv;
 }
@@ -987,7 +996,7 @@ PANELS.pedigree = {
 // Minigame chỉ gửi vào luật kết quả "đạt / không đạt"; mọi tiến độ do state.js quyết.
 const trickIco = id => {
   let u = null;
-  try { u = SPR3?.trickIcon?.[id]?.toDataURL?.() || null; } catch { u = null; }
+  try { u = hd(SPR3?.trickIcon?.[id])?.toDataURL?.() || null; } catch { u = null; }
   return u ? h('img', { class: 'ico', src: u, alt: '', draggable: false }) : h('span', { class: 'ico emo' }, D.TRICKS[id].icon);
 };
 async function doTrain(id) {
@@ -1039,7 +1048,7 @@ export function showTrain(trickId) {
     const score = h('div', { class: 'train-score', id: 'train-score' });
     const pup = h('canvas', { class: 'train-dog', id: 'train-dog', width: 48, height: 40 });
     // dùng pixel art làm nền cho thanh, vạch khen, kim và dấu khen
-    const skin = (el, im) => { try { const u = im?.toDataURL?.(); if (u) el.style.backgroundImage = `url(${u})`; } catch { /* chưa có art thì dùng màu CSS */ } };
+    const skin = (el, im) => { try { const u = hd(im)?.toDataURL?.(); if (u) el.style.backgroundImage = `url(${u})`; } catch { /* chưa có art thì dùng màu CSS */ } };
     skin(bar, SPR3?.trainBar?.track); skin(zoneEl, SPR3?.trainBar?.zone); skin(mark, SPR3?.trainBar?.mark);
     const newRound = () => {   // viền xanh/đỏ của lượt trước giữ nguyên tới khi bấm lượt sau
       zone = 0.06 + Math.random() * (0.88 - T.zone);
@@ -1052,7 +1061,7 @@ export function showTrain(trickId) {
       const c = pup.getContext('2d');
       c.imageSmoothingEnabled = false; c.clearRect(0, 0, pup.width, pup.height);
       const im = R.dogPoseImg(g, pose, 'right', Math.floor(performance.now() / 260));
-      if (im) c.drawImage(im, Math.round((pup.width - im.width * 2) / 2), pup.height - im.height * 2, im.width * 2, im.height * 2);
+      if (im) c.drawImage(hd(im), Math.round((pup.width - im.width * 2) / 2), pup.height - im.height * 2, im.width * 2, im.height * 2);
     };
     let pose = 'beg', poseUntil = 0;
     const loop = () => {
@@ -1266,7 +1275,7 @@ PANELS.todo = {
   },
 };
 // ---------- Người đang ở cùng bản đồ (issue 25, vườn online) ----------
-const LIVE_ICON = () => { try { return SPR2?.onlineIcon?.toDataURL?.() || null; } catch { return null; } };
+const LIVE_ICON = () => { try { return hd(SPR2?.onlineIcon)?.toDataURL?.() || null; } catch { return null; } };
 PANELS.online = {
   title: '👥 Người đang ở đây',
   render(body, s) {
@@ -1297,7 +1306,7 @@ async function visitGate(name) {
   sound.play('error');
   refreshPanel();
 }
-const friendIcon = (cls, text) => h('span', { class: 'fr-ico ' + cls, title: text, 'aria-label': text }, SPR2?.friendIcons?.[cls] ? h('img', { class: 'ico', src: SPR2.friendIcons[cls].toDataURL(), alt: '' }) : { ripe: '🍅', help: '🐛', on: '●', off: '○' }[cls]);
+const friendIcon = (cls, text) => h('span', { class: 'fr-ico ' + cls, title: text, 'aria-label': text }, SPR2?.friendIcons?.[cls] ? h('img', { class: 'ico', src: hd(SPR2.friendIcons[cls]).toDataURL(), alt: '' }) : { ripe: '🍅', help: '🐛', on: '●', off: '○' }[cls]);
 PANELS.friends = {
   title: '👫 Bạn bè',
   open() { fr.msg = ''; fr.err = ''; loadFriends(); },
@@ -1543,8 +1552,8 @@ function renderMini(s) {
   $('todo-btn').classList.toggle('urgent', urgent);
   if (!memo.get('todo-ico')) {
     memo.set('todo-ico', 1);
-    const ic = SPR2?.todo, g = $('todo-ico').getContext('2d');
-    if (ic) g.drawImage(ic, 0, 0); else { g.font = '10px sans-serif'; g.fillText('📋', 0, 10); }
+    const ic = hd(SPR2?.todo), cv = $('todo-ico'), g = cv.getContext('2d');
+    if (ic) { cv.width = ic.width; cv.height = ic.height; g.drawImage(ic, 0, 0); } else { g.font = '10px sans-serif'; g.fillText('📋', 0, 10); }
   }
 }
 
@@ -1864,7 +1873,7 @@ function arrowEl(key, kind) {
     el = h('canvas', { class: 'alert-arrow', width: 12, height: 12 });
     el.dataset.key = key;
     const src = kind === 'stray' ? SPR3?.strayArrow : (key.startsWith('bark:') && SPR2?.barkArrow) || SPR2?.alertArrow;   // mũi tên chỉ hướng chó sủa (issue 31), con lạc thì mũi tên vàng
-    if (src) el.getContext('2d').drawImage(src, 0, 0); else { const c = el.getContext('2d'); c.fillStyle = kind === 'stray' ? '#f2b81e' : '#e5452f'; c.fillRect(0, 3, 12, 6); }
+    if (src) { const s2 = hd(src); el.width = s2.width; el.height = s2.height; el.getContext('2d').drawImage(s2, 0, 0); } else { const c = el.getContext('2d'); c.fillStyle = kind === 'stray' ? '#f2b81e' : '#e5452f'; c.fillRect(0, 3, 12, 6); }
     box.append(el);
   }
   return el;
