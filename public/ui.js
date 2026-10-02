@@ -1162,14 +1162,14 @@ export function handleEvents(events) {
 // Lấy chỗ gấp từ state (S.urgentSpots) nên bản lưu đang có sự cố cũng báo; hiện ở mọi bản đồ.
 const BANNER_MS = 8000;
 let seenUrgent = new Set(), bannerUntil = 0, bannerOff = false;
-function arrowEl(key) {
+function arrowEl(key, kind) {
   const box = $('alert-arrows');
   let el = [...box.children].find(c => c.dataset.key === key);
   if (!el) {
     el = h('canvas', { class: 'alert-arrow', width: 12, height: 12 });
     el.dataset.key = key;
-    const src = SPR2?.alertArrow;
-    if (src) el.getContext('2d').drawImage(src, 0, 0); else { const c = el.getContext('2d'); c.fillStyle = '#e5452f'; c.fillRect(0, 3, 12, 6); }
+    const src = kind === 'stray' ? SPR3?.strayArrow : SPR2?.alertArrow;
+    if (src) el.getContext('2d').drawImage(src, 0, 0); else { const c = el.getContext('2d'); c.fillStyle = kind === 'stray' ? '#f2b81e' : '#e5452f'; c.fillRect(0, 3, 12, 6); }
     box.append(el);
   }
   return el;
@@ -1191,7 +1191,8 @@ export function updateAlerts(s, toScreen, nowMs = performance.now()) {
   bn.hidden = !on;
   document.body.classList.toggle('alerting', on);
   const rootBox = $('alert-arrows');
-  if (!urgent.length && !rootBox.firstChild) return;   // không có gì gấp: khỏi đo bố cục mỗi khung hình
+  const lost = s.scene === 'farm' ? S.strays(s) : [];   // con lạc ngủ ngoài: mũi tên vàng khi ngoài khung nhìn (không báo động)
+  if (!urgent.length && !lost.length && !rootBox.firstChild) return;   // không có gì gấp: khỏi đo bố cục mỗi khung hình
   const hud = $('hud').getBoundingClientRect(), bar = $('bottombar').getBoundingClientRect();
   const box = { l: 0, t: hud.bottom + 4, r: innerWidth, b: bar.top - 4 };
   const live = new Set();
@@ -1202,6 +1203,14 @@ export function updateAlerts(s, toScreen, nowMs = performance.now()) {
     live.add(t.key);
     el.style.transform = `translate(${(a.x - 18).toFixed(1)}px, ${(a.y - 18).toFixed(1)}px) rotate(${a.ang.toFixed(4)}rad)`;
     el.dataset.ang = String(Math.round(a.ang * 180 / Math.PI));
+  }
+  for (const a of lost) {
+    const key = 'stray:' + a.id, p = arrowFor(toScreen(a.x, a.y), box, 22), el = arrowEl(key, 'stray');
+    el.hidden = !p;
+    if (!p) continue;
+    live.add(key);
+    el.style.transform = `translate(${(p.x - 18).toFixed(1)}px, ${(p.y - 18).toFixed(1)}px) rotate(${p.ang.toFixed(4)}rad)`;
+    el.dataset.ang = String(Math.round(p.ang * 180 / Math.PI));
   }
   for (const el of [...rootBox.children]) if (!live.has(el.dataset.key)) el.remove();
 }

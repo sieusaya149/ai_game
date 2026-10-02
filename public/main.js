@@ -128,6 +128,7 @@ function applyResult(res, target, id) {
   if (res.rename) ui.askRename(res.rename).then(r => r && changed());
   if (res.go) goScene(res.go);
   if (res.bath != null) (world.baths ??= []).push({ id: res.bath, t0: now });
+  if (res.grain) (world.grains ??= []).push({ ...res.grain, t0: now });   // nắm thóc vừa rải ở cửa chuồng
   if (res.buyStrip) askStrip(res.buyStrip);
   if (res.sleep) goSleep();
   if (res.ok && target && (/pet|vuot|stroke|love/i.test(id ?? '') || (target.kind === 'animal' && id === 'feed'))) {
@@ -528,6 +529,7 @@ function frame(now) {
   world.angels = (world.angels ?? []).filter(g => now - g.t0 < R.ANGEL_MS);
   if (state.scene === 'farm') for (const e of events) if (e.type === 'passed' && e.x != null) world.angels.push({ x: e.x, y: e.y, t0: now });
   world.baths = (world.baths ?? []).filter(b => now - b.t0 < R.BATH_MS);
+  world.grains = (world.grains ?? []).filter(g => now - g.t0 < R.GRAIN_MS);
   if (state.scene === 'farm') for (const e of events) if (e.type === 'wallow') world.baths.push({ id: e.id, t0: now, wallow: true });
   R.render(ctx, {
     state, w: world, cam, scale, width: canvas.width, height: canvas.height, dpr, now,

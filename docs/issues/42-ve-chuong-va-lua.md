@@ -19,11 +19,11 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): sau 18h phần lớn con về chuồng, số con lạc mỗi tối nằm trong 1–3 (thống kê hạt giống cố định); con ❤️ thấp, con non, con ở xa dễ lạc hơn; đêm bão lạc nhiều hơn rõ rệt; số thả rông vẫn không vượt 30.
-- [ ] Unit test: rải thóc trừ 1 bao cám, các con trong 5 ô vào chuồng, con ngoài 5 ô không vào; từ chối khi hết cám; báo "đã qua cửa chuồng" ghi con vào chuồng và cập nhật số "đã về".
-- [ ] Unit test: chạy bù một đêm không con nào chết; con lạc được đánh dấu ngủ ngoài.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu ở 17h59 với đàn gà → qua 18h thấy gà tự về, còn 1–3 con có 💤 và mũi tên chỉ hướng; chạy ra đẩy một con về cửa chuồng; dùng rải thóc để lùa phần còn lại → cửa chuồng hiện đủ số.
-- [ ] Pixel art 💤, mũi tên, cám thóc có đủ.
+- [x] Unit test (seam 1): sau 18h phần lớn con về chuồng, số con lạc mỗi tối nằm trong 1–3 (thống kê hạt giống cố định); con ❤️ thấp, con non, con ở xa dễ lạc hơn; đêm bão lạc nhiều hơn rõ rệt; số thả rông vẫn không vượt 30.
+- [x] Unit test: rải thóc trừ 1 bao cám, các con trong 5 ô vào chuồng, con ngoài 5 ô không vào; từ chối khi hết cám; báo "đã qua cửa chuồng" ghi con vào chuồng và cập nhật số "đã về".
+- [x] Unit test: chạy bù một đêm không con nào chết; con lạc được đánh dấu ngủ ngoài.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu ở 17h59 với đàn gà → qua 18h thấy gà tự về, còn 1–3 con có 💤 và mũi tên chỉ hướng; chạy ra đẩy một con về cửa chuồng; dùng rải thóc để lùa phần còn lại → cửa chuồng hiện đủ số.
+- [x] Pixel art 💤, mũi tên, cám thóc có đủ.
 
 ## Blocked by
 

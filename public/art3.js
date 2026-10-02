@@ -173,16 +173,20 @@ const EYE = '#1a0e08';
 
 function chick(frame, pose = 'stand', male = false) {
   const C = male ? P.chickM : P.chick;
-  const oy = pose === 'stand' ? 0 : 1;
-  const legs = pose === 'stand' ? (frame
-    ? [B(3, 7, 1, 1, P.leg, { noise: 0 }), B(6, 6, 1, 1, P.leg, { noise: 0 })]
-    : [B(4, 7, 1, 1, P.leg, { noise: 0 }), B(6, 7, 1, 1, P.leg, { noise: 0 })]) : [];
+  const run = pose === 'run', up = pose === 'stand' || run;   // dáng chạy hoảng: vẫn đứng trên chân, sải rộng
+  const oy = up ? 0 : 1;
+  const legs = !up ? [] : run ? (frame
+    ? [B(1, 7, 3, 1, P.leg, { noise: 0 }), B(6, 7, 3, 1, P.leg, { noise: 0 })]
+    : [B(3, 7, 2, 1, P.leg, { noise: 0 }), B(6, 6, 1, 2, P.leg, { noise: 0 })])
+    : (frame
+      ? [B(3, 7, 1, 1, P.leg, { noise: 0 }), B(6, 6, 1, 1, P.leg, { noise: 0 })]
+      : [B(4, 7, 1, 1, P.leg, { noise: 0 }), B(6, 7, 1, 1, P.leg, { noise: 0 })]);
   // gà trống con: lông vàng cam có sọc nâu dọc lưng, chân cao hơn, nhú mào đỏ
   const stripe = male ? (px, py, k) => (py + 0.5 < 4.6 + oy && (px === 5 || px === 7) ? '#8a4e14' : undefined) : undefined;
   const c = fig(9, 9, [
     ...legs,
     E(5.3, 5.2 + oy, 3.1, 2.5, C, { pat: stripe }),
-    E(6.2, 5.4 + oy, 1.5, 1.1, C, { sep: true, max: 2 }),
+    E(6.2, 5.4 + oy - (run ? 1.3 : 0), 1.5, 1.1, C, { sep: true, max: 2 }),   // chạy: cánh giơ lên
     E(3.5, 3.4 + oy, 2.1, 2.1, C, { sep: true, pat: male ? (px, py) => (py + 0.5 < 2.6 + oy && px === 4 ? '#8a4e14' : undefined) : undefined }),
     male && B(3, 1 + oy, 1, 1, P.red, { noise: 0, min: 2 }),
     B(1, 3 + oy + (pose === 'sick' ? 1 : 0), 1, 1, P.beak, { noise: 0, min: 2 }),
@@ -190,24 +194,27 @@ function chick(frame, pose = 'stand', male = false) {
   const x = c.getContext('2d');
   if (pose === 'sleep') { R(x, '#7a5410', 2, 3 + oy, 2, 1); }
   else if (pose === 'sick') { R(x, EYE, 2, 4 + oy - 1); R(x, '#a07018', 2, 2 + oy); }
-  else { R(x, EYE, 2, 3); R(x, '#ffb070', 3, 4); }
+  else { R(x, EYE, 2, 3); if (run) R(x, '#fff6dc', 3, 2); R(x, '#ffb070', 3, 4); }   // chạy: mắt trợn tròn
   if (!male) R(x, C[3], 4, 1 + oy); // chỏm lông tơ
   return c;
 }
 
 function hen(stage, frame, pose = 'stand') {
   if (stage === 'non') return chick(frame, pose);
-  const old = stage === 'gia';
+  const old = stage === 'gia', run = pose === 'run', up = pose === 'stand' || run;
   if (stage === 'nho') {
-    const oy = pose === 'stand' ? 0 : 2;
-    const legs = pose === 'stand' ? (frame
-      ? [B(4, 9, 1, 2, P.leg, { noise: 0 }), B(3, 10, 1, 1, P.leg, { noise: 0 }), B(8, 9, 1, 1, P.leg, { noise: 0 })]
-      : [B(5, 9, 1, 2, P.leg, { noise: 0 }), B(4, 10, 1, 1, P.leg, { noise: 0 }), B(7, 9, 1, 2, P.leg, { noise: 0 }), B(6, 10, 1, 1, P.leg, { noise: 0 })]) : [];
+    const oy = up ? 0 : 2;
+    const legs = !up ? [] : run ? (frame
+      ? [B(3, 9, 1, 2, P.leg, { noise: 0 }), B(1, 11, 3, 1, P.leg, { noise: 0 }), B(8, 9, 1, 2, P.leg, { noise: 0 }), B(8, 11, 3, 1, P.leg, { noise: 0 })]
+      : [B(5, 9, 1, 1, P.leg, { noise: 0 }), B(4, 10, 2, 1, P.leg, { noise: 0 }), B(7, 9, 1, 2, P.leg, { noise: 0 }), B(6, 11, 3, 1, P.leg, { noise: 0 })])
+      : (frame
+        ? [B(4, 9, 1, 2, P.leg, { noise: 0 }), B(3, 10, 1, 1, P.leg, { noise: 0 }), B(8, 9, 1, 1, P.leg, { noise: 0 })]
+        : [B(5, 9, 1, 2, P.leg, { noise: 0 }), B(4, 10, 1, 1, P.leg, { noise: 0 }), B(7, 9, 1, 2, P.leg, { noise: 0 }), B(6, 10, 1, 1, P.leg, { noise: 0 })]);
     const c = fig(11, 12, [
       ...legs,
       E(8.6, 4.6 + oy, 1.1, 1.7, P.henTail),
       E(6.1, 6.4 + oy, 3.7, 2.5, P.pullet, { pat: speck(P.pullet) }),
-      E(7, 6.3 + oy, 2.1, 1.3, P.hen, { sep: true }),
+      E(7, 6.3 + oy - (run ? 1.4 : 0), 2.1, 1.3, P.hen, { sep: true }),
       E(3.5, 2.5 + oy, 0.9, 0.6, P.red),
       E(3.5, 3.9 + oy + (pose === 'sick' ? 1 : 0), 1.8, 1.8, P.pullet, { sep: true }),
       B(1, 4 + oy + (pose === 'sick' ? 1 : 0), 1, 1, P.beak, { min: 2, noise: 0 }),
@@ -218,17 +225,21 @@ function hen(stage, frame, pose = 'stand') {
   }
   const H = old ? fade(P.hen, 0.38) : P.hen, HW = old ? fade(P.henW, 0.35) : P.henW, HT = old ? fade(P.henTail, 0.3) : P.henTail;
   const RD = old ? fade(P.red, 0.35) : P.red;
-  const oy = pose === 'stand' ? 0 : 2, hy = (old ? 1 : 0) + (pose === 'sleep' ? 1 : 0) + (pose === 'sick' ? 2 : 0);
-  const hx = pose === 'sleep' ? 1 : 0;
-  const legs = pose === 'stand' ? (frame
-    ? [B(5, 10, 1, 2, P.leg, { noise: 0 }), B(4, 11, 1, 1, P.leg, { noise: 0 }), B(10, 10, 1, 1, P.leg, { noise: 0 })]
-    : [B(6, 10, 1, 2, P.leg, { noise: 0 }), B(5, 11, 1, 1, P.leg, { noise: 0 }), B(9, 10, 1, 2, P.leg, { noise: 0 }), B(8, 11, 1, 1, P.leg, { noise: 0 })]) : [];
+  const oy = up ? 0 : 2, hy = (old ? 1 : 0) + (pose === 'sleep' ? 1 : 0) + (pose === 'sick' ? 2 : 0) + (run ? 1 : 0);
+  const hx = pose === 'sleep' ? 1 : run ? -1 : 0;   // chạy: cổ vươn ra trước
+  const wy = run ? 1.6 : 0;
+  const legs = !up ? [] : run ? (frame
+    ? [B(4, 10, 1, 2, P.leg, { noise: 0 }), B(2, 12, 3, 1, P.leg, { noise: 0 }), B(10, 10, 1, 2, P.leg, { noise: 0 }), B(10, 12, 3, 1, P.leg, { noise: 0 })]
+    : [B(6, 10, 1, 1, P.leg, { noise: 0 }), B(5, 11, 2, 1, P.leg, { noise: 0 }), B(9, 10, 1, 2, P.leg, { noise: 0 }), B(8, 12, 3, 1, P.leg, { noise: 0 })])
+    : (frame
+      ? [B(5, 10, 1, 2, P.leg, { noise: 0 }), B(4, 11, 1, 1, P.leg, { noise: 0 }), B(10, 10, 1, 1, P.leg, { noise: 0 })]
+      : [B(6, 10, 1, 2, P.leg, { noise: 0 }), B(5, 11, 1, 1, P.leg, { noise: 0 }), B(9, 10, 1, 2, P.leg, { noise: 0 }), B(8, 11, 1, 1, P.leg, { noise: 0 })]);
   const c = fig(14, 13, [
     ...legs,
     E(11.3, 4.4 + oy + (old ? 1 : 0), 1.5, 2.7, HT),
     E(12.2, 5.6 + oy + (old ? 1 : 0), 0.9, 2, HT, { sep: true, max: 2 }),
     E(7.6, 7.3 + oy, 4.7, 3.1, H, { pat: speck(H) }),
-    E(8.8, 7.1 + oy, 2.9, 1.8, HW, { sep: true, pat: (px, py, k, col) => (py === Math.round(7.1 + oy) + 1 && px % 2 ? HW[0] : undefined) }),
+    E(8.8, 7.1 + oy - wy, 2.9, 1.8, HW, { sep: true, pat: (px, py, k, col) => (py === Math.round(7.1 + oy - wy) + 1 && px % 2 ? HW[0] : undefined) }),
     E(4.1 + hx, 2.1 + oy + hy, 1.4, 0.9, RD),
     E(4.1 + hx, 4.3 + oy + hy, 2.1, 2.1, H, { sep: true }),
     E(2.8 + hx, 6.4 + oy + hy, 0.6, 0.8, RD),
@@ -244,6 +255,7 @@ function speck(ramp) {
 function faceBird(x, ex, ey, pose, old) {
   if (pose === 'sleep') { R(x, '#3b2412', ex, ey, 2, 1); return; }
   if (pose === 'sick') { R(x, EYE, ex, ey); R(x, '#5a3a20', ex - 1, ey - 1); R(x, '#5a3a20', ex + 1, ey - 1); return; }
+  if (pose === 'run') { R(x, EYE, ex, ey - 1, 1, 2); R(x, '#fff6dc', ex + 1, ey - 1); return; }   // mắt trợn khi hoảng
   R(x, EYE, ex, ey);
   if (old) R(x, '#8a6a50', ex, ey - 1);
 }
@@ -252,17 +264,20 @@ function faceBird(x, ex, ey, pose, old) {
 
 function rooster(stage, frame, pose = 'stand') {
   if (stage === 'non') return chick(frame, pose, true);
-  const old = stage === 'gia';
+  const old = stage === 'gia', run = pose === 'run', up = pose === 'stand' || run;
   if (stage === 'nho') {
-    const oy = pose === 'stand' ? 0 : 2, sk = pose === 'sick' ? 1 : 0;
-    const legs = pose === 'stand' ? (frame
-      ? [B(4, 10, 1, 2, P.leg, { noise: 0 }), B(3, 11, 1, 1, P.leg, { noise: 0 }), B(8, 10, 1, 1, P.leg, { noise: 0 })]
-      : [B(5, 10, 1, 2, P.leg, { noise: 0 }), B(4, 11, 1, 1, P.leg, { noise: 0 }), B(8, 10, 1, 2, P.leg, { noise: 0 }), B(7, 11, 1, 1, P.leg, { noise: 0 })]) : [];
+    const oy = up ? 0 : 2, sk = pose === 'sick' ? 1 : 0;
+    const legs = !up ? [] : run ? (frame
+      ? [B(3, 10, 1, 2, P.leg, { noise: 0 }), B(1, 12, 3, 1, P.leg, { noise: 0 }), B(8, 10, 1, 2, P.leg, { noise: 0 }), B(8, 12, 3, 1, P.leg, { noise: 0 })]
+      : [B(5, 10, 1, 1, P.leg, { noise: 0 }), B(4, 11, 2, 1, P.leg, { noise: 0 }), B(8, 10, 1, 2, P.leg, { noise: 0 }), B(7, 12, 3, 1, P.leg, { noise: 0 })])
+      : (frame
+        ? [B(4, 10, 1, 2, P.leg, { noise: 0 }), B(3, 11, 1, 1, P.leg, { noise: 0 }), B(8, 10, 1, 1, P.leg, { noise: 0 })]
+        : [B(5, 10, 1, 2, P.leg, { noise: 0 }), B(4, 11, 1, 1, P.leg, { noise: 0 }), B(8, 10, 1, 2, P.leg, { noise: 0 }), B(7, 11, 1, 1, P.leg, { noise: 0 })]);
     const c = fig(12, 13, [
       ...legs,
       E(9.4, 4.4 + oy, 1.3, 2.4, P.rooTail),
       E(6.4, 7.4 + oy, 3.8, 2.5, P.rooBody),
-      E(7.2, 7.2 + oy, 2.2, 1.4, P.rooWing, { sep: true }),
+      E(7.2, 7.2 + oy - (run ? 1.5 : 0), 2.2, 1.4, P.rooWing, { sep: true }),
       E(4.3, 5.4 + oy, 1.6, 2, P.gold),
       E(3.8, 2.1 + oy + sk, 1.2, 0.8, P.red),
       E(3.7, 3.9 + oy + sk, 1.8, 1.8, P.gold, { sep: true }),
@@ -274,10 +289,14 @@ function rooster(stage, frame, pose = 'stand') {
   }
   const RB = old ? fade(P.rooBody, 0.3) : P.rooBody, RW = old ? fade(P.rooWing, 0.3) : P.rooWing;
   const G = old ? fade(P.gold, 0.4) : P.gold, T = old ? fade(P.rooTail, 0.25) : P.rooTail, RD = old ? fade(P.red, 0.35) : P.red;
-  const oy = pose === 'stand' ? 0 : 3, hy = (old ? 1 : 0) + (pose === 'sick' ? 2 : 0) + (pose === 'sleep' ? 1 : 0);
-  const legs = pose === 'stand' ? (frame
-    ? [B(5, 12, 1, 2, P.leg, { noise: 0 }), B(4, 13, 1, 1, P.leg, { noise: 0 }), B(10, 12, 1, 1, P.leg, { noise: 0 })]
-    : [B(6, 12, 1, 2, P.leg, { noise: 0 }), B(5, 13, 1, 1, P.leg, { noise: 0 }), B(9, 12, 1, 2, P.leg, { noise: 0 }), B(8, 13, 1, 1, P.leg, { noise: 0 })]) : [];
+  const oy = up ? 0 : 3, hy = (old ? 1 : 0) + (pose === 'sick' ? 2 : 0) + (pose === 'sleep' ? 1 : 0) + (run ? 1 : 0);
+  const wy = run ? 1.7 : 0;
+  const legs = !up ? [] : run ? (frame
+    ? [B(4, 12, 1, 2, P.leg, { noise: 0 }), B(2, 14, 3, 1, P.leg, { noise: 0 }), B(10, 12, 1, 2, P.leg, { noise: 0 }), B(10, 14, 3, 1, P.leg, { noise: 0 })]
+    : [B(6, 12, 1, 1, P.leg, { noise: 0 }), B(5, 13, 2, 1, P.leg, { noise: 0 }), B(9, 12, 1, 2, P.leg, { noise: 0 }), B(8, 14, 3, 1, P.leg, { noise: 0 })])
+    : (frame
+      ? [B(5, 12, 1, 2, P.leg, { noise: 0 }), B(4, 13, 1, 1, P.leg, { noise: 0 }), B(10, 12, 1, 1, P.leg, { noise: 0 })]
+      : [B(6, 12, 1, 2, P.leg, { noise: 0 }), B(5, 13, 1, 1, P.leg, { noise: 0 }), B(9, 12, 1, 2, P.leg, { noise: 0 }), B(8, 13, 1, 1, P.leg, { noise: 0 })]);
   const tailDrop = old ? 1.5 : 0;
   const c = fig(15, 15, [
     ...legs,
@@ -285,7 +304,7 @@ function rooster(stage, frame, pose = 'stand') {
     E(12, 4.6 + oy + tailDrop, 2, 3.4, T, { pat: (px, py, k) => (k >= 2 && (px + py) % 3 === 0 ? T[3] : undefined) }),
     E(13, 7.4 + oy + tailDrop, 1.2, 2.6, T, { sep: true }),
     E(8.2, 9.2 + oy, 4.4, 2.9, RB),
-    E(9.2, 9 + oy, 2.8, 1.8, RW, { sep: true, pat: (px, py) => (py === Math.round(9 + oy) + 1 && px % 2 ? T[2] : undefined) }),
+    E(9.2, 9 + oy - wy, 2.8, 1.8, RW, { sep: true, pat: (px, py) => (py === Math.round(9 + oy - wy) + 1 && px % 2 ? T[2] : undefined) }),
     E(4.9, 6.8 + oy + hy * 0.5, 2.2, 2.8, G, { pat: (px, py, k) => (k < 3 && (px * 3 + py) % 4 === 0 ? G[Math.max(0, k - 1)] : undefined) }),
     // mào răng cưa to
     E(4.4, 1.9 + oy + hy, 2, 1.2, RD, { pat: (px, py) => (py === Math.round(1.9 + oy + hy) - 1 && px % 2 === 0 ? '' : undefined) }),
@@ -295,63 +314,64 @@ function rooster(stage, frame, pose = 'stand') {
   ]);
   const x = c.getContext('2d');
   faceBird(x, 3, 4 + oy + hy, pose, old);
-  if (pose === 'stand') { R(x, '#ffe07a', 7, 12); } // cựa
+  if (up) { R(x, '#ffe07a', 7, 12); } // cựa
   return c;
 }
 
 // ---------- VỊT ---------- non 9x8 · nhỡ 12x11 · trưởng thành 15x12 · già 15x12
 
 function duck(stage, frame, pose = 'stand') {
-  const sit = pose !== 'stand', sk = pose === 'sick' ? 1 : 0;
+  const run = pose === 'run', sit = pose !== 'stand' && !run, sk = pose === 'sick' ? 1 : 0;
   if (stage === 'non') {
     // vịt con: dáng thuyền dài, mỏ dẹt to 2x2, mũ lông ô-liu, chân màng
     const oy = sit ? 1 : 0;
     const cap = (px, py) => (py + 0.5 < 2.2 + oy + sk ? '#b8a83a' : undefined);
     const c = fig(10, 8, [
-      !sit && B(frame ? 4 : 5, 6, 2, 1, P.bill, { noise: 0, min: 1 }),
-      !sit && B(frame ? 7 : 7, frame ? 5 : 6, 2, 1, P.bill, { noise: 0, max: 1 }),
+      !sit && B(run ? (frame ? 2 : 4) : (frame ? 4 : 5), 6, run ? 3 : 2, 1, P.bill, { noise: 0, min: 1 }),
+      !sit && B(run ? (frame ? 7 : 6) : 7, frame ? 5 : 6, run ? 3 : 2, 1, P.bill, { noise: 0, max: 1 }),
       E(5.9, 4.5 + oy, 3.4, 1.9, P.duckling, { pat: (px, py) => (py + 0.5 < 3.4 + oy && px >= 5 && px <= 7 ? '#c8b440' : undefined) }),
       E(8.7, 3.3 + oy, 0.8, 0.8, P.duckling),
-      E(6.7, 4.5 + oy, 1.7, 1, P.duckling, { sep: true, max: 2 }),
+      E(6.7, 4.5 + oy - (run ? 1.2 : 0), 1.7, 1, P.duckling, { sep: true, max: 2 }),
       E(3.6, 2.7 + oy + sk, 1.9, 1.7, P.duckling, { sep: true, pat: cap }),
       B(1, 3 + oy + sk, 2, 1, P.bill, { noise: 0, min: 2 }),
       B(1, 4 + oy + sk, 2, 1, P.bill, { noise: 0, max: 1 }),
     ]);
     const x = c.getContext('2d');
     if (pose === 'sleep') R(x, '#8a6a10', 3, 3 + oy, 2, 1);
-    else { R(x, EYE, 3, 2 + oy + sk); if (pose === 'sick') R(x, '#9a7a10', 4, 1 + oy + sk); }
+    else { R(x, EYE, 3, 2 + oy + sk); if (pose === 'sick') R(x, '#9a7a10', 4, 1 + oy + sk); if (run) R(x, '#fff6dc', 4, 1 + oy); }
     return c;
   }
   if (stage === 'nho') {
     const oy = sit ? 2 : 0;
     const c = fig(12, 11, [
-      !sit && B(frame ? 4 : 5, 9, 2, 1, P.bill, { noise: 0, min: 1 }),
-      !sit && B(frame ? 8 : 7, frame ? 8 : 9, 2, 1, P.bill, { noise: 0, max: 1 }),
+      !sit && B(run ? (frame ? 2 : 4) : (frame ? 4 : 5), 9, run ? 3 : 2, 1, P.bill, { noise: 0, min: 1 }),
+      !sit && B(run ? (frame ? 8 : 7) : (frame ? 8 : 7), frame ? 8 : 9, run ? 3 : 2, 1, P.bill, { noise: 0, max: 1 }),
       !sit && B(frame ? 5 : 6, 8, 1, 1, P.bill, { noise: 0 }),
       E(6.6, 6.2 + oy, 4, 2.4, P.duckY, { pat: (px, py, k) => (k === 3 && hash(px, py) < 0.4 ? P.duck[3] : undefined) }),
       E(10.3, 4.6 + oy, 0.9, 0.9, P.duckY),
-      E(7.4, 6 + oy, 2.4, 1.4, P.duck, { sep: true, max: 2 }),
+      E(7.4, 6 + oy - (run ? 1.4 : 0), 2.4, 1.4, P.duck, { sep: true, max: 2 }),
       E(3.8, 4.6 + oy, 1.2, 1.8, P.duckY),
       E(3.6, 2.9 + oy + sk, 1.8, 1.6, P.duckY, { sep: true }),
       B(1, 3 + oy + sk, 2, 1, P.bill, { noise: 0, min: 2 }),
     ]);
     const x = c.getContext('2d');
     if (pose === 'sleep') R(x, '#8a6a10', 3, 3 + oy, 2, 1);
-    else { R(x, EYE, 3, 3 + oy + sk); if (pose === 'sick') R(x, '#8a7020', 2, 2 + oy + sk); }
+    else { R(x, EYE, 3, 3 + oy + sk); if (pose === 'sick') R(x, '#8a7020', 2, 2 + oy + sk); if (run) R(x, '#fff6dc', 4, 2 + oy); }
     return c;
   }
   const old = stage === 'gia';
   const D = old ? fade(P.duck, 0.25, '#c8c2b4') : P.duck, BL = old ? fade(P.bill, 0.3) : P.bill;
-  const oy = sit ? 2 : 0, hy = (old ? 1 : 0) + sk * 2 + (pose === 'sleep' ? 2 : 0);
-  const hx = pose === 'sleep' ? 2 : 0;
+  const oy = sit ? 2 : 0, hy = (old ? 1 : 0) + sk * 2 + (pose === 'sleep' ? 2 : 0) + (run ? 1 : 0);
+  const hx = pose === 'sleep' ? 2 : run ? -1 : 0;   // chạy: cổ vươn ra trước, chân màng sải rộng
+  const wy = run ? 1.6 : 0;
   const c = fig(15, 12, [
-    !sit && B(frame ? 5 : 6, 10, 2, 1, BL, { noise: 0, min: 1 }),
-    !sit && B(frame ? 10 : 9, frame ? 9 : 10, 2, 1, BL, { noise: 0, max: 1 }),
+    !sit && B(run ? (frame ? 3 : 5) : (frame ? 5 : 6), 10, run ? 3 : 2, 1, BL, { noise: 0, min: 1 }),
+    !sit && B(run ? (frame ? 10 : 8) : (frame ? 10 : 9), frame ? 9 : 10, run ? 3 : 2, 1, BL, { noise: 0, max: 1 }),
     !sit && B(frame ? 6 : 7, 9, 1, 1, BL, { noise: 0 }),
     !sit && B(frame ? 10 : 9, 9, 1, frame ? 0 : 1, BL, { noise: 0 }),
     E(8.4, 7 + oy, 5, 2.8, D),
     E(13.1, 5.2 + oy, 1, 1.1, D),
-    E(9.2, 6.8 + oy, 3.1, 1.6, D, { sep: true, max: 2, pat: (px, py) => (px >= 11 && py === Math.round(6.8 + oy) ? '#5a7ab8' : undefined) }),
+    E(9.2, 6.8 + oy - wy, 3.1, 1.6, D, { sep: true, max: 2, pat: (px, py) => (px >= 11 && py === Math.round(6.8 + oy - wy) ? '#5a7ab8' : undefined) }),
     E(4.6 + hx * 0.5, 5.4 + oy + hy * 0.5, 1.4, 2.4, D),
     E(4.5 + hx, 3.2 + oy + hy, 2, 1.8, D, { sep: true }),
     B(1 + hx, 3 + oy + hy, 3, 1, BL, { noise: 0, min: 2 }),
@@ -360,6 +380,7 @@ function duck(stage, frame, pose = 'stand') {
   const x = c.getContext('2d');
   const ex = 4 + hx, ey = 3 + oy + hy;
   if (pose === 'sleep') R(x, '#8a8c9e', ex, ey, 2, 1);
+  else if (run) { R(x, EYE, ex, ey - 1, 1, 2); R(x, '#fff6dc', ex + 1, ey - 1); }
   else { R(x, EYE, ex, ey); if (pose === 'sick') R(x, '#6a6c7a', ex - 1, ey - 1); if (old) R(x, '#9a9caa', ex, ey - 1); }
   return c;
 }
@@ -635,6 +656,8 @@ function cat(stage, frame, pose = 'stand') {
 
 const STAGES = ['non', 'nho', 'truong', 'gia'];
 const species = fn => Object.fromEntries(STAGES.map(st => [st, pair(f => fn(st, f))]));
+// Dáng chạy hoảng (bị lùa) theo từng giai đoạn — riêng cho gà mái / gà trống / vịt
+const runner = fn => Object.fromEntries(STAGES.map(st => [st, pair(f => fn(st, f, 'run'))]));
 
 // ---------- trạng thái phủ (dùng chung) ----------
 
@@ -1720,6 +1743,44 @@ function strayIcon() {
   R(z, '#1f6fd1', 0, 5, 3, 1); R(z, '#1f6fd1', 1, 4);
   return c;
 }
+// Mũi tên vàng chỉ hướng con lạc ở ngoài khung nhìn (12x12 như SPR2.alertArrow, màu ấm để khác mũi tên báo động đỏ)
+const STRAY_ARROW = [
+  '......o.....',
+  '.....ooo....',
+  '....ohWo....',
+  'ooooohyyo...',
+  'ohhhhhhyyo..',
+  'ohyyyyyyyyo.',
+  'ohyyyyyyyyyo',
+  'oaaaaayyyyo.',
+  'ooooooayyo..',
+  '......oayo..',
+  '.......oo...',
+  '.......o....',
+];
+const strayArrow = () => spr(STRAY_ARROW, { o: '#4a3208', h: '#ffeca8', W: '#fffbe8', y: '#f2b81e', a: '#b57a0c' });
+// Biển gỗ treo ở cửa chuồng, render.js viết số "đã về" lên mặt biển (26x11, chừa 2 hàng dây treo)
+function homeBoard() {
+  return draw(26, 11, x => {
+    for (const ox of [6, 19]) { R(x, '#8a5a2b', ox, 0, 1, 2); R(x, OUT, ox - 1, 0, 1, 2); }
+    R(x, OUT, 0, 2, 26, 9);
+    R(x, WOOD[1], 1, 3, 24, 7); R(x, WOOD[2], 1, 3, 24, 1); R(x, WOOD[0], 1, 9, 24, 1);
+    R(x, '#fff6dc', 2, 3, 22, 7);   // mặt biển sáng để chữ số nổi lên
+    R(x, '#e8d8b0', 2, 9, 22, 1);
+    for (const ox of [1, 24]) R(x, WOOD[0], ox, 3, 1, 7);   // nẹp hai đầu
+  });
+}
+// Bao cám để rải thóc ở cửa chuồng
+function feedSack() {
+  return draw(10, 11, x => {
+    shadow(x, 5, 10, 4.4, 1.2);
+    R(x, OUT, 1, 2, 8, 9); R(x, '#d9c79a', 2, 3, 6, 7); R(x, '#efe2bd', 2, 3, 6, 2); R(x, '#b8a271', 2, 8, 6, 2);
+    R(x, OUT, 3, 0, 4, 3); R(x, '#c8b488', 4, 1, 2, 2);   // miệng bao túm lại
+    R(x, '#8a5a2b', 3, 2, 4, 1);                           // dây buộc
+    R(x, '#e8c34a', 4, 4, 3, 3); R(x, '#8a5a10', 4, 6, 3, 1);   // nhãn hạt thóc
+    R(x, '#f7d547', 5, 4);
+  });
+}
 function warn() {
   return draw(9, 8, x => {
     for (let i = 0; i < 7; i++) { const hw = Math.floor(i * 0.65); R(x, OUT, 4 - hw - 1, i, hw * 2 + 3, 1); }
@@ -1783,6 +1844,8 @@ const ANIMAL = {
 
 export const SPR3 = {
   animal: ANIMAL,
+  // dáng chạy hoảng khi bị lùa (issue 42): run.<loài>.<giai đoạn>.<hướng>[frame]
+  run: { ga: runner(hen), gaTrong: runner(rooster), vit: runner(duck) },
   // ngủ & bệnh theo dáng từng loài, giai đoạn trưởng thành (bản 'left'); xem sleepBy/sickBy để có đủ giai đoạn
   sleep: {
     ga: hen('truong', 0, 'sleep'), gaTrong: rooster('truong', 0, 'sleep'), vit: duck('truong', 0, 'sleep'), heo: pig('truong', 0, 'sleep'),
@@ -1825,10 +1888,12 @@ export const SPR3 = {
   eggNest: eggNest(),
   eggFertile: eggFertile(),
   grainScatter: grainScatter(),
+  homeBoard: homeBoard(),
+  strayArrow: strayArrow(),
   lowFence: { h: lowFence('h'), v: lowFence('v') },
   ratTrap: ratTrap(),
   vetClinic: vetClinic(),
-  items: { soapBar: soapBar(), vaccine: vaccine(), medicine: medicine(), treat: treat(), sausage: sausage(), manure: manure() },
+  items: { soapBar: soapBar(), vaccine: vaccine(), medicine: medicine(), treat: treat(), sausage: sausage(), manure: manure(), feedSack: feedSack() },
   status: {
     heart1: heartN(1), heart2: heartN(2), heart3: heartN(3), heart4: heartN(4), heart5: heartN(5),
     dirtyIcon: dirtyIcon(), strayIcon: strayIcon(), warn: warn(),

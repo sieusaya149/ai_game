@@ -4,7 +4,7 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR3, muddy } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf } from './state.js';
+import { canMove, marketOpen, actionsFor, nextStrip, penUse, penCapOf, penHome, gateOf, isDusk } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE } from './data.js';
 
@@ -185,9 +185,10 @@ function statusIcon(name) {
 // Thiếu art thì dự phòng bằng sprite cũ: non = SPR.baby, nhỡ = bản thu nhỏ, già = bản nhạt màu.
 const SP3 = { dog: 'cho' }, MALE = { ga: 'gaTrong', bo: 'boDuc' };
 const sp3Key = a => (a.sex === 'm' && MALE[a.type] && SPR3?.animal?.[MALE[a.type]]) ? MALE[a.type] : SP3[a.type] ?? a.type;
-export function animalImg(a, face, frame, sleep) {
+export function animalImg(a, face, frame, sleep, run) {
   const stage = a.stage ?? 'truong', key = sp3Key(a);
   if (sleep) { const z = SPR3?.sleepBy?.[key]?.[stage]; if (z) return face === 'right' ? derived(z, 'flip', () => flip(z)) : z; }
+  if (run) { const r = SPR3?.run?.[key]?.[stage]; if (r) return r[face][frame % r[face].length]; }   // đang bị lùa: dáng chạy hoảng
   const set3 = SPR3?.animal?.[key]?.[stage];
   if (set3) return set3[face][frame % set3[face].length];
   const baby = SPR.baby?.[a.type];
@@ -212,6 +213,7 @@ const bellied = img => derived(img, 'belly', () => {
   x.drawImage(img, 0, 0, c.width, c.height);
   return c;
 });
+export const GRAIN_MS = 2800;   // nắm thóc rải ở cửa chuồng còn trên đất chừng này ms
 export const ANGEL_MS = 2600;   // thiên thần bay lên trong chừng này ms
 export const DEAL_MS = TRADE.visitMs;   // Chú Ba dắt con vật đi: cảnh dài chừng này ms
 const angelFallback = () => once('angel', () => {
@@ -474,6 +476,14 @@ export function render(ctx, f) {
   drawStatic(ctx, m, camX / scale, camY / scale, (camX + width) / scale, (camY + height) / scale);
 
   const blit = (img, x, y) => { if (img) ctx.drawImage(img, Math.round(x), Math.round(y)); };
+  // Biển "đã về" trên cửa chuồng: SPR3.homeBoard nếu có, không thì tấm gỗ vẽ tạm. Còn con chưa về thì chữ đỏ.
+  const homeSign = (g, h) => {
+    const im = SPR3?.homeBoard, x = Math.round(g.x), y = Math.round(g.y) - 12;
+    if (im) blit(im, x - im.width / 2, y - im.height);
+    else { rect(ctx, '#6b4020', x - 13, y - 9, 26, 9); rect(ctx, '#fff6dc', x - 12, y - 8, 24, 7); }
+    ctx.font = '6px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = h.home < h.total ? '#7a1f10' : '#1d5a1d';
+    ctx.fillText(`${h.home}/${h.total}`, x, y - 2);
+  };
   const shadow = (x, y, rx) => {
     ctx.fillStyle = 'rgba(20,40,10,0.22)';
     ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y) - 0.5, rx, rx * 0.38, 0, 0, 7); ctx.fill();
@@ -534,6 +544,8 @@ export function render(ctx, f) {
   for (const p of m.penList) {   // nhà/mái chuồng theo cấp, rồi máng
     const hs = p.house, hi = hs.sprite === 'quarantine' ? SPR3?.quarantine : SPR3?.pen?.[hs.sprite]?.[p.lv - 1];
     if (hi && vis(hs.x, hs.y - hi.height / 2, hi.width)) add(hs.y, () => blit(hi, hs.x - hi.width / 2, hs.y - hi.height));
+    const hm = farm && isDusk(state) ? penHome(state, p.id) : null, gt = hm?.total ? gateOf(state, p.id) : null;
+    if (gt && vis(gt.x, gt.y, 24)) add(gt.y + 3, () => homeSign(gt, hm));   // biển số con đã về trên cửa chuồng
     const tr = p.trough, n = state.troughs?.[p.type] ?? 0;
     if (!tr || !vis(tr.x, tr.y, 20)) continue;
     add(tr.y, () => {
@@ -598,6 +610,20 @@ export function render(ctx, f) {
       ctx.globalAlpha = 1;
     });
   }
+  // thóc vừa rải ở cửa chuồng: bao cám nghiêng xuống rồi hạt nằm trên đất, mờ dần
+  for (const g of farm ? wd.grains ?? [] : []) {
+    const u = (now - g.t0) / GRAIN_MS;
+    if (u < 0 || u > 1 || !vis(g.x, g.y)) continue;
+    add(g.y - 1, () => {
+      ctx.globalAlpha = u > 0.75 ? (1 - u) / 0.25 : 1;
+      const im = SPR3?.grainScatter;
+      if (im) blit(im, g.x - im.width / 2, g.y - im.height + 5);
+      else { rect(ctx, '#e8c34a', g.x - 6, g.y - 2, 12, 3); }
+      const sk = SPR3?.feedSack;
+      if (sk && u < 0.45) blit(sk, g.x + 5, g.y - sk.height - 3 + Math.round(u * 6));
+      ctx.globalAlpha = 1;
+    });
+  }
   // đồ trang trí
   for (const d of m.decos) {
     if (!vis(d.x, d.y)) continue;
@@ -611,8 +637,8 @@ export function render(ctx, f) {
     if (a.x == null || !vis(a.x, a.y)) continue;
     const rt = wd.rt.get('a' + a.id) ?? {};
     const frame = rt.walking ? Math.floor(rt.anim * 7) % 2 : rt.peck ? Math.floor(rt.anim * 6) % 2 : 0;
-    const sleeping = !rt.walking && (night > 0.6 || rt.nap);   // ban đêm, hoặc con già ngủ gật
-    let im = animalImg(a, rt.face ?? 'left', frame, sleeping);
+    const sleeping = !rt.walking && (night > 0.6 || rt.nap || a.stray);   // ban đêm, hoặc con già ngủ gật
+    let im = animalImg(a, rt.face ?? 'left', frame, sleeping, rt.scared);
     if (!im) continue;
     if (a.pregnant && !sleeping) im = bellied(im);
     const dy = rt.peck && frame ? 1 : 0;
@@ -636,6 +662,8 @@ export function render(ctx, f) {
     if (emote && emote.until > now) icon = statusIcon(emote.icon);
     else if (state.time < (a.scaredUntil ?? 0)) icon = statusIcon('scared');
     else if (a.sick) icon = statusIcon('sick');
+    else if (rt.scared) icon = statusIcon('scared');
+    else if (a.stray) icon = SPR3?.strayIcon ?? statusIcon('zzz');   // con lạc ngủ ngoài 💤
     else if (a.hunger < 35) icon = statusIcon('hungry');
     else if (a.ready) icon = statusIcon(a.type === 'cuu' ? 'wool' : 'milk');
     else if (a.pregnant) icon = statusIcon('pregnant');

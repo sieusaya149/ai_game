@@ -42,12 +42,12 @@ for (const sp in SPR3.animal) {
   if (SPR3.sickBy[sp]) for (const st in SPR3.sickBy[sp]) put(r, SPR3.sickBy[sp][st], `bệnh ${st}`);
 }
 const groups = {
-  'Hành động': ['heoMud', 'dogHerd', 'dogSit', 'dogBeg', 'catPounce', 'catNap', 'catMouse'],
+  'Hành động': ['run', 'heoMud', 'dogHerd', 'dogSit', 'dogBeg', 'catPounce', 'catNap', 'catMouse'],
   'Hiệu ứng': ['fx'],
   'Săn mồi': ['rat', 'hawk', 'hawkShadow', 'weasel'],
   'NPC': ['npcTiSun', 'npcTiSunIdle', 'npcCoUt', 'npcCoUtIdle', 'npcChuBa', 'npcChuBaIdle'],
   'Chuồng': ['pen', 'quarantine', 'doghouse', 'catDoor', 'scale'],
-  'Đồ vật': ['grave', 'graveFlower', 'angel', 'eggNest', 'eggFertile', 'grainScatter', 'lowFence', 'ratTrap', 'vetClinic'],
+  'Đồ vật': ['grave', 'graveFlower', 'angel', 'eggNest', 'eggFertile', 'grainScatter', 'homeBoard', 'strayArrow', 'lowFence', 'ratTrap', 'vetClinic'],
   'Túi đồ & trạng thái': ['items', 'status'],
 };
 for (const g in groups) { const r = section(g); for (const k of groups[g]) walk(r, SPR3[k], k, true); }

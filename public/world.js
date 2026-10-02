@@ -1,6 +1,6 @@
 // Thế giới: di chuyển, va chạm, tìm đường, AI con vật/chó/quạ/trộm, tìm target. Không vẽ gì.
 import { TS, GROUND } from './layout.js';
-import { ANIMALS, CROPS, DOG, DIR_NAME, BOND } from './data.js';
+import { ANIMALS, CROPS, DOG, DIR_NAME, BOND, FREE } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
 import { troughOf } from './farm.js';
@@ -126,10 +126,36 @@ const STAGE_SPEED = { non: 1.25, nho: 1.1, truong: 1, gia: 0.6 };
 const henOf = (state, a) => a.type === 'ga' && a.stage === 'non'
   ? state.animals.filter(h => h.type === 'ga' && h.sex === 'f' && (h.stage === 'truong' || h.stage === 'gia') && h.x != null).sort((u, v) => dist(u, a) - dist(v, a))[0] : null;
 // Gà thả rông (luật chọn ô a.tile, ở đây chỉ đi tới đó): thẳng tới điểm trong ô, không bước vào ô ngoài vùng đi lại; kẹt lâu thì nhảy tới nơi.
+// Lùa một con thả rông ra xa điểm src (người chơi lát 42, con chó lát 45): nó chạy ngược hướng src, tới cửa chuồng thì
+// luật ghi là đã về (ST.passGate). radius px, speed px/giây. Trả true nếu con này đang bị lùa (đã xử lý xong lượt đi của nó).
+export function shoo(state, a, src, dt, { radius = FREE.shyRadius, speed = 46, w } = {}) {
+  const rt = rtOf(w ?? { rt: new Map() }, 'a' + a.id);
+  if (!a.tile || a.x == null) return false;
+  return herd(state, a, rt, dt, ST.roamOf(state), src, radius, speed);
+}
+function herd(state, a, rt, dt, R, src = state.player, radius = FREE.shyRadius, speed = 46) {
+  const dx = a.x - src.x, dy = a.y - src.y, d = Math.hypot(dx, dy);
+  rt.scared = false;
+  if (d >= radius) return false;
+  const gates = ST.animalPen(state, a)?.gates ?? [];
+  const ok = (x, y) => { const c = Math.floor(x / TS), r = Math.floor(y / TS); return R.has(c, r) || gates.some(g => g[0] === c && g[1] === r); };
+  const st = speed * (STAGE_SPEED[a.stage] ?? 1) * dt, ux = dx / (d || 1), uy = d ? dy / d : 1;
+  let nx = a.x + ux * st, ny = a.y + uy * st;
+  if (!ok(nx, ny)) { if (ok(nx, a.y)) ny = a.y; else if (ok(a.x, ny)) nx = a.x; else { nx = a.x; ny = a.y; } }
+  a.x = nx; a.y = ny;
+  const c = Math.floor(a.x / TS), r = Math.floor(a.y / TS);
+  if (gates.some(g => g[0] === c && g[1] === r)) { ST.passGate(state, a.id); return true; }
+  if (R.has(c, r)) a.tile = { c, r };
+  if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
+  rt.walking = true; rt.peck = false; rt.scared = true; rt.anim += dt * 2;
+  return true;
+}
 function freeWalk(state, a, w, dt0) {
   const rt = rtOf(w, 'a' + a.id), dt = aiStep(rt, dt0, onScreen(w, a));
   if (!dt) return;
-  const R = ST.roamOf(state), tx = a.tile.c * TS + 3 + (a.id * 7) % 10, ty = a.tile.r * TS + 6 + (a.id * 5) % 8;
+  const R = ST.roamOf(state);
+  if (a.stray && herd(state, a, rt, dt, R)) return;
+  const tx = a.tile.c * TS + 3 + (a.id * 7) % 10, ty = a.tile.r * TS + 6 + (a.id * 5) % 8;
   const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
   rt.walking = false; rt.peck = false;
   if (d < 1.5) { rt.stuck = 0; rt.peck = true; rt.anim += dt; return; }   // tới nơi: bới đất
@@ -318,6 +344,7 @@ function stripEdge(state, dir) {
   const y = dir === 'S' ? (o.r + o.h) * TS : dir === 'N' ? o.r * TS : clamp(p.y, o.r * TS, (o.r + o.h) * TS);
   return { x, y };
 }
+const gateOn = (state, id) => ST.isDusk(state) && ST.penHome(state, id).total > 0;   // cửa chuồng chỉ là target từ chạng vạng (rải thóc, xem số con đã về)
 const findBy = (list, id) => (list ?? []).find(e => e.id === id);
 
 // Bụi/đá theo id (bản đồ vườn lớn có hàng trăm cái, tìm mỗi khung hình thì chậm): bảng tra nhớ theo bản đồ
@@ -337,6 +364,7 @@ export function targetPos(state, t) {
     case 'threat': return findBy(state.threats, t.id);
     case 'dog': return state.dog;
     case 'trough': return troughAnchor(t);
+    case 'gate': return ST.gateOf(state, t.id);
     case 'scale': { const c = scaleOf(t); return c ? { x: c.x, y: c.y + 8 } : null; }
     case 'nest': return coop()?.at ?? null;
     case 'building': return M.buildings.find(b => b.id === t.id)?.at ?? null;
@@ -356,7 +384,7 @@ export function exists(state, t) {
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
 }
-const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
+const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, gate: 24, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -404,6 +432,7 @@ export function findTarget(state, w) {
   }
   for (const { pen, id } of M.troughs) consider({ kind: 'trough', pen, id });
   for (const p of M.penList) if (p.scale) consider({ kind: 'scale', pen: p.type, id: p.id });
+  if (atFarm()) for (const p of M.penList) if (gateOn(state, p.id)) consider({ kind: 'gate', id: p.id });
   for (const d of M.decos) if (d.kind === 'deco_bench') consider({ kind: 'deco', id: d.id });
   for (const b of M.buildings) if (b.at && b.id !== 'coop') consider({ kind: 'building', id: b.id });
   if (!atFarm()) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì sang nhà/làng bằng nút của nhà/cổng
@@ -422,6 +451,7 @@ export function nameOf(state, t) {
     case 'threat': return findBy(state.threats, t.id)?.kind === 'thief' ? 'Thằng Tèo' : 'Con quạ';
     case 'dog': return state.dog.name || DOG.name;
     case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;
+    case 'gate': { const h = ST.penHome(state, t.id); return `Cửa ${M.penById[t.id]?.name?.toLowerCase() ?? 'chuồng'} (${h.home}/${h.total} đã về)`; }
     case 'scale': return 'Cân heo';
     case 'nest': return 'Ổ ấp trứng';
     case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
@@ -445,6 +475,7 @@ export function anchorOf(state, t) {
     case 'dog': { const im = dogImg(state.dog, 'left', 0); return { x: pos.x, top: pos.y - (im?.height ?? 12) - 1 }; }
     case 'threat': { const th = pos; const alt = 0; return th.kind === 'crow' ? { x: th.x, top: th.y - 16 - alt } : { x: th.x, top: th.y - 26 }; }
     case 'trough': return { x: pos.x, top: pos.y - 12 };
+    case 'gate': return { x: pos.x, top: pos.y - 16 };
     case 'scale': return { x: pos.x, top: pos.y - 24 };
     case 'nest': return { x: pos.x, top: pos.y - 14 };
     case 'building': {
@@ -480,6 +511,7 @@ export function hitTest(state, wx, wy) {
   }
   for (const d of M.decos) if (d.kind === 'deco_bench') { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
   for (const { pen, id } of M.troughs) { const tr = M.penById[id].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen, id }; }
+  if (atFarm()) for (const p of M.penList) { const g = gateOn(state, p.id) && ST.gateOf(state, p.id); if (g && hitRect(g.x - 14, g.y - 16, 28, 22, wx, wy)) return { kind: 'gate', id: p.id }; }
   for (const p of M.penList) if (p.scale && hitRect(p.scale.x - 8, p.scale.y - 14, 16, 16, wx, wy)) return { kind: 'scale', pen: p.type, id: p.id };
   const cp = coop();
   if (cp && hitRect(cp.x, cp.y, 30, 28, wx, wy, 0) || cp && hitRect(cp.at.x - 9, cp.at.y - 12, 18, 12, wx, wy)) return { kind: 'nest' };

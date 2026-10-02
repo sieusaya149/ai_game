@@ -48,7 +48,8 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 - `state.time`: thời gian game (ms), tăng mỗi khung hình thêm `dtReal * state.speed` (speed ∈ `SPEEDS` = 1, 5, 20). Nút tốc độ vẫn có khi chơi offline.
 - Mọi bộ đếm giờ trong luật chơi dùng `state.time`, **không dùng `Date.now()`**. Chỗ cần giờ ngoài đời (`savedAt`, chạy bù) dùng `now()` của `clock.js`.
-- Ngày: `DAY_MS` = 20 phút. `dayFraction = (time % DAY_MS) / DAY_MS`. Ban đêm khi `dayFraction >= NIGHT_FROM`. Giờ hiển thị: `6:00 + dayFraction × 24h`. Ngày 1 bắt đầu lúc 6:00 sáng.
+- Ngày: `DAY_MS` = 20 phút. `dayFraction = (time % DAY_MS) / DAY_MS`. Ban đêm khi `dayFraction >= NIGHT_FROM` (0.75 = 0h, lúc màn hình tối nhất). Giờ hiển thị: `6:00 + dayFraction × 24h`. Ngày 1 bắt đầu lúc 6:00 sáng.
+- **Chạng vạng** `isDusk(state)`: `dayFraction >= FREE.duskAt` (0.5 = **18h**). Mốc gà vịt thôi thả rông mà về chuồng (issue 42); đừng nhầm với `isNight` (nửa đêm).
 - Thời tiết đổi mỗi ngày mới: `sun` 45% · `cloud` 30% · `rain` 25%. Mưa: mọi ô luôn đủ nước. Nắng: đất khô nhanh gấp 1.5 lần.
 - **Mùa** (chỉ hiển thị ở Phase 0): mỗi mùa 7 ngày game, Xuân, Hạ, Thu, Đông. `seasonOf(state)`.
 - **Hai lịch (ADR 0003):** lịch game (ngày đêm, mùa, thời tiết) theo `state.time`; lịch ngoài đời (`realDay()`) dành cho nhiệm vụ hằng ngày sau này.
@@ -145,6 +146,7 @@ Animal = {
   weight,                                     // kg; con non/nhỡ ăn no thì lên cân tới WEIGHT[type][1] (lát bán theo cân dùng tiếp)
   mom: null | { id, name }, dad: null | { id, name },   // cha mẹ khi đẻ trong trại (lát sinh sản, phả hệ)
   tile: null | { c, r },                      // ô đang đứng khi thả rông (ADR 0013); null = trong chuồng
+  stray: false,                               // chạng vạng chưa về chuồng, ngủ ngoài tới sáng (issue 42); luôn đi kèm tile ≠ null
   nextProduct, ready,                         // sản phẩm (theo state.time); con già chu kỳ ×AGING.oldEvery
   pregnant, dueAt,
   x, y, scaredUntil?,                         // điểm ảnh, do world cập nhật
@@ -244,8 +246,23 @@ starChance(s, a)                  // xác suất milk/shear ra sữa ngon / lôn
 roamOf(state)            // → { tiles: [{c,r}], has(c,r) }: vùng gà thả rông đi lại = ô trong đất, tới được từ nhà, không phải ô chắn/chuồng/ô hàng rào thấp (ngoài cổng, trong nhà không tính). Ruộng rào kín thì ô ruộng không nằm trong vùng. Nhớ tạm theo farm.rev
 hiddenEggs(state)        // → trứng đang nằm trong bụi: s.eggs có `tile: {c,r}` (x,y = giữa ô); nhặt bằng perform(egg, 'collect') như trứng thường
 ```
-Mỗi bước tick (ban ngày, FREE trong data.js): tối đa `FREE.max` (30) con loài `FREE.types` (gà), không bệnh, không ở chuồng cách ly, có `a.tile`; cứ `FREE.moveMs` đổi sang ô khác cách ≤ `FREE.radius` ô (`a.tileAt` = lúc đổi kế). Sáng ra bước từ cửa chuồng; ban đêm (hoặc bệnh/cách ly/vượt 30) `tile = null` và về chuồng. Đứng ở ô ruộng có cây: con nhỡ trở lên mổ sâu (`stats.pecks`), 5% (`FREE.seedLoss`) lần mổ mất hạt vừa gieo (cây ở giai đoạn 0). Gà mái trưởng thành thả rông đẻ trứng ở ô cỏ gần bụi/đá/cây trong `FREE.layRadius`, mỗi ô một ổ. Chạy bù offline dùng đúng luật này.
+Mỗi bước tick (ban ngày, FREE trong data.js): tối đa `FREE.max` (30) con loài `FREE.types` (gà), không bệnh, không ở chuồng cách ly, có `a.tile`; cứ `FREE.moveMs` đổi sang ô khác cách ≤ `FREE.radius` ô (`a.tileAt` = lúc đổi kế). Sáng ra bước từ cửa chuồng; từ chạng vạng `isDusk` (18h) trở đi, hoặc bệnh/cách ly/vượt 30, thì `tile = null` và về chuồng (trừ con lạc, xem issue 42). Đứng ở ô ruộng có cây: con nhỡ trở lên mổ sâu (`stats.pecks`), 5% (`FREE.seedLoss`) lần mổ mất hạt vừa gieo (cây ở giai đoạn 0). Gà mái trưởng thành thả rông đẻ trứng ở ô cỏ gần bụi/đá/cây trong `FREE.layRadius`, mỗi ô một ổ. Chạy bù offline dùng đúng luật này.
 Hàng rào thấp: vật phẩm `deco_lowfence` (ITEMS, kind deco, bán ở chợ), đặt bằng `placeEntity` như đồ trang trí (qua `canPlace`), người chơi bước qua được, chỉ chặn gà. `world.js` diễn hoạt gà theo `a.tile` (`freeWalk`); `render.js` vẽ `SPR3.lowFence` (ngang/dọc theo hàng xóm) và `SPR3.eggNest` cho trứng có `tile`.
+
+### Chạng vạng về chuồng, con lạc, lùa tay, rải thóc (issue 42, ADR 0013)
+```js
+isDusk(state)            // → đã qua 18h (FREE.duskAt) hay chưa
+strays(state)            // → [animal] các con đang lạc, ngủ ngoài chuồng (a.stray && a.tile). Rỗng ban ngày
+penHome(state, penId)    // → { type, home, total }: số con thả rông của chuồng đã về / tổng. total = 0 nếu chuồng không nuôi loài thả rông
+gateOf(state, penId)     // → { x, y } điểm ảnh giữa cửa chuồng, hay null nếu chuồng không có ô cửa
+passGate(state, id)      // world.js báo "con id vừa đi qua cửa chuồng" → luật ghi là đã về (tile = null, stray = false). → false nếu nó đang ở trong chuồng rồi
+shoo(state, a, src, dt, { radius, speed, w })   // world.js: lùa một con ra xa điểm src; tới ô cửa thì tự gọi passGate. → true nếu nó đang bị lùa
+```
+- **Luật chạng vạng (thuần, chạy bù ra cùng kết quả):** mỗi ngày đúng một lần, bước tick đầu tiên có `isDusk` gọi `dusk(state)` (đánh dấu `state.duskDay = state.day`). Mọi con đang thả rông về chuồng, trừ `FREE.strayPerDusk` = **1–3 con lạc** (đàn nhỏ thì tối đa nửa đàn) được bốc theo trọng số: ❤️ thấp, con non/nhỡ, con đứng xa cửa chuồng thì dễ lạc hơn. **Đêm mưa bão** (`weather === 'rain'`) cả đàn tán loạn: `max(FREE.stormMin, 40% đàn)` con lạc. Con lạc mang `stray: true`, giữ nguyên `tile`, **ngủ ngoài tới sáng** và không bao giờ chết vì chuyện này (ADR 0004). Sáng hôm sau `stray` tự về `false` và nó đi kiếm ăn như thường. Mỗi con lạc phát event `stray` (gộp theo loài).
+- **Lùa tay:** `world.js` cho con lạc chạy tránh người chơi trong `FREE.shyRadius` (32px ≈ 2 ô) — đi vòng ra sau mà đẩy nó về phía cửa chuồng; bước vào ô cửa thì gọi `passGate`. Dùng `shoo(...)` nếu cần lùa từ nguồn khác (chó lùa, lát 45).
+- **Rải thóc:** target mới `{ kind: 'gate', id }` (cửa chuồng, chỉ hiện từ chạng vạng và khi chuồng có loài thả rông). Hành động `scatter` tốn **1 bao cám** của loài đó (`ANIMALS[type].feed`); mọi con lạc của chuồng trong `FREE.lureRadius` (5 ô quanh ô cửa) vào chuồng ngay. Hết cám thì `disabled`; không còn con nào lạc cũng `disabled`. Kết quả có thêm `grain: { x, y }` để main đẩy hoạt cảnh thóc rải vào `world.grains`.
+- **Hiển thị:** `render.js` treo biển `SPR3.homeBoard` trên cửa chuồng với số `home/total` (đỏ khi chưa đủ, xanh khi đủ); con lạc đeo `SPR3.strayIcon` (💤) và ngủ gật; `ui.js` vẽ mũi tên vàng `SPR3.strayArrow` (`.alert-arrow[data-key="stray:<id>"]`) khi con lạc ở ngoài khung nhìn. Con đang bị lùa dùng dáng chạy hoảng `SPR3.run.<loài>.<giai đoạn>` (gà mái, gà trống, vịt).
+
 ### Target, hành động
 ```js
 actionsFor(state, target)         // → [{ id, icon, label, disabled?: 'lý do', tiles?: [plotIdx...] }]; phần tử đầu là hành động chính.
@@ -375,6 +392,7 @@ Loại việc của `todoList`: `crow`, `thief`, `sick` (gấp); `hungry`, `dry`
 { kind: 'egg', id }
 { kind: 'poop', id }
 { kind: 'trough', pen, id? }   // pen: 'chicken'|'pig'|'pasture'; id = thực thể chuồng (có nhiều chuồng cùng loại). Máng ăn gom theo loại: state.troughs[loại]
+{ kind: 'gate', id }           // cửa chuồng (id thực thể chuồng); chỉ là target từ chạng vạng (isDusk), cho rải thóc và xem số con đã về
 { kind: 'nest' }
 { kind: 'dog' }
 { kind: 'threat', id }
@@ -385,7 +403,7 @@ Loại việc của `todoList`: `crow`, `thief`, `sick` (gấp); `hungry`, `dry`
 { kind: 'building', id }       // theo bản đồ đang đứng. Vườn: house, gate, shed, shipbin, board, well, doghouse (không tương tác).
                                //   Nhà: bed, wardrobe, (stove, table, plant chỉ để ngắm). Làng: market, smithy, friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck` (và `upgrade` nâng cấp chuồng); ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck` (và `upgrade` nâng cấp chuồng); cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 
@@ -399,6 +417,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `crow`, `thief` | `name` (cây bị mất) | important (`loss`) |
 | `levelup` | `level` | important (`levelup`) |
 | `order` | — | important (`order`) |
+| `stray` | `animal` (tên loài), `id` | important (`stray`), gộp theo loài: "N con gà lạc, chưa về chuồng 💤" |
 | `oldSoon` | `animal` (tên loài), `id` | important (`old`), gộp theo loài |
 | `passed` | `animal`, `id`, `kind` (loại), `sex`, `x`, `y` | important (`old`), gộp theo loài; main đẩy thiên thần bay lên vào `world.angels` |
 | `egg` | — | info |

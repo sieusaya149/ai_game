@@ -334,6 +334,8 @@ export const farmHours = s => (s.simMs || 0) / 3600_000;
 // ---------- Thời gian ----------
 const dayFrac = s => (s.time % DAY_MS) / DAY_MS;
 export const isNight = s => dayFrac(s) >= NIGHT_FROM;
+// Đã qua chạng vạng (18h) chưa: mốc gà vịt thôi thả rông mà về chuồng, cũng là lúc cửa chuồng có biển "đã về" và rải thóc được (issue 42)
+export const isDusk = s => dayFrac(s) >= FREE.duskAt;
 export function clockText(s) {
   const t = (6 + dayFrac(s) * 24) % 24;
   const h = Math.floor(t), m = Math.floor((t - h) * 60);
@@ -600,10 +602,72 @@ function peck(s, a, c, r) {
   if (k.bugs) { k.bugs = false; s.stats.pecks = (s.stats.pecks || 0) + 1; fxEv(at.x, at.y, 'Gà mổ sâu 🐛', COL.good); }
   if (stageOf(k) === 0 && Math.random() < FREE.seedLoss) { p.crop = null; fxEv(at.x, at.y, 'Gà ăn mất hạt 🌱', COL.bad); log(s, 'Gà mổ mất hạt vừa gieo'); }
 }
+// Chạng vạng (một lần mỗi đêm): phần lớn con thả rông tự về chuồng, vài con lạc ngủ ngoài (a.stray). Không ai chết vì ngủ ngoài (ADR 0004).
+// Dễ lạc: ❤️ thấp, con non, con ở xa cửa chuồng. Đêm mưa bão cả đàn tán loạn, lạc nhiều hơn hẳn.
+function dusk(s) {
+  s.duskDay = s.day;
+  const cand = s.animals.filter(a => a.tile && canRoam(s, a));
+  if (!cand.length) return;
+  const n = cand.length, [lo, hi] = FREE.strayPerDusk;
+  let k = s.weather === 'rain' ? Math.max(FREE.stormMin, Math.round(n * FREE.stormShare)) : Math.min(rint(lo, hi), Math.max(1, Math.ceil(n / 2)));
+  k = Math.min(k, n);
+  const weight = a => {
+    const g = animalPen(s, a)?.gates[0], far = g ? Math.max(Math.abs(a.tile.c - g[0]), Math.abs(a.tile.r - g[1])) : 0;
+    return (1 + (5 - (a.bond || 1)) * 0.5) * (a.stage === 'non' ? 2 : a.stage === 'nho' ? 1.5 : 1) * (1 + far / 8);
+  };
+  for (; k > 0; k--) {
+    const w = cand.map(weight);
+    let r = Math.random() * w.reduce((x, y) => x + y, 0), i = 0;
+    while (i < cand.length - 1 && (r -= w[i]) > 0) i++;
+    const a = cand.splice(i, 1)[0];
+    a.stray = true;
+    emit({ type: 'stray', animal: ANIMALS[a.type].name, id: a.id });
+  }
+}
+// Con đang ngủ ngoài (lạc) tới sáng
+export const strays = s => s.animals.filter(a => a.stray && a.tile);
+// world.js báo: con id vừa đi qua cửa chuồng (bị lùa tay, chó lùa, hay chạy theo thóc rải).
+// Luật ghi con đó là đã về chuồng, hết lạc. false nếu nó đang ở trong chuồng rồi.
+export function passGate(s, id) {
+  const a = s.animals.find(x => x.id === id);
+  if (!a?.tile) return false;
+  a.stray = false; goHome(s, a);
+  return true;
+}
+// Điểm cửa chuồng (giữa các ô cửa) theo id chuồng; null nếu không có
+export function gateOf(s, id) {
+  const p = mapOf(s).penById[id];
+  if (!p?.gates.length) return null;
+  return { x: p.gates.reduce((n, g) => n + g[0], 0) / p.gates.length * TS + 8, y: p.gates[0][1] * TS + 8 };
+}
+// Số con thả rông của chuồng đã về: { type, home, total } (total = 0: chuồng không có loài thả rông)
+export function penHome(s, id) {
+  const list = s.animals.filter(a => a.pen === id && FREE.types.includes(a.type));
+  return { type: list[0]?.type ?? null, home: list.filter(a => !a.tile).length, total: list.length };
+}
+function gateActs(s, t) {
+  const h = penHome(s, t.id);
+  if (!h.total) return [];
+  const def = ANIMALS[h.type], n = have(s, def.feed), out = s.animals.some(a => a.pen === t.id && a.stray && a.tile);
+  return [mk('scatter', '🌾', `Rải thóc gọi về (còn ${n} ${itemName(def.feed).toLowerCase()})`,
+    n <= 0 ? noItem(def.feed) : !out ? 'Không có con nào lạc ngoài kia' : null)];
+}
+function scatter(s, t, at) {
+  const p = mapOf(s).penById[t.id], def = ANIMALS[penHome(s, t.id).type];
+  take(s, def.feed);
+  const near = s.animals.filter(a => a.pen === t.id && a.stray && a.tile && p.gates.some(([c, r]) => Math.max(Math.abs(a.tile.c - c), Math.abs(a.tile.r - r)) <= FREE.lureRadius));
+  for (const a of near) passGate(s, a.id);
+  const h = penHome(s, t.id), msg = near.length ? `${near.length} con chạy về chuồng` : 'Chưa con nào nghe thấy, đi gần hơn nhé';
+  const g = gateOf(s, t.id) ?? at;
+  return res(true, msg, [say(at, near.length ? `Rải thóc 🌾 ${h.home}/${h.total} đã về` : 'Rải thóc 🌾')], 'eat', { grain: { x: g.x, y: g.y } });
+}
 function stepFree(s, d) {
-  const roam = roamOf(s), day = !isNight(s);
+  const roam = roamOf(s), day = !isDusk(s);
+  if (!day && (s.duskDay || 0) !== s.day) dusk(s);
   let n = 0;
   for (const a of s.animals) {
+    if (a.stray && a.tile && !day && canRoam(s, a)) { n++; continue; }   // ngủ ngoài tới sáng
+    if (a.stray) a.stray = false;
     if (!day || !roam.tiles.length || !canRoam(s, a) || n >= FREE.max) { if (a.tile) goHome(s, a); continue; }
     n++;
     if (a.tile && roam.has(a.tile.c, a.tile.r) && s.time < (a.tileAt || 0)) continue;
@@ -972,7 +1036,7 @@ const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 export function actionsFor(s, t) {
   if (!t) return [];
   const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: eggActs,
-    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, scale: () => [mk('weigh', '⚖️', 'Cân heo xem số ký')], nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
+    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, gate: gateActs, scale: () => [mk('weigh', '⚖️', 'Cân heo xem số ký')], nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
   return f ? f(s, t) : [];
 }
 
@@ -1163,6 +1227,7 @@ function posOf(s, t) {
   const m = mapOf(s);
   if (t.kind === 'plot' || t.kind === 'lockedPlot') return m.plotCenter(t.idx) ?? s.player;
   if (t.kind === 'trough') return troughOf(m, t) ?? s.player;
+  if (t.kind === 'gate') return gateOf(s, t.id) ?? s.player;
   if (t.kind === 'scale') return (m.penById[t.id] ?? m.pens[t.pen])?.scale ?? s.player;
   if (t.kind === 'nest') return m.building('coop')?.at ?? s.player;
   if (t.kind === 'building') return sceneMap(s).building(t.id)?.at ?? s.player;
@@ -1215,6 +1280,7 @@ function doArea(s, tiles, id) {
 }
 
 const DO = {
+  gate(s, t, id, at) { return scatter(s, t, at); },
   plot(s, t, id, at) {
     const p = s.plots[t.idx], c = p.crop;
     switch (id) {

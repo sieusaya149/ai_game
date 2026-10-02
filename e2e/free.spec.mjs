@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 import { makeSave, seedSave, tilePoint } from './helpers.mjs';
 import { DAY_MS } from '../public/data.js';
 
-// Ban ngày (13h), đàn gà trưởng thành trong chuồng; ruộng 9 ô có cây giữa chừng, bị sâu (sâu không tự thành bệnh).
+// Ban ngày (8h24, còn lâu mới tới 18h về chuồng), đàn gà trưởng thành trong chuồng; ruộng 9 ô có cây giữa chừng, bị sâu (sâu không tự thành bệnh).
 const flock = (n, extra) => makeSave(s => {
-  s.time = DAY_MS * 0.3; s.exp = 400; s.coins = 500;
+  s.time = DAY_MS * 0.1; s.exp = 400; s.coins = 500;
   for (const p of s.plots) { p.soil = 'tilled'; p.water = 100; p.crop = { id: 'cai', progress: 0.5, planted: 0, bugs: true, bugSince: 1e12, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 }; }
   const tpl = s.animals.find(a => a.type === 'ga' && a.stage === 'truong');
   for (let i = 0; i < n; i++) s.animals.push({ ...structuredClone(tpl), id: s.nextId++, sex: 'f', pen: tpl.pen, tile: null, nextProduct: 1e15 });
@@ -37,7 +37,7 @@ test('ban ngày gà đi khắp trại, vào ruộng mổ sâu', async ({ page, c
 });
 
 test('mua hàng rào thấp, rào quanh ruộng: gà không vào nữa', async ({ page, context }, testInfo) => {
-  await open(page, context, flock(25, s => { s.time = DAY_MS * 0.3; }));
+  await open(page, context, flock(25, s => { s.time = DAY_MS * 0.1; }));
   // chợ: mua đủ hàng rào qua luật mua bán
   const ring = await page.evaluate(async () => {
     const S = await import('/state.js'), s = globalThis.__farm.state, f = s.farm.ents.find(e => e.kind === 'field'), out = [];

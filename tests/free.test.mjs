@@ -42,7 +42,8 @@ test('ban ngày gà thả rông có ô hợp lệ: không trong nhà, chuồng, 
   // chạng vạng: về chuồng
   s.time = DAY_MS * 0.8;
   seeded(2, () => run(s, 5000));
-  for (const a of hens) assert.equal(a.tile, null);
+  for (const a of hens) assert.ok(a.tile === null || a.stray, 'về chuồng, trừ con lạc ngủ ngoài');
+  assert.ok(hens.filter(a => a.tile).length <= 3);
 });
 
 test('tối đa 30 con thả rông; con thừa ở trong chuồng; gà bệnh và gà ở chuồng cách ly không thả rông', () => {

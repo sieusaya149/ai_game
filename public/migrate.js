@@ -18,6 +18,7 @@ export const animalDefaults = a => ({
   weight: weightAt(a.type, a.stage ?? 'non'),   // kg
   mom: null, dad: null,                 // { id, name } của cha mẹ nếu đẻ trong trại
   pen: null,                            // id thực thể chuồng đang ở (xếp tự động khi null, xem settlePens ở state.js)
+  stray: false,                         // chạng vạng chưa về chuồng, ngủ ngoài tới sáng (issue 42)
   tile: null,                          // { c, r } ô đang đứng khi thả rông (ADR 0013); null = trong chuồng
   nextProduct: 0, ready: false, pregnant: false, dueAt: 0,
   mate: null,                           // { id, name } con đực đã làm cha lứa đang mang (nái/bò/cừu cái)

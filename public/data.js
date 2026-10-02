@@ -195,6 +195,11 @@ export const FREE = {
   radius: 5,                  // ô kế tiếp cách ô hiện tại tối đa 5 ô
   seedLoss: 0.05,             // 5% lần mổ ruộng mất hạt vừa gieo
   layRadius: 4,               // trứng đẻ cách con mái tối đa 4 ô
+  duskAt: 0.5,                // 18h (ngày trong game bắt đầu 6h sáng): chạng vạng, gà vịt về chuồng
+  strayPerDusk: [1, 3],       // chạng vạng: 1-3 con lạc ngủ ngoài (đàn nhỏ thì tối đa nửa đàn)
+  stormMin: 4, stormShare: 0.4, // đêm mưa bão: ít nhất 4 con, hoặc 40% đàn
+  lureRadius: 5,              // rải thóc ở cửa chuồng: con trong 5 ô chạy về
+  shyRadius: 32,              // px: con lạc chạy tránh người trong khoảng 2 ô
 };
 
 // ---------- Vật phẩm ----------
@@ -350,7 +355,7 @@ export const ACHIEVEMENTS = [
 export const NOTIFY_WINDOW = 3000;
 export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
-  levelup: 'Lên cấp', order: 'Đơn hàng mới', old: 'Con vật sắp già, ra đi',
+  levelup: 'Lên cấp', order: 'Đơn hàng mới', old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -367,6 +372,7 @@ export const EVENT_LEVEL = {
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   oldSoon:   { level: 'important', cat: 'old', group: e => 'oldSoon:' + e.animal, label: 'Con vật sắp già', text: (n, e) => `${n} con ${animalN(e.animal)} sắp già, chuẩn bị hoặc bán đi nhé 👵` },
   passed:    { level: 'important', cat: 'old', group: e => 'passed:' + e.animal, label: 'Con vật già ra đi', text: (n, e) => `${n} con ${animalN(e.animal)} đã già và ra đi thanh thản 😇` },
+  stray:     { level: 'important', cat: 'stray', group: e => 'stray:' + e.animal, label: 'Con lạc chưa về chuồng', text: (n, e) => `${n} con ${animalN(e.animal)} lạc, chưa về chuồng 💤` },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
   born:      { level: 'info', group: e => 'born:' + e.kind, label: 'Con vật chào đời' },
   cockcrow:  { level: 'none', group: () => 'cockcrow', label: 'Gà trống gáy' },
