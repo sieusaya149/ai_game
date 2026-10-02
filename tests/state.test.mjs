@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
-import { CROPS, FARMING, HUSBANDRY, DOG, THREATS, DAY_MS } from '../public/data.js';
+import { CROPS, FARMING, HUSBANDRY, DOG, THREATS, DAY_MS, FREE } from '../public/data.js';
 
 const MIN = 60_000;
 // localStorage giả cho Node
@@ -175,13 +175,14 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
 });
 
 test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () => {
-  const s = newGame();
+  const s = newGame(); FREE.types = [];   // ở yên trong chuồng (thả rông có test riêng: free.test.mjs)
   const hen = s.animals.find(a => a.type === 'ga' && a.stage === 'truong');
   hen.x = 100; hen.y = 320; s.troughs.chicken = 20;
   const ev = noBugs(() => run(s, 3 * MIN));
   assert.ok(s.eggs.length >= 1);
   assert.ok(ev.some(e => e.type === 'spawn' && e.what === 'egg'));
   assert.equal(s.eggs[0].x, 100);
+  FREE.types = ['ga'];
   const egg = s.eggs[0];
   assert.match(G.actionsFor(s, { kind: 'egg', id: egg.id }).find(a => a.id === 'collect').label, /Nhặt trứng/);
   const r = G.perform(s, { kind: 'egg', id: egg.id }, 'collect');
@@ -222,7 +223,7 @@ test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
   noBugs(() => run(s, 1000));
   assert.equal(s.animals[0].ready, true);
   assert.equal(G.actionsFor(s, { kind: 'animal', id: 50 })[0].id, 'milk');
-  G.perform(s, { kind: 'animal', id: 50 }, 'milk');
+  withRandom(0.99, () => G.perform(s, { kind: 'animal', id: 50 }, 'milk'));   // không ra sữa ngon ⭐ (tỉ lệ ngẫu nhiên, lát 39)
   assert.equal(s.basket.sua, 1);
   const sellAct = G.actionsFor(s, { kind: 'animal', id: 50 }).find(a => a.id === 'sell');
   assert.match(sellAct.label, /Bán bò cho Chú Ba \(700 xu\)/);

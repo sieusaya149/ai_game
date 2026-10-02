@@ -107,7 +107,10 @@ export function ensurePositions(state) {
   const p = state.player, F = ST.mapOf(state);
   if (p.x == null || p.y == null) { p.x = M.spawn.x; p.y = M.spawn.y; }
   p.dir ??= 0;
-  for (const a of state.animals) { const pn = (a.x == null || a.y == null) && ST.animalPen(state, a); if (pn) Object.assign(a, inArea(pn.area)); }
+  for (const a of state.animals) {
+    if ((a.x == null || a.y == null) && a.tile) { a.x = a.tile.c * TS + 8; a.y = a.tile.r * TS + 8; continue; }
+    const pn = (a.x == null || a.y == null) && ST.animalPen(state, a); if (pn) Object.assign(a, inArea(pn.area));
+  }
   const d = state.dog;
   if (d.x == null || d.y == null) { d.x = F.dogHome.x; d.y = F.dogHome.y; }
   for (const e of state.eggs ?? []) if (e.x == null) Object.assign(e, inArea((F.pens.chicken ?? Object.values(F.pens)[0]).area));
@@ -122,11 +125,26 @@ const STAGE_SPEED = { non: 1.25, nho: 1.1, truong: 1, gia: 0.6 };
 // Gà mẹ gần nhất cùng chuồng cho gà con chạy theo
 const henOf = (state, a) => a.type === 'ga' && a.stage === 'non'
   ? state.animals.filter(h => h.type === 'ga' && h.sex === 'f' && (h.stage === 'truong' || h.stage === 'gia') && h.x != null).sort((u, v) => dist(u, a) - dist(v, a))[0] : null;
+// Gà thả rông (luật chọn ô a.tile, ở đây chỉ đi tới đó): thẳng tới điểm trong ô, không bước vào ô ngoài vùng đi lại; kẹt lâu thì nhảy tới nơi.
+function freeWalk(state, a, w, dt0) {
+  const rt = rtOf(w, 'a' + a.id), dt = aiStep(rt, dt0, onScreen(w, a));
+  if (!dt) return;
+  const R = ST.roamOf(state), tx = a.tile.c * TS + 3 + (a.id * 7) % 10, ty = a.tile.r * TS + 6 + (a.id * 5) % 8;
+  const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
+  rt.walking = false; rt.peck = false;
+  if (d < 1.5) { rt.stuck = 0; rt.peck = true; rt.anim += dt; return; }   // tới nơi: bới đất
+  const st = Math.min(d, (A_SPEED[a.type] ?? 14) * (STAGE_SPEED[a.stage] ?? 1) * dt), nx = a.x + dx / d * st, ny = a.y + dy / d * st;
+  const ok = (x, y) => R.has(Math.floor(x / TS), Math.floor(y / TS));
+  if (ok(nx, ny) || !ok(a.x, a.y)) { a.x = nx; a.y = ny; rt.stuck = 0; } else if ((rt.stuck = (rt.stuck || 0) + dt) > 1.5) { a.x = tx; a.y = ty; rt.stuck = 0; }
+  if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
+  rt.walking = true; rt.anim += dt;
+}
 function updateAnimals(state, w, dt0, out) {
   const p = state.player;
   const ms = M.mudSpot;
   const inMudSpot = a => !!ms && Math.abs(a.x - ms.x) < ms.rx && Math.abs(a.y - ms.y) < ms.ry;
   for (const a of state.animals) {
+    if (a.tile && state.scene === 'farm') { freeWalk(state, a, w, dt0); continue; }
     const pen = ST.animalPen(state, a);
     if (!pen) continue;
     const area = pen.area, rt = rtOf(w, 'a' + a.id), seen = onScreen(w, a);

@@ -187,6 +187,16 @@ export const THREATS = {
   thiefCaughtCoins: [20, 60], // bắt được thằng Tèo: nó xin lỗi, đền xu
 };
 
+// ---------- Thả rông ban ngày (ADR 0013) ----------
+export const FREE = {
+  types: ['ga'],              // loài được thả rông
+  max: 30,                    // tối đa 30 con thả rông; con vượt giới hạn ở trong chuồng
+  moveMs: [8000, 20000],      // mỗi lần đổi ô sau khoảng này
+  radius: 5,                  // ô kế tiếp cách ô hiện tại tối đa 5 ô
+  seedLoss: 0.05,             // 5% lần mổ ruộng mất hạt vừa gieo
+  layRadius: 4,               // trứng đẻ cách con mái tối đa 4 ô
+};
+
 // ---------- Vật phẩm ----------
 // kind: seed | supply | feed | deco. Hạt giống sinh tự động từ CROPS.
 export const ITEMS = {
@@ -210,6 +220,7 @@ export const ITEMS = {
   deco_flower:    { name: 'Chậu hoa',      kind: 'deco',   price: 30,  lv: 1, desc: 'Cho nông trại thêm xinh.' },
   deco_lamp:      { name: 'Đèn lồng',      kind: 'deco',   price: 90,  lv: 3, desc: 'Sáng lung linh ban đêm, trộm ngại vào hơn.' },
   deco_bench:     { name: 'Ghế đá',        kind: 'deco',   price: 70,  lv: 2, desc: 'Ngồi nghỉ chân.' },
+  deco_lowfence:  { name: 'Hàng rào thấp', kind: 'deco',   price: 8,   lv: 2, desc: 'Đặt quanh khối ruộng: gà không vào được, nhưng cũng hết gà mổ sâu giúp. Bạn bước qua được.' },
 };
 
 // ---------- Mua đất ----------
