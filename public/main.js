@@ -109,6 +109,7 @@ function applyResult(res, target, id) {
   if (res.sound) evs.push({ type: 'sound', name: res.sound });
   else if (res.ok === false) evs.push({ type: 'sound', name: 'error' });
   if (evs.length) ui.handleEvents(evs);
+  if (target?.id === 'friendGate' && sync) { ui.openPanel('friends'); changed(); return; }   // cổng bạn bè: mở bảng bạn bè khi đang online
   if (res.msg && (!res.ok || !res.fx?.length)) ui.toast(res.msg);
   if (res.open) ui.openPanel(res.open);
   if (res.go) goScene(res.go);
@@ -222,6 +223,7 @@ function liveReset() { peers.clear(); liveMap = null; ui.setLive(!!sync, 0); }
 // tin từ WebSocket (qua sync.js): kết nối (lại) thì vào lại bản đồ ở khung hình tới; rớt thì xóa người khác
 function liveMsg(m) {
   if (m.t === 'hello' || m.t === 'down') { liveReset(); return; }
+  if (m.t === 'visit') { ui.toast(`🟡 ${m.name} vừa ghé thăm vườn của bạn`); return; }   // bạn bè ghé vườn mình (issue 26; nguồn tin: issue 27)
   if (peers.receive(m, performance.now())) ui.setLive(true, peers.size);
 }
 // mỗi khung hình: đổi bản đồ thì báo join, đi thì gửi vị trí tối đa LIVE.hz lần mỗi giây

@@ -444,6 +444,7 @@ export function openPanel(id) {
   root.replaceChildren(h('div', { class: 'backdrop', on: { click: closePanel } }), shell(PANELS[id].title));
   root.hidden = false;
   refreshPanel();
+  PANELS[id].open?.();
   sound.play('pop');
 }
 function closePanel() {
@@ -886,6 +887,59 @@ PANELS.online = {
   },
 };
 
+// ---------- Bạn bè và cổng vườn (issue 26) ----------
+// Dữ liệu lấy từ server mỗi lần mở bảng (và sau khi thêm/xóa); chưa tải xong thì hiện "Đang tải"
+const fr = { data: null, gates: null, err: '', msg: '', input: '' };
+async function loadFriends() {
+  const [f, g] = await Promise.all([net.friends(), net.gates()]);
+  fr.data = f.ok ? f : null; fr.gates = g.ok ? g.gates : null;
+  if (!(f.ok && g.ok)) fr.err = f.error || g.error || 'Không tải được danh sách.';
+  if (panel === 'friends') refreshPanel();
+}
+const friendIcon = (cls, text) => h('span', { class: 'fr-ico ' + cls, title: text, 'aria-label': text }, SPR2?.friendIcons?.[cls] ? h('img', { class: 'ico', src: SPR2.friendIcons[cls].toDataURL(), alt: '' }) : { ripe: '🍅', help: '🐛', on: '●', off: '○' }[cls]);
+PANELS.friends = {
+  title: '👫 Bạn bè',
+  open() { fr.msg = ''; fr.err = ''; loadFriends(); },
+  render(body) {
+    const add = async e => {
+      e?.preventDefault();
+      const who = $('fr-input').value.trim();
+      fr.input = who;
+      if (!who) return;
+      const r = await net.addFriend(who);
+      fr.err = r.ok ? '' : r.error; fr.msg = r.ok ? `Đã thêm ${r.name} vào danh sách bạn.` : '';
+      if (r.ok) fr.input = '';
+      sound.play(r.ok ? 'pop' : 'error');
+      await loadFriends();
+    };
+    body.append(h('form', { class: 'fr-add', on: { submit: add } },
+      h('input', { id: 'fr-input', class: 'fr-input', type: 'text', maxlength: 24, placeholder: 'Tên hoặc mã kết bạn', autocomplete: 'off', value: fr.input, on: { input: e => { fr.input = e.target.value; } } }),
+      h('button', { class: 'btn green sm', type: 'submit' }, 'Thêm')));
+    if (fr.err) body.append(h('div', { class: 'note closed', role: 'alert', id: 'fr-err' }, fr.err));
+    else if (fr.msg) body.append(h('div', { class: 'note', id: 'fr-msg' }, fr.msg));
+    if (!fr.data) return body.append(empty(fr.err ? '' : 'Đang tải...'));
+    body.append(h('div', { class: 'note' }, 'Mã kết bạn của bạn: ', h('b', { id: 'fr-code' }, fr.data.code), ' (đưa mã này cho bạn để họ thêm bạn)'));
+    body.append(section('Bạn bè'));
+    if (!fr.data.friends.length) body.append(empty('Chưa có bạn nào. Nhập tên hoặc mã kết bạn ở trên nhé.'));
+    for (const f of fr.data.friends) {
+      body.append(h('div', { class: 'row fr-row', 'data-name': f.name },
+        h('div', { class: 'row-ico' }, friendIcon(f.online ? 'on' : 'off', f.online ? 'Đang online' : 'Đang offline')),
+        h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, f.name), h('div', { class: 'row-desc fr-state' }, `Cấp ${f.level} · ${f.online ? 'online' : 'offline'}`)),
+        h('div', { class: 'fr-flags' }, f.ripe && friendIcon('ripe', 'Có đồ chín'), f.help && friendIcon('help', 'Cần giúp')),
+        h('button', { class: 'btn red sm nosound fr-del', type: 'button', 'aria-label': `Xóa bạn ${f.name}`, on: { click: async () => {
+          if (!await confirmBox(`Xóa ${f.name} khỏi danh sách bạn? Vườn của họ vẫn ở đó.`, 'Xóa', 'Giữ lại', true)) return;
+          const r = await net.removeFriend(f.name);
+          fr.err = r.ok ? '' : r.error; fr.msg = r.ok ? `Đã xóa ${f.name} khỏi danh sách bạn.` : '';
+          await loadFriends();
+        } } }, '✖')));
+    }
+    body.append(section('Cổng vườn trong làng'));
+    if (!fr.gates?.length) return body.append(empty('Chưa có vườn nào khác trong làng.'));
+    for (const g of fr.gates) body.append(h('div', { class: 'row gate-row' + (g.friend ? ' pinned' : ''), 'data-name': g.name },
+      h('div', { class: 'row-ico' }, g.friend ? '📌' : '🚪'),
+      h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, `Vườn ${g.name}`), h('div', { class: 'row-desc' }, `Cấp ${g.level}${g.friend ? ' · bạn bè' : ''}`))));
+  },
+};
 PANELS.map = {
   title: '🗺️ Bản đồ',
   render(body, s) {
@@ -1287,6 +1341,7 @@ export function initUI(a) {
   says.append(...D.QUICK_CHAT.map(t => btn(t, () => { says.hidden = true; api.say(t); }, 'small')));
   $('live-chat').addEventListener('click', () => { says.hidden = !says.hidden; });
   $('live-people').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('online'); });
+  $('live-friends').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('friends'); });
 
   $('bb-build').addEventListener('click', () => { if (!isBlocking()) api.buildStart(); });
   $('build-done').addEventListener('click', () => api.buildDone());

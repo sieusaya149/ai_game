@@ -20,14 +20,14 @@ Làng có bảng bạn bè và các cổng vườn để chọn nơi sang thăm.
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 3): thêm bạn bằng tên và bằng mã đều thành công; tên không tồn tại, mã sai, đã là bạn, tự thêm mình đều bị từ chối với đúng lý do.
-- [ ] Unit test (seam 3): danh sách bạn trả đúng cấp, online (có kết nối WebSocket) hay offline; cờ 🍅 bật khi vườn bạn có ô chín và 🐛 bật khi có sâu hoặc cỏ (dựng bằng đẩy bản lưu ghi sẵn).
-- [ ] Unit test (seam 3): danh sách bạn không chứa bản lưu hay số liệu riêng ngoài cấp và các cờ.
-- [ ] Unit test (seam 3): xóa bạn chỉ bỏ quan hệ bạn bè, không xóa vườn hay tài khoản của ai; sau khi xóa, người kia không còn trong phần ghim của người xóa.
-- [ ] Unit test (seam 3): danh sách cổng vườn có bạn bè ở đầu rồi tới người khác, không có chính mình.
-- [ ] E2E (Playwright, 2 trình duyệt, desktop + 360px): A thêm B bằng tên → danh sách A hiện B với cấp và online; B offline thì chuyển sang offline; cổng vườn của B ở đầu danh sách cổng của A.
-- [ ] E2E: thêm bạn bằng mã kết bạn của B thành công; xóa bạn thì B biến khỏi phần ghim.
-- [ ] Bảng bạn bè và danh sách cổng không tràn ngang ở 360px, nút đủ to.
+- [x] Unit test (seam 3): thêm bạn bằng tên và bằng mã đều thành công; tên không tồn tại, mã sai, đã là bạn, tự thêm mình đều bị từ chối với đúng lý do.
+- [x] Unit test (seam 3): danh sách bạn trả đúng cấp, online (có kết nối WebSocket) hay offline; cờ 🍅 bật khi vườn bạn có ô chín và 🐛 bật khi có sâu hoặc cỏ (dựng bằng đẩy bản lưu ghi sẵn).
+- [x] Unit test (seam 3): danh sách bạn không chứa bản lưu hay số liệu riêng ngoài cấp và các cờ.
+- [x] Unit test (seam 3): xóa bạn chỉ bỏ quan hệ bạn bè, không xóa vườn hay tài khoản của ai; sau khi xóa, người kia không còn trong phần ghim của người xóa.
+- [x] Unit test (seam 3): danh sách cổng vườn có bạn bè ở đầu rồi tới người khác, không có chính mình.
+- [x] E2E (Playwright, 2 trình duyệt, desktop + 360px): A thêm B bằng tên → danh sách A hiện B với cấp và online; B offline thì chuyển sang offline; cổng vườn của B ở đầu danh sách cổng của A.
+- [x] E2E: thêm bạn bằng mã kết bạn của B thành công; xóa bạn thì B biến khỏi phần ghim.
+- [x] Bảng bạn bè và danh sách cổng không tràn ngang ở 360px, nút đủ to.
 
 ## Blocked by
 

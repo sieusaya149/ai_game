@@ -500,3 +500,15 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 #live-says { position: absolute; left: 48px; bottom: 0; width: max-content; max-width: min(230px, calc(100vw - 72px)); padding: 6px; display: flex; flex-direction: column; gap: 5px; z-index: 7; }
 #live-says[hidden] { display: none; }
 #live-says .btn { min-height: 36px; padding: 4px 12px; font-size: 13px; justify-content: flex-start; text-align: left; white-space: normal; }
+
+/* bạn bè và cổng vườn (issue 26) */
+.fr-add { display: flex; gap: 8px; align-items: center; }
+.fr-input { flex: 1; min-width: 0; min-height: 44px; padding: 6px 12px; font: inherit; font-size: 16px; border-radius: 12px; border: 2px solid var(--line); background: #fff; }
+.fr-add .btn { min-height: 44px; flex: none; }
+.fr-row, .gate-row { margin-top: 6px; }
+.fr-row .row-ico { font-size: 20px; }
+.fr-flags { flex: none; display: flex; gap: 2px; font-size: 18px; }
+.fr-ico.on { color: #2ea84a; } .fr-ico.off { color: #999; }
+.fr-ico .ico { width: 22px; height: 22px; }
+.fr-del { flex: none; min-width: 44px; min-height: 44px; padding: 0; }
+.gate-row.pinned { background: #fff0c8; border-color: #e0b24a; }

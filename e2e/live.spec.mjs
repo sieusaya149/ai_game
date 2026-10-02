@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 import { E2E_DB } from '../playwright.config.mjs';
 import { runAdmin } from '../tests/helpers/server.mjs';
-import { makeSave, closeAway } from './helpers.mjs';
+import { makeSave, closeAway, villageAt } from './helpers.mjs';
 import { QUICK_CHAT } from '../public/data.js';
 
 const uniq = () => 'Lg' + Math.random().toString(36).slice(2, 7);
@@ -12,6 +12,7 @@ const uniq = () => 'Lg' + Math.random().toString(36).slice(2, 7);
 // Một người chơi trong trình duyệt riêng: tài khoản mới, vườn trên server ghi sẵn (mutate chỉnh bản lưu), máy nhớ "đã vào làng"
 async function player(browser, { baseURL, viewport, isMobile, hasTouch }, mutate) {
   const context = await browser.newContext({ baseURL, viewport, isMobile, hasTouch });
+  await villageAt(context);   // chợ chỉ mở ban ngày
   const name = uniq();
   const invite = (await runAdmin('invite', '--db', E2E_DB)).out;
   expect((await context.request.post('/api/register', { data: { name, pin: '123456', invite } })).ok()).toBe(true);
@@ -117,7 +118,7 @@ test('online: mua hạt giống ở chợ Bà Tư vẫn như cũ; cột chat/bi�
     const r = sel => [...document.querySelectorAll(sel)].filter(e => e.offsetParent || getComputedStyle(e).position === 'fixed').map(e => { const b = e.getBoundingClientRect(); return { sel, l: b.left, t: b.top, r: b.right, b: b.bottom }; }).filter(b => b.r > b.l);
     return { live: r('#live .live-btn'), others: [...r('#joy-base'), ...r('#main-action'), ...r('#chips .chip'), ...r('#target-name'), ...r('#mini-wrap'), ...r('#hud-speed'), ...r('#todo-btn')] };
   });
-  expect(boxes.live.length).toBe(6);
+  expect(boxes.live.length).toBe(7);   // 4 biểu cảm + chat + bạn bè + người đang ở đây
   if (touch) expect(boxes.others.some(o => o.sel === '#joy-base')).toBe(true);
   for (const a of boxes.live) for (const o of boxes.others)
     expect(a.r <= o.l || o.r <= a.l || a.b <= o.t || o.b <= a.t, `${JSON.stringify(a)} đè ${JSON.stringify(o)}`).toBe(true);

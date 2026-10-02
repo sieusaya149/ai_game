@@ -30,6 +30,16 @@ export const MIGRATIONS = [
         account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
         play TEXT, save TEXT, saved_at INTEGER, updated INTEGER, rev INTEGER NOT NULL DEFAULT 0)`);
   },
+  // v4: bạn bè (issue 26). Quan hệ một chiều (A ghim B); mã kết bạn của tài khoản cấp lười ở lần xem đầu
+  db => {
+    db.exec(`
+      ALTER TABLE accounts ADD COLUMN friend_code TEXT;
+      CREATE UNIQUE INDEX accounts_friend_code ON accounts(friend_code);
+      CREATE TABLE friends (
+        account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        friend_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        created INTEGER NOT NULL, PRIMARY KEY (account_id, friend_id))`);
+  },
 ];
 
 // Mở (tạo nếu chưa có) file SQLite và đưa schema lên bản mới nhất
