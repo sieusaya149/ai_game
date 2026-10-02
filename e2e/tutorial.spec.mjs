@@ -14,6 +14,8 @@ const screenOf = (page, x, y) => page.evaluate(([x, y]) => {
 async function tap(page, touch, x, y) {
   for (let i = 0; i < 30; i++) {
     await page.waitForTimeout(500);   // camera dừng hẳn
+    // lỡ chạm trúng công trình nằm trên đường đi: đóng bảng rồi đi tiếp
+    if (await page.locator('#panel-root:not([hidden])').count()) { await page.locator('#panel-root .close').first().click(); await page.waitForTimeout(250); }
     const p = await screenOf(page, x, y);
     const b = await page.evaluate(() => ({ w: innerWidth, top: document.getElementById('hud').getBoundingClientRect().bottom + 4, bot: document.getElementById('bottombar').getBoundingClientRect().top - 4, mini: document.getElementById('mini-wrap').getBoundingClientRect().toJSON() }));
     const inMini = (px, py) => px > b.mini.left - 14 && px < b.mini.right + 14 && py > b.mini.top - 14 && py < b.mini.bottom + 14;
