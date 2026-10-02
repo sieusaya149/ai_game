@@ -1,9 +1,15 @@
 // Các đường API HTTP JSON. Mỗi issue thêm API thì thêm route ở đây và ghi vào SPEC.md.
-import { SESSION_MS, register, login, accountOf, endSession } from './accounts.mjs';
+import { SESSION_MS, register, login, accountOf, endSession, tokenOf } from './accounts.mjs';
+import { claimPlay, readFarm, storeFarm } from './farms.mjs';
 import { HttpError } from './router.mjs';
 
 const COOKIE = 'nt_session';
-const tokenOf = req => /(?:^|;\s*)nt_session=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
+// Tài khoản của cookie, không có thì 401
+const mustAccount = ({ db, req }) => {
+  const a = accountOf(db, tokenOf(req));
+  if (!a) throw new HttpError(401, 'Chưa đăng nhập', { code: 'no_session' });
+  return a;
+};
 
 // Cookie phiên: HttpOnly (JS trong trang không đọc được), SameSite=Lax, Secure khi sau HTTPS (Caddy gửi X-Forwarded-Proto)
 function setSession({ req, res }, token) {
@@ -35,9 +41,12 @@ export function addRoutes(r) {
     return {};
   });
   // đang đăng nhập là ai (cookie hợp lệ), không thì 401
-  r.route('GET', '/api/me', ({ db, req }) => {
-    const a = accountOf(db, tokenOf(req));
-    if (!a) throw new HttpError(401, 'Chưa đăng nhập', { code: 'no_session' });
-    return { name: a.name };
-  });
+  r.route('GET', '/api/me', c => ({ name: mustAccount(c).name }));
+
+  // Vườn online (issue 22, ADR 0012). Bắt đầu chơi trên máy này: cấp phiên chơi mới, máy cũ lưu lần cuối rồi thoát
+  r.route('POST', '/api/play', async c => claimPlay(c, mustAccount(c)));
+  // Đọc vườn của mình: { farm, rev, savedAt } hoặc 404 no_farm
+  r.route('GET', '/api/farm', c => readFarm(c.db, mustAccount(c)));
+  // Gửi bản lưu { play, save }: 409 play_replaced (phiên cũ) · 400 save_invalid · 422 implausible (số liệu vô lý)
+  r.route('POST', '/api/farm', c => storeFarm(c, mustAccount(c), c.body ?? {}));
 }

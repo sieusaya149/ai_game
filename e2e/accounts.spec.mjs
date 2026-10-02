@@ -31,12 +31,16 @@ test('đăng ký bằng mã mời, reload vẫn đăng nhập, đăng xuất v�
   await page.getByRole('button', { name: 'Tạo tài khoản mới' }).click();
   await noHScroll(page);
   await signUp(page, name, code);
-  await expect(page.getByRole('heading', { name: 'Đã vào làng' })).toBeVisible();
-  await expect(page.getByText(`Chào ${name}`)).toBeVisible();
+  // chưa có vườn online, máy chưa có vườn chơi đơn: tạo vườn mới, tên nhân vật là tên tài khoản
+  await expect(page.getByPlaceholder('Tên của bạn')).toHaveValue(name);
+  await page.getByRole('button', { name: /Vào nông trại/ }).click();
+  await expect(page.locator('#hud-name')).toHaveText(name);
 
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Đã vào làng' })).toBeVisible();   // giữ đăng nhập, không hỏi PIN
+  await expect(page.locator('#hud-name')).toHaveText(name);   // giữ đăng nhập, không hỏi PIN, vào thẳng vườn online
+  await expect(page.locator('#creator')).toBeHidden();
 
+  await page.locator('.bb-btn[data-panel="settings"]').click();
   await page.getByRole('button', { name: 'Đăng xuất' }).click();
   await expect(page.getByRole('button', { name: /Chơi một mình/ })).toBeVisible();
   await page.reload();
@@ -48,7 +52,7 @@ test('câu lỗi đúng lý do: mã mời đã dùng, mã sai, tên trùng, PIN 
   await page.goto('/');
   await page.getByRole('button', { name: /Vào làng/ }).click();
   await signUp(page, name, code);
-  await expect(page.getByRole('heading', { name: 'Đã vào làng' })).toBeVisible();
+  await expect(page.getByPlaceholder('Tên của bạn')).toHaveValue(name);
 
   // người khác (trình duyệt sạch) thử lại
   const ctx = await browser.newContext({ viewport: page.viewportSize() });
@@ -70,7 +74,7 @@ test('câu lỗi đúng lý do: mã mời đã dùng, mã sai, tên trùng, PIN 
   await expect(p2.getByRole('alert')).toHaveText('Sai tên hoặc PIN.');
   await p2.getByPlaceholder('PIN 6 số').fill('123456');
   await p2.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(p2.getByRole('heading', { name: 'Đã vào làng' })).toBeVisible();
+  await expect(p2.getByPlaceholder('Tên của bạn')).toHaveValue(name);   // vào được: tài khoản chưa có vườn thì tạo vườn
   await ctx.close();
 });
 
@@ -79,7 +83,9 @@ test('bị khóa tạm thì hiện còn bao lâu', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /Vào làng/ }).click();
   await signUp(page, name, await invite());
-  await page.getByRole('button', { name: 'Đăng xuất' }).click();
+  await expect(page.getByPlaceholder('Tên của bạn')).toHaveValue(name);
+  await page.context().clearCookies();   // như máy khác: chưa đăng nhập
+  await page.reload();
   await page.getByRole('button', { name: /Vào làng/ }).click();
   await page.getByPlaceholder('Tên nhân vật').fill(name);
   for (let i = 0; i < 5; i++) {

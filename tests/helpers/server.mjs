@@ -28,8 +28,9 @@ export async function bootServer(opts = {}) {
       return { status: res.status, body: await res.json().catch(() => null), headers: res.headers };
     },
     // Mở WebSocket, chờ kết nối xong. `next()` chờ tin nhắn JSON kế tiếp, `closed` là promise đóng kết nối.
-    async ws(path = '/ws') {
-      const s = new WebSocket(url.replace('http', 'ws') + path);
+    // `cookie`: mã phiên đăng nhập (như trình duyệt gửi cookie nt_session lúc nâng cấp)
+    async ws(path = '/ws', { cookie } = {}) {
+      const s = new WebSocket(url.replace('http', 'ws') + path, cookie ? { headers: { cookie: `nt_session=${cookie}` } } : undefined);
       sockets.add(s);
       const inbox = [], waiting = [];
       s.on('message', d => { const m = JSON.parse(d); waiting.length ? waiting.shift()(m) : inbox.push(m); });

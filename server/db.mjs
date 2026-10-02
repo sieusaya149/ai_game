@@ -22,6 +22,14 @@ export const MIGRATIONS = [
         token_hash TEXT PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
         created INTEGER NOT NULL, expires INTEGER NOT NULL)`);
   },
+  // v3: vườn online (issue 22). Mỗi tài khoản một dòng: phiên chơi đang giữ quyền ghi, bản lưu JSON (NULL = chưa có vườn),
+  // savedAt của bản lưu (giờ trình duyệt), giờ server lúc nhận, số lần đã ghi (rev)
+  db => {
+    db.exec(`
+      CREATE TABLE farms (
+        account_id INTEGER PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+        play TEXT, save TEXT, saved_at INTEGER, updated INTEGER, rev INTEGER NOT NULL DEFAULT 0)`);
+  },
 ];
 
 // Mở (tạo nếu chưa có) file SQLite và đưa schema lên bản mới nhất

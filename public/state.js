@@ -3,7 +3,7 @@ import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
-  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
+  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
@@ -127,11 +127,16 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     shipbin: { items: {} },   // thùng giao hàng: lái buôn lấy hết lúc 6h sáng
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
     animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
-    dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name },
+    dog: { adult: START.dogAdult, age: START.dogAdult ? DOG.growMs : 0, hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name, chained: false },   // chained: xích chó (online)
     poops: [], threats: [], orders: [], nextOrderAt: 0,
     stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
     notify: {},   // loại thông báo 🟡 đã tắt: { ripe: false }; thiếu = bật. Mức 🔴 không tắt được
+    // Trường cho online (issue 22, không đổi phiên bản v2): chơi đơn hay vườn trên làng, tên tài khoản,
+    // thống kê hôm nay theo ngày ngoài đời (giúp/trộm, issue 28/30), nhật ký khách ghé vườn (mới nhất ở đầu)
+    mode: 'offline', account: null,
+    today: { day: '', helps: 0, steals: 0, stolen: 0 },
+    guests: [],
   };
   const m = mapOf(s);
   Object.assign(s.player, m.spawn);
@@ -142,8 +147,12 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
   return s;
 }
 
+// Lưu vườn chơi đơn vào localStorage. Vườn online (mode 'online') chỉ cập nhật savedAt, không bao giờ ghi đè
+// bản chơi đơn: phần gửi lên server và bản nháp trên máy do sync.js lo.
 export function saveGame(s) {
-  try { s.savedAt = now(); localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* không có localStorage */ }
+  s.savedAt = now();
+  if (s.mode === 'online') return;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* không có localStorage */ }
 }
 export function resetGame() {
   try { localStorage.removeItem(SAVE_KEY); localStorage.setItem(MIGRATED_KEY, '1'); } catch { /* bỏ qua */ }
@@ -174,9 +183,15 @@ function readSave() {
   }
   return null;
 }
+function readRaw(raw) {
+  problem = null;
+  try { return migrate(raw); } catch (e) { problem = `Không đọc được bản lưu (${e.message}).`; return null; }
+}
 
-export function loadGame() {
-  const s = readSave();
+// Không truyền gì: đọc vườn chơi đơn trong localStorage. Truyền `raw` (bản lưu đã parse, vd vườn online từ server)
+// thì đọc bản đó, không đụng localStorage. Cả hai đều bù trường thiếu và chạy bù như nhau.
+export function loadGame(raw) {
+  const s = raw === undefined ? readSave() : readRaw(raw);
   if (!s) return null;
   // Bổ sung trường thiếu
   const base = createGame({ name: s.name });
@@ -197,6 +212,12 @@ export function loadGame() {
   s.simMs = Number.isFinite(s.simMs) ? s.simMs : s.time || 0;
   s.frozenTotal = Number.isFinite(s.frozenTotal) ? s.frozenTotal : 0;
   s.notify = Object.fromEntries(Object.entries(s.notify ?? {}).filter(([k, v]) => k in NOTIFY_CATS && v === false));
+  // trường online (bản lưu Phase 0 chưa có)
+  s.mode = s.mode === 'online' ? 'online' : 'offline';
+  s.account = s.mode === 'online' && typeof s.account === 'string' ? s.account : null;
+  s.today = { ...base.today, ...s.today };
+  s.guests = Array.isArray(s.guests) ? s.guests : [];
+  s.dog.chained = !!s.dog.chained;
   s.frozenMs = 0; delete s.away;
   evq = [];
   const t = now(), gone = Math.max(0, t - (s.savedAt || t)), elapsed = Math.min(gone, MAX_CATCHUP_MS);
@@ -249,6 +270,31 @@ export function awaySummary(events, frozenMs = 0) {
   if (coins) out.push(`Lái buôn trả ${coins} xu`);
   if (frozenMs >= MIN) out.push(`Vườn đã đóng băng ${spanText(frozenMs)}`);
   return out;
+}
+
+// ---------- Chống gian lận nhẹ (ADR 0002): server dùng để từ chối bản lưu online vô lý ----------
+// Của cải = xu + đồ (nông sản, sản phẩm theo giá bán; đồ khác theo giá mua). Mua bán gần như không làm tăng của cải,
+// chỉ thu hoạch, đơn hàng, thưởng mới tăng: nên bán cả kho một lúc vẫn hợp lý, còn sửa xu/đồ thì không.
+export const SAVE_JUMP = {
+  simSlack: DAY_MS / 2 + MIN,   // ngủ một đêm chạy thẳng tới sáng (tối đa nửa ngày game) + sai số
+  wealth: 3000, wealthPerPlotMin: 150,   // mức cho sẵn (lên cấp, thành tựu, đơn hàng) + mỗi ô ruộng mỗi phút vườn chạy
+  exp: 1000, expPerPlotMin: 30,
+  plotsExtra: 10,               // phần con vật, trứng, đơn hàng tính như thêm từng này ô
+};
+export function wealthOf(s) {
+  let w = s.coins || 0;
+  for (const o of [s.inv, s.basket, s.shipbin?.items]) for (const [k, n] of Object.entries(o ?? {})) w += (Number(n) || 0) * (sellPrice(k) || ITEMS[k]?.price || 0);
+  return w;
+}
+// prev, next: hai bản lưu liên tiếp của cùng vườn; dtMs: thời gian ngoài đời giữa hai bản (server tính, có chặn trên).
+// Hàm thuần → { ok: true } hoặc { ok: false, reason: 'time'|'coins'|'exp', msg }
+export function checkSaveJump(prev, next, dtMs) {
+  const J = SAVE_JUMP, sim = Math.max(0, (next.simMs || 0) - (prev.simMs || 0));
+  if (sim > Math.max(0, dtMs) * Math.max(...SPEEDS) + J.simSlack) return { ok: false, reason: 'time', msg: 'Vườn chạy nhanh hơn thời gian thật' };
+  const k = ((prev.plots ?? []).filter(p => p.unlocked && !p.removed).length + J.plotsExtra) * sim / MIN;
+  if (wealthOf(next) - wealthOf(prev) > J.wealth + J.wealthPerPlotMin * k) return { ok: false, reason: 'coins', msg: 'Xu và đồ tăng nhanh vô lý' };
+  if ((next.exp || 0) - (prev.exp || 0) > J.exp + J.expPerPlotMin * k) return { ok: false, reason: 'exp', msg: 'Kinh nghiệm tăng nhanh vô lý' };
+  return { ok: true };
 }
 
 // Mùa chỉ để hiển thị: mỗi mùa 7 ngày game. dayIn = ngày thứ mấy trong mùa (1..7).

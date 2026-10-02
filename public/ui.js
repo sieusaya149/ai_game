@@ -929,10 +929,10 @@ PANELS.settings = {
         h('li', {}, h('kbd', {}, 'Esc'), ': đóng bảng.'),
         h('li', {}, '📱 Điện thoại: chạm mặt đất để đi, chạm vật để làm việc, hoặc dùng cần điều khiển.')),
       section('Làng'),
-      net.rememberedName()
-        ? [h('p', { class: 'mini' }, `Đang vào làng với tên ${net.rememberedName()}.`),
-          btn('Đăng xuất', async () => { closePanel(); await net.logout(); api.leaveToMode(); }, 'plain')]
-        : btn('🏘️ Vào làng', () => { closePanel(); api.leaveToMode(); }, 'green'),
+      ...(s.mode === 'online'
+        ? [h('p', { class: 'mini' }, `Đang ở làng với tên ${s.account}. Vườn tự lưu lên làng.`),
+          btn('Đăng xuất', async () => { closePanel(); await api.leaveToMode(); await net.logout(); }, 'plain')]
+        : [btn('🏘️ Vào làng', () => { closePanel(); api.leaveToMode(); }, 'green')]),
       section('Nguy hiểm'),
       btn('🗑️ Chơi lại từ đầu', async () => {
         if (resetting) return;
@@ -948,13 +948,14 @@ PANELS.settings = {
 };
 
 // ---------- Màn tạo nhân vật ----------
-export function showCreator() {
+// online: { name } = vườn mới trên làng, tên nhân vật là tên tài khoản (không sửa được)
+export function showCreator(online) {
   if (!api) return;
   closePanel();
   creatorOpen = true;
   const root = $('creator');
   const look = { ...D.DEFAULT_LOOK };
-  const input = h('input', { class: 'name-input', type: 'text', maxLength: 20, placeholder: 'Tên của bạn', autocomplete: 'off', spellcheck: false });
+  const input = h('input', { class: 'name-input', type: 'text', maxLength: 20, placeholder: 'Tên của bạn', autocomplete: 'off', spellcheck: false, value: online?.name ?? '', readOnly: !!online });
   const allowed = k => (k === 'hat' ? [0, 1] : k === 'acc' ? [0] : [...Array(lookCount(k)).keys()]);
   const editor = lookEditor(look, allowed, () => {}, null);
   const dice = btn('🎲 Ngẫu nhiên', () => {
@@ -981,7 +982,7 @@ export function showCreator() {
   const preview = makePreview(() => look, 6);
   root.replaceChildren(h('div', { class: 'creator-card' },
     h('h1', {}, 'Nông Trại Vui'),
-    h('p', { class: 'sub' }, 'Chào mừng bạn tới nông trại mới! Hãy giới thiệu bản thân nào.'),
+    h('p', { class: 'sub' }, online ? `Vườn mới của ${online.name} trên làng. Chọn ngoại hình nào!` : 'Chào mừng bạn tới nông trại mới! Hãy giới thiệu bản thân nào.'),
     h('div', { class: 'stage' }, preview, h('div', { class: 'shadow' })),
     dice,
     input,
@@ -1000,13 +1001,15 @@ function showCard(...kids) {
   root.replaceChildren(h('div', { class: 'creator-card' }, h('h1', {}, 'Nông Trại Vui'), ...kids));
   root.hidden = false;
 }
-export function showMode() {
+// notice: câu báo ở đầu (vd "Bạn đã đăng nhập ở thiết bị khác.")
+export function showMode(notice) {
   if (!api) return;
   showCard(
+    notice ? h('p', { class: 'auth-err', role: 'alert' }, notice) : null,
     h('p', { class: 'sub' }, 'Bạn muốn chơi thế nào?'),
     btn('🌾 Chơi một mình', () => api.startSolo(), 'orange big wide'),
     h('p', { class: 'mini' }, 'Chơi ngay trên máy này, không cần mạng.'),
-    btn('🏘️ Vào làng', () => showAuth('login'), 'green big wide'),
+    btn('🏘️ Vào làng', async () => { const who = await net.whoAmI(true); if (who) api.startOnline(who); else showAuth('login'); }, 'green big wide'),
     h('p', { class: 'mini' }, 'Đăng nhập để gặp bạn bè trong làng. Cần mã mời của quản trị.'));
 }
 export function closeCreator() {
@@ -1028,7 +1031,7 @@ export function showAuth(mode = 'login') {
     busy = true; err.hidden = true; go.disabled = true;
     try {
       const r = reg ? await net.register(name.value, pin.value, invite.value) : await net.login(name.value, pin.value);
-      if (r.ok) showVillage(r.name); else fail(r.error);
+      if (r.ok) api.startOnline(r.name); else fail(r.error);
     } finally { busy = false; go.disabled = false; }
   };
   const go = h('button', { class: 'btn orange big wide', type: 'submit' }, reg ? 'Đăng ký' : 'Đăng nhập');
@@ -1041,12 +1044,32 @@ export function showAuth(mode = 'login') {
     btn('← Quay lại', showMode, 'plain sm'));
   if (matchMedia('(pointer:fine)').matches) name.focus();
 }
-export function showVillage(name) {
+// Đang vào làng (chờ server trao vườn); error = không vào được, cho thử lại
+export function showVillage(name, error) {
   showCard(
-    h('h2', {}, 'Đã vào làng'),
-    h('p', { class: 'sub' }, `Chào ${name}! Vườn online sắp mở, bạn quay lại sau nhé.`),
+    h('h2', {}, error ? 'Chưa vào được làng' : 'Đang vào làng…'),
+    error ? h('p', { class: 'auth-err', role: 'alert' }, error) : h('p', { class: 'sub' }, `Chào ${name}! Đang mở vườn của bạn.`),
+    error ? btn('🔄 Thử lại', () => api.startOnline(name), 'green big wide') : null,
     btn('🌾 Chơi một mình', () => api.startSolo(), 'orange big wide'),
     btn('Đăng xuất', async () => { await net.logout(); showMode(); }, 'plain sm'));
+}
+// Tài khoản chưa có vườn trên làng mà máy này có vườn chơi đơn (issue 22)
+export function showBringUp(name, solo, { bring, fresh }) {
+  const lv = S.levelInfo(solo.exp).level;
+  showCard(
+    h('h2', {}, 'Mang vườn này lên làng?'),
+    h('p', { class: 'sub' }, `Tài khoản ${name} chưa có vườn trên làng. Bạn muốn mang vườn chơi một mình trên máy này lên, hay bắt đầu vườn mới?`),
+    h('div', { class: 'bring-farm' },
+      h('b', {}, `Vườn của ${solo.name}`),
+      h('span', {}, `Cấp ${lv} · 🪙 ${fmt(solo.coins)} · ${S.dayText(solo)}`)),
+    btn('🧺 Mang vườn chơi đơn lên', bring, 'green big wide'),
+    btn('🌱 Bắt đầu vườn mới', fresh, 'orange big wide'),
+    h('p', { class: 'mini' }, 'Vườn chơi một mình vẫn nằm nguyên trên máy này. Từ đây hai vườn là hai bản riêng.'));
+}
+// Biểu tượng nhỏ mất kết nối với làng (vườn online), vẫn chơi tiếp được
+export function setOnline(on) {
+  const e = $('hud-net');
+  if (e) e.hidden = !!on;
 }
 // ---------- Sự kiện từ tick() ----------
 function showBadge(ev) {

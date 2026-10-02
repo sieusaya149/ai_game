@@ -12,6 +12,7 @@ import { eventMeta } from './notify.js';
 import { todoList } from './todo.js';
 import * as P from './perf.js';
 import * as net from './net.js';
+import { claim, startSync } from './sync.js';
 
 const ACTION_MS = 350;
 const actionMs = () => ACTION_MS * slowFactor(state);   // hết thể lực thì làm chậm
@@ -142,13 +143,70 @@ function begin() {
   save();
 }
 
-// Lưu game. Đang trong chế độ xây dựng thì lưu bố cục lúc trước khi vào (chỉ Xong mới lưu bố cục mới).
+// Bản để lưu (đã đóng dấu savedAt). Đang trong chế độ xây dựng thì lấy bố cục lúc trước khi vào (chỉ Xong mới lưu bố cục mới).
+function snapshot() {
+  if (!state) return null;
+  const c = world.build ? structuredClone(state) : state;
+  if (world.build) restoreLayout(c, world.build.snap);
+  saveGame(c);   // chơi đơn: ghi localStorage; vườn online: chỉ đóng dấu giờ, không đụng bản chơi đơn
+  return c;
+}
+// Lưu game: chơi đơn vào localStorage; vườn online thì ghi bản nháp trên máy, sync.js tự gửi lên server mỗi 10 giây
 function save() {
-  if (!state) return;
-  if (!world.build) { saveGame(state); return; }
-  const c = structuredClone(state);
-  restoreLayout(c, world.build.snap);
-  saveGame(c);
+  const c = snapshot();
+  if (c && sync) sync.draft(c);
+}
+
+// ---------- Vườn online (issue 22) ----------
+let sync = null;       // đồng bộ với server khi đang chơi vườn online
+let pending = null;    // { name, claim }: đã có phiên chơi, đang chờ chọn "mang vườn lên" hoặc tạo vườn mới
+// Vào làng với tài khoản `name`: xin phiên chơi (máy cũ nếu có sẽ lưu lần cuối rồi thoát), rồi chơi vườn trên server
+async function startOnline(name) {
+  ui.showVillage(name);
+  const r = await claim(name);
+  if (!r.ok) {
+    if (r.status === 401) { net.forget(); ui.showMode(); } else ui.showVillage(name, r.error);
+    return;
+  }
+  pending = { name, claim: r };
+  if (r.farm) {
+    const s = loadGame(r.farm);
+    if (!s) { pending = null; ui.showVillage(name, 'Không đọc được vườn trên làng. Báo quản trị giúp nhé.'); return; }
+    playOnline(s);
+    const away = s.away; delete s.away;
+    ui.showAway(away);
+    return;
+  }
+  // tài khoản chưa có vườn: có vườn chơi đơn thì hỏi mang lên, không thì tạo vườn mới
+  const solo = loadGame();
+  if (!solo) { ui.showCreator({ name }); return; }
+  delete solo.away;
+  ui.showBringUp(name, solo, {
+    bring: () => { playOnline(solo); sync.pushNow(); },   // bản chơi đơn trong localStorage vẫn nằm nguyên
+    fresh: () => ui.showCreator({ name }),
+  });
+}
+// Bắt đầu chơi bản lưu `s` như vườn online của tài khoản đang chờ
+function playOnline(s) {
+  const { name, claim: r } = pending;
+  pending = null;
+  Object.assign(s, { mode: 'online', account: name, name });
+  ui.closeCreator();
+  state = s;
+  sync = startSync({
+    name, play: r.play, rev: r.rev, getSave: snapshot,
+    onStatus: ui.setOnline,
+    onKicked: () => { sync = null; quit(); net.forget(); ui.showMode('Bạn đã đăng nhập ở thiết bị khác.'); },
+    onReject: msg => ui.toast(`Làng chưa nhận bản lưu: ${msg}`),
+  });
+  begin();
+}
+// Rời vườn đang chơi (không lưu): về trạng thái chưa vào game
+function quit() {
+  if (world.build) { world.build = null; ui.showBuild(false); }
+  state = null; busy = null; curTarget = null; lastTargetKey = '';
+  ui.setTarget(null, [], '');
+  ui.setOnline(true);
 }
 
 const api = {
@@ -158,7 +216,13 @@ const api = {
   doAction,
   changed,
   newGame({ name, look }) {
-    state = createGame({ name, look });
+    const s = createGame({ name, look });
+    if (pending) { playOnline(s); sync.pushNow(); return; }   // vườn online mới: gửi lên làng ngay
+    if (sync) {   // Chơi lại từ đầu khi đang online: vườn mới thay vườn trên làng, bản chơi đơn không đổi
+      Object.assign(s, { mode: 'online', account: state?.account ?? name });
+      state = s; begin(); sync.pushNow(); return;
+    }
+    state = s;
     begin();
   },
   buildStart() {
@@ -171,7 +235,7 @@ const api = {
     if (!world.build) return;
     world.build = null;
     ui.showBuild(false);
-    saveGame(state);
+    save();
     ui.toast('Đã lưu bố cục mới');
     changed();
   },
@@ -180,7 +244,7 @@ const api = {
     restoreLayout(state, world.build.snap);
     world.build = null;
     ui.showBuild(false);
-    saveGame(state);
+    save();
     changed();
   },
   // Chọn món để đặt (what = { kind, pen?, item? }) hoặc bỏ chọn (null)
@@ -215,20 +279,20 @@ const api = {
     return true;
   },
   startSolo: () => startSolo(false),
-  // Về màn chọn chế độ (Cài đặt → Vào làng / Đăng xuất): lưu vườn rồi rời bản chơi đơn
-  leaveToMode() {
-    if (world.build) { world.build = null; ui.showBuild(false); }
-    save();
-    state = null; busy = null; curTarget = null; lastTargetKey = '';
-    ui.setTarget(null, [], '');
+  startOnline,
+  // Về màn chọn chế độ (Cài đặt → Vào làng / Đăng xuất): lưu vườn (online thì gửi bản cuối lên làng) rồi rời vườn
+  async leaveToMode() {
+    const fin = snapshot(), s = sync;
+    sync = null; pending = null;
+    quit();
     ui.showMode();
+    await s?.stop(fin);
   },
   resetGame() {
-    if (world.build) { world.build = null; ui.showBuild(false); }
-    resetSave();
-    state = null; busy = null; curTarget = null; lastTargetKey = '';
-    ui.setTarget(null, [], '');
-    ui.showCreator();
+    const online = sync ? state?.account : null;
+    if (!online) resetSave();   // vườn online: không đụng bản chơi đơn; vườn mới sẽ thay vườn trên làng
+    quit();
+    ui.showCreator(online ? { name: online } : undefined);
   },
 };
 
@@ -516,8 +580,10 @@ function frame(now) {
   if (now - lastSave > 5000) { lastSave = now; save(); }
 }
 
-document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
-window.addEventListener('pagehide', save);
+// Ẩn tab / đóng trang: lưu ngay; vườn online gửi luôn lên làng (keepalive, vẫn đi khi trang đã đóng)
+const saveNow = () => { save(); sync?.flush(); };
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
+window.addEventListener('pagehide', saveNow);
 
 // ---------- Khởi động ----------
 resize();
@@ -541,7 +607,7 @@ function startSolo(first) {
 globalThis.__farm = { get state() { return state; }, get world() { return world; }, get scale() { return scale; }, get view() { return view; }, get dpr() { return dpr; },
   get perf() { return { chunksDrawn: R.chunkStats().drawn, fps: fps.avg, fpsNow: fps.fps, measured: fps.elapsed, battery: prefs.battery, hinted: prefs.hinted }; } };
 requestAnimationFrame(t => { last = t; lastSave = t; requestAnimationFrame(frame); });
-// Máy này còn đăng nhập thì vào làng (chưa có vườn online, chỉ màn chờ). Không thì: có bản lưu chơi đơn → chơi tiếp, chưa có → chọn chế độ.
+// Máy này còn đăng nhập thì vào vườn online. Không thì: có bản lưu chơi đơn → chơi tiếp, chưa có → chọn chế độ.
 const who = await net.whoAmI();
-if (who) ui.showVillage(who);
+if (who) startOnline(who);
 else startSolo(true);

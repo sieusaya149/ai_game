@@ -47,6 +47,8 @@ export function accountOf(db, token) {
   return db.prepare(`SELECT a.id, a.name FROM sessions s JOIN accounts a ON a.id = s.account_id
     WHERE s.token_hash = ? AND s.expires > ?`).get(sha(token), Date.now()) ?? null;
 }
+// Mã phiên trong cookie `nt_session` của request HTTP (cả lúc nâng cấp WebSocket)
+export const tokenOf = req => /(?:^|;\s*)nt_session=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
 export function endSession(db, token) {
   if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha(token));
 }

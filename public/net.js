@@ -4,6 +4,8 @@ const KEY = 'nongtrai-online';
 
 export const rememberedName = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
 const remember = name => { try { name ? localStorage.setItem(KEY, name) : localStorage.removeItem(KEY); } catch {} };
+// Thôi tự vào làng khi mở game (vd đã bị máy khác thay): lần sau hiện màn chọn chế độ
+export const forget = () => remember(null);
 
 // Câu báo lỗi theo mã `code` của server
 const MSG = {
@@ -41,10 +43,11 @@ export async function logout() {
   remember(null);
 }
 // Máy này còn đăng nhập không? Trả tên, hoặc null (hết hạn/chưa vào làng). Mất mạng thì null nhưng giữ ghi nhớ.
-export async function whoAmI() {
-  if (!rememberedName()) return null;
+// force: hỏi server kể cả khi máy không nhớ (nút Vào làng: cookie còn hạn thì khỏi nhập PIN)
+export async function whoAmI(force) {
+  if (!force && !rememberedName()) return null;
   const r = await call('/api/me');
-  if (r.ok) return r.name;
+  if (r.ok) { remember(r.name); return r.name; }
   if (r.status === 401) remember(null);
   return null;
 }

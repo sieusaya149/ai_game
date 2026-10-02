@@ -79,7 +79,14 @@ kbd {
   background: linear-gradient(var(--cream), var(--cream-2)); border: 3px solid var(--wood); border-radius: 16px;
   box-shadow: 0 3px 0 var(--wood-d), 0 6px 10px rgba(0, 0, 0, 0.25);
 }
-#hud-player { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; }
+#hud-player { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px; }
+/* mất kết nối với làng: chấm nhỏ đè góc ảnh đại diện (không chiếm chỗ trong HUD) */
+#hud-net { position: absolute; left: 30px; top: 30px; width: 22px; height: 22px; display: grid; place-items: center; font-size: 12px; line-height: 1;
+  border-radius: 50%; background: #ffe0dc; border: 2px solid var(--red); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); animation: pulse-net 1.6s ease-in-out infinite; }
+#hud-net[hidden] { display: none; }
+#hud-net::after { content: ''; position: absolute; width: 22px; height: 2px; background: var(--red); transform: rotate(-45deg); }
+@keyframes pulse-net { 50% { transform: scale(1.12); } }
+.bring-farm { width: 100%; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--paper, #fff8e1); border: 2px solid var(--line, #d8b98a); font-size: 14px; }
 #hud-avatar { width: 44px; height: 44px; flex: none; border-radius: 11px; background: linear-gradient(#a6dcf5, #d9f0c0); border: 2px solid var(--wood-l); image-rendering: pixelated; }
 .hud-who { flex: 1; min-width: 0; }
 .hud-name { display: flex; align-items: baseline; gap: 6px; font-size: 15px; line-height: 1.15; }

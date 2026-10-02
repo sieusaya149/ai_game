@@ -14,7 +14,8 @@ export const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 export async function startServer({ port = 4173, host = '127.0.0.1', dbPath, publicDir = PUBLIC_DIR } = {}) {
   if (!dbPath) throw new Error('thiếu dbPath');
   const db = openDb(dbPath);
-  const router = createRouter({ db });
+  const ctx = { db };   // route nhận { db, live, ... }; live gắn sau khi có server HTTP
+  const router = createRouter(ctx);
   addRoutes(router);
   const files = serveStatic(publicDir);
 
@@ -27,7 +28,7 @@ export async function startServer({ port = 4173, host = '127.0.0.1', dbPath, pub
       if (!res.headersSent) res.writeHead(500).end();
     }
   });
-  const live = attachLive(server);
+  const live = ctx.live = attachLive(server, ctx);
   await new Promise((ok, no) => server.once('error', no).listen(port, host, ok));
 
   let closing;
