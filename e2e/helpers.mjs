@@ -68,7 +68,30 @@ export async function createCharacter(page, name = 'Tester') {
 
 // Chạm/click vào ô ruộng `idx` trên canvas (nhân vật tự đi tới rồi làm hành động chính).
 // Ô ngoài màn hình thì chạm về phía đó cho nhân vật đi, camera đi theo, lặp tới khi thấy ô.
-export async function tapPlot(page, idx, touch) {
+// `until` (tùy chọn): hàm async trả true khi kết quả mong đợi đã xảy ra. Chạm có thể bị game bỏ qua (nhấn quá 700ms lúc máy ì,
+// camera còn trượt nên trượt ô, nhân vật đang bận), nên chưa thấy kết quả thì chạm lại thay vì chờ mãi.
+export async function tapPlot(page, idx, touch, until) {
+  if (!until) return tapPlotOnce(page, idx, touch);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await tapPlotOnce(page, idx, touch);
+    const end = Date.now() + 5000;
+    while (Date.now() < end) {
+      if (await until()) return;
+      await page.waitForTimeout(100);
+    }
+  }
+  throw new Error(`Chạm ô ruộng ${idx} nhiều lần mà không thấy kết quả`);
+}
+
+async function tapPlotOnce(page, idx, touch) {
+  // chờ camera dừng trượt (theo nhân vật) để tọa độ tính ra còn đúng lúc chạm
+  let last = '';
+  for (let k = 0; k < 30; k++) {
+    const cur = await page.evaluate(() => JSON.stringify(globalThis.__farm.view));
+    if (cur === last) break;
+    last = cur;
+    await page.waitForTimeout(120);
+  }
   for (let i = 0; i < 12; i++) {
     const pt = await page.evaluate(async i => {
       const { mapOf } = await import('/state.js');

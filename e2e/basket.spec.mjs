@@ -21,16 +21,13 @@ test('giỏ gần đầy → thu hoạch tới khi bị khóa → về kho cất
   await ready(page);
   await expect(page.locator('#hud-basket-n')).toHaveText('22/30');
 
-  await tapPlot(page, 0, touch);
-  await expect.poll(async () => (await basket(page)).n, { timeout: 10_000 }).toBe(26);
-  await tapPlot(page, 1, touch);
-  await expect.poll(async () => (await basket(page)).n, { timeout: 10_000 }).toBe(30);
+  await tapPlot(page, 0, touch, async () => (await basket(page)).n === 26);
+  await tapPlot(page, 1, touch, async () => (await basket(page)).n === 30);
   await expect(page.locator('#hud-basket')).toHaveClass(/full/);
   await page.screenshot({ path: `test-results/basket-hud-${testInfo.project.name}.png` });
 
   // ô thứ ba bị khóa: giỏ đầy, cây vẫn còn
-  await tapPlot(page, 2, touch);
-  await expect(page.locator('#toasts')).toContainText('Giỏ đầy, về kho cất đồ', { timeout: 10_000 });
+  await tapPlot(page, 2, touch, async () => (await page.locator('#toasts').textContent()).includes('Giỏ đầy, về kho cất đồ'));
   expect((await basket(page)).n).toBe(30);
   expect((await basket(page)).left).toBe(1);
 
@@ -59,7 +56,6 @@ test('giỏ gần đầy → thu hoạch tới khi bị khóa → về kho cất
   await expect(page.locator('#hud-basket-n')).toHaveText('0/30');
 
   // giờ thu hoạch tiếp được
-  await tapPlot(page, 2, touch);
-  await expect.poll(async () => (await basket(page)).n, { timeout: 10_000 }).toBe(4);
+  await tapPlot(page, 2, touch, async () => (await basket(page)).n === 4);
   expect(errors).toEqual([]);
 });
