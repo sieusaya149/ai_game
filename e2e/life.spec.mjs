@@ -49,7 +49,7 @@ test('mở bản lưu v2 cũ: đủ con vật; tua giờ vườn qua mốc thì 
       return { x: (a.x * f.scale - f.view.camX) / f.dpr + r.left, y: ((a.y - 4) * f.scale - f.view.camY) / f.dpr + r.top };
     }, chick);
     if (touch) await page.touchscreen.tap(pt.x, pt.y); else await page.mouse.click(pt.x, pt.y);
-    await expect(page.locator('#target-name')).toHaveText(/^Gà [♀♂] · (Nhỡ|Trưởng thành)$/, { timeout: 1500 });
+    await expect(page.locator('#target-name')).toHaveText(/^Gà [♀♂] · (Nhỡ|Trưởng thành) (❤️)+$/, { timeout: 1500 });
   }).toPass({ timeout: 15_000 });
 });
 

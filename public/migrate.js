@@ -14,7 +14,7 @@ export const animalDefaults = a => ({
   hunger: 100, happy: 60,
   sick: 0, sickSince: 0, starvingSince: 0,   // sick: 0 khỏe · 1 mệt · 2 bệnh nặng · 3 nguy kịch
   dirty: 0,                             // độ dơ 0..100
-  bond: 2,                              // độ thân ❤️1..5
+  bond: 2, bondXp: 0,                   // độ thân ❤️1..5 · điểm ẩn trong tim hiện tại (BOND.perHeart)
   weight: weightAt(a.type, a.stage ?? 'non'),   // kg
   mom: null, dad: null,                 // { id, name } của cha mẹ nếu đẻ trong trại
   pen: null,                            // id thực thể chuồng đang ở (xếp tự động khi null, xem settlePens ở state.js)
