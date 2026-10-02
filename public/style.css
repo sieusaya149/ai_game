@@ -484,3 +484,4 @@ body.alerting #hud { top: calc(50px + var(--st)); }
 .build-btns { display: flex; gap: 12px; }
 .build-btns .btn { min-width: 128px; min-height: 52px; }
 body.building #bottombar, body.building #actions, body.building #joy-base, body.building #tutorial { display: none !important; }
+#hud-speed[hidden] { display: none; }

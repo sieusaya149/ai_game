@@ -4,7 +4,7 @@ import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, actionsFor, nextStrip } from './state.js';
+import { canMove, marketOpen, dayFraction, actionsFor, nextStrip } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
 
@@ -322,7 +322,7 @@ function outdoorChunk(m, ci, cw) {
 // ---------- Ban đêm ----------
 const smooth = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 export function nightAmount(state) {
-  const f = (state.time % DAY_MS) / DAY_MS;
+  const f = dayFraction(state);
   return Math.min(smooth(NIGHT_FROM - 0.07, NIGHT_FROM + 0.02, f), 1 - smooth(0.93, 1, f));
 }
 

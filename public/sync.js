@@ -2,10 +2,19 @@
 // xin phiên chơi, tự gửi bản lưu lên server mỗi SAVE_MS và khi đóng trang, giữ WebSocket để nhận lệnh "lưu lần cuối rồi thoát"
 // khi tài khoản đăng nhập ở máy khác, rớt mạng thì báo trạng thái, tự kết nối lại và gửi bù bản mới nhất.
 // Bản nháp trên máy nằm ở DRAFT_KEY (không bao giờ đụng bản chơi đơn), để đóng trang lúc mất mạng không mất phần chưa gửi.
+import { measureOffset, useServerTime } from './clock.js';
 export const SAVE_MS = 10_000;
 const RETRY_MS = 3000;
 const DRAFT_KEY = 'nongtrai-online-draft';
 const BEACON_MAX = 60_000;   // trình duyệt giới hạn thân request keepalive ~64 KB
+
+// Đo độ lệch giờ máy với server (GET /api/health trả `now`) rồi trỏ clock.js sang giờ server. Mất mạng thì giữ giờ cũ.
+export async function syncClock() {
+  const off = await measureOffset(async () => (await (await fetch('/api/health', { cache: 'no-store' })).json()).now);
+  if (off != null) useServerTime(off);
+  return off;
+}
+const CLOCK_MS = 300_000;   // đo lại định kỳ cho giờ máy trôi lệch dần
 
 const json = r => r.json().catch(() => ({}));
 async function post(path, body, keepalive) {
@@ -60,7 +69,7 @@ export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReje
   }
   // ngừng hẳn: gửi bản cuối (nếu có) rồi đóng kết nối
   async function end(final) {
-    stopped = true; clearTimeout(timer); clearTimeout(retry);
+    stopped = true; clearTimeout(timer); clearTimeout(retry); clearInterval(clockTimer);
     removeEventListener('online', online); removeEventListener('offline', offline);
     if (final) await push(final);
     ws?.close();
@@ -89,6 +98,7 @@ export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReje
   addEventListener('offline', offline);
   connect();
   later(SAVE_MS);
+  const clockTimer = setInterval(syncClock, CLOCK_MS);
 
   return {
     // ghi bản nháp trên máy (main.js gọi mỗi lần lưu)
