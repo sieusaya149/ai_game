@@ -1,0 +1,100 @@
+<!doctype html><meta charset="utf-8"><title>SPR3</title>
+<style>
+  body { margin: 0; padding: 8px; background: #5a9e3a; font: 11px sans-serif; color: #fff; }
+  h2 { margin: 14px 0 4px; font-size: 13px; }
+  h3 { margin: 6px 0 2px; font-size: 11px; color: #ffe9a8; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .cell { display: flex; flex-direction: column; gap: 2px; }
+  canvas { image-rendering: pixelated; }
+</style>
+<body>
+<div id="root"></div>
+<script type="module">
+import { SPR3, muddy } from './art3.js';
+const S = 4, root = document.getElementById('root');
+let nsec = 0;
+const section = (t, tag = 'h2') => {
+  const s = document.createElement('div'); s.id = 'sec' + nsec++; s.style.display = 'inline-block'; s.style.minWidth = '100%';
+  const h = document.createElement(tag); h.textContent = t; s.append(h);
+  const r = document.createElement('div'); r.className = 'row'; s.append(r); root.append(s); return r;
+};
+function put(row, img, label, scale = S) {
+  const cell = document.createElement('div'); cell.className = 'cell';
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  c.getContext('2d').drawImage(img, 0, 0);
+  c.style.width = img.width * scale + 'px'; c.style.height = img.height * scale + 'px';
+  const l = document.createElement('span'); l.textContent = `${label} ${img.width}x${img.height}`;
+  cell.append(l, c); row.append(cell);
+}
+function walk(row, v, label, onlyLeft = false) {
+  if (v instanceof HTMLCanvasElement) return put(row, v, label);
+  if (Array.isArray(v)) return v.forEach((e, i) => walk(row, e, `${label}[${i}]`, onlyLeft));
+  for (const k in v) { if (onlyLeft && k === 'right') continue; walk(row, v[k], `${label}.${k}`, onlyLeft); }
+}
+// Con vật: mỗi loài một hàng, 4 giai đoạn × 2 khung (bản trái) + 1 khung phải
+for (const sp in SPR3.animal) {
+  const r = section(`animal.${sp}`, 'h3');
+  for (const st in SPR3.animal[sp]) {
+    const set = SPR3.animal[sp][st];
+    put(r, set.left[0], `${st} L0`); put(r, set.left[1], `L1`); put(r, set.right[0], `R0`);
+  }
+  if (SPR3.sleepBy[sp]) for (const st in SPR3.sleepBy[sp]) put(r, SPR3.sleepBy[sp][st], `ngủ ${st}`);
+  if (SPR3.sickBy[sp]) for (const st in SPR3.sickBy[sp]) put(r, SPR3.sickBy[sp][st], `bệnh ${st}`);
+}
+const groups = {
+  'Hành động': ['heoMud', 'dogHerd', 'dogSit', 'dogBeg', 'catPounce', 'catNap', 'catMouse'],
+  'Hiệu ứng': ['fx'],
+  'Săn mồi': ['rat', 'hawk', 'hawkShadow', 'weasel'],
+  'NPC': ['npcTiSun', 'npcTiSunIdle', 'npcCoUt', 'npcCoUtIdle', 'npcChuBa', 'npcChuBaIdle'],
+  'Chuồng': ['pen', 'quarantine', 'doghouse', 'catDoor', 'scale'],
+  'Đồ vật': ['grave', 'graveFlower', 'angel', 'eggNest', 'eggFertile', 'grainScatter', 'lowFence', 'ratTrap', 'vetClinic'],
+  'Túi đồ & trạng thái': ['items', 'status'],
+};
+for (const g in groups) { const r = section(g); for (const k of groups[g]) walk(r, SPR3[k], k, true); }
+{ const r = section('muddy() kẹp bùn theo dáng'); for (const sp of ['heo', 'bo', 'ga', 'cho']) for (const lv of [1, 2, 3]) put(r, muddy(SPR3.animal[sp].truong.left[0], lv), `${sp} bùn${lv}`); }
+
+// Cảnh cỡ thật
+function grass(x, w, h) {
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const n = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453 % 1;
+    x.fillStyle = Math.abs(n) < 0.12 ? '#5a9e3a' : '#6cb846'; x.fillRect(i, j, 1, 1);
+  }
+}
+const feet = (x, img, cx, by) => x.drawImage(img, Math.round(cx - img.width / 2), by - img.height + 1);
+function scene(scale, t) {
+  const W = 420, H = 200;
+  const r = section(`Cảnh cỡ thật (${scale}x)`);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'); grass(x, W, H);
+  // ba cấp chuồng gà, heo, chuồng lớn
+  SPR3.pen.coop.forEach((p, i) => x.drawImage(p, 4 + i * 50, 4));
+  SPR3.pen.pig.forEach((p, i) => x.drawImage(p, 160 + i * 46, 6));
+  SPR3.pen.barn.forEach((p, i) => x.drawImage(p, 4 + i * 60, 52));
+  x.drawImage(SPR3.quarantine, 190, 56); x.drawImage(SPR3.vetClinic, 230, 52);
+  SPR3.doghouse.forEach((p, i) => x.drawImage(p, 290 + i * 34, 60));
+  // đàn gà vịt
+  const flock = [['ga', 'truong'], ['ga', 'non'], ['ga', 'non'], ['gaTrong', 'truong'], ['ga', 'nho'], ['vit', 'truong'], ['vit', 'non'], ['vit', 'non'], ['vit', 'nho'], ['ga', 'gia'], ['gaTrong', 'nho']];
+  flock.forEach(([sp, st], i) => feet(x, SPR3.animal[sp][st][i % 3 ? 'left' : 'right'][(i + t) % 2], 14 + i * 16, 128));
+  x.drawImage(SPR3.grainScatter, 60, 130); x.drawImage(SPR3.eggNest, 196, 118);
+  // thú lớn
+  const big = [['heo', 'truong'], ['heo', 'non'], ['heo', 'nho'], ['bo', 'truong'], ['boDuc', 'truong'], ['bo', 'non'], ['cuu', 'truong'], ['cuuXoan', 'truong'], ['cuu', 'nho']];
+  let bx = 10;
+  big.forEach(([sp, st], i) => { const im = SPR3.animal[sp][st].left[(i + t) % 2]; feet(x, im, bx + im.width / 2, 160); bx += im.width + 6; });
+  x.drawImage(muddy(SPR3.animal.heo.gia.left[0], 3), 250, 146); x.drawImage(SPR3.fx.flies[t % 3], 254, 140);
+  x.drawImage(SPR3.heoMud[t % 2], 280, 146);
+  // chó lùa, mèo
+  feet(x, SPR3.dogHerd.right[t % 2], 330, 160); feet(x, SPR3.animal.cho.truong.left[t % 2], 370, 160);
+  feet(x, SPR3.dogSit.left[0], 400, 160);
+  feet(x, SPR3.animal.meo.truong.left[t % 2], 20, 194); feet(x, SPR3.catNap.left[t % 2], 50, 194); feet(x, SPR3.catMouse.left[t % 2], 80, 194);
+  feet(x, SPR3.catPounce.left[t % 2], 110, 194); feet(x, SPR3.rat.left[t % 2], 130, 194);
+  x.drawImage(SPR3.hawkShadow, 150, 186); x.drawImage(SPR3.hawk.left[t % 2], 148, 166);
+  feet(x, SPR3.weasel.left[t % 2], 190, 194);
+  feet(x, SPR3.npcTiSun[0][0], 220, 194); feet(x, SPR3.npcCoUt[0][0], 240, 194); feet(x, SPR3.npcChuBa[0][0], 260, 194);
+  feet(x, SPR3.sick.bo, 300, 194); feet(x, SPR3.sleep.cho, 340, 194); x.drawImage(SPR3.graveFlower, 360, 182); x.drawImage(SPR3.angel[t % 2], 380, 166);
+  feet(x, SPR3.animal.cho.non.left[0], 405, 194);
+  c.style.width = W * scale + 'px'; c.style.height = H * scale + 'px';
+  r.append(c);
+}
+scene(1, 0); scene(2, 0);
+document.title = 'done';
+</script>
