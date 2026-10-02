@@ -36,7 +36,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/todo.js` | `todoList(state)`: danh sách Việc cần làm cho bảng, bản đồ nhỏ, mũi tên. Thuần JS |
 | `public/minimap.js` | Vẽ bản đồ nhỏ: `miniView`, `miniDots`, `drawMini`, `DOT` |
 | `public/perf.js` | Hiệu năng: mảng nền `CHUNK`, `dirtyChunks`, `chunksIn`, AI ngoài màn hình `aiStep`, đo FPS `createFps`, tiết kiệm pin (`BATTERY_FPS`, `shouldSuggestBattery`), tùy chọn máy `loadPrefs`/`savePrefs` (khóa `nongtrai-pref`) |
-| `public/art.js`, `public/art2.js`, `public/art3.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...); `art3.js` export `SPR3` (Phase 2: `SPR3.animal[loài][non|nho|truong|gia] = { left, right }` với loài `ga gaTrong vit heo bo boDuc cuu cuuXoan cho meo`, `sleepBy[loài][giai đoạn]`, `angel`, chuồng, kẻ săn mồi...; xem `_sprites3.html`). `render.animalImg(a, face, frame, sleep)` chọn hình theo `a.type/stage/sex` (đực: `gaTrong`, `boDuc`), thiếu art thì dùng sprite cũ. Thêm sprite mới thì giữ nguyên mọi export cũ |
+| `public/art.js`, `public/art2.js`, `public/art3.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...); `art3.js` export `SPR3` (Phase 2: `SPR3.animal[loài][non|nho|truong|gia] = { left, right }` với loài `ga gaTrong vit vitDuc heo bo boDuc cuu cuuXoan cho meo`, `sleepBy[loài][giai đoạn]`, `angel`, chuồng, kẻ săn mồi...; xem `_sprites3.html`). `render.animalImg(a, face, frame, sleep)` chọn hình theo `a.type/stage/sex` (đực: `gaTrong`, `vitDuc`, `boDuc`), thiếu art thì dùng sprite cũ. Thêm sprite mới thì giữ nguyên mọi export cũ |
 | `public/render.js`, `public/world.js`, `public/main.js` | Vẽ (theo khung nhìn, nền chia mảng 16x16 ô), di chuyển/tìm đường/AI/chế độ xây dựng/camera, vòng lặp, chuyển cảnh mờ dần, input. **Không tự quyết luật**, chỉ gọi `state.js` |
 | `public/index.html`, `public/style.css`, `public/ui.js`, `public/sound.js` | HUD, nút hành động, các bảng, tạo nhân vật, thông báo, âm thanh |
 | `server/` | Server Node (ADR 0010), xem mục Server. `server.js` cũ (hỏng) và `scripts/static-server.mjs` đã bị xóa ở issue 20 |
@@ -96,9 +96,9 @@ state = {
   animals: [ Animal ],                        // xem "Con vật (v3)" ngay dưới
   troughs: { chicken, pig, pasture },
   manure: { chicken, pig, pasture },          // phân chuồng tích dần 0..100 (đầy = chuồng bẩn), xúc ở máng (hành động `muck`)
-  eggs: [ { id, x, y, laidAt, fertile?, candled?, mom?, dad? } ],   // fertile: có phôi (ẩn tới khi soi); mom/dad = { id, name }
-  clutch: [ { mom, dad } ],                    // gốc gác của các trứng có phôi đã nhặt (khớp theo thứ tự với món trung_phoi)
-  nest: { egg, hatchAt, mom, dad },
+  eggs: [ { id, sp?, x, y, laidAt, fertile?, candled?, mom?, dad? } ],   // sp = loài đẻ ('ga' | 'vit'; thiếu = 'ga'); fertile: có phôi (ẩn tới khi soi); mom/dad = { id, name }
+  clutch: [ { sp?, mom, dad } ],               // gốc gác của các trứng có phôi đã nhặt (khớp theo thứ tự với món trung_phoi / trung_vit_phoi)
+  nest: { egg, hatchAt, sp?, mom, dad },       // sp = loài quả trứng đang ấp
   dog: { stage, age, hunger, happy, x, y, nextPoop, name },   // stage/age như con vật, theo LIFE.cho
   poops: [ { id, x, y, at } ],
   threats: [ { id, kind: 'crow'|'thief', plot, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
@@ -132,7 +132,7 @@ Hình dạng chung cho mọi loài trong `state.animals` (nền cho cả Phase 2
 
 ```js
 Animal = {
-  id, type: 'ga'|'heo'|'bo'|'cuu',            // (lát sau: 'vit', mèo... thêm loài vào ANIMALS + LIFE)
+  id, type: 'ga'|'vit'|'heo'|'bo'|'cuu',      // (lát sau: mèo... thêm loài vào ANIMALS + LIFE)
   name,                                       // mặc định tên loài ('Gà'); lát sau đặt tên riêng / "Bông con"
   sex: 'f'|'m',                               // cái / đực. Mặc định theo id: chẵn cái, lẻ đực
   stage: 'non'|'nho'|'truong'|'gia',          // giai đoạn (STAGES), cập nhật mỗi tick theo age
@@ -198,13 +198,13 @@ renameAnimal(state, id, name)     // → R { id }: cắt khoảng trắng; reaso
 pedigree(state, id)               // → { id, name, sex, mom, dad, kids: [{id,name,sex}] } | null
 breedNote(state, animal)          // → 'Chuồng đầy' | null: nái/bò/cừu cái đủ cặp nhưng chuồng đầy nên không sinh
 animalPrice(type, sex)            // (data.js) giá mua theo giới tính
-{ kind: 'egg' } actions           // candle (Soi trứng: e.candled = true, res.fertile) · collect (đã soi và có phôi → món trung_phoi, ngược lại trung)
+{ kind: 'egg' } actions           // candle (Soi trứng: e.candled = true, res.fertile) · collect (theo e.sp: gà → trung_phoi/trung, vịt → trung_vit_phoi/trung_vit)
 { kind: 'animal' } action         // rename → res.rename = id (UI mở hộp nhập tên rồi gọi renameAnimal)
-{ kind: 'nest' } action           // incubate: chỉ nhận trung_phoi
+{ kind: 'nest' } action           // incubate: chỉ nhận trứng có phôi (trung_phoi, hết thì trung_vit_phoi); nở ra con đúng loài
 ```
 
 - Luật (BREED trong data.js): chỉ gà mái đẻ; có gà trống trưởng thành thì 40% trứng `fertile`; gà trống gáy lúc 6h (đổi ngày; không gáy khi chạy bù): event `cockcrow {id}` + `sound cockcrow` + chữ bay.
-- Trứng có phôi mới nở: ổ ấp (nhận `trung_phoi`), trứng bỏ quên (20% mỗi 10 phút), ổ ấp tự động ở chuồng gà cấp 3 (`pen.incub = { at, mom, dad }`, tự nhận trứng có phôi nằm trong chuồng).
+- Trứng có phôi mới nở: ổ ấp (nhận trứng có phôi), trứng bỏ quên (20% mỗi 10 phút), ổ ấp tự động ở chuồng gà cấp 3 (`pen.incub = { at, sp, mom, dad }`, tự nhận trứng có phôi nằm trong chuồng). Nở ra con non đúng loài của quả trứng.
 - Heo/bò/cừu: đực + cái trưởng thành, no (> growNeedsHunger) và vui (> 40), cùng chuồng (cách ly không sinh). Heo: mỗi phút 25% một nái mang bầu, đẻ 1–3 (nái già 1–2); bò mang thai `BREED.gestation.bo` = 10 giờ vườn, cừu 8 giờ, đẻ 1 con. `a.mate` = cha lứa đang mang. Chuồng đầy (sức chứa cả loại chuồng) thì không thụ thai, không đẻ, hiện chữ "Chuồng đầy". Con vật bị đóng băng thì không sinh (dựa `s.time`).
 - Con mới sinh/nở: sex 50/50, `name` = "<tên mẹ> con", `mom`/`dad` = { id, name }; event `born`. Chưa có chống cận huyết (con gái trưởng thành sớm có thể phối với cha).
 ```js
@@ -244,8 +244,23 @@ starChance(s, a)                  // xác suất milk/shear ra sữa ngon / lôn
 roamOf(state)            // → { tiles: [{c,r}], has(c,r) }: vùng gà thả rông đi lại = ô trong đất, tới được từ nhà, không phải ô chắn/chuồng/ô hàng rào thấp (ngoài cổng, trong nhà không tính). Ruộng rào kín thì ô ruộng không nằm trong vùng. Nhớ tạm theo farm.rev
 hiddenEggs(state)        // → trứng đang nằm trong bụi: s.eggs có `tile: {c,r}` (x,y = giữa ô); nhặt bằng perform(egg, 'collect') như trứng thường
 ```
-Mỗi bước tick (ban ngày, FREE trong data.js): tối đa `FREE.max` (30) con loài `FREE.types` (gà), không bệnh, không ở chuồng cách ly, có `a.tile`; cứ `FREE.moveMs` đổi sang ô khác cách ≤ `FREE.radius` ô (`a.tileAt` = lúc đổi kế). Sáng ra bước từ cửa chuồng; ban đêm (hoặc bệnh/cách ly/vượt 30) `tile = null` và về chuồng. Đứng ở ô ruộng có cây: con nhỡ trở lên mổ sâu (`stats.pecks`), 5% (`FREE.seedLoss`) lần mổ mất hạt vừa gieo (cây ở giai đoạn 0). Gà mái trưởng thành thả rông đẻ trứng ở ô cỏ gần bụi/đá/cây trong `FREE.layRadius`, mỗi ô một ổ. Chạy bù offline dùng đúng luật này.
-Hàng rào thấp: vật phẩm `deco_lowfence` (ITEMS, kind deco, bán ở chợ), đặt bằng `placeEntity` như đồ trang trí (qua `canPlace`), người chơi bước qua được, chỉ chặn gà. `world.js` diễn hoạt gà theo `a.tile` (`freeWalk`); `render.js` vẽ `SPR3.lowFence` (ngang/dọc theo hàng xóm) và `SPR3.eggNest` cho trứng có `tile`.
+Mỗi bước tick (ban ngày, FREE trong data.js): tối đa `FREE.max` (30) con loài `FREE.types` (gà, vịt), không bệnh, không ở chuồng cách ly, có `a.tile`; cứ `FREE.moveMs` đổi sang ô khác cách ≤ `FREE.radius` ô (`a.tileAt` = lúc đổi kế). Sáng ra bước từ cửa chuồng; ban đêm (hoặc bệnh/cách ly/vượt 30) `tile = null` và về chuồng. Vịt con thì không tự chọn ô: bám `tile` của vịt mái gần nhất đang thả rông (đi thành hàng theo mẹ). Đứng ở ô ruộng có cây: con nhỡ trở lên mổ sâu (`stats.pecks`), 5% (`FREE.seedLoss`) lần mổ mất hạt vừa gieo (cây ở giai đoạn 0). Gà/vịt mái trưởng thành thả rông đẻ trứng ở ô cỏ gần bụi/đá/cây trong `FREE.layRadius`, mỗi ô một ổ. Chạy bù offline dùng đúng luật này.
+Hàng rào thấp: vật phẩm `deco_lowfence` (ITEMS, kind deco, bán ở chợ), đặt bằng `placeEntity` như đồ trang trí (qua `canPlace`), người chơi bước qua được, chỉ chặn gà. `world.js` diễn hoạt gà theo `a.tile` (`freeWalk`); `render.js` vẽ `SPR3.lowFence` (ngang/dọc theo hàng xóm) và `SPR3.eggNest` / `SPR3.eggNestDuck` cho trứng có `tile`.
+
+### Vịt (issue 47)
+
+Vịt là **loài mới** trong `ANIMALS`/`LIFE` (`type: 'vit'`), không có trong bản lưu cũ nên **không cần bước chuyển v3**.
+
+- Nuôi **chung chuồng gia cầm** với gà (`ANIMALS.vit.pen = 'chicken'`): `penCount`/`penCap` tính chung, chuồng đầy thì không mua thêm được dù là loài nào.
+- Mua ở chợ Bà Tư từ cấp `ANIMALS.vit.lv` (2), chọn đực/cái như gà (`buyAnimal(state, 'vit', sex)`, `animalPrice`).
+- Vòng đời cùng thang tuổi với gà (`LIFE.vit` = 5 phút / 10 phút / 20 giờ / 4 giờ).
+- **Vịt mái trưởng thành đẻ trứng vịt**: cùng nhánh luật với gà (`POULTRY = ['ga', 'vit']` trong state.js). Quả trứng ghi `sp: 'vit'`; có vịt cồ (vịt trống) trưởng thành thì `BREED.fertile` quả có phôi — phôi tính theo **trống cùng loài**. Vịt già đẻ thưa (chu kỳ ×2 như mọi loài già).
+- Sản phẩm mới: `PRODUCTS.trung_vit` (18 xu) và `PRODUCTS.trung_vit_phoi`. Vào giỏ/kho, bán ở chợ và thùng giao hàng như mọi sản phẩm; đơn hàng của làng có lúc xin trứng vịt khi người chơi đã đủ cấp nuôi vịt.
+- Dùng chung mọi luật khác với gà: thả rông ban ngày và đẻ trứng trong bụi (41), về chuồng buổi tối, dơ và tự tắm cát ở chuồng cấp 3 (37), bệnh (38), độ thân (39), bán cho Chú Ba (40), ổ ấp và ổ ấp tự động (36).
+- **Vịt con đi thành hàng theo vịt mẹ**: trong chuồng thì `world.js` xếp con thứ k cách mẹ 7 + 6k px về phía sau hướng mẹ đang đi; ra vườn thì `state.js` cho vịt con bám đúng `tile` của vịt mái gần nhất đang thả rông (không có mẹ thì tự đi như gà). Vịt nhỡ bới đất như gà nhỡ; `A_SPEED.vit = 17`.
+- Pixel art (art3.js): `SPR3.animal.vit` (vịt mái: thân trắng, mỏ cam) và `SPR3.animal.vitDuc` (vịt cồ: đầu xanh lục, vòng cổ trắng, ức nâu, đuôi đen vểnh) — mỗi giai đoạn một bộ riêng, kèm `sleepBy`/`sickBy`; `eggDuck`, `eggDuckFertile`, `eggNestDuck`. Tiếng kêu `quack` (sound.js).
+- Bơi ở hồ để lại Phase 6.
+
 ### Target, hành động
 ```js
 actionsFor(state, target)         // → [{ id, icon, label, disabled?: 'lý do', tiles?: [plotIdx...] }]; phần tử đầu là hành động chính.

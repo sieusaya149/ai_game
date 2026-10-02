@@ -87,9 +87,9 @@ const stinkImgs = () => SPR.stink ?? once('stink', () => [0, 1].map(f => {
   return c;
 }));
 const eggImg = () => SPR.eggGround ?? SPR.product.trung;
-// Trứng đã soi: có phôi = SPR3.eggFertile (sáng, chấm phôi); trống = trứng sáng không chấm. Chưa soi: trứng thường.
+// Trứng đã soi: có phôi = SPR3.eggFertile / eggDuckFertile (sáng, chấm phôi); trống = trứng sáng không chấm. Chưa soi: trứng gà thường, trứng vịt = SPR3.eggDuck.
 const eggEmpty = () => once('eggEmpty', () => pix(['....ggg....', '...gOOOg...', '..gOyyyOg..', '..OyywyyO..', '..OyyyyyO..', '..OyyyyyO..', '..OyyyyyO..', '...OyyyO...', '....OOO....'], { g: 'rgba(255,230,140,0.4)', O: '#3b2412', y: '#fff0c0', w: '#ffffff' }));
-const eggImgOf = e => (e.candled ? (e.fertile ? SPR3?.eggFertile : null) ?? eggEmpty() : eggImg());
+const eggImgOf = e => (e.candled ? (e.fertile ? (e.sp === 'vit' ? SPR3?.eggDuckFertile : SPR3?.eggFertile) : null) ?? eggEmpty() : e.sp === 'vit' ? SPR3?.eggDuck ?? eggImg() : eggImg());
 const wellImg = () => SPR.well ?? once('well', () => {
   const c = mkCanvas(24, 26), x = c.getContext('2d');
   rect(x, '#3b2412', 2, 0, 20, 4); rect(x, '#d9483b', 3, 1, 18, 2);
@@ -183,7 +183,7 @@ function statusIcon(name) {
 // ---------- Chọn sprite theo thực thể (world.js cũng dùng để tính vùng bấm) ----------
 // a = { type, stage, sex }. Hình theo giai đoạn ở SPR3 (art3.js): con đực có bộ riêng (gà trống, bò đực).
 // Thiếu art thì dự phòng bằng sprite cũ: non = SPR.baby, nhỡ = bản thu nhỏ, già = bản nhạt màu.
-const SP3 = { dog: 'cho' }, MALE = { ga: 'gaTrong', bo: 'boDuc' };
+const SP3 = { dog: 'cho' }, MALE = { ga: 'gaTrong', vit: 'vitDuc', bo: 'boDuc' };
 const sp3Key = a => (a.sex === 'm' && MALE[a.type] && SPR3?.animal?.[MALE[a.type]]) ? MALE[a.type] : SP3[a.type] ?? a.type;
 export function animalImg(a, face, frame, sleep) {
   const stage = a.stage ?? 'truong', key = sp3Key(a);
@@ -555,7 +555,7 @@ export function render(ctx, f) {
       rect(ctx, '#3b2412', coop.at.x - 8, coop.at.y - 6, 16, 6); rect(ctx, '#e8c34a', coop.at.x - 7, coop.at.y - 5, 14, 4);
       if (state.nest?.egg) { rect(ctx, '#3b2412', coop.at.x - 3, coop.at.y - 9, 6, 6); rect(ctx, '#fff8e0', coop.at.x - 2, coop.at.y - 8, 4, 4); }
     }
-    if (state.nest?.egg) bub(coop.at.x, coop.at.y - 12, SPR.product.trung, 'nest');
+    if (state.nest?.egg) bub(coop.at.x, coop.at.y - 12, (state.nest.sp === 'vit' ? SPR3?.eggDuck : null) ?? SPR.product.trung, 'nest');
   });
 
   // cây trồng, cỏ, sâu
@@ -586,7 +586,7 @@ export function render(ctx, f) {
 
   // trứng, phân
   // trứng trong bụi: vẽ ổ cỏ (đã soi thì vẽ như trứng đã soi)
-  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = (e.tile && !e.candled && SPR3?.eggNest) || eggImgOf(e); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
+  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = (e.tile && !e.candled && (e.sp === 'vit' ? SPR3?.eggNestDuck : SPR3?.eggNest)) || eggImgOf(e); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
   for (const p of farm ? state.poops ?? [] : []) {
     if (p.x == null || !vis(p.x, p.y)) continue;
     add(p.y, () => {

@@ -1,0 +1,160 @@
+// Vịt (issue 47): loài mới ở chuồng gia cầm chung với gà, qua API công khai của state.js.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as G from '../public/state.js';
+import { ANIMALS, LIFE, DAY_MS, MAX_CATCHUP_MS, PRODUCTS, FREE, DIRT } from '../public/data.js';
+
+const MIN = 60_000, HOUR = 60 * MIN;
+const store = {};
+globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
+const NOON = DAY_MS * 0.3;
+const newGame = () => { const s = G.createGame({ name: 'Hùng' }); s.orders = []; s.nextOrderAt = 1e15; s.animals = []; s.time = NOON; s.coins = 1e6; s.exp = 1e6; return s; };
+const bird = (s, type, stage, sex, extra) => {
+  const a = { ...structuredClone(G.createGame().animals[0]), id: s.nextId++, type, name: ANIMALS[type].name, stage, age: G.stageStart(type, stage), nextProduct: s.time, ready: false, sex, hunger: 100, happy: 80, ...extra };
+  s.animals.push(a);
+  return a;
+};
+const feed = s => { s.weather = 'sun'; for (const k of Object.keys(s.troughs)) s.troughs[k] = 20; for (const a of s.animals) { a.hunger = 100; a.happy = Math.max(a.happy, 80); } };
+const run = (s, ms, each) => { const ev = []; for (let t = 0; t < ms; t += 5000) { feed(s); each?.(s); ev.push(...G.tick(s, Math.min(5000, ms - t))); } return ev; };
+const healthy = s => { for (const a of s.animals) { a.sick = 0; a.dirty = 0; } };   // nuôi khéo: không bệnh, không dơ
+
+test('vịt có bảng loài riêng, cùng thang tuổi với gà, nuôi chung chuồng gia cầm', () => {
+  assert.equal(ANIMALS.vit.pen, ANIMALS.ga.pen);
+  assert.deepEqual(LIFE.vit, LIFE.ga);
+  assert.ok(FREE.types.includes('vit'));
+  assert.equal(ANIMALS.vit.product, 'trung_vit');
+  assert.ok(PRODUCTS.trung_vit.price > 0);
+});
+
+test('vịt đi đủ 4 giai đoạn đúng mốc giờ', () => {
+  const s = newGame(), d = bird(s, 'vit', 'non', 'f', { age: 0, nextProduct: 1e15 });
+  assert.equal(d.stage, 'non');
+  const seen = [];
+  for (let t = 0; t < 21 * HOUR; t += MIN) { feed(s); G.tick(s, MIN); if (!seen.includes(d.stage)) seen.push(d.stage); if (d.stage === 'truong') break; }
+  assert.deepEqual(seen, ['non', 'nho', 'truong']);
+  assert.ok(d.age >= 15 * MIN && d.age < 16 * MIN + 1, 'lên trưởng thành sau 5+10 phút');
+  d.age = G.stageStart('vit', 'gia'); feed(s); G.tick(s, 1000);
+  assert.equal(d.stage, 'gia');
+});
+
+test('vịt mái trưởng thành đẻ trứng vịt, nhặt vào kho và bán được', () => {
+  const s = newGame(); bird(s, 'vit', 'truong', 'f');
+  s.eggs = [];
+  run(s, 4 * MIN);
+  assert.ok(s.eggs.length >= 1, 'có trứng');
+  assert.equal(s.eggs[0].sp, 'vit');
+  const e = s.eggs[0];
+  const r = G.perform(s, { kind: 'egg', id: e.id }, 'collect');
+  assert.ok(r.ok);
+  assert.equal(G.haveItem(s, 'trung_vit'), 1);
+  assert.equal(G.haveItem(s, 'trung'), 0, 'không lẫn trứng gà');
+  s.time = NOON;   // chợ mở 6h–18h
+  const coins = s.coins, sold = G.sell(s, 'trung_vit', 1);
+  assert.ok(sold.ok, sold.msg);
+  assert.equal(s.coins - coins, PRODUCTS.trung_vit.price);
+});
+
+test('vịt non, vịt trống không đẻ; vịt già đẻ thưa hơn vịt trưởng thành', () => {
+  const s = newGame(); bird(s, 'vit', 'non', 'f', { nextProduct: 0 }); bird(s, 'vit', 'nho', 'f', { nextProduct: 0 }); bird(s, 'vit', 'truong', 'm', { nextProduct: 0 });
+  run(s, 10 * MIN);   // vịt con 5+10 phút mới lớn
+  assert.equal(s.eggs.length, 0);
+  const a = newGame(), b = newGame(); bird(a, 'vit', 'truong', 'f'); bird(b, 'vit', 'gia', 'f');
+  const laid = ev => ev.filter(e => e.type === 'egg').length;   // đếm lúc đẻ: khỏi phụ thuộc trứng còn nằm đó hay không
+  const nA = laid(run(a, 60 * MIN, healthy)), nB = laid(run(b, 60 * MIN, healthy));
+  assert.ok(nB < nA, `già ${nB} < trưởng thành ${nA}`);
+});
+
+test('vịt tính chung sức chứa chuồng gia cầm với gà', () => {
+  const s = newGame();
+  s.animals = [];
+  const cap = G.penCap(s, 'chicken');
+  for (let i = 0; i < cap - 1; i++) bird(s, 'ga', 'truong', 'f', { pen: s.farm.ents.find(e => e.pen === 'chicken')?.id });
+  assert.ok(G.buyAnimal(s, 'vit', 'f').ok, 'còn 1 chỗ cho vịt');
+  const r = G.buyAnimal(s, 'ga', 'f');
+  assert.equal(r.ok, false, 'chuồng đầy');
+});
+
+test('trứng vịt có phôi: soi, nhặt, ấp nở ra vịt con', () => {
+  const s = newGame(); bird(s, 'vit', 'truong', 'f'); bird(s, 'vit', 'truong', 'm');
+  s.eggs = [{ id: s.nextId++, sp: 'vit', x: 10, y: 10, laidAt: s.time, fertile: true, mom: { id: 1, name: 'Mẹ' }, dad: { id: 2, name: 'Bố' } }];
+  const id = s.eggs[0].id;
+  assert.ok(G.perform(s, { kind: 'egg', id }, 'candle').ok);
+  assert.ok(G.perform(s, { kind: 'egg', id }, 'collect').ok);
+  assert.equal(G.haveItem(s, 'trung_vit_phoi'), 1);
+  const ducks = s.animals.length;
+  assert.ok(G.perform(s, { kind: 'nest' }, 'incubate').ok);
+  run(s, 4 * MIN);
+  assert.equal(s.animals.length, ducks + 1);
+  const b = s.animals.at(-1);
+  assert.equal(b.type, 'vit'); assert.equal(b.stage, 'non'); assert.equal(b.mom.name, 'Mẹ');
+});
+
+test('vịt dùng luật chung: thả rông ban ngày, về chuồng buổi tối; chạy bù offline không con nào chết', () => {
+  const s = newGame(); const ds = [bird(s, 'vit', 'truong', 'f'), bird(s, 'vit', 'nho', 'm')];
+  run(s, 3 * MIN);
+  assert.ok(ds.every(d => d.tile), 'ban ngày thả rông');
+  s.time = DAY_MS * 0.78; run(s, 2 * MIN);   // sau 18h
+  assert.ok(ds.every(d => !d.tile), 'tối về chuồng');
+  const o = newGame(); const od = [bird(o, 'vit', 'truong', 'f'), bird(o, 'vit', 'non', 'm'), bird(o, 'vit', 'truong', 'm')];
+  o.troughs.chicken = 100;
+  G.tick(o, Math.min(MAX_CATCHUP_MS, 3 * HOUR));
+  assert.ok(od.every(d => o.animals.includes(d)), 'không con nào chết');
+});
+
+test('đơn hàng của làng có lúc xin trứng vịt khi đã mở khoá vịt', () => {
+  const s = newGame(); s.exp = 1e6;
+  const asked = new Set();
+  for (let i = 0; i < 300; i++) { s.orders = []; s.nextOrderAt = s.time; G.tick(s, 1000); for (const k of Object.keys(s.orders[0]?.items ?? {})) asked.add(k); }
+  assert.ok(asked.has('trung_vit'), 'có đơn xin trứng vịt');
+  assert.ok(asked.has('trung'), 'vẫn có đơn xin trứng gà');
+  const low = newGame(); low.exp = 0;   // cấp 1: chưa nuôi được vịt
+  const lowAsked = new Set();
+  for (let i = 0; i < 200; i++) { low.orders = []; low.nextOrderAt = low.time; G.tick(low, 1000); for (const k of Object.keys(low.orders[0]?.items ?? {})) lowAsked.add(k); }
+  assert.ok(!lowAsked.has('trung_vit'), 'cấp thấp chưa xin trứng vịt');
+});
+
+test('vịt dơ dần, tắm sạch được; có ổ cát ở chuồng cấp 3 thì tự tắm cát như gà', () => {
+  const s = newGame(); const d = bird(s, 'vit', 'truong', 'f', { dirty: 90, happy: 30, nextProduct: 1e15 });
+  const t = { kind: 'animal', id: d.id };
+  assert.ok(G.isDirty(d));
+  s.inv.soap = 1; s.can = 3; G.tick(s, 0);
+  assert.equal(G.perform(s, t, 'bath').ok, true);
+  assert.equal(d.dirty, 0);
+  const u = newGame(); G.mapOf(u).pens.chicken.ent.sand = true;
+  const e = bird(u, 'vit', 'truong', 'f', { dirty: 0, nextProduct: 1e15 });
+  run(u, 4 * 60 * MIN);
+  assert.ok(e.dirty <= DIRT.sandCap, `tắm cát: ${e.dirty}`);
+});
+
+test('vịt bệnh thì chậm lại và chữa bằng thuốc như gà', () => {
+  const s = newGame(); const d = bird(s, 'vit', 'truong', 'f', { nextProduct: 1e15 });
+  d.sick = true; d.sickSince = s.time;
+  s.inv.medicine = 1;
+  const r = G.perform(s, { kind: 'animal', id: d.id }, 'medicine');
+  assert.ok(r.ok, r.msg);
+  assert.ok(!d.sick);
+});
+
+test('bán vịt trưởng thành cho Chú Ba theo giá loài; vịt có độ thân như gà', () => {
+  const s = newGame(); const d = bird(s, 'vit', 'truong', 'f', { nextProduct: 1e15, bond: 0, bondXp: 0 });
+  const coins = s.coins;
+  const r = G.sellAnimal(s, d.id);
+  assert.ok(r.ok, r.msg);
+  assert.ok(s.coins > coins);
+  assert.ok(!s.animals.includes(d));
+  const t = newGame(); const e = bird(t, 'vit', 'truong', 'f', { nextProduct: 1e15, bond: 0, bondXp: 0 });
+  assert.ok(G.perform(t, { kind: 'animal', id: e.id }, 'pet').ok);
+  assert.ok(e.bondXp > 0 || e.bond > 0, 'vuốt ve cộng điểm thân');
+});
+
+test('thả rông: vịt con bám ô của vịt mẹ, không đi lung tung một mình', () => {
+  const s = newGame();
+  const mom = bird(s, 'vit', 'truong', 'f', { nextProduct: 1e15 });
+  const kids = [bird(s, 'vit', 'non', 'm', { age: 0 }), bird(s, 'vit', 'non', 'f', { age: 0 })];
+  run(s, 3 * MIN, healthy);   // dưới 5 phút: vịt con chưa lên nhỡ
+  assert.ok(mom.tile, 'mẹ ra vườn');
+  for (const k of kids) assert.deepEqual({ c: k.tile?.c, r: k.tile?.r }, { c: mom.tile.c, r: mom.tile.r }, 'con bám ô của mẹ');
+  const lone = newGame(); const alone = bird(lone, 'vit', 'non', 'm', { age: 0 });
+  run(lone, 3 * MIN, healthy);
+  assert.ok(alone.tile, 'không có mẹ thì vẫn tự đi');
+});

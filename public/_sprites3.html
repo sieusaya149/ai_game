@@ -47,7 +47,7 @@ const groups = {
   'Săn mồi': ['rat', 'hawk', 'hawkShadow', 'weasel'],
   'NPC': ['npcTiSun', 'npcTiSunIdle', 'npcCoUt', 'npcCoUtIdle', 'npcChuBa', 'npcChuBaIdle'],
   'Chuồng': ['pen', 'quarantine', 'doghouse', 'catDoor', 'scale'],
-  'Đồ vật': ['grave', 'graveFlower', 'angel', 'eggNest', 'eggFertile', 'grainScatter', 'lowFence', 'ratTrap', 'vetClinic'],
+  'Đồ vật': ['grave', 'graveFlower', 'angel', 'eggNest', 'eggFertile', 'eggNestDuck', 'eggDuck', 'eggDuckFertile', 'grainScatter', 'lowFence', 'ratTrap', 'vetClinic'],
   'Túi đồ & trạng thái': ['items', 'status'],
 };
 for (const g in groups) { const r = section(g); for (const k of groups[g]) walk(r, SPR3[k], k, true); }
@@ -73,7 +73,7 @@ function scene(scale, t) {
   x.drawImage(SPR3.quarantine, 190, 56); x.drawImage(SPR3.vetClinic, 230, 52);
   SPR3.doghouse.forEach((p, i) => x.drawImage(p, 290 + i * 34, 60));
   // đàn gà vịt
-  const flock = [['ga', 'truong'], ['ga', 'non'], ['ga', 'non'], ['gaTrong', 'truong'], ['ga', 'nho'], ['vit', 'truong'], ['vit', 'non'], ['vit', 'non'], ['vit', 'nho'], ['ga', 'gia'], ['gaTrong', 'nho']];
+  const flock = [['ga', 'truong'], ['ga', 'non'], ['ga', 'non'], ['gaTrong', 'truong'], ['ga', 'nho'], ['vit', 'truong'], ['vit', 'non'], ['vit', 'non'], ['vit', 'nho'], ['vitDuc', 'truong'], ['vitDuc', 'non'], ['vitDuc', 'nho'], ['vitDuc', 'gia'], ['ga', 'gia'], ['gaTrong', 'nho']];
   flock.forEach(([sp, st], i) => feet(x, SPR3.animal[sp][st][i % 3 ? 'left' : 'right'][(i + t) % 2], 14 + i * 16, 128));
   x.drawImage(SPR3.grainScatter, 60, 130); x.drawImage(SPR3.eggNest, 196, 118);
   // thú lớn
