@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep,
+  nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -12,7 +12,8 @@ import { eventMeta } from './notify.js';
 import { todoList } from './todo.js';
 import * as P from './perf.js';
 import * as net from './net.js';
-import { claim, startSync } from './sync.js';
+import { claim, startSync, syncClock } from './sync.js';
+import { useServerTime } from './clock.js';
 import { createPeers } from './presence.js';
 
 const ACTION_MS = 350;
@@ -170,6 +171,7 @@ async function startOnline(name) {
     return;
   }
   pending = { name, claim: r };
+  await syncClock();   // giờ server trước khi chạy bù, để giờ máy lệch không ảnh hưởng
   if (r.farm) {
     const s = loadGame(r.farm);
     if (!s) { pending = null; ui.showVillage(name, 'Không đọc được vườn trên làng. Báo quản trị giúp nhé.'); return; }
@@ -197,7 +199,7 @@ function playOnline(s) {
   sync = startSync({
     name, play: r.play, rev: r.rev, getSave: snapshot,
     onStatus: ui.setOnline,
-    onKicked: () => { sync = null; quit(); net.forget(); ui.showMode('Bạn đã đăng nhập ở thiết bị khác.'); },
+    onKicked: () => { sync = null; useServerTime(null); quit(); net.forget(); ui.showMode('Bạn đã đăng nhập ở thiết bị khác.'); },
     onReject: msg => ui.toast(`Làng chưa nhận bản lưu: ${msg}`),
     onMessage: liveMsg,
   });
@@ -318,6 +320,7 @@ const api = {
     const fin = snapshot(), s = sync;
     sync = null; pending = null;
     quit();
+    useServerTime(null);
     ui.showMode();
     await s?.stop(fin);
   },
@@ -574,7 +577,7 @@ function frame(now) {
   world.view = { x0: cam.x - 40, y0: cam.y - 40, x1: cam.x + canvas.width / scale + 40, y1: cam.y + canvas.height / scale + 40 };
 
   // 1-2) thời gian game
-  const events = tick(state, dtMs * (state.speed || 1)) ?? [];
+  const events = tick(state, dtMs * speedOf(state)) ?? [];
 
   // 3) nhập liệu → di chuyển, AI
   if (ui.isBlocking()) { keys.clear(); world.input.x = world.input.y = 0; }

@@ -8,7 +8,7 @@ import {
 import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
 import { migrate, newFarm } from './migrate.js';
-import { now } from './clock.js';
+import { now, villageCal } from './clock.js';
 
 export { levelInfo, mapOf, reachable, footprint, sceneMap };
 export const SAVE_KEY = 'nongtrai-save-v2';
@@ -215,10 +215,12 @@ export function loadGame(raw) {
   // trường online (bản lưu Phase 0 chưa có)
   s.mode = s.mode === 'online' ? 'online' : 'offline';
   s.account = s.mode === 'online' && typeof s.account === 'string' ? s.account : null;
+  if (s.mode === 'online') s.speed = 1;
   s.today = { ...base.today, ...s.today };
   s.guests = Array.isArray(s.guests) ? s.guests : [];
   s.dog.chained = !!s.dog.chained;
   s.frozenMs = 0; delete s.away;
+  const pend = s.awayPending; delete s.awayPending;   // server đã chạy bù lúc chủ vắng: tóm tắt chờ chủ về
   evq = [];
   const t = now(), gone = Math.max(0, t - (s.savedAt || t)), elapsed = Math.min(gone, MAX_CATCHUP_MS);
   let events = [];
@@ -235,6 +237,7 @@ export function loadGame(raw) {
   s.frozenTotal += s.frozenMs;
   const lines = awaySummary(events, s.frozenMs);
   s.away = lines.length || gone >= AWAY_SHOW_MS ? { lines, frozenMs: s.frozenMs, ms: gone } : null;
+  if (pend) s.away = s.away ? { lines: [...pend.lines, ...s.away.lines], frozenMs: pend.frozenMs + s.away.frozenMs, ms: pend.ms + s.away.ms } : pend;
   s.savedAt = t;
   return s;
 }
@@ -290,7 +293,8 @@ export function wealthOf(s) {
 // Hàm thuần → { ok: true } hoặc { ok: false, reason: 'time'|'coins'|'exp', msg }
 export function checkSaveJump(prev, next, dtMs) {
   const J = SAVE_JUMP, sim = Math.max(0, (next.simMs || 0) - (prev.simMs || 0));
-  if (sim > Math.max(0, dtMs) * Math.max(...SPEEDS) + J.simSlack) return { ok: false, reason: 'time', msg: 'Vườn chạy nhanh hơn thời gian thật' };
+  const speed = next.mode === 'online' ? 1 : Math.max(...SPEEDS);   // online khóa x1 (issue 23)
+  if (sim > Math.max(0, dtMs) * speed + J.simSlack) return { ok: false, reason: 'time', msg: 'Vườn chạy nhanh hơn thời gian thật' };
   const k = ((prev.plots ?? []).filter(p => p.unlocked && !p.removed).length + J.plotsExtra) * sim / MIN;
   if (wealthOf(next) - wealthOf(prev) > J.wealth + J.wealthPerPlotMin * k) return { ok: false, reason: 'coins', msg: 'Xu và đồ tăng nhanh vô lý' };
   if ((next.exp || 0) - (prev.exp || 0) > J.exp + J.expPerPlotMin * k) return { ok: false, reason: 'exp', msg: 'Kinh nghiệm tăng nhanh vô lý' };
@@ -300,13 +304,19 @@ export function checkSaveJump(prev, next, dtMs) {
 // Mùa chỉ để hiển thị: mỗi mùa 7 ngày game. dayIn = ngày thứ mấy trong mùa (1..7).
 const SEASONS = [['xuan', 'Xuân'], ['ha', 'Hạ'], ['thu', 'Thu'], ['dong', 'Đông']];
 export function seasonOf(s) {
-  const d = Math.max(0, (s.day || 1) - 1), [key, name] = SEASONS[Math.floor(d / 7) % 4];
+  const d = Math.max(0, dayOf(s) - 1), [key, name] = SEASONS[Math.floor(d / 7) % 4];
   return { key, name, dayIn: d % 7 + 1 };
 }
 export const farmHours = s => (s.simMs || 0) / 3600_000;
 
 // ---------- Thời gian ----------
-const dayFrac = s => (s.time % DAY_MS) / DAY_MS;
+// Online: ngày đêm, ngày, mùa theo lịch làng (giờ server); chơi đơn theo state.time. Đóng băng không làm lịch làng dừng.
+const online = s => s.mode === 'online';
+export const dayOf = s => online(s) ? villageCal(now()).day : s.day;
+export const dayFraction = s => online(s) ? villageCal(now()).frac : (s.time % DAY_MS) / DAY_MS;
+const dayFrac = dayFraction;
+// Tốc độ chạy thật: online luôn x1
+export const speedOf = s => online(s) ? 1 : s.speed || 1;
 export const isNight = s => dayFrac(s) >= NIGHT_FROM;
 export function clockText(s) {
   const t = (6 + dayFrac(s) * 24) % 24;
@@ -314,7 +324,7 @@ export function clockText(s) {
   const part = h < 12 ? 'sáng' : h < 18 ? 'chiều' : h < 22 ? 'tối' : 'đêm';
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${part}`;
 }
-export const dayText = s => `Ngày ${s.day}`;
+export const dayText = s => `Ngày ${dayOf(s)}`;
 
 // Chợ Bà Tư mở từ MARKET.open tới MARKET.close (giờ trong game). Mua bán đều qua cổng kiểm tra này.
 const hourOf = s => (6 + dayFrac(s) * 24) % 24;
@@ -332,7 +342,7 @@ const SLEEP_EARLY = `Để dành cho tối nay, ${STAMINA.sleepHour} giờ chi�
 // Ngủ: chạy mô phỏng thật tới 6h sáng hôm sau (cây vẫn lớn; như chạy bù offline thì không có quạ/trộm), hồi đầy thể lực.
 export function sleep(s) {
   if (!canSleep(s)) return R(false, SLEEP_EARLY, { reason: 'early' });
-  const left = (Math.floor(s.time / DAY_MS) + 1) * DAY_MS - s.time, was = catchUp;
+  const left = online(s) ? DAY_MS - villageCal(now()).tod : (Math.floor(s.time / DAY_MS) + 1) * DAY_MS - s.time, was = catchUp;
   s.sit = false; s.threats = [];
   catchUp = true;
   let ev;

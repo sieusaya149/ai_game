@@ -16,12 +16,12 @@ Online cả làng cùng một buổi sáng.
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): lịch làng là hàm của giờ server và mốc chung: cùng một giờ cho cùng ngày, mùa và giờ trong ngày; qua đúng ranh giới mùa thì đổi mùa. Hai "người chơi" có độ lệch giờ máy khác nhau, sau khi áp độ lệch, ra cùng kết quả.
-- [ ] Unit test (seam 1): vườn đóng băng sau 8 tiếng nhưng lịch làng vẫn tiến đủ thời gian đã trôi; tuổi con vật vẫn tính theo giờ vườn thật sự chạy.
-- [ ] Unit test (seam 1): hàm "ngày ngoài đời" đổi đúng lúc qua nửa đêm theo múi giờ đã chốt.
-- [ ] Unit test (seam 3): server trả giờ hiện tại khi trình duyệt hỏi đồng bộ giờ; sai số đo lệch nằm trong ngưỡng test.
-- [ ] E2E (Playwright, desktop + 360px): hai trình duyệt cùng vào làng, một bên có đồng hồ máy bị lệch (dựng bằng cách chỉnh giờ trình duyệt của Playwright) → cả hai hiện cùng ngày game và cùng ban ngày hay ban đêm.
-- [ ] E2E: vào làng thì không còn nút x5/x20, chơi một mình thì vẫn còn và dùng được.
+- [x] Unit test (seam 1): lịch làng là hàm của giờ server và mốc chung: cùng một giờ cho cùng ngày, mùa và giờ trong ngày; qua đúng ranh giới mùa thì đổi mùa. Hai "người chơi" có độ lệch giờ máy khác nhau, sau khi áp độ lệch, ra cùng kết quả.
+- [x] Unit test (seam 1): vườn đóng băng sau 8 tiếng nhưng lịch làng vẫn tiến đủ thời gian đã trôi; tuổi con vật vẫn tính theo giờ vườn thật sự chạy.
+- [x] Unit test (seam 1): hàm "ngày ngoài đời" đổi đúng lúc qua nửa đêm theo múi giờ đã chốt.
+- [x] Unit test (seam 3): server trả giờ hiện tại khi trình duyệt hỏi đồng bộ giờ; sai số đo lệch nằm trong ngưỡng test.
+- [x] E2E (Playwright, desktop + 360px): hai trình duyệt cùng vào làng, một bên có đồng hồ máy bị lệch (dựng bằng cách chỉnh giờ trình duyệt của Playwright) → cả hai hiện cùng ngày game và cùng ban ngày hay ban đêm.
+- [x] E2E: vào làng thì không còn nút x5/x20, chơi một mình thì vẫn còn và dùng được.
 
 ## Blocked by
 

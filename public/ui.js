@@ -314,7 +314,7 @@ export function renderHUD(s) {
   }
   let clock = '';
   try { clock = S.clockText(s); } catch { clock = ''; }
-  if (!/Ngày/i.test(clock)) clock = `Ngày ${s.day} · ${clock}`;
+  if (!/Ngày/i.test(clock)) clock = `Ngày ${S.dayOf(s)} · ${clock}`;
   setText('hud-time', clock);
   const se = S.seasonOf(s);
   if (memo.get('hud-season') !== se.key) {
@@ -335,7 +335,8 @@ export function renderHUD(s) {
     if (smithKey !== JSON.stringify([s.smith, s.tools])) refreshPanel(); else if ($('smith-left')) $('smith-left').textContent = smithLeft(s);
   }
   $('hud-water').classList.toggle('empty', s.can <= 0);
-  setText('hud-speed', `⏩ x${s.speed || 1}`);
+  setText('hud-speed', `⏩ x${S.speedOf(s)}`);
+  $('hud-speed').hidden = s.mode === 'online';   // online luôn x1
 
   // Túi hạt đang chọn
   const seedKey = 'seed_' + s.selectedSeed;
@@ -801,7 +802,7 @@ PANELS.house = {
       const li = S.levelInfo(s.exp);
       const list = h('div', { class: 'stats' },
         h('div', { class: 'stat big' }, h('span', {}, '⭐ Cấp độ'), h('b', {}, li.level)),
-        h('div', { class: 'stat big' }, h('span', {}, '📅 Ngày thứ'), h('b', {}, s.day)),
+        h('div', { class: 'stat big' }, h('span', {}, '📅 Ngày thứ'), h('b', {}, S.dayOf(s))),
         h('div', { class: 'stat big' }, h('span', {}, '🐾 Vật nuôi'), h('b', {}, (s.animals || []).length)),
         STAT_LABELS.map(([k, l]) => h('div', { class: 'stat' }, h('span', {}, l), h('b', {}, fmt(s.stats?.[k] || 0)))));
       return body.append(list);
@@ -920,9 +921,11 @@ let resetting = false;
 PANELS.settings = {
   title: '⚙️ Cài đặt',
   render(body, s) {
-    body.append(section('Tốc độ game'),
-      h('div', { class: 'seg' }, D.SPEEDS.map(v => btn('x' + v, () => { s.speed = v; sound.play('pop'); commit(); }, (s.speed === v ? 'orange' : 'plain') + ' nosound'))),
-      h('p', { class: 'mini' }, 'x5 và x20 giúp cây lớn nhanh để xem thử. Chơi thoải mái thì để x1.'),
+    body.append(...(s.mode === 'online'
+        ? [section('Tốc độ game'), h('p', { class: 'mini' }, 'Cả làng chạy cùng giờ, luôn ở tốc độ x1.')]
+        : [section('Tốc độ game'),
+          h('div', { class: 'seg' }, D.SPEEDS.map(v => btn('x' + v, () => { s.speed = v; sound.play('pop'); commit(); }, (s.speed === v ? 'orange' : 'plain') + ' nosound'))),
+          h('p', { class: 'mini' }, 'x5 và x20 giúp cây lớn nhanh để xem thử. Chơi thoải mái thì để x1.')]),
       section('Âm thanh'),
       h('div', { class: 'seg' }, btn(sound.isMuted() ? '🔇 Đang tắt tiếng' : '🔊 Đang bật tiếng', () => { sound.setMuted(!sound.isMuted()); sound.play('pop'); refreshPanel(); }, sound.isMuted() ? 'plain' : 'green nosound')),
       section('Thông báo'),
@@ -1262,7 +1265,9 @@ export function initUI(a) {
   $('minimap').addEventListener('click', () => { if (!isBlocking()) openPanel('map'); });
   $('todo-btn').addEventListener('click', () => { if (!isBlocking()) openPanel('todo'); });
   $('hud-speed').addEventListener('click', () => {
-    const s = st(), i = D.SPEEDS.indexOf(s.speed);
+    const s = st();
+    if (s.mode === 'online') return;
+    const i = D.SPEEDS.indexOf(s.speed);
     s.speed = D.SPEEDS[(i + 1) % D.SPEEDS.length];
     sound.play('pop');
     renderHUD(s);

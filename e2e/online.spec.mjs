@@ -167,3 +167,46 @@ test('hai trình duyệt: đăng nhập ở B thì A thoát về màn đầu, v�
   await expect(page.getByRole('button', { name: /Chơi một mình/ })).toBeVisible();
   await ctxB.close();
 });
+
+// Giờ trong HUD ('Ngày 12 · 7:30 sáng') → số phút game kể từ đầu ngày 1
+const gameMin = async page => {
+  const t = await page.locator('#hud-time').textContent();
+  const [, d, h, m, part] = t.match(/Ngày (\d+).*?(\d+):(\d+) (\S+)/);
+  const h24 = part === 'sáng' ? +h : part === 'chiều' ? (+h === 12 ? 12 : +h + 12) : part === 'tối' ? +h + 12 : (+h >= 10 ? +h + 12 : +h % 12 + 24);   // đêm: 22h..5h
+  return (+d - 1) * 1440 + (h24 - 6 + 24) % 24 * 60 + +m;
+};
+test('đồng hồ làng: máy lệch giờ vẫn cùng ngày game và cùng ngày/đêm với người kia; online không có x5/x20', async ({ browser, page, context, baseURL }) => {
+  test.setTimeout(90_000);
+  await noHint(context);
+  await newOnlineFarm(page, uniq());
+  const isMobile = test.info().project.use.isMobile, hasTouch = test.info().project.use.hasTouch;
+  const ctxB = await browser.newContext({ baseURL, viewport: page.viewportSize(), isMobile, hasTouch });
+  await noHint(ctxB);
+  await ctxB.addInitScript(() => { const real = Date.now.bind(Date); Date.now = () => real() + 29 * 3600_000 + 777_000; });   // máy B lệch +29 giờ
+  const b = await ctxB.newPage();
+  await newOnlineFarm(b, uniq());
+  const skew = await b.evaluate(() => Date.now()) - Date.now();
+  expect(skew).toBeGreaterThan(28 * 3600_000);   // máy B thật sự lệch
+  const [ma, mb] = [await gameMin(page), await gameMin(b)];
+  expect(Math.abs(ma - mb)).toBeLessThan(10);   // cùng ngày, cùng giờ (sai số vài giây thật)
+  expect(await page.locator('#hud-weather').textContent().then(t => t.includes('🌙')))
+    .toBe(await b.locator('#hud-weather').textContent().then(t => t.includes('🌙')));
+  // online: khóa x1
+  await expect(page.locator('#hud-speed')).toBeHidden();
+  await page.locator('.bb-btn[data-panel="settings"]').click();
+  await expect(page.getByRole('button', { name: 'x5', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'x20', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: `test-results/clock-online-${test.info().project.name}.png` });
+  await ctxB.close();
+});
+
+test('chơi một mình vẫn có nút x5/x20 và dùng được', async ({ page, context }) => {
+  await seedSave(context, SOLO());
+  await page.goto('/');
+  await expect(page.locator('#hud-name')).toHaveText('Bé Solo');
+  await expect(page.locator('#hud-speed')).toBeVisible();
+  await page.locator('#hud-speed').click({ force: true });
+  await expect(page.locator('#hud-speed')).toHaveText('⏩ x5');
+  await page.locator('.bb-btn[data-panel="settings"]').click();
+  await expect(page.getByRole('button', { name: 'x20', exact: true })).toBeVisible();
+});

@@ -38,6 +38,8 @@ export function attachLive(server, ctx) {
   });
   const socketsOf = id => [...wss.clients].filter(s => s.account?.id === id);
   return {
+    // tài khoản đang có trình duyệt giữ phiên chơi kết nối (tức đang online)
+    playing: id => socketsOf(id).some(s => s.play && s.readyState === s.OPEN),
     // gửi tin tới mọi kết nối của một tài khoản; trả số kết nối đã gửi
     sendTo(id, m) { const ss = socketsOf(id); for (const s of ss) send(s, m); return ss.length; },
     // lệnh "lưu lần cuối rồi thoát" cho máy đang giữ phiên `play`; trả các kết nối đã nhận lệnh
