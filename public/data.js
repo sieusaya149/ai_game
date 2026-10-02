@@ -67,6 +67,20 @@ export const ANIMALS = {
   bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
   cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
 };
+// Dơ và tắm (lát 37). Độ dơ 0..100 theo giờ vườn; từ sạch tới dơ hẳn mất fullMs, mưa hoặc chuồng bẩn thì nhanh gấp đôi.
+export const DIRT = {
+  fullMs: 3 * 60 * MIN,
+  fastMul: 2,                 // mưa hoặc chuồng bẩn
+  high: 60,                   // từ mức này là "dơ": mất vui, dễ bệnh hơn
+  unhappyPerMin: 1.5,         // con dơ (trừ heo, bò) mất vui mỗi phút
+  sickMul: 2,                 // con dơ dễ bệnh gấp đôi
+  mud: ['heo', 'bo'],         // đầm bùn: dơ ngay, không mất vui
+  wallowAfterMs: 20 * MIN,    // tắm xong chừng này lâu mới lăn bùn lại
+  sandCap: 30,                // gà có ổ cát tự tắm cát: dơ không vượt mức này (trừ khi trời mưa)
+  bathHappy: 15, bathBond: 0.2,
+};
+// Phân chuồng tích dần theo giờ vườn (0..100); đầy thì chuồng bẩn
+export const MANURE = { fullMs: 2 * 60 * MIN, dirtyAt: 100, perScoop: 25 };   // xúc: nhận 1 phân chuồng mỗi perScoop độ đầy (tối thiểu 1)
 export const HUSBANDRY = {
   hungerMs: 5 * MIN,          // từ no (100) xuống đói hẳn (0)
   autoEatBelow: 60,           // đói hơn mức này thì tự ra máng ăn nếu máng còn cám
@@ -157,7 +171,9 @@ export const ITEMS = {
   fertilizer: { name: 'Phân bón',          kind: 'supply', price: 12, lv: 1, desc: 'Bón trước khi chín: +50% sản lượng, lớn nhanh hơn.' },
   medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 3, desc: 'Chữa khỏi vật nuôi bị bệnh.' },
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
-  feed_ga:    { name: 'Cám gà',            kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
+  soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
+  manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Hố ủ phân sẽ dùng sau.' },
+  feed_ga:    { name: 'Cám gà',           kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
   feed_heo:   { name: 'Cám heo',           kind: 'feed',   price: 10, lv: 3, desc: 'Thức ăn cho heo.' },
   hay:        { name: 'Cỏ khô',            kind: 'feed',   price: 8,  lv: 5, desc: 'Thức ăn cho bò và cừu.' },
   wood:       { name: 'Gỗ',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi dọn bụi cây trên đất mới.' },
@@ -314,6 +330,9 @@ export const EVENT_LEVEL = {
   passed:    { level: 'important', cat: 'old', group: e => 'passed:' + e.animal, label: 'Con vật già ra đi', text: (n, e) => `${n} con ${animalN(e.animal)} đã già và ra đi thanh thản 😇` },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
+  wallow:    { level: 'none', group: e => 'wallow:' + e.id, label: 'Heo, bò lăn bùn' },
+  bathed:    { level: 'info', group: e => 'bathed:' + e.id, label: 'Đã tắm cho vật nuôi' },
+  mucked:    { level: 'info', group: e => 'mucked:' + e.pen, label: 'Đã xúc phân chuồng' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },
   log:       { level: 'info', group: () => 'log', label: 'Nhật ký' },
   toast:     { level: 'direct', group: e => 'toast:' + e.text, label: 'Thông báo của luật chơi' },

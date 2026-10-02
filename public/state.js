@@ -1,7 +1,7 @@
 // Mô hình dữ liệu + luật chơi. Thuần JS, không DOM (localStorage có bọc try/catch).
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
-  ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
+  ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND,
@@ -153,7 +153,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     inv: { ...START.items }, basket: {},   // inv = kho, basket = giỏ
     shipbin: { items: {} },   // thùng giao hàng: lái buôn lấy hết lúc 6h sáng
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
-    animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
+    animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, manure: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], nest: { egg: false, hatchAt: 0 },
     dog: { stage: START.dogStage, age: stageStart('cho', START.dogStage), hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name },
     poops: [], threats: [], orders: [], nextOrderAt: 0,
     stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0 },
@@ -210,6 +210,7 @@ export function loadGame() {
   const base = createGame({ name: s.name });
   s.stats = { ...base.stats, ...s.stats };
   s.troughs = { ...base.troughs, ...s.troughs };
+  s.manure = { ...base.manure, ...s.manure };
   for (const k of ['owned', 'achievements', 'inv', 'basket', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
   for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
   s.shipbin = { items: Object.fromEntries(Object.entries(s.shipbin?.items ?? {}).filter(([k, n]) => (CROPS[k] || PRODUCTS[k]) && n > 0)) };
@@ -402,6 +403,7 @@ function step(s, d) {
   if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
   for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d);
   stepAnimals(s, d);
+  stepManure(s, d);
   stepEggs(s);
   stepDog(s, d);
   if (!catchUp) stepThreats(s, d);
@@ -522,6 +524,7 @@ function stepAnimals(s, d) {
     a.hunger = Math.max(0, a.hunger - 100 * d / HUSBANDRY.hungerMs * (pigNho ? AGING.pigHungry : 1));
     // tự ra máng ăn
     if (a.hunger < HUSBANDRY.autoEatBelow && s.troughs[def.pen] > 0) { s.troughs[def.pen]--; a.hunger = 100; }
+    stepDirt(s, a, d);
     // vui: trôi dần về 50, mùi hôi kéo xuống
     if (a.happy > 50) a.happy = Math.max(50, a.happy - HUSBANDRY.happyDecayPerMin * d / MIN);
     a.happy = Math.max(0, a.happy - stink);
@@ -529,7 +532,7 @@ function stepAnimals(s, d) {
     if (a.hunger <= BOND.hungerBelow || (a.dirty || 0) >= BOND.dirtyAbove) bondShift(a, -BOND.lossPerMin * d / MIN);
     // đói lả -> bệnh
     if (a.hunger <= 0) { if (!a.starvingSince) { a.starvingSince = s.time; emit({ type: 'hungry', animal: def.name }); } } else a.starvingSince = 0;
-    if (!a.sick && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving) || chance(HUSBANDRY.sickChancePerMin * sickFactor(a), d))) {
+    if (!a.sick && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving) || chance(HUSBANDRY.sickChancePerMin * sickFactor(a) * (isDirty(a) ? DIRT.sickMul : 1), d))) {
       a.sick = 1; a.sickSince = s.time; emit({ type: 'sick', animal: def.name }); fxEv(a.x, a.y, `${def.name} bị bệnh 🤒`, COL.bad); log(s, `${def.name} bị bệnh, cho uống thuốc thú y nhé`);
     }
     if (a.sick || a.hunger <= HUSBANDRY.growNeedsHunger) continue;
@@ -544,6 +547,35 @@ function stepAnimals(s, d) {
   }
   stepPigs(s, d);
 }
+
+// ---------- Dơ, tắm, dọn chuồng ----------
+export const isDirty = a => a.dirty >= DIRT.high;
+// Chuồng bẩn khi phân đầy
+export const penDirty = (s, pen) => (s.manure?.[pen] ?? 0) >= MANURE.dirtyAt;
+// Cờ ổ cát của chuồng (lát 35 đặt `sand: true` lên thực thể chuồng cấp 3)
+const penSand = (s, pen) => !!mapOf(s).pens[pen]?.ent?.sand;
+
+function stepDirt(s, a, d) {
+  const pen = ANIMALS[a.type].pen;
+  if (DIRT.mud.includes(a.type)) {   // đầm bùn: dơ ngay (tắm xong một lúc mới lăn lại), không mất vui
+    if (a.dirty < 100 && s.time >= (a.wallowAt || 0)) { a.dirty = 100; emit({ type: 'wallow', id: a.id }); }
+    return;
+  }
+  const rain = s.weather === 'rain';
+  a.dirty = Math.min(100, a.dirty + 100 * d / DIRT.fullMs * (rain || penDirty(s, pen) ? DIRT.fastMul : 1));
+  if (a.type === 'ga' && !rain && penSand(s, pen)) a.dirty = Math.min(a.dirty, DIRT.sandCap);   // tự tắm cát
+  if (isDirty(a)) a.happy = Math.max(0, a.happy - DIRT.unhappyPerMin * d / MIN);
+}
+
+function stepManure(s, d) {
+  for (const pen of Object.keys(s.manure)) {
+    if (s.animals.some(a => ANIMALS[a.type].pen === pen)) s.manure[pen] = Math.min(100, s.manure[pen] + 100 * d / MANURE.fullMs);
+  }
+}
+
+// Việc cần làm (lát 48 hoàn thiện): con đang dơ (không kể heo, bò đầm bùn) và chuồng đang bẩn
+export const dirtyAnimals = s => s.animals.filter(a => isDirty(a) && !DIRT.mud.includes(a.type));
+export const dirtyPens = s => Object.keys(s.manure).filter(pen => penDirty(s, pen) && s.animals.some(a => ANIMALS[a.type].pen === pen));
 
 function stepPigs(s, d) {
   settlePens(s);
@@ -812,9 +844,10 @@ function animalActs(s, t) {
   if (a.ready) A.collect = a.type === 'bo' ? mk('milk', '🥛', 'Vắt sữa', room(s) < 1 ? FULL : null) : mk('shear', '✂️', 'Xén lông', room(s) < 1 ? FULL : null);
   A.feed = mk('feed', '🌾', `Cho ăn tận tay (còn ${n})`, n <= 0 ? noItem(def.feed) : a.hunger >= 95 ? 'Bụng no căng rồi' : null);
   A.pet = mk('pet', '🤗', 'Vuốt ve');
+  A.bath = mk('bath', '🧼', `Tắm (xà phòng còn ${have(s, 'soap')}, bình ${s.can}/${canMax(s)})`, have(s, 'soap') <= 0 ? noItem('soap') : s.can <= 0 ? 'Bình hết nước, ra giếng múc nhé' : null);
   if (a.sick) A.medicine = mk('medicine', '💊', `Cho uống thuốc thú y (còn ${have(s, 'medicine')})`, have(s, 'medicine') <= 0 ? noItem('medicine') : null);
   if (animalCan(a, 'vitamin') && !a.sick) A.vitamin = mk('vitamin', '💉', `Cho uống vitamin (còn ${have(s, 'vitamin')})`, have(s, 'vitamin') <= 0 ? noItem('vitamin') : null);
-  const first = a.sick ? 'medicine' : a.ready ? 'collect' : a.hunger < 40 ? 'feed' : 'pet';
+  const first = a.sick ? 'medicine' : a.ready ? 'collect' : a.hunger < 40 ? 'feed' : isDirty(a) ? 'bath' : 'pet';
   const list = [A[first], ...Object.entries(A).filter(([k]) => k !== first).map(([, v]) => v)];
   if (animalCan(a, 'sell')) list.push(mk('sell', ICON[a.type], `Bán ${def.name.toLowerCase()} (${def.sell} xu)`));
   return list;
@@ -825,6 +858,8 @@ function troughActs(s, t) {
   if (!item) return [];
   const acts = [mk('fill', '🌾', `Đổ cám vào máng (${s.troughs[t.pen]}/${HUSBANDRY.troughMax})`,
     n <= 0 ? noItem(item) : s.troughs[t.pen] >= HUSBANDRY.troughMax ? 'Máng đầy ắp rồi' : null)];
+  const muck = mk('muck', '💩', `Xúc phân chuồng (${Math.floor(s.manure[t.pen] ?? 0)}%)`, (s.manure[t.pen] ?? 0) < MANURE.perScoop ? 'Chuồng còn sạch, chưa cần xúc' : null);
+  if (penDirty(s, t.pen)) acts.unshift(muck); else acts.push(muck);
   const up = upgradeInfo(s, t.id ?? mapOf(s).pens[t.pen]?.id);   // chạm vào chuồng (qua máng) cũng nâng cấp được
   if (up) acts.push(mk('upgrade', '⬆️', `Nâng chuồng lên cấp ${up.lv} (${fmtXu(up.price)} xu)`, up.error));
   return acts;
@@ -1004,6 +1039,12 @@ const DO = {
     switch (id) {
       case 'feed': take(s, def.feed); a.hunger = 100; return res(true, 'Ăn no nê', [say(at, 'Ngon quá! 😋'), ...heartFx(s, a, at, 'feed')], 'eat', { bond: a.bond });
       case 'pet': a.happy = Math.min(100, a.happy + HUSBANDRY.petHappy); return res(true, 'Vui quá', [say(at, '❤️'), ...heartFx(s, a, at, 'pet')], sound, { bond: a.bond });
+      case 'bath':
+        take(s, 'soap'); s.can--;
+        a.dirty = 0; a.wallowAt = s.time + DIRT.wallowAfterMs;
+        a.happy = Math.min(100, a.happy + DIRT.bathHappy); 
+        emit({ type: 'bathed', animal: def.name, id: a.id });
+        return res(true, `${def.name} sạch bong, vui hẳn lên`, [say(at, 'Sạch bong! ✨'), ...heartFx(s, a, at, 'bath')], 'water', { bath: a.id });
       case 'medicine': take(s, 'medicine'); a.sick = 0; a.sickSince = 0; a.starvingSince = 0; a.hunger = Math.max(a.hunger, 30); return res(true, 'Đã khỏi bệnh', [say(at, 'Khỏe rồi! 💪'), ...heartFx(s, a, at, 'cure')], 'spray');
       case 'vitamin':
         // lớn vọt thêm một nửa giai đoạn đang ở (không vượt quá đầu giai đoạn trưởng thành)
@@ -1039,6 +1080,12 @@ const DO = {
     if (id === 'upgrade') {
       const r = upgradePen(s, t.id ?? mapOf(s).pens[t.pen]?.id);
       return res(r.ok, r.msg, r.ok ? [say(at, `Cấp ${r.lv}! ⬆️`)] : [], r.ok ? 'coin' : 'error');
+    }
+    if (id === 'muck') {
+      const n = Math.max(1, Math.floor(s.manure[t.pen] / MANURE.perScoop));
+      s.manure[t.pen] = 0; give(s, 'manure', n); addExp(s, 2);
+      emit({ type: 'mucked', pen: t.pen, qty: n });
+      return res(true, `Chuồng sạch bong, được ${n} phân chuồng`, [say(at, `+${n} Phân chuồng`), say({ x: at.x, y: at.y - 10 }, '✨ Sạch rồi')], 'dig');
     }
     take(s, FEED_OF_PEN[t.pen]);
     s.troughs[t.pen] = Math.min(HUSBANDRY.troughMax, s.troughs[t.pen] + HUSBANDRY.unitsPerBag);
