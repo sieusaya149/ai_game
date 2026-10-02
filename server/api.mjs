@@ -1,6 +1,7 @@
 // Các đường API HTTP JSON. Mỗi issue thêm API thì thêm route ở đây và ghi vào SPEC.md.
 import { SESSION_MS, register, login, accountOf, endSession, tokenOf } from './accounts.mjs';
 import { claimPlay, readFarm, storeFarm, visitFarm } from './farms.mjs';
+import { addFriend, removeFriend, listFriends, listGates } from './friends.mjs';
 import { HttpError } from './router.mjs';
 
 const COOKIE = 'nt_session';
@@ -51,4 +52,13 @@ export function addRoutes(r) {
   r.route('GET', '/api/visit', c => { mustAccount(c); return visitFarm(c, c.url.searchParams.get('name')); });
   // Gửi bản lưu { play, save }: 409 play_replaced (phiên cũ) · 400 save_invalid · 422 implausible (số liệu vô lý)
   r.route('POST', '/api/farm', c => storeFarm(c, mustAccount(c), c.body ?? {}));
+
+  // Bạn bè và cổng vườn (issue 26). Danh sách bạn: { code, friends: [{ name, level, online, ripe, help }] }
+  r.route('GET', '/api/friends', c => listFriends(c, mustAccount(c)));
+  // Thêm bạn { name } hoặc { code }: 404 no_such_name · 404 bad_code · 409 already_friend · 400 self
+  r.route('POST', '/api/friends', c => addFriend(c.db, mustAccount(c), c.body ?? {}));
+  // Xóa bạn { name }: chỉ bỏ quan hệ bạn bè
+  r.route('POST', '/api/friends/remove', c => removeFriend(c.db, mustAccount(c), c.body ?? {}));
+  // Cổng vườn trong làng: { gates: [{ name, level, friend }] }, bạn bè ở đầu, không có chính mình
+  r.route('GET', '/api/gates', c => listGates(c, mustAccount(c)));
 }

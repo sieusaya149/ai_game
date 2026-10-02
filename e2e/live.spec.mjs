@@ -118,7 +118,7 @@ test('online: mua hạt giống ở chợ Bà Tư vẫn như cũ; cột chat/bi�
     const r = sel => [...document.querySelectorAll(sel)].filter(e => e.offsetParent || getComputedStyle(e).position === 'fixed').map(e => { const b = e.getBoundingClientRect(); return { sel, l: b.left, t: b.top, r: b.right, b: b.bottom }; }).filter(b => b.r > b.l);
     return { live: r('#live .live-btn'), others: [...r('#joy-base'), ...r('#main-action'), ...r('#chips .chip'), ...r('#target-name'), ...r('#mini-wrap'), ...r('#hud-speed'), ...r('#todo-btn')] };
   });
-  expect(boxes.live.length).toBe(6);
+  expect(boxes.live.length).toBe(7);   // 4 biểu cảm + chat + bạn bè + người đang ở đây
   if (touch) expect(boxes.others.some(o => o.sel === '#joy-base')).toBe(true);
   for (const a of boxes.live) for (const o of boxes.others)
     expect(a.r <= o.l || o.r <= a.l || a.b <= o.t || o.b <= a.t, `${JSON.stringify(a)} đè ${JSON.stringify(o)}`).toBe(true);
