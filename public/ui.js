@@ -7,6 +7,7 @@ import { SPR2 } from './art2.js';
 import { createNotifier, arrowTargets, arrowFor } from './notify.js';
 import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
+import * as net from './net.js';
 
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n || 0).toLocaleString('vi-VN');
@@ -927,6 +928,11 @@ PANELS.settings = {
         h('li', {}, h('kbd', {}, '1'), '–', h('kbd', {}, '6'), ': các hành động phụ.'),
         h('li', {}, h('kbd', {}, 'Esc'), ': đóng bảng.'),
         h('li', {}, '📱 Điện thoại: chạm mặt đất để đi, chạm vật để làm việc, hoặc dùng cần điều khiển.')),
+      section('Làng'),
+      net.rememberedName()
+        ? [h('p', { class: 'mini' }, `Đang vào làng với tên ${net.rememberedName()}.`),
+          btn('Đăng xuất', async () => { closePanel(); await net.logout(); api.leaveToMode(); }, 'plain')]
+        : btn('🏘️ Vào làng', () => { closePanel(); api.leaveToMode(); }, 'green'),
       section('Nguy hiểm'),
       btn('🗑️ Chơi lại từ đầu', async () => {
         if (resetting) return;
@@ -986,6 +992,62 @@ export function showCreator() {
   if (matchMedia('(pointer:fine)').matches) input.focus();
 }
 
+// ---------- Màn chọn chế độ, đăng nhập / đăng ký, "Đã vào làng" (issue 21). Dùng chung lớp phủ #creator ----------
+function showCard(...kids) {
+  closePanel();
+  creatorOpen = true;
+  const root = $('creator');
+  root.replaceChildren(h('div', { class: 'creator-card' }, h('h1', {}, 'Nông Trại Vui'), ...kids));
+  root.hidden = false;
+}
+export function showMode() {
+  if (!api) return;
+  showCard(
+    h('p', { class: 'sub' }, 'Bạn muốn chơi thế nào?'),
+    btn('🌾 Chơi một mình', () => api.startSolo(), 'orange big wide'),
+    h('p', { class: 'mini' }, 'Chơi ngay trên máy này, không cần mạng.'),
+    btn('🏘️ Vào làng', () => showAuth('login'), 'green big wide'),
+    h('p', { class: 'mini' }, 'Đăng nhập để gặp bạn bè trong làng. Cần mã mời của quản trị.'));
+}
+export function closeCreator() {
+  creatorOpen = false;
+  const root = $('creator');
+  root.hidden = true; root.replaceChildren();
+}
+export function showAuth(mode = 'login') {
+  const reg = mode === 'register';
+  const name = h('input', { class: 'name-input', type: 'text', maxLength: 20, placeholder: 'Tên nhân vật', autocomplete: 'username', spellcheck: false, name: 'name' });
+  const pin = h('input', { class: 'name-input', type: 'password', inputMode: 'numeric', pattern: '[0-9]*', maxLength: 6, placeholder: 'PIN 6 số', autocomplete: reg ? 'new-password' : 'current-password', name: 'pin' });
+  const invite = reg ? h('input', { class: 'name-input', type: 'text', maxLength: 12, placeholder: 'Mã mời', autocomplete: 'off', autocapitalize: 'characters', spellcheck: false, name: 'invite' }) : null;
+  const err = h('p', { class: 'auth-err', role: 'alert', hidden: true });
+  const fail = text => { err.textContent = text; err.hidden = false; sound.play('error'); };
+  let busy = false;
+  const submit = async e => {
+    e.preventDefault();
+    if (busy) return;
+    busy = true; err.hidden = true; go.disabled = true;
+    try {
+      const r = reg ? await net.register(name.value, pin.value, invite.value) : await net.login(name.value, pin.value);
+      if (r.ok) showVillage(r.name); else fail(r.error);
+    } finally { busy = false; go.disabled = false; }
+  };
+  const go = h('button', { class: 'btn orange big wide', type: 'submit' }, reg ? 'Đăng ký' : 'Đăng nhập');
+  showCard(
+    h('div', { class: 'seg' },
+      btn('Đã có tài khoản', () => showAuth('login'), reg ? 'plain sm' : 'orange sm'),
+      btn('Tạo tài khoản mới', () => showAuth('register'), reg ? 'orange sm' : 'plain sm')),
+    h('form', { class: 'auth-form', on: { submit } }, name, pin, invite, err, go),
+    reg ? h('p', { class: 'mini' }, 'Tên nhân vật không trùng ai trong làng. PIN gồm đúng 6 số, nhớ kỹ nhé.') : h('p', { class: 'mini' }, 'Quên PIN? Nhờ quản trị đặt lại PIN.'),
+    btn('← Quay lại', showMode, 'plain sm'));
+  if (matchMedia('(pointer:fine)').matches) name.focus();
+}
+export function showVillage(name) {
+  showCard(
+    h('h2', {}, 'Đã vào làng'),
+    h('p', { class: 'sub' }, `Chào ${name}! Vườn online sắp mở, bạn quay lại sau nhé.`),
+    btn('🌾 Chơi một mình', () => api.startSolo(), 'orange big wide'),
+    btn('Đăng xuất', async () => { await net.logout(); showMode(); }, 'plain sm'));
+}
 // ---------- Sự kiện từ tick() ----------
 function showBadge(ev) {
   const box = $('badges');

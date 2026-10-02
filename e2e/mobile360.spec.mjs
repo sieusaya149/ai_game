@@ -111,6 +111,7 @@ for (const size of SIZES) {
     test('tạo nhân vật', async ({ page }) => {
       await page.goto('/');
       await expect(page.locator('#creator')).toBeVisible();
+      await page.getByRole('button', { name: /Chơi một mình/ }).click();
       await audit(page, 'creator', size);
     });
 

@@ -111,7 +111,7 @@ export const SCENES = {
       { kind: 'houseA', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 6, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
       { kind: 'houseB', name: 'Nhà dân', sprite: 'villageHouses.1', foot: { c: 11, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
       { kind: 'houseC', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 33, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
-      { kind: 'friendGate', name: 'Cổng bạn bè', sprite: 'friendGate', foot: { c: 29, r: 21, w: 3, h: 1 }, spr: { x: 4, y: -20 }, at: { x: 24, y: 28 }, sub: 'Sắp ra mắt: thăm bạn bè' },
+      { kind: 'friendGate', name: 'Cổng bạn bè', sprite: 'friendGate', foot: { c: 29, r: 21, w: 3, h: 1 }, spr: { x: 4, y: -20 }, at: { x: 24, y: 28 }, sub: 'Đăng nhập để thăm bạn bè' },
       ...[[8, 13], [16, 13], [22, 13], [28, 13], [35, 13]].map(([c, r], i) => ({ kind: 'lamp' + i, name: 'Đèn đường', sprite: 'lampPost', foot: { c, r, w: 1, h: 1 }, spr: { x: 2, y: -14 }, at: null })),
       ...[[11, 14], [23, 14]].map(([c, r], i) => ({ kind: 'bench' + i, name: 'Ghế đá', sprite: 'bench', foot: { c, r, w: 2, h: 1 }, spr: { x: 4, y: 2 }, at: { x: 16, y: 26 } })),
     ],

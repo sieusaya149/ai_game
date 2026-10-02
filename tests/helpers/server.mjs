@@ -21,11 +21,11 @@ export async function bootServer(opts = {}) {
   return {
     url, dbPath, dir,
     get: (path, init) => fetch(url + path, init),
-    // GET/POST JSON, trả { status, body }
+    // GET/POST JSON, trả { status, body, headers }
     async json(path, body, init = {}) {
       const res = await fetch(url + path, body === undefined ? init
         : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), ...init });
-      return { status: res.status, body: await res.json().catch(() => null) };
+      return { status: res.status, body: await res.json().catch(() => null), headers: res.headers };
     },
     // Mở WebSocket, chờ kết nối xong. `next()` chờ tin nhắn JSON kế tiếp, `closed` là promise đóng kết nối.
     async ws(path = '/ws') {

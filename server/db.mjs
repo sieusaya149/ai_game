@@ -8,6 +8,20 @@ export const MIGRATIONS = [
     db.exec('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
     db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run('created', String(Date.now()));
   },
+  // v2: tài khoản, mã mời, phiên đăng nhập (issue 21). Phiên chỉ lưu băm của mã; mã mời giữ lại sau khi xóa tài khoản
+  db => {
+    db.exec(`
+      CREATE TABLE accounts (
+        id INTEGER PRIMARY KEY, name TEXT NOT NULL, name_key TEXT NOT NULL UNIQUE,
+        pin_hash TEXT NOT NULL, pin_salt TEXT NOT NULL, created INTEGER NOT NULL,
+        fails INTEGER NOT NULL DEFAULT 0, locked_until INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE invites (
+        code TEXT PRIMARY KEY, created INTEGER NOT NULL,
+        used_by INTEGER REFERENCES accounts(id) ON DELETE SET NULL, used_at INTEGER);
+      CREATE TABLE sessions (
+        token_hash TEXT PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        created INTEGER NOT NULL, expires INTEGER NOT NULL)`);
+  },
 ];
 
 // Mở (tạo nếu chưa có) file SQLite và đưa schema lên bản mới nhất

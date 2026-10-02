@@ -107,7 +107,7 @@ test('tiệm rèn mở bảng nâng cấp; cổng bạn bè chưa mở: chạm t
   assert.ok(smithy.ok);
   assert.equal(smithy.open, 'smithy');
   const gate = G.perform(s, { kind: 'building', id: 'friendGate' }, G.actionsFor(s, { kind: 'building', id: 'friendGate' })[0].id);
-  assert.match(gate.msg, /Sắp ra mắt: thăm bạn bè/);
+  assert.match(gate.msg, /Đăng nhập để thăm bạn bè/);
 });
 
 test('sạp hàng không còn trong vườn mới, nhà kho chỉ còn là chỗ cất đồ', () => {

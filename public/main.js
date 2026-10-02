@@ -11,6 +11,7 @@ import * as V from './world.js';
 import { eventMeta } from './notify.js';
 import { todoList } from './todo.js';
 import * as P from './perf.js';
+import * as net from './net.js';
 
 const ACTION_MS = 350;
 const actionMs = () => ACTION_MS * slowFactor(state);   // hết thể lực thì làm chậm
@@ -212,6 +213,15 @@ const api = {
     plan = { kind, until: performance.now() + 30_000 };
     V.goToTarget(state, world, { kind: 'door', to: 'farm' });
     return true;
+  },
+  startSolo: () => startSolo(false),
+  // Về màn chọn chế độ (Cài đặt → Vào làng / Đăng xuất): lưu vườn rồi rời bản chơi đơn
+  leaveToMode() {
+    if (world.build) { world.build = null; ui.showBuild(false); }
+    save();
+    state = null; busy = null; curTarget = null; lastTargetKey = '';
+    ui.setTarget(null, [], '');
+    ui.showMode();
   },
   resetGame() {
     if (world.build) { world.build = null; ui.showBuild(false); }
@@ -513,16 +523,25 @@ window.addEventListener('pagehide', save);
 resize();
 setupJoystick();
 ui.initUI(api);
-state = loadGame();
-if (state) {
-  begin();
-  const away = state.away; delete state.away;   // chỉ hiện một lần, không lưu lại
-  ui.showAway(away);
-  ui.showWhatsNew(state);   // đợi màn vắng nhà đóng rồi mới hiện
-} else {
-  ui.showCreator();
-  if (loadProblem()) ui.toast('Không đọc được bản lưu cũ, bản cũ vẫn được giữ nguyên. Bạn có thể bắt đầu vườn mới.');
+// Vào bản chơi đơn: có bản lưu thì chơi tiếp, chưa có thì tạo nhân vật
+function startSolo(first) {
+  ui.closeCreator();
+  state = loadGame();
+  if (state) {
+    begin();
+    const away = state.away; delete state.away;   // chỉ hiện một lần, không lưu lại
+    ui.showAway(away);
+    ui.showWhatsNew(state);   // đợi màn vắng nhà đóng rồi mới hiện
+  } else if (!first) ui.showCreator();
+  else {
+    ui.showMode();
+    if (loadProblem()) ui.toast('Không đọc được bản lưu cũ, bản cũ vẫn được giữ nguyên. Bạn có thể bắt đầu vườn mới.');
+  }
 }
 globalThis.__farm = { get state() { return state; }, get world() { return world; }, get scale() { return scale; }, get view() { return view; }, get dpr() { return dpr; },
   get perf() { return { chunksDrawn: R.chunkStats().drawn, fps: fps.avg, fpsNow: fps.fps, measured: fps.elapsed, battery: prefs.battery, hinted: prefs.hinted }; } };
 requestAnimationFrame(t => { last = t; lastSave = t; requestAnimationFrame(frame); });
+// Máy này còn đăng nhập thì vào làng (chưa có vườn online, chỉ màn chờ). Không thì: có bản lưu chơi đơn → chơi tiếp, chưa có → chọn chế độ.
+const who = await net.whoAmI();
+if (who) ui.showVillage(who);
+else startSolo(true);

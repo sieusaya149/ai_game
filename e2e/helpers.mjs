@@ -57,6 +57,9 @@ export async function closeAway(page) {
 
 // ---------- Thao tác UI ----------
 export async function createCharacter(page, name = 'Tester') {
+  // màn đầu hỏi chế độ chơi: chọn Chơi một mình (bản server cũ không có màn này)
+  const solo = page.getByRole('button', { name: /Chơi một mình/ });
+  if (await solo.isVisible()) await solo.click();
   await page.getByPlaceholder('Tên của bạn').fill(name);
   await page.getByRole('button', { name: /Vào nông trại/ }).click();
   await expect(page.locator('#creator')).toBeHidden();

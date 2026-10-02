@@ -731,7 +731,7 @@ function threatActs(s, t) {
 
 // Chỗ trong làng chưa mở: chạm vào chỉ có lời nhắn
 const TALK = {
-  friendGate: { icon: '🚪', label: 'Xem cổng bạn bè', msg: 'Sắp ra mắt: thăm bạn bè' },
+  friendGate: { icon: '🚪', label: 'Xem cổng bạn bè', msg: 'Đăng nhập để thăm bạn bè' },
 };
 function buildingActs(s, t) {
   const b = sceneMap(s).building(t.id);

@@ -1,7 +1,8 @@
 // Router HTTP JSON tự viết: `route(method, path, fn)`, fn nhận { req, url, body, ...ctx } và trả object (gửi 200 JSON).
 // Muốn báo lỗi thì `throw new HttpError(status, 'lý do')`, client nhận { ok: false, error }.
 export class HttpError extends Error {
-  constructor(status, msg) { super(msg); this.status = status; }
+  // extra (vd { code }) được gộp vào thân JSON lỗi
+  constructor(status, msg, extra) { super(msg); this.status = status; this.extra = extra; }
 }
 
 const MAX_BODY = 1 << 20;   // 1 MB, đủ cho một bản lưu vườn
@@ -37,11 +38,11 @@ export function createRouter(ctx = {}) {
         const fn = r[req.method];
         if (!fn) throw new HttpError(405, 'Sai phương thức');
         const body = req.method === 'GET' || req.method === 'HEAD' ? null : await readBody(req);
-        sendJson(res, 200, { ok: true, ...await fn({ ...ctx, req, url, body }) });
+        sendJson(res, 200, { ok: true, ...await fn({ ...ctx, req, res, url, body }) });
       } catch (e) {
         const status = e instanceof HttpError ? e.status : 500;
         if (status === 500) console.error(e);
-        sendJson(res, status, { ok: false, error: status === 500 ? 'Lỗi server' : e.message });
+        sendJson(res, status, { ok: false, error: status === 500 ? 'Lỗi server' : e.message, ...e.extra });
       }
       return true;
     },
