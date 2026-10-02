@@ -865,10 +865,41 @@ function timeLabel(t) {
   const hrs = (6 + fr * 24) % 24, hh = Math.floor(hrs), mm = Math.floor((hrs - hh) * 60);
   return `Ngày ${day} · ${hh}:${String(mm).padStart(2, '0')}`;
 }
+// Nhật ký khách (issue 28, 30): ai đã giúp, ai đã trộm gì lúc mấy giờ. Dòng trộm có nút "Sang trộm lại 😤"
+// đi thẳng qua làng tới vườn kẻ trộm; kẻ trộm chưa tới cấp 5 hay vườn mình còn nhỏ thì nút mờ kèm lý do.
+const guestLine = g => (g.kind === 'steal'
+  ? `${g.by} đã trộm ${g.qty} ${D.itemName(g.item).toLowerCase()} lúc ${D.hourText(g.at)} 😤`
+  : `${g.by} đã ${D.HELP_JOBS[g.act]?.verb ?? 'giúp'} giúp bạn lúc ${D.hourText(g.at)} 🙏`);
+function revengeWhy(s, g) {
+  if (s.mode !== 'online') return 'Chỉ sang vườn người khác được khi đang chơi trong làng';
+  if (S.levelInfo(s.exp).level < D.GUEST.stealLv) return `Phải tới cấp ${D.GUEST.stealLv} mới đi trộm được`;
+  if ((g.lv || 1) < D.GUEST.stealLv) return S.STEAL_SMALL;
+  return null;
+}
+async function goRevenge(name) {
+  closePanel();
+  const r = await api.revenge(name);
+  if (r?.ok || !r?.error) return;
+  sound.play('error');
+  pushToast(r.error);
+}
 PANELS.log = {
   title: '📜 Nhật ký',
   render(body, s) {
-    if (!(s.log || []).length) return body.append(empty('Chưa có gì xảy ra. Ra ruộng làm việc thôi!'));
+    const guests = s.guests ?? [];
+    if (guests.length) {
+      body.append(section('Khách ghé vườn'));
+      for (const g of guests) {
+        const why = g.kind === 'steal' ? revengeWhy(s, g) : null;
+        body.append(h('div', { class: 'row guest-row' + (g.kind === 'steal' ? ' stolen' : ''), 'data-by': g.by },
+          h('div', { class: 'row-ico' }, g.kind === 'steal' ? '😈' : '🙏'),
+          h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, guestLine(g))),
+          g.kind === 'steal' && h('div', { class: 'row-act' },
+            btn('😤 Sang trộm lại', () => goRevenge(g.by), 'red sm nosound revenge', { disabled: !!why, title: why ?? `Sang vườn ${g.by}` }))));
+      }
+      body.append(section('Nhật ký vườn'));
+    }
+    if (!(s.log || []).length) return body.append(empty(guests.length ? 'Vườn chưa có chuyện gì khác.' : 'Chưa có gì xảy ra. Ra ruộng làm việc thôi!'));
     body.append(h('div', { class: 'log' }, s.log.map(e => h('div', { class: 'log-row' }, h('span', { class: 'log-t' }, timeLabel(e.t)), h('span', {}, e.text)))));
   },
 };
@@ -1450,6 +1481,7 @@ export function handleEvents(events) {
       case 'sound': sound.play(e.name); break;
       case 'levelup': celebQueue.push(e.level); if (!celebOpen) nextCelebration(); break;
       case 'achievement': showBadge(e); break;
+      case 'stolen': alertNow(D.EVENT_LEVEL.stolen.text(1, e)); break;   // có người trộm vườn mình (issue 30)
     }
     notifier(e, Date.now());
   }
@@ -1458,7 +1490,14 @@ export function handleEvents(events) {
 // ---------- 🔴 Báo gấp: băng rôn đỏ + tiếng + rung + mũi tên ở mép màn hình ----------
 // Lấy chỗ gấp từ state (S.urgentSpots) nên bản lưu đang có sự cố cũng báo; hiện ở mọi bản đồ.
 const BANNER_MS = 8000;
-let seenUrgent = new Set(), bannerUntil = 0, bannerOff = false;
+let seenUrgent = new Set(), bannerUntil = 0, bannerOff = false, alertEv = null;
+// Báo gấp đến từ một event chứ không phải chỗ cố định trong vườn (vd có người sang trộm, issue 30)
+function alertNow(text) {
+  alertEv = { text, until: performance.now() + BANNER_MS };
+  bannerOff = false;
+  sound.play('alarm');
+  try { navigator.vibrate?.([220, 90, 220]); } catch { /* máy không rung */ }
+}
 function arrowEl(key) {
   const box = $('alert-arrows');
   let el = [...box.children].find(c => c.dataset.key === key);
@@ -1480,9 +1519,13 @@ export function updateAlerts(s, toScreen, nowMs = performance.now()) {
     bannerUntil = nowMs + BANNER_MS; bannerOff = false;
   }
   seenUrgent = keys;
-  const bn = $('alert-banner'), on = spots.length > 0 && !bannerOff && nowMs < bannerUntil;
+  if (alertEv && nowMs >= alertEv.until) alertEv = null;
+  const bn = $('alert-banner'), spotOn = spots.length > 0 && nowMs < bannerUntil;
+  const on = !bannerOff && (spotOn || !!alertEv);
   if (on) {
-    const text = (spots.length === 1 ? spots[0].text : `${spots.length} sự cố trong vườn!`) + (s.scene === 'farm' ? '' : ' Về vườn ngay!');
+    const text = spotOn
+      ? (spots.length === 1 ? spots[0].text : `${spots.length} sự cố trong vườn!`) + (s.scene === 'farm' ? '' : ' Về vườn ngay!')
+      : alertEv.text;
     if (bn.textContent !== text) bn.textContent = text;
   }
   bn.hidden = !on;
@@ -1502,7 +1545,7 @@ export function updateAlerts(s, toScreen, nowMs = performance.now()) {
   }
   for (const el of [...rootBox.children]) if (!live.has(el.dataset.key)) el.remove();
 }
-export function dismissBanner() { bannerOff = true; $('alert-banner').hidden = true; document.body.classList.remove('alerting'); }
+export function dismissBanner() { bannerOff = true; alertEv = null; $('alert-banner').hidden = true; document.body.classList.remove('alerting'); }
 
 // ---------- Khởi tạo ----------
 export function initUI(a) {

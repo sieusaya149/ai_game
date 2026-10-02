@@ -6,31 +6,33 @@
 //     bằng chính hàm đó rồi gửi bản lưu lên như thường);
 //   · chủ offline → chạy bù vườn (issue 24) rồi áp dụng ngay trên bản lưu đó và lưu lại.
 // Mã thao tác là duy nhất nên áp dụng hai lần cùng mã thì lần sau không làm gì (guestOpApply trả reason 'done').
-import { guestOpApply } from '../public/state.js';
+import { guestOpApply, basketCap, basketCount } from '../public/state.js';
 import { levelInfo } from '../public/data.js';
+import { serverDay } from '../public/clock.js';
 import { catchUpFarm, farmRow, writeFarm } from './farms.mjs';
 
-const ACTS = ['water', 'weed', 'catch', 'shoo'];
+// Thao tác nhận được và tên trường số đi kèm mỗi việc (issue 28 giúp, issue 30 trộm)
+const ACTS = { water: 'idx', weed: 'idx', catch: 'idx', shoo: 'crow', crop: 'idx', egg: 'egg', product: 'animal' };
+const KINDS = { help: ['water', 'weed', 'catch', 'shoo'], steal: ['crop', 'egg', 'product'] };
 const KEEP_MS = 7 * 86400_000;   // thao tác đã áp dụng giữ chừng này rồi dọn
 const no = (reason, msg) => ({ ok: false, reason, msg });
 
-// Lọc thao tác nhận từ khách: chỉ giữ đúng các trường server biết, mọi thứ còn lại (ai làm, lúc nào) do server điền
+// Lọc thao tác nhận từ khách: chỉ giữ đúng các trường server biết, mọi thứ còn lại (ai làm, cấp mấy, giỏ còn
+// mấy chỗ, lúc nào) do server điền
 function cleanOp(raw) {
-  if (!/^[A-Za-z0-9_-]{8,64}$/.test(String(raw?.id ?? '')) || raw.kind !== 'help' || !ACTS.includes(raw.act)) return null;
-  const op = { id: raw.id, kind: 'help', act: raw.act };
-  if (raw.act === 'shoo') op.crow = raw.crow;
-  else op.idx = raw.idx;
-  const n = op.act === 'shoo' ? op.crow : op.idx;
-  return Number.isInteger(n) && n >= 0 && n < 1e6 ? op : null;
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(String(raw?.id ?? '')) || !KINDS[raw.kind]?.includes(raw.act)) return null;
+  const key = ACTS[raw.act], op = { id: raw.id, kind: raw.kind, act: raw.act, [key]: raw[key] };
+  return Number.isInteger(op[key]) && op[key] >= 0 && op[key] < 1e6 ? op : null;
 }
 
 const pendingOf = (db, ownerId) => db.prepare('SELECT id, op FROM guest_ops WHERE owner_id = ? AND applied IS NULL ORDER BY created, rowid').all(ownerId);
 const parse = row => { try { return JSON.parse(row.op); } catch { return null; } };
+const whoOf = op => ({ name: op.by, level: op.level, room: op.room });
 // Áp dụng các thao tác đang chờ lên bản lưu `save` (đã parse). Thao tác đã có trong bản lưu thì guestOpApply tự bỏ qua.
 function applyPending(rows, save) {
   for (const row of rows) {
     const op = parse(row);
-    if (op) guestOpApply(save, { name: op.by, level: op.level }, op);
+    if (op) guestOpApply(save, whoOf(op), op);
   }
 }
 const markApplied = (db, rows, t) => { const q = db.prepare('UPDATE guest_ops SET applied = ? WHERE id = ?'); for (const r of rows) q.run(t, r.id); };
@@ -63,8 +65,9 @@ export function submitGuestOp(ctx, guest, ownerId, raw) {
   const save = JSON.parse(row.save);
   applyPending(pending, save);                      // hàng đợi còn tồn: tính cả vào giới hạn mỗi ngày
   const t = Date.now();
-  Object.assign(op, { by: guest.name, level: levelOf(db, guest.id), at: t });
-  const r = guestOpApply(save, { name: op.by, level: op.level }, op);
+  const me = guestSave(db, guest.id);
+  Object.assign(op, { by: guest.name, level: levelInfo(me?.exp || 0).level, room: roomOf(me), at: t });
+  const r = guestOpApply(save, whoOf(op), op);
   if (!r.ok) return r;
   db.prepare('INSERT OR IGNORE INTO guest_ops (id, owner_id, guest_id, op, created, applied) VALUES (?, ?, ?, ?, ?, ?)')
     .run(op.id, ownerId, guest.id, JSON.stringify(op), t, online ? null : t);
@@ -74,9 +77,19 @@ export function submitGuestOp(ctx, guest, ownerId, raw) {
   return { ok: true, id: op.id, reward: r.reward };
 }
 
-// Cấp của khách lấy từ vườn đã lưu của họ (luật sau này dùng: trộm cần cấp 5)
-function levelOf(db, id) {
-  try { return levelInfo(JSON.parse(farmRow(db, id)?.save ?? 'null')?.exp || 0).level; } catch { return 1; }
+// Cấp và sức chứa giỏ của khách lấy từ vườn đã lưu của họ (luật trộm cần: cấp 5 và giỏ còn chỗ)
+function guestSave(db, id) {
+  try { return JSON.parse(farmRow(db, id)?.save ?? 'null'); } catch { return null; }
+}
+function roomOf(me) {
+  try { return me ? Math.max(0, basketCap(me) - basketCount(me)) : 0; } catch { return 0; }
+}
+
+// Số vụ trộm server đã nhận của khách `id` trong ngày ngoài đời của `t` (farms.mjs dùng để chặn bản lưu khai khống)
+export function stealsOf(db, id, t = Date.now()) {
+  const from = Date.parse(serverDay(t) + 'T00:00:00Z') - 7 * 3600_000;   // nửa đêm giờ Việt Nam
+  const rows = db.prepare('SELECT op FROM guest_ops WHERE guest_id = ? AND created >= ?').all(id, from);
+  return rows.reduce((a, r) => a + (parse(r)?.kind === 'steal' ? 1 : 0), 0);
 }
 
 // Loại tin WebSocket của hàng đợi (live.mjs tra sau HANDLERS và presence). `pres.gardenOf(sock)` cho biết

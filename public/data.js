@@ -8,7 +8,7 @@ export const MARKET = { open: 6, close: 18 }; // chợ Bà Tư mở từ 6h tớ
 // morningRegen: tự hồi mỗi sáng 6h · benchPerMin: ngồi ghế đá hồi mỗi phút · sleepHour: từ giờ này mới ngủ được
 export const STAMINA = {
   max: 100, slow: 2, morningRegen: 30, benchPerMin: 15, sleepHour: 18,
-  cost: { till: 1, water: 1, plant: 1, harvest: 1, clearBush: 2, breakRock: 3 },
+  cost: { till: 1, water: 1, plant: 1, harvest: 1, clearBush: 2, breakRock: 3, steal: 2 },
 };
 // Công cụ 3 cấp (sắt/đồng/vàng). area: vùng tác động theo cấp (one = 1 ô · row = hàng 3 ô theo hướng nhìn · block = 3×3 tâm ô mục tiêu)
 // price: xu nâng lên cấp 2, cấp 3 (mất DAY_MS ở tiệm rèn) · act: hành động ruộng dùng công cụ này · canMax: sức chứa bình tưới theo cấp
@@ -222,10 +222,13 @@ export const ACHIEVEMENTS = [
   { id: 'rich5000',   name: 'Đại gia làng',     desc: 'Kiếm tổng cộng 5.000 xu', stat: 'earned',  goal: 5000, coins: 500 },
 ];
 
-// ---------- Khách giúp vườn (issue 28, ADR 0012) ----------
+// ---------- Khách giúp vườn và trộm vườn (issue 28, 30, ADR 0012) ----------
 // helpMax: mỗi vườn mỗi ngày ngoài đời nhận tối đa bấy nhiêu việc giúp · helpCoins/helpExp: thưởng cho khách mỗi việc
 // logMax: nhật ký khách trong bản lưu chủ giữ bấy nhiêu việc gần nhất (cũng là nơi nhớ mã thao tác đã áp dụng)
-export const GUEST = { helpMax: 10, helpCoins: 3, helpExp: 2, logMax: 60 };
+// stealLv: cấp tối thiểu để đi trộm, cũng là cấp tối thiểu để vườn bị trộm (bảo vệ người mới)
+// stealPct: mỗi vụ trộm lấy tối đa bấy nhiêu sản lượng còn lại của ô hay con đó (mỗi người một lần mỗi ô hay mỗi con)
+// dayPct: mỗi vườn mỗi ngày ngoài đời mất tối đa bấy nhiêu tổng giá trị đồ chín · thể lực mỗi vụ: STAMINA.cost.steal
+export const GUEST = { helpMax: 10, helpCoins: 3, helpExp: 2, logMax: 60, stealLv: 5, stealPct: 0.25, dayPct: 0.3 };
 // Bốn việc giúp: động từ và đơn vị để ghép câu cảm ơn ("Lan đã tưới 3 ô giúp bạn")
 export const HELP_JOBS = {
   water: { verb: 'tưới', unit: 'ô', icon: '💧', label: 'Tưới giúp' },
@@ -250,6 +253,11 @@ export const NOTIFY_CATS = {
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
 const helpN = act => HELP_JOBS[act]?.verb ?? 'làm';
+// Giờ ngoài đời (giờ Việt Nam) của một vụ trộm, kiểu "2h sáng" — dùng trong nhật ký vườn (issue 30)
+export function hourText(t) {
+  const h = new Date((Number(t) || 0) + 7 * 3600_000).getUTCHours();   // giờ Việt Nam (clock.js REAL_TZ_MS)
+  return `${h % 12 || 12}h ${h < 4 ? 'đêm' : h < 11 ? 'sáng' : h < 13 ? 'trưa' : h < 18 ? 'chiều' : h < 22 ? 'tối' : 'đêm'}`;
+}
 export const EVENT_LEVEL = {
   sick:      { level: 'urgent', group: e => 'sick:' + e.animal, label: 'Con vật bị bệnh' },
   eating:    { level: 'urgent', group: e => 'eating:' + e.kind, label: 'Quạ, trộm đang ăn cây' },
@@ -262,6 +270,7 @@ export const EVENT_LEVEL = {
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   helped:    { level: 'important', cat: 'help', group: e => `helped:${e.by}:${e.act}`, label: 'Khách giúp vườn', text: (n, e) => `${e.by} đã ${helpN(e.act)} ${n} ${HELP_JOBS[e.act]?.unit ?? 'việc'} giúp bạn 🙏` },
+  stolen:    { level: 'urgent', group: e => `stolen:${e.by}:${e.item}`, label: 'Có người sang trộm', text: (n, e) => `${e.by} đã trộm ${e.qty * n} ${itemName(e.item).toLowerCase()} lúc ${hourText(e.at)} 😤` },
   gift:      { level: 'important', cat: 'gate', group: () => 'gate:gift', label: 'Có quà ở cổng', text: (n, e) => n > 1 ? `${n} món quà mới trong hộp quà ở cổng 🎁` : `${e.name} tặng bạn ${e.qty} ${itemName(e.item).toLowerCase()} 🎁` },
   note:      { level: 'important', cat: 'gate', group: () => 'gate:note', label: 'Lời nhắn mới ở sổ lưu bút', text: (n, e) => n > 1 ? `${n} lời nhắn mới trong sổ lưu bút 📖` : `${e.name} vừa ký sổ lưu bút của bạn 📖` },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },

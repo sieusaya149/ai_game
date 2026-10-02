@@ -11,7 +11,7 @@ const MIN = 60_000;
 test('bản lưu có trường online vẫn đọc được như vườn thường, giữ nguyên các trường đó', () => {
   clear();
   const s = G.createGame({ name: 'Lan' });
-  Object.assign(s, { mode: 'online', account: 'Lan', today: { day: '2026-10-02', helps: 3, steals: 1, stolen: 2 }, guests: [{ who: 'Cúc', what: 'help', at: 1 }] });
+  Object.assign(s, { mode: 'online', account: 'Lan', today: { day: '2026-10-02', helps: 3, steals: 1, stolen: 2, robs: 1 }, guests: [{ who: 'Cúc', what: 'help', at: 1 }] });
   s.dog.chained = true;
   const back = G.loadGame(JSON.parse(JSON.stringify(s)));
   assert.equal(back.coins, s.coins);
@@ -30,7 +30,7 @@ test('bản lưu Phase 0 thiếu trường online: bù mặc định, là vườ
   store[G.SAVE_KEY] = JSON.stringify(s);
   const back = G.loadGame();
   assert.deepEqual([back.mode, back.account], ['offline', null]);
-  assert.deepEqual(back.today, { day: '', helps: 0, steals: 0, stolen: 0 });
+  assert.deepEqual(back.today, { day: '', helps: 0, steals: 0, stolen: 0, robs: 0 });
   assert.deepEqual(back.guests, []);
   assert.equal(back.dog.chained, false);
 });

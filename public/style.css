@@ -514,6 +514,13 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 .fr-del { flex: none; min-width: 44px; min-height: 44px; padding: 0; }
 .gate-row.pinned { background: #fff0c8; border-color: #e0b24a; }
 
+/* Nhật ký khách trong bảng Nhật ký (issue 28, 30): dòng bị trộm nổi màu đỏ, có nút sang trộm lại */
+.guest-row { margin-top: 6px; }
+.guest-row .row-ico { font-size: 20px; }
+.guest-row .row-name { font-weight: 700; white-space: normal; }
+.guest-row.stolen { background: #ffe9e4; border-color: #e5452f; }
+.guest-row .revenge { flex: none; white-space: nowrap; }
+
 /* ---------- Thăm vườn người khác (issue 27): thanh tên chủ vườn dưới HUD, chừa chỗ bản đồ nhỏ bên phải; bảng chọn vườn ---------- */
 #visit-bar { align-self: flex-start; max-width: calc(100% - 112px); display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px 4px 4px 12px; font-size: 13px; font-weight: 800; }
 .visit-row { display: flex; align-items: center; gap: 8px; }

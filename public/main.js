@@ -5,7 +5,7 @@ import {
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
-import { DIR_NAME, LIVE } from './data.js';
+import { DIR_NAME, LIVE, itemName } from './data.js';
 import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
@@ -237,24 +237,27 @@ function liveMsg(m) {
   if (peers.receive(m, performance.now())) ui.setLive(true, peers.size);
 }
 
-// ---------- Giúp vườn bạn (issue 28, ADR 0012): luật ở state.js, server kiểm tra và xếp hàng ----------
-// Server nhận việc giúp: cộng xu và EXP vào vườn mình (bản đi dạo không tự cộng). Từ chối thì chỉ báo lý do.
+// ---------- Giúp và trộm vườn bạn (issue 28, 30, ADR 0012): luật ở state.js, server kiểm tra và xếp hàng ----------
+// Server nhận việc: cộng xu, EXP và đồ trộm được vào vườn mình (bản đi dạo không tự cộng). Từ chối thì chỉ báo lý do.
 function guestAck(m) {
   const mine = home ?? state;
   if (!mine) return;
   if (!m.ok) { if (m.msg) ui.toast(m.msg); ui.handleEvents([{ type: 'sound', name: 'error' }]); return; }
   guestReward(mine, m.reward);
   const p = state.player, t0 = performance.now();
-  for (const [i, text] of [`+${m.reward.coins} xu`, `+${m.reward.exp} EXP`].entries())
-    world.fx.push({ text, color: i ? '#7ad7ff' : '#ffd23f', x: p.x, y: p.y - 14 - i * 10, t0 });
-  ui.handleEvents([{ type: 'sound', name: 'coin' }]);
+  const lines = m.reward.items
+    ? Object.entries(m.reward.items).map(([k, n]) => [`+${n} ${itemName(k)}`, '#5cd65c'])
+    : [[`+${m.reward.coins} xu`, '#ffd23f'], [`+${m.reward.exp} EXP`, '#7ad7ff']];
+  for (const [i, [text, color]] of lines.entries()) world.fx.push({ text, color, x: p.x, y: p.y - 14 - i * 10, t0 });
+  ui.handleEvents([{ type: 'sound', name: m.reward.items ? 'pop' : 'coin' }]);
   changed();
 }
-// Khách vừa làm gì đó trong vườn mình (chủ đang online): áp dụng bằng chính hàm luật rồi cảm ơn (🟡 gộp theo người và việc)
+// Khách vừa làm gì đó trong vườn mình (chủ đang online): áp dụng bằng chính hàm luật rồi báo
+// (giúp: cảm ơn 🟡 gộp theo người và việc · trộm: báo gấp 🔴)
 function guestDid(op) {
   const mine = home ?? state;
   if (!mine || !op) return;
-  guestOpApply(mine, { name: op.by, level: op.level }, op);
+  guestOpApply(mine, { name: op.by, level: op.level, room: op.room }, op);
   const evs = takeGuestLog(mine);
   if (evs.length) ui.handleEvents(evs);
   changed();
@@ -352,6 +355,7 @@ const api = {
   say, emote,
   people: () => peers.roster(),
   visit,
+  revenge,
   // Nút "Về làng" lúc thăm vườn: tự đi ra cổng, tới nơi là ra làng như đi bộ ra
   leaveVisit() {
     if (!state?.visit || busy || fading || world.stun > 0) return;
@@ -433,6 +437,24 @@ async function visit(name) {
   }, FADE_MS);
   return { ok: true };
 }
+// Nút "Sang trộm lại 😤" trong nhật ký vườn (issue 30): đi thẳng qua làng rồi vào vườn kẻ trộm.
+// Trả { ok: true } hoặc { ok: false, error } để bảng nhật ký hiện lý do.
+async function revenge(name) {
+  const bad = error => ({ ok: false, error });
+  if (!state || !sync) return bad('Phải ở trong làng mới sang vườn người khác được');
+  if (home) return bad('Bạn đang ở vườn người khác rồi');
+  for (let hop = 0; hop < 2 && state.scene !== 'village'; hop++) {   // trong nhà thì ra vườn trước, rồi ra làng
+    if (fading || world.build) return bad('');
+    const doors = sceneMap(state).doors.map(d => d.to);
+    const to = doors.includes('village') ? 'village' : doors.includes('farm') ? 'farm' : null;
+    if (!to) return bad('Từ đây chưa ra làng được');
+    goScene(to);
+    await new Promise(ok => setTimeout(ok, FADE_MS + 80));
+  }
+  if (!state || home || state.scene !== 'village') return bad('Chưa ra tới làng được');
+  return visit(name);
+}
+
 // Ra cổng vườn người khác: về lại vườn mình, nhân vật vẫn đứng ở làng đúng chỗ lúc bước vào
 function leaveVisit() {
   state = home; home = null; plan = null;
