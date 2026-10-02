@@ -880,25 +880,27 @@ const GUIDE = [
     text: [`Mỗi con vật lớn qua 4 giai đoạn: ${D.STAGE_NAME.non} → ${D.STAGE_NAME.nho} → ${D.STAGE_NAME.truong} → ${D.STAGE_NAME.gia}, mỗi giai đoạn một hình và nết riêng.`,
       'Tuổi tính theo giờ vườn thật sự chạy (đóng băng thì không già đi). Gà vịt sống nhanh nhất rồi tới heo, bò cừu sống lâu nhất; chó mèo không bao giờ ra đi vì già.',
       `Sắp vào giai đoạn già thì được báo trước khoảng ${D.AGING.warnMs / HOUR} giờ vườn để chuẩn bị hoặc bán đi. Con già đẻ thưa, cho ít sản phẩm hơn và hay ngủ.`] },
-  { title: 'Tắm cho vật nuôi', art: () => [SPR3?.items?.soapBar, SPR3?.fx?.soap?.m?.[0], SPR3?.fx?.sparkleClean?.[0]],
+  { title: 'Tắm cho vật nuôi', lv: 2, art: () => [SPR3?.items?.soapBar, SPR3?.fx?.soap?.m?.[0], SPR3?.fx?.sparkleClean?.[0]],
     text: [`Con vật dơ dần theo giờ vườn, dơ hẳn sau khoảng ${D.DIRT.fullMs / HOUR} giờ; trời mưa hoặc chuồng bẩn thì nhanh gấp ${D.DIRT.fastMul} lần. Dơ từ ${D.DIRT.high} trở lên là mất vui, dễ bệnh hơn, sản phẩm kém.`,
       `Tắm tốn 1 ${D.ITEMS.soap.name.toLowerCase()} (mua ở chợ Bà Tư) và 1 nước trong bình tưới: sủi bọt, con vật lắc mình văng nước rồi sạch bong, +${D.DIRT.bathHappy} vui và thân hơn một chút.`,
       'Heo và bò đầm bùn thì dơ ngay nhưng không mất vui — đó là nét vui của chúng, tắm xong một lúc lại lăn bùn tiếp.'] },
-  { title: 'Bệnh và thú y', art: () => [SPR3?.status?.warn, SPR3?.items?.medicine, SPR3?.items?.vaccine, SPR3?.quarantine],
+  { title: 'Bệnh và thú y', lv: D.ANIMALS.heo.lv, art: () => [SPR3?.status?.warn, SPR3?.items?.medicine, SPR3?.items?.vaccine, SPR3?.quarantine],
     text: [`Bệnh qua 4 giai đoạn: ${S.SICK_NAME.join(' → ')}.`,
       `Mệt chữa bằng ${D.SICK.doses[1]} liều thuốc thú y, Bệnh nặng cần ${D.SICK.doses[2]} liều, Nguy kịch chỉ bác sĩ thú y mới cứu được (gọi qua điện thoại ở nhà, ${D.SICK.vetPrice} xu).`,
       'Bệnh nặng lây cho một con cùng chuồng; chuồng cách ly không lây và hồi bệnh nhanh hơn. Thuốc, vắc-xin mua ở trạm thú y Cô Út trong làng.',
       `Dưới cấp ${D.SICK.minLevel}, con vật không bệnh quá Mệt — người chơi mới được bảo hộ.`] },
-  { title: 'Lùa về chuồng', art: () => [SPR3?.homeBoard, SPR3?.strayArrow, SPR3?.dogHerd?.left?.[0]],
+  { title: 'Lùa về chuồng', lv: D.ANIMALS.vit.lv, art: () => [SPR3?.homeBoard, SPR3?.strayArrow, SPR3?.dogHerd?.left?.[0]],
     text: [`Chạng vạng (18h) gà vịt thả rông tự về chuồng, trừ ${D.FREE.strayPerDusk[0]}–${D.FREE.strayPerDusk[1]} con lạc 💤 ngủ ngoài tới sáng — không con nào gặp nguy hiểm chỉ vì chuyện này.`,
       `Lùa tay: đi vòng ra sau con lạc, đẩy nó về phía cửa chuồng. Nhanh hơn thì rải thóc ở cửa chuồng (tốn 1 bao cám), mọi con lạc trong ${D.FREE.lureRadius} ô quanh đó tự chạy về.`,
       `Chó học lệnh ${D.TRICKS.herd.name} (${D.TRICKS.herd.sessions} buổi) thì lùa cả đàn về chuồng trong khoảng ${D.TRAIN.herdMs / 1000} giây, và tự làm mỗi tối nếu no và vui.`] },
-  { title: 'Kẻ săn mồi', art: () => [SPR3?.rat?.left?.[0], SPR3?.hawk?.left?.[0], SPR3?.weasel?.left?.[0], SPR3?.status?.predIcon],
+  { title: 'Kẻ săn mồi', lv: D.PREDATOR.minLevel, art: () => [SPR3?.rat?.left?.[0], SPR3?.hawk?.left?.[0], SPR3?.weasel?.left?.[0], SPR3?.status?.predIcon],
     text: [`Từ cấp ${D.PREDATOR.minLevel}: chuột ăn cám, trộm trứng và cắn con non; diều hâu cắp gà vịt con đang thả rông ban ngày; chồn bắt con ngủ ngoài chuồng lúc nửa đêm.`,
       `Đang chơi thì luôn được báo trước khoảng ${D.PREDATOR.warnMs / 1000} giây trước khi nó ra tay — chạm vào để đuổi là kịp, không ai bị hại.`,
       'Phòng chuột bằng bẫy chuột; phòng diều hâu bằng mái che sân; phòng chồn bằng đèn lồng hoặc lùa đàn vào chuồng trước khi ngủ. Chó canh nhà cũng đuổi được cả ba.'] },
 ];
 let guidePage = 0;
+// Hệ thống mới chỉ hiện trang sổ tay khi người chơi tới cấp tương ứng (page.lv, thiếu = luôn hiện); không dội cả loạt lên người mới
+const guidePages = s => GUIDE.filter(p => !p.lv || level(s) >= p.lv);
 function guideIcon() {
   const c = h('canvas', { class: 'guide-ico', width: 12, height: 12 });
   if (spr().guidebook) c.getContext('2d').drawImage(spr().guidebook, 0, 0);
@@ -921,9 +923,10 @@ PANELS.guide = {
   title: '📖 Sổ tay',
   render(body) {
     body.append(h('button', { class: 'guide-open', id: 'open-pedigree', type: 'button', on: { click: () => openPanel('pedigree') } }, h('span', { class: 'ico emo' }, '🌳'), h('b', {}, 'Phả hệ vật nuôi'), h('small', {}, 'Tên, cha mẹ, con của từng con')));
-    const n = GUIDE.length, p = GUIDE[guidePage], go = d => { guidePage = (guidePage + d + n) % n; sound.play('click'); refreshPanel(); };
+    const pages = guidePages(st()), n = pages.length; guidePage = Math.min(guidePage, n - 1);
+    const p = pages[guidePage], go = d => { guidePage = (guidePage + d + n) % n; sound.play('click'); refreshPanel(); };
     body.append(
-      h('div', { class: 'guide-dots' }, GUIDE.map((_, i) => h('button', { class: 'guide-dot nosound' + (i === guidePage ? ' on' : ''), type: 'button', title: GUIDE[i].title, 'aria-label': GUIDE[i].title, on: { click: () => { guidePage = i; sound.play('click'); refreshPanel(); } } }))),
+      h('div', { class: 'guide-dots' }, pages.map((q, i) => h('button', { class: 'guide-dot nosound' + (i === guidePage ? ' on' : ''), type: 'button', title: q.title, 'aria-label': q.title, on: { click: () => { guidePage = i; sound.play('click'); refreshPanel(); } } }))),
       h('div', { class: 'guide-page' }, guideArt(p.art()), h('h3', {}, p.title), p.text.map(t => h('p', {}, t))),
       h('div', { class: 'guide-nav' }, btn('◀ Trước', () => go(-1), 'plain sm nosound'), h('span', { class: 'mini' }, `Trang ${guidePage + 1}/${n}`), btn('Sau ▶', () => go(1), 'plain sm nosound')));
   },

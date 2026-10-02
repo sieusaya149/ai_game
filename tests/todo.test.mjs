@@ -132,3 +132,11 @@ test('mũi tên chỉ hướng lấy chỗ từ danh sách việc gấp', () => 
   assert.ok(t.some(p => p.x === 40 && p.y === 50));
   assert.ok(t.some(p => p.x === c.x && p.y === c.y));
 });
+
+test('trứng trong bụi tách khỏi trứng dưới đất, mỗi loại một dòng có số', () => {
+  const s = newGame();
+  s.eggs.push({ id: s.nextId++, sp: 'ga', x: 40, y: 40, laidAt: 0 }, { id: s.nextId++, sp: 'ga', x: 60, y: 60, laidAt: 0, tile: { c: 3, r: 3 } }, { id: s.nextId++, sp: 'ga', x: 80, y: 80, laidAt: 0, tile: { c: 5, r: 5 } });
+  const egg = get(s, 'egg'), bush = get(s, 'bushEgg');
+  assert.equal(egg.count, 1); assert.equal(egg.label, '🥚 1 trứng dưới đất');
+  assert.equal(bush.count, 2); assert.equal(bush.label, '🌿 2 trứng trong bụi'); assert.equal(bush.level, 'normal');
+});

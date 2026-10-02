@@ -1,6 +1,6 @@
 // Việc cần làm: đọc state, liệt kê việc trong vườn theo loại, mức gấp, số lượng và chỗ gần người chơi nhất. Thuần JS, không DOM.
 // Bảng 📋, bản đồ nhỏ và mũi tên chỉ hướng đều lấy vị trí từ đây.
-import { mapOf, dirtyAnimals, dirtyPens, predWarning, strays } from './state.js';
+import { mapOf, dirtyAnimals, dirtyPens, predWarning, strays, hiddenEggs } from './state.js';
 import { ANIMALS, HUSBANDRY } from './data.js';
 import { TS } from './layout.js';
 
@@ -26,7 +26,8 @@ const KINDS = [
   { kind: 'bugs', level: 'normal', icon: '🐛', label: n => `${n} ô có sâu`, spots: s => plots(s, p => alive(p) && p.crop.bugs) },
   { kind: 'weeds', level: 'normal', icon: '🌿', label: n => `${n} ô có cỏ`, spots: s => plots(s, p => p.weeds) },
   { kind: 'ripe', level: 'normal', icon: '🌾', label: n => `${n} ô chín`, spots: s => plots(s, isRipe) },
-  { kind: 'egg', level: 'normal', icon: '🥚', label: n => `${n} trứng dưới đất`, spots: s => (s.eggs ?? []).map(e => ({ id: e.id, x: e.x, y: e.y, target: { kind: 'egg', id: e.id } })) },
+  { kind: 'egg', level: 'normal', icon: '🥚', label: n => `${n} trứng dưới đất`, spots: s => (s.eggs ?? []).filter(e => !e.tile).map(e => ({ id: e.id, x: e.x, y: e.y, target: { kind: 'egg', id: e.id } })) },
+  { kind: 'bushEgg', level: 'normal', icon: '🌿', label: n => `${n} trứng trong bụi`, spots: s => hiddenEggs(s).map(e => ({ id: e.id, x: e.x, y: e.y, target: { kind: 'egg', id: e.id } })) },
   { kind: 'trough', level: 'normal', icon: '🥣', label: n => `${n} máng hết cám`, spots: s => troughs(s) },
   { kind: 'poop', level: 'normal', icon: '💩', label: n => `${n} đống phân chó`, spots: s => (s.poops ?? []).map(o => ({ id: o.id, x: o.x, y: o.y, target: { kind: 'poop', id: o.id } })) },
 ];
