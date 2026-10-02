@@ -1,0 +1,65 @@
+<!doctype html><meta charset="utf-8"><title>SPR4 cây trồng</title>
+<style>
+  body { margin: 0; padding: 10px; background: #3f6e2c; font: 11px sans-serif; color: #fff; }
+  h2 { margin: 14px 0 6px; font-size: 13px; }
+  table { border-collapse: collapse; }
+  th { font-weight: normal; padding: 2px 6px; text-align: left; }
+  td { padding: 3px 6px; vertical-align: bottom; background: #63402a; border: 1px solid #3f6e2c; }
+  canvas { image-rendering: pixelated; display: block; }
+  .scenes { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+</style>
+<body>
+<h2>16 cây × giai đoạn (4x, nền đất cuốc ẩm)</h2>
+<table id="grid"></table>
+<h2>Nông sản cây mới (12x12, 4x)</h2>
+<div id="produce" class="scenes"></div>
+<h2>Cảnh ruộng 1x và 2x</h2>
+<div class="scenes"><canvas id="s1"></canvas><canvas id="s2"></canvas></div>
+<script type="module">
+import { SPR } from './art.js';
+import { SPR4, CROP4_IDS } from './art4.js';
+import { CROPS } from './data.js';
+const NAMES = { ...Object.fromEntries(Object.entries(CROPS).map(([k, v]) => [k, v.name])), hanhla: 'Hành lá', dauphong: 'Đậu phộng', raumuong: 'Rau muống', dualeo: 'Dưa leo', khoailang: 'Khoai lang', ot: 'Ớt', suhao: 'Su hào', bapcai: 'Bắp cải' };
+const soil = SPR.soil?.tilledWet ?? SPR.plot;
+const S = +(new URLSearchParams(location.search).get('s') || 4), COLS = ['s0 hạt', 's1 mầm', 's2 cây non', 's3 ra hoa', 's4 chín', 'bệnh', 'héo', 'chết'];
+const grid = document.getElementById('grid');
+grid.insertAdjacentHTML('beforeend', '<tr><th></th>' + COLS.map(c => `<th>${c}</th>`).join('') + '</tr>');
+const cell = im => {
+  // Ô 16x16 cao thêm đủ chỗ cho cây cao, đất ở đáy.
+  const H = Math.max(16, im.height + 1), c = document.createElement('canvas');
+  c.width = 16; c.height = H; c.style.width = 16 * S + 'px'; c.style.height = H * S + 'px';
+  const x = c.getContext('2d'); x.drawImage(soil, 0, H - 16); x.drawImage(im, 0, H - 16 + 15 - im.height);
+  const td = document.createElement('td'); td.title = `${im.width}x${im.height}`; td.append(c);
+  const l = document.createElement('div'); l.textContent = `${im.width}x${im.height}`; td.append(l); return td;
+};
+for (const id of CROP4_IDS) {
+  const s = SPR4.crop[id], tr = document.createElement('tr');
+  tr.insertAdjacentHTML('beforeend', `<th>${NAMES[id] ?? id}<br><small>${id}</small></th>`);
+  for (const im of [...s.stages, s.sick, s.rotten, s.dead]) tr.append(cell(im));
+  grid.append(tr);
+}
+for (const [id, im] of Object.entries(SPR4.produce)) {
+  const c = document.createElement('canvas'); c.width = 12; c.height = 12; c.style.width = c.style.height = 12 * S + 'px';
+  c.getContext('2d').drawImage(im, 0, 0);
+  const d = document.createElement('div'); d.append(c, NAMES[id]); document.getElementById('produce').append(d);
+}
+// Cảnh: lưới 4x4 khối ruộng 3x3, mỗi khối một cây, các ô ở giai đoạn khác nhau.
+function scene(cv, scale) {
+  const B = 3, gap = 1, cols = 4, rows = 4, T = 16, W = cols * (B + gap) * T + T, H = rows * (B + gap) * T + T;
+  cv.width = W; cv.height = H; cv.style.width = W * scale + 'px'; cv.style.height = H * scale + 'px';
+  const x = cv.getContext('2d'); x.fillStyle = '#5a9e3a'; x.fillRect(0, 0, W, H);
+  const order = [0, 1, 2, 3, 4, 4, 3, 4, 2];
+  CROP4_IDS.forEach((id, k) => {
+    const bx = (k % cols) * (B + gap) * T + T, by = Math.floor(k / cols) * (B + gap) * T + T;
+    for (let i = 0; i < 9; i++) { const px = bx + (i % 3) * T, py = by + Math.floor(i / 3) * T; x.drawImage(soil, px, py); }
+    for (let i = 0; i < 9; i++) {
+      const px = bx + (i % 3) * T, py = by + Math.floor(i / 3) * T, s = SPR4.crop[id];
+      const im = i === 8 && k % 3 === 0 ? s.sick : i === 8 && k % 3 === 1 ? s.rotten : i === 8 ? s.dead : s.stages[order[i]];
+      x.drawImage(im, px + (16 - im.width) / 2, py + 15 - im.height);
+    }
+    x.fillStyle = '#fff'; x.font = '8px sans-serif'; x.fillText(NAMES[id], bx, by - 3);
+  });
+}
+scene(document.getElementById('s1'), 1); scene(document.getElementById('s2'), 2);
+document.title = 'SPR4 ok';
+</script>

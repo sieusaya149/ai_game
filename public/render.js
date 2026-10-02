@@ -2,6 +2,7 @@
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
 import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
+import { SPR4 } from './art4.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, actionsFor, nextStrip } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -355,10 +356,11 @@ function floweringImg() {
   });
 }
 export function cropImg(p) {
-  const c = p.crop;
-  if (c.dead) return SPR.dead ?? tinted(SPR.grow, '#3b2a18', 0.75);
-  if (c.rotten) return SPR.rotten ?? tinted(SPR.grow, '#4a3a20', 0.6);
+  const c = p.crop, own = SPR4.crop[c.id];
+  if (c.dead) return own?.dead ?? SPR.dead ?? tinted(SPR.grow, '#3b2a18', 0.75);
+  if (c.rotten) return own?.rotten ?? SPR.rotten ?? tinted(SPR.grow, '#4a3a20', 0.6);
   const st = cropStage(c);
+  if (own) return c.sick ? (st >= 1 ? own.sick : tinted(own.stages[0], '#d4c23a', 0.6)) : own.stages[st];
   let img = st === 0 ? seedlingImg() : st === 1 ? SPR.sprout : st === 2 ? SPR.grow : st === 3 ? floweringImg() : (SPR.ripe[c.id] ?? SPR.grow);
   if (c.sick) img = st >= 1 && SPR.sick ? SPR.sick : tinted(img, '#d4c23a', 0.6);
   return img;
