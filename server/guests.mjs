@@ -7,6 +7,7 @@
 //   · chủ offline → chạy bù vườn (issue 24) rồi áp dụng ngay trên bản lưu đó và lưu lại.
 // Mã thao tác là duy nhất nên áp dụng hai lần cùng mã thì lần sau không làm gì (guestOpApply trả reason 'done').
 import { guestOpApply, basketCap, basketCount, haveItem } from '../public/state.js';
+import { migrate } from '../public/migrate.js';
 import { levelInfo, ITEMS, CROPS, PRODUCTS } from '../public/data.js';
 import { serverDay } from '../public/clock.js';
 import { catchUpFarm, farmRow, writeFarm } from './farms.mjs';
@@ -49,6 +50,8 @@ function applyPending(rows, save) {
     if (op) guestOpApply(save, whoOf(op), op);
   }
 }
+// Bản lưu chủ trong DB (đã qua migrate lúc nhận; dòng lưu từ trước Phase 2 có thể còn v2 thì đưa lên v3 trước khi áp luật)
+const farmSave = row => migrate(JSON.parse(row.save));
 const markApplied = (db, rows, t) => { const q = db.prepare('UPDATE guest_ops SET applied = ? WHERE id = ?'); for (const r of rows) q.run(t, r.id); };
 
 // Chủ vườn đang offline: áp dụng hàng đợi lên bản lưu (đã chạy bù trước đó) rồi lưu lại. Trả dòng farms mới nhất.
@@ -57,7 +60,7 @@ export function runGuestQueue(db, row) {
   if (!row?.save) return row;
   const rows = pendingOf(db, row.account_id);
   if (!rows.length) return row;
-  const save = JSON.parse(row.save);
+  const save = farmSave(row);
   applyPending(rows, save);
   const t = Date.now();
   writeFarm(db, row.account_id, save, t);
@@ -76,7 +79,7 @@ export function submitGuestOp(ctx, guest, ownerId, raw) {
   const online = live?.playing(ownerId);
   if (!online) row = catchUpFarm(db, row) ?? row;   // chủ vắng: chạy bù vườn trước (issue 24)
   const pending = pendingOf(db, ownerId);
-  const save = JSON.parse(row.save);
+  const save = farmSave(row);
   applyPending(pending, save);                      // hàng đợi còn tồn: tính cả vào giới hạn mỗi ngày
   const t = Date.now();
   const me = guestSave(db, guest.id);

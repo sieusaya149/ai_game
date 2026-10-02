@@ -14,12 +14,13 @@ export const tileHash = (c, r) => (Math.imul(c + 101, 73856093) ^ Math.imul(r + 
 // guest: đồ riêng của chủ vườn, khách thăm vườn (issue 27) chạm vào chỉ nhận lý do này.
 export const BUILDING_DEFS = {
   house:    { name: 'Nhà',           sprite: 'house',     foot: { w: 4, h: 4 }, spr: { x: -8, y: -22 }, at: { x: 32, y: 74 }, fixed: true,
-    door: { c: 1, r: 3, w: 2, h: 1, to: 'house' }, guest: 'Đây là nhà riêng của chủ vườn' },
+    door: { c: 1, r: 3, w: 2, h: 1, to: 'house' }, guest: 'Đây là nhà riêng của chủ vườn', catDoor: { x: 50, y: 58 } },
   board:    { name: 'Bảng đơn hàng', sprite: 'board',     foot: { w: 1, h: 1 }, spr: { x: -4, y: -8 },  at: { x: 8, y: 24 }, guest: 'Đơn hàng này của chủ vườn' },
   shed:     { name: 'Nhà kho',       sprite: 'shed',      foot: { w: 4, h: 3 }, spr: { x: 0, y: -10 },  at: { x: 32, y: 58 }, guest: 'Kho riêng của chủ vườn, khách không mở được' },
   well:     { name: 'Giếng nước',    sprite: 'well',      foot: { w: 1, h: 1 }, spr: { x: 0, y: -8 },   at: { x: 8, y: 24 } },
   shipbin:  { name: 'Thùng giao hàng', sprite: 'shippingBin', foot: { w: 2, h: 1 }, spr: { x: 4, y: -4 }, at: { x: 16, y: 24 }, guest: 'Thùng giao hàng của chủ vườn, khách không mở được' },
   doghouse: { name: 'Chuồng chó',    sprite: 'doghouse',  foot: { w: 1, h: 1 }, spr: { x: -6, y: -8 },  at: null, home: { x: 8, y: 26 } },
+  cathouse: { name: 'Nhà mèo',       sprite: 'cathouse',  foot: { w: 1, h: 1 }, spr: { x: -5, y: -8 },  at: null, catHome: { x: 8, y: 24 } },
   // Cổng nằm ở hàng cuối của đất; exit là các ô ngay ngoài cổng vẫn đi được, cũng là cửa sang làng; in là chỗ NPC đi vào.
   gate:     { name: 'Cổng',          sprite: 'signboard', foot: { w: 3, h: 1 }, spr: { x: 2, y: -6 },   at: { x: -16, y: 10 }, in: { x: -16, y: 24 }, exit: [[-2, 1], [-1, 1]], fixed: true,
     door: { c: -2, r: 1, w: 2, h: 1, to: 'village', dir: 3 } },
@@ -29,23 +30,30 @@ export const BUILDING_DEFS = {
 };
 
 // Chuồng: kích thước khung rào (ô); các vị trí bên trong tính so với góc trên-trái khung.
-// trough: ô máng (c, r) + điểm vẽ (x, y); area: vùng con vật đi lang thang (điểm ảnh).
+// trough: ô máng (c, r) + điểm vẽ (x, y), không có thì chuồng không có máng; area: vùng con vật đi lang thang (điểm ảnh);
+// house: điểm chân (giữa đáy) của nhà/mái chuồng vẽ theo cấp (SPR3.pen).
 export const PEN_DEFS = {
   chicken: {
     name: 'Chuồng gà', w: 13, h: 9, gates: [[6, 0], [7, 0]],
-    trough: { c: 1, r: 1, x: 32, y: 30 }, area: { x: 22, y: 42, w: 164, h: 84 },
+    trough: { c: 1, r: 1, x: 32, y: 30 }, area: { x: 22, y: 42, w: 164, h: 84 }, house: { x: 74, y: 42, sprite: 'coop' },
     ground: { kind: 'PEN', c: 1, r: 1, w: 11, h: 7 },
     nest: { foot: { c: 9, r: 1, w: 2, h: 1 }, spr: { x: 145, y: 4 }, at: { x: 160, y: 42 } },
   },
   pig: {
     name: 'Chuồng heo', w: 6, h: 9, gates: [[2, 0]],
-    trough: { c: 3, r: 1, x: 64, y: 30 }, area: { x: 22, y: 42, w: 52, h: 84 },
+    trough: { c: 3, r: 1, x: 64, y: 30 }, area: { x: 22, y: 42, w: 52, h: 84 }, house: { x: 62, y: 126, sprite: 'pig' },
+    scale: { c: 1, r: 1, x: 24, y: 30 },   // cân heo cạnh máng, mỗi chuồng heo một cái (ô c, r + điểm chân x, y)
     ground: { kind: 'MUD', c: 1, r: 1, w: 4, h: 7 },
     mud: { x: 24, y: 84, w: 40, h: 22 }, mudSpot: { x: 44, y: 95, rx: 22, ry: 14, x0: 28, x1: 60, y0: 88, y1: 102 },
   },
   pasture: {
     name: 'Đồng cỏ bò cừu', w: 8, h: 9, gates: [[3, 0]],
-    trough: { c: 5, r: 1, x: 96, y: 30 }, area: { x: 22, y: 42, w: 84, h: 84 },
+    trough: { c: 5, r: 1, x: 96, y: 30 }, area: { x: 22, y: 42, w: 84, h: 84 }, house: { x: 100, y: 126, sprite: 'barn' },
+  },
+  // Chuồng cách ly: nhận mọi loài, mỗi chỗ một con, không có máng
+  quarantine: {
+    name: 'Chuồng cách ly', w: 5, h: 5, gates: [[2, 0]],
+    area: { x: 18, y: 26, w: 44, h: 36 }, house: { x: 40, y: 78, sprite: 'quarantine' },
   },
 };
 
@@ -88,6 +96,7 @@ export const SCENES = {
       { kind: 'stove', name: 'Bếp', sprite: 'stove', foot: { c: 6, r: 2, w: 2, h: 1 }, spr: { x: 4, y: -8 }, at: null },
       { kind: 'table', name: 'Bàn', sprite: 'table', foot: { c: 4, r: 5, w: 2, h: 1 }, spr: { x: 0, y: -4 }, at: null },
       { kind: 'plant', name: 'Chậu cây', sprite: 'pottedPlant', foot: { c: 10, r: 8, w: 1, h: 1 }, spr: { x: 0, y: -8 }, at: null },
+      { kind: 'phone', name: 'Điện thoại', sprite: 'phone', foot: { c: 4, r: 2, w: 1, h: 1 }, spr: { x: 0, y: -14 }, at: { x: 8, y: 26 } },
     ],
     props: [
       { sprite: 'window', x: 64, y: 6 }, { sprite: 'window', x: 128, y: 6 },
@@ -103,7 +112,7 @@ export const SCENES = {
   village: {
     name: 'Làng', mw: 40, mh: 28,
     walk: { c: 2, r: 3, w: 36, h: 22 },
-    paths: [[17, 5, 3, 5], [3, 10, 34, 3], [21, 9, 5, 1], [28, 9, 4, 1], [7, 9, 2, 1], [12, 9, 2, 1], [34, 9, 2, 1], [29, 13, 3, 8]],
+    paths: [[17, 5, 3, 5], [3, 10, 34, 3], [21, 9, 5, 1], [28, 9, 4, 1], [7, 9, 2, 1], [12, 9, 2, 1], [34, 9, 2, 1], [29, 13, 3, 8], [14, 9, 3, 1]],
     trees: [[4, 4], [9, 5], [15, 5], [21, 4], [26, 5], [32, 4], [37, 5],
       [4, 15], [6, 17], [3, 19], [8, 20], [5, 22], [10, 22], [12, 18], [15, 21], [18, 17], [20, 20], [23, 22], [26, 18], [34, 17], [36, 20], [33, 23], [25, 16]],
     clear: [{ x0: 256, x1: 336, y0: 0, y1: 70 }],
@@ -114,9 +123,12 @@ export const SCENES = {
         npc: { key: 'npcBaTu', x: 56, y: 36 } },
       { kind: 'smithy', name: 'Tiệm rèn Ông Sáu', sprite: 'smithy', foot: { c: 28, r: 7, w: 4, h: 2 }, spr: { x: 4, y: -16 }, at: { x: 32, y: 42 }, label: 'Tiệm rèn',
     npc: { key: 'npcOngSau', x: 60, y: 38 } },
+      { kind: 'vet', name: 'Trạm thú y Cô Út', sprite: 'vetClinic', foot: { c: 14, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -8 }, at: { x: 24, y: 40 }, label: 'Trạm thú y',
+        npc: { key: 'npcCoUt', x: 52, y: 40 } },
       { kind: 'houseA', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 6, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
       { kind: 'houseB', name: 'Nhà dân', sprite: 'villageHouses.1', foot: { c: 11, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
-      { kind: 'houseC', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 33, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
+      { kind: 'houseC', name: 'Nhà Chú Ba', sprite: 'villageHouses.0', foot: { c: 33, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: { x: 24, y: 40 },
+        npc: { key: 'npcChuBa', x: 24, y: 52 } },   // lái buôn Chú Ba đứng trước nhà
       { kind: 'friendGate', name: 'Cổng bạn bè', sprite: 'friendGate', foot: { c: 29, r: 21, w: 3, h: 1 }, spr: { x: 4, y: -20 }, at: { x: 24, y: 28 }, sub: 'Đăng nhập để thăm bạn bè' },
       ...[[8, 13], [16, 13], [22, 13], [28, 13], [35, 13]].map(([c, r], i) => ({ kind: 'lamp' + i, name: 'Đèn đường', sprite: 'lampPost', foot: { c, r, w: 1, h: 1 }, spr: { x: 2, y: -14 }, at: null })),
       ...[[11, 14], [23, 14]].map(([c, r], i) => ({ kind: 'bench' + i, name: 'Ghế đá', sprite: 'bench', foot: { c, r, w: 2, h: 1 }, spr: { x: 4, y: 2 }, at: { x: 16, y: 26 } })),

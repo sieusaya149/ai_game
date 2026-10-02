@@ -3,10 +3,11 @@ import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTi
 import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
+import { SPR3, muddy } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet } from './state.js';
+import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
-import { CROP_STAGES, DAY_MS, NIGHT_FROM } from './data.js';
+import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
 
@@ -87,6 +88,9 @@ const stinkImgs = () => SPR.stink ?? once('stink', () => [0, 1].map(f => {
   return c;
 }));
 const eggImg = () => SPR.eggGround ?? SPR.product.trung;
+// Trứng đã soi: có phôi = SPR3.eggFertile / eggDuckFertile (sáng, chấm phôi); trống = trứng sáng không chấm. Chưa soi: trứng gà thường, trứng vịt = SPR3.eggDuck.
+const eggEmpty = () => once('eggEmpty', () => pix(['....ggg....', '...gOOOg...', '..gOyyyOg..', '..OyywyyO..', '..OyyyyyO..', '..OyyyyyO..', '..OyyyyyO..', '...OyyyO...', '....OOO....'], { g: 'rgba(255,230,140,0.4)', O: '#3b2412', y: '#fff0c0', w: '#ffffff' }));
+const eggImgOf = e => (e.candled ? (e.fertile ? (e.sp === 'vit' ? SPR3?.eggDuckFertile : SPR3?.eggFertile) : null) ?? eggEmpty() : e.sp === 'vit' ? SPR3?.eggDuck ?? eggImg() : eggImg());
 const wellImg = () => SPR.well ?? once('well', () => {
   const c = mkCanvas(24, 26), x = c.getContext('2d');
   rect(x, '#3b2412', 2, 0, 20, 4); rect(x, '#d9483b', 3, 1, 18, 2);
@@ -122,11 +126,33 @@ const decoFallback = kind => once('deco' + kind, () => {
   }
   return c;
 });
-const decoImg = kind => SPR.deco?.[kind] ?? (kind === 'deco_bench' && SPR2?.bench) ?? decoFallback(kind);
+const decoImg = kind => (kind === 'deco_lowfence' ? SPR3?.lowFence?.h : kind === 'grave' ? SPR3?.grave : kind === 'grave_flower' ? SPR3?.graveFlower
+  : kind === 'deco_rattrap' ? SPR3?.ratTrap : kind === 'deco_canopy' ? SPR3?.canopy : null)
+  ?? SPR.deco?.[kind] ?? (kind === 'deco_bench' && SPR2?.bench) ?? decoFallback(kind);
+// Bẫy chuột: đang gài / đã sập (e.shut). Thiếu art thì dùng lại hình bẫy đang gài.
+const trapImg = e => (e.shut ? SPR3?.ratTrapFull ?? SPR3?.ratTrapShut : SPR3?.ratTrap) ?? decoImg('deco_rattrap');
+// Kẻ săn mồi (issue 43): mỗi loài một bộ hình riêng cho từng tư thế
+function predImg(p, rt) {
+  const f = Math.floor((rt.anim ?? 0) * 6) % 2;
+  const set = p.kind === 'rat' ? (p.state === 'leaving' ? SPR3?.ratFlee : rt.eat ? SPR3?.ratEat : SPR3?.rat)
+    : p.kind === 'hawk' ? (p.carry ? SPR3?.hawkCarry : rt.dive ? SPR3?.hawkDive : SPR3?.hawk)
+      : (rt.pounce ? SPR3?.weaselCatch : SPR3?.weasel);
+  const base = set ?? (p.kind === 'rat' ? SPR3?.rat : p.kind === 'hawk' ? SPR3?.hawk : SPR3?.weasel);
+  if (!base) return null;
+  const side = base[rt.face === 'right' ? 'right' : 'left'];
+  return side[f % side.length];
+}
+
+// Hàng rào thấp nằm cạnh hàng rào khác theo chiều dọc (mà không có hàng xóm ngang) thì vẽ cọc dọc
+const lowFenceAt = (m, e) => {
+  const at = (c, r) => m.decos.some(d => d.kind === 'deco_lowfence' && d.ent.c === c && d.ent.r === r);
+  return (!(at(e.c - 1, e.r) || at(e.c + 1, e.r)) && (at(e.c, e.r - 1) || at(e.c, e.r + 1)) ? SPR3?.lowFence?.v : SPR3?.lowFence?.h) ?? decoImg('deco_lowfence');
+};
 
 // Nội thất dự phòng (khi SPR2 chưa có): khối gỗ đơn giản đúng kích thước sprite thật
 const FURN = { bed: [32, 24, '#e5452f'], wardrobe: [24, 32, '#b07a45'], stove: [24, 24, '#9a9a94'], table: [32, 20, '#c98c4a'],
-  pottedPlant: [16, 24, '#3d8c2a'], rug: [48, 32, '#c44434'], window: [16, 16, '#8fd3ff'], doorMat: [16, 16, '#d9b860'] };
+  pottedPlant: [16, 24, '#3d8c2a'], rug: [48, 32, '#c44434'], window: [16, 16, '#8fd3ff'], doorMat: [16, 16, '#d9b860'],
+  phone: [16, 30, '#4c4c58'], vetClinic: [48, 40, '#2f9a4a'] };
 const furnFallback = k => once('furn' + k, () => {
   const [w, h, col] = FURN[k] ?? [16, 16, '#b07a45'], c = mkCanvas(w, h), x = c.getContext('2d');
   rect(x, '#3b2412', 0, 0, w, h); rect(x, col, 1, 1, w - 2, h - 2); rect(x, 'rgba(255,255,255,0.25)', 1, 1, w - 2, 2);
@@ -162,8 +188,9 @@ const STATUS_ROWS = {
   hungry: null,
 };
 function statusIcon(name) {
-  const s = SPR.status?.[name];
+  const s = SPR.status?.[name] ?? SPR3?.status?.[name];
   if (s) return s;
+  if (name === 'crow') return once('stcrow', () => pix(['...yyyy', '...y..y', '...y..y', '...y.yy', '.yyy.y.', 'yyyy...', '.yy....'], { y: '#f2b81e' }));   // nốt nhạc: gà trống gáy
   if (name === 'hungry') return SPR.grain;
   if (name === 'milk') return SPR.product.sua;
   if (name === 'wool') return SPR.product.len;
@@ -171,24 +198,76 @@ function statusIcon(name) {
 }
 
 // ---------- Chọn sprite theo thực thể (world.js cũng dùng để tính vùng bấm) ----------
-export function animalImg(type, adult, face, frame) {
-  const set = adult ? SPR.animal?.[type] : SPR.baby?.[type];
-  if (set) return set[face][frame % set[face].length];
-  const ad = SPR.animal?.[type] ?? (type === 'heo' ? pigFallback() : null);
+// a = { type, stage, sex }. Hình theo giai đoạn ở SPR3 (art3.js): con đực có bộ riêng (gà trống, bò đực).
+// Thiếu art thì dự phòng bằng sprite cũ: non = SPR.baby, nhỡ = bản thu nhỏ, già = bản nhạt màu.
+const SP3 = { dog: 'cho' }, MALE = { ga: 'gaTrong', vit: 'vitDuc', bo: 'boDuc' };
+const sp3Key = a => (a.sex === 'm' && MALE[a.type] && SPR3?.animal?.[MALE[a.type]]) ? MALE[a.type] : SP3[a.type] ?? a.type;
+export function animalImg(a, face, frame, sleep, run) {
+  const stage = a.stage ?? 'truong', key = sp3Key(a);
+  // bệnh nặng trở lên: nằm bẹp một chỗ, dáng bệnh riêng của từng loài ở từng giai đoạn
+  if (a.sick >= 2) { const z = SPR3?.sickBy?.[key]?.[stage]; if (z) return face === 'right' ? derived(z, 'flip', () => flip(z)) : z; }
+  if (sleep) { const z = SPR3?.sleepBy?.[key]?.[stage]; if (z) return face === 'right' ? derived(z, 'flip', () => flip(z)) : z; }
+  if (run) { const r = SPR3?.run?.[key]?.[stage]; if (r) return r[face][frame % r[face].length]; }   // đang bị lùa: dáng chạy hoảng
+  const set3 = SPR3?.animal?.[key]?.[stage];
+  if (set3) return set3[face][frame % set3[face].length];
+  const baby = SPR.baby?.[a.type];
+  if (stage === 'non' && baby) return baby[face][frame % baby[face].length];
+  const ad = SPR.animal?.[a.type] ?? (a.type === 'heo' ? pigFallback() : null);
   if (!ad) return null;
   const im = ad[face][frame % ad[face].length];
-  return adult ? im : scaled(im, 0.62);
+  if (stage === 'non') return scaled(im, 0.62);
+  if (stage === 'nho') return scaled(im, 0.8);
+  return stage === 'gia' ? tinted(im, '#d8d0c0', 0.35) : im;
 }
-export const dogImg = (adult, face, frame) => animalImg('dog', adult, face, frame);
-// Chó canh khách (issue 31): ngủ gật, sủa, chạy đuổi — mỗi tư thế chó con và chó trưởng thành có sprite riêng.
-// Thiếu sprite thì về tư thế đi bộ hiện có.
-const dogSet = (key, adult) => SPR2?.[key]?.[adult ? 'adult' : 'pup'];
-function guardImg(adult, face, rt, nap, now) {
-  if (nap) return dogSet('dogNap', adult) ?? dogImg(adult, face, 0);
-  const set = rt.bark ? dogSet(rt.run ? 'dogRun' : 'dogBark', adult) : null;
-  const frames = set?.[face];
-  if (frames?.length) return frames[Math.floor(now / 110) % frames.length];
-  return dogImg(adult, face, rt.walking ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0);
+// Hoạt cảnh tắm: bọt phủ (1.2 giây), lắc mình văng nước (0.8), lấp lánh sạch (1.0). main.js đẩy vào wd.baths khi tắm.
+export const BATH_MS = 3000, WALLOW_MS = 2200;
+export function bathPhase(b, now) {
+  const e = now - b.t0;
+  return e < 1200 ? { name: 'soap', t: e / 1200 } : e < 2000 ? { name: 'shake', t: (e - 1200) / 800 } : e < BATH_MS ? { name: 'sparkle', t: (e - 2000) / 1000 } : null;
+}
+// Con cái mang thai: thân nở ra một chút (bụng to)
+const bellied = img => derived(img, 'belly', () => {
+  const c = mkCanvas(Math.round(img.width * 1.2), img.height), x = c.getContext('2d');
+  x.imageSmoothingEnabled = false;
+  x.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+});
+export const GRAIN_MS = 2800;   // nắm thóc rải ở cửa chuồng còn trên đất chừng này ms
+export const ANGEL_MS = 2600;   // thiên thần bay lên trong chừng này ms
+export const DEAL_MS = TRADE.visitMs;   // Chú Ba dắt con vật đi: cảnh dài chừng này ms
+const angelFallback = () => once('angel', () => {
+  const c = mkCanvas(10, 11), x = c.getContext('2d');
+  rect(x, '#f7d547', 3, 0, 4, 1); rect(x, '#ffffff', 0, 4, 3, 2); rect(x, '#ffffff', 7, 4, 3, 2); rect(x, '#fff3e0', 3, 2, 4, 8);
+  return c;
+});
+export const dogImg = (dog, face, frame, sleep) => animalImg({ type: 'dog', stage: dog.stage, sex: 'm' }, face, frame, sleep);
+// Dáng chó theo động tác lệnh (issue 45): mỗi giai đoạn một bộ art riêng; thiếu art thì về dáng đứng
+const DOG_POSE = { sit: 'dogSitBy', beg: 'dogBegBy', herd: 'dogHerdBy', bark: 'dogBarkBy' };
+export function dogPoseImg(dog, pose, face, frame) {
+  const set = pose && SPR3?.[DOG_POSE[pose]]?.[dog.stage];
+  return set ? set[face][frame % set[face].length] : dogImg(dog, face, frame);
+}
+// Mèo (issue 44): mỗi dáng một bộ art riêng theo giai đoạn ở art3 (vồ, phơi nắng, ngậm chuột); thiếu art thì về dáng đứng.
+// rt = dữ liệu chạy của world.js (hướng, đang đi, đang vồ, đã tới chỗ khoe)
+export function catImg(c, rt = {}) {
+  const st = c.stage ?? 'truong', face = rt.face ?? 'left', base = { type: 'meo', stage: st, sex: c.sex };
+  const fr = Math.floor((rt.anim ?? 0) * (rt.walking ? (rt.run ? 10 : 7) : 2)) % 2;
+  const pose = key => { const set = SPR3?.[key]?.[st]; return set ? set[face][fr % set[face].length] : null; };
+  if (c.sick >= 2 || c.sleep) return animalImg(base, face, 0, c.sleep);
+  if (rt.pounceT) return pose('catPounceBy') ?? animalImg(base, face, 0);
+  if (c.sun) return pose('catNapBy') ?? animalImg(base, face, 0, true);
+  if (c.trophy && !rt.shown) return pose('catMouseBy') ?? animalImg(base, face, 0);
+  return animalImg(base, face, rt.walking ? fr : 0);
+}
+// Chó canh khách (issue 31): đứng sủa thì dáng sủa theo giai đoạn (art3, issue 45); chạy đuổi thì dáng chạy của issue 31,
+// mới có bộ chó con / chó lớn (chó nhỡ dùng bộ chó con, chó già dùng bộ chó lớn). Thiếu art thì về dáng đi bộ.
+const dogSet = (key, dog) => SPR2?.[key]?.[dog.stage === 'truong' || dog.stage === 'gia' ? 'adult' : 'pup'];
+function guardImg(dog, face, rt, now) {
+  const fr = Math.floor(now / 110);
+  if (!rt.walking) return dogPoseImg(dog, 'bark', face, fr);
+  const frames = dogSet('dogRun', dog)?.[face];
+  if (frames?.length) return frames[fr % frames.length];
+  return dogImg(dog, face, Math.floor(rt.anim * 10) % 2);
 }
 // Sao quay quanh đầu lúc đứng hình; chưa có sprite thì vẽ tạm ba chấm vàng
 function stunStars(ctx, blit, x, y, now) {
@@ -215,6 +294,30 @@ export function crowImg(face, frame) {
   const set = SPR.crow ?? crowFallback();
   return set[face][frame % set[face].length];
 }
+// Thằng Tèo: nhân vật dựng bằng art.character (world.js vẽ cùng bảng khung hình với người chơi)
+export const TEO_LOOK = { skin: 1, hair: 0, hairColor: 4, shirt: 4, pants: 2, hat: 2, acc: 1 };
+// Tí Sún: đi / rón rén / bị bắt — mỗi tư thế một bộ sprite riêng (issue 46)
+export function tisunImg(pose, face = 'left', frame = 0, dir = 0) {
+  if (pose === 'caught') return SPR3?.npcTiSunCaught ?? null;
+  if (pose === 'sneak') { const a = SPR3?.npcTiSunSneak?.[face]; if (a) return a[frame % a.length]; }
+  const set = SPR3?.npcTiSun;
+  return set ? set[dir][frame % set[dir].length] : null;
+}
+// Chồn hương: đi đêm / bắt / bị đuổi. Chưa có art thì mượn tạm con chồn của kẻ săn mồi.
+export function civetImg(pose = 'walk', face = 'left', frame = 0) {
+  const key = pose === 'catch' ? 'civetCatch' : pose === 'flee' ? 'civetFlee' : 'civet';
+  const a = SPR3?.[key]?.[face] ?? SPR3?.weasel?.[face];
+  return a ? a[frame % a.length] : null;
+}
+const oneOf = v => (Array.isArray(v) ? v[0] : v) ?? null;
+// Đồ thằng Tèo sắm sau mỗi lần bị bắt: đèn pin rồi giày êm (issue 46)
+function teoGear(blit, state, t, face) {
+  const g = thiefGear(state);
+  const sh = g.shoes && oneOf(SPR3?.thiefShoes?.[face]);
+  if (sh) blit(sh, Math.round(t.x - sh.width / 2), t.y - sh.height + 1);
+  const to = g.torch && oneOf(SPR3?.thiefTorch?.[face]);
+  if (to) blit(to, face === 'right' ? t.x + 4 : t.x - 4 - to.width, t.y - 15);
+}
 export const eggSize = () => { const e = eggImg(); return { w: e.width, h: e.height }; };
 export const poopSize = () => { const e = poopImg(); return { w: e.width, h: e.height }; };
 const spr2 = key => String(key).split('.').reduce((o, k) => o?.[k], SPR2);   // 'villageHouses.1' = phần tử của mảng
@@ -224,10 +327,14 @@ export function gateImg(id, s) {
   if (id === 'giftbox') return (g.open === id && SPR2?.giftBoxOpen) || (g.gifts > 0 && SPR2?.giftBoxFull) || SPR2?.giftBox;
   return (g.open === id && SPR2?.guestBookOpen) || SPR2?.guestBook;
 }
+const spr3 = key => String(key).split('.').reduce((o, k) => o?.[k], SPR3);   // công trình vẽ ở art3 (trạm thú y)
+const PEN_SHORT = { chicken: 'Gà', pig: 'Heo', pasture: 'Bò cừu', quarantine: 'Cách ly' };
 export function buildingImg(b) {
-  if (b.interior) return spr2(b.sprite) ?? furnFallback(b.sprite);
+  if (b.interior) return spr2(b.sprite) ?? spr3(b.sprite) ?? furnFallback(b.sprite);
   if (b.sprite === 'well') return wellImg();
   if (b.sprite === 'board') return boardImg();
+  if (b.sprite === 'doghouse' && SPR3?.doghouse) return SPR3.doghouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.doghouse[0];   // chuồng chó 3 cấp
+  if (b.sprite === 'cathouse' && SPR3?.cathouse) return SPR3.cathouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.cathouse[0];   // nhà mèo 3 cấp
   return SPR[b.sprite] ?? SPR2?.[b.sprite] ?? null;
 }
 export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h: i.height }; }
@@ -343,7 +450,7 @@ function outdoorChunk(m, ci, cw) {
   }
 
   // hàng rào, xếp theo hàng để chồng lớp đúng
-  for (const f of fences.filter(f => f.c >= c0 && f.c <= c1 && f.r >= r0 && f.r <= r1).sort((a, b) => a.r - b.r || a.c - b.c)) fenceTile(x, f.kind, f.c * TS, f.r * TS);
+  for (const f of fences.filter(f => f.c >= c0 && f.c <= c1 && f.r >= r0 && f.r <= r1).sort((a, b) => a.r - b.r || a.c - b.c)) fenceTile(x, f.kind, f.c * TS, f.r * TS, f.lv);
 
   // cỏ và hoa lác đác
   const nearRoad = (c, r) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => gAt(c + a, r + b) === GROUND.ROAD);
@@ -445,6 +552,8 @@ function drawBuild(ctx, state, m, b, now) {
   if (di) ctx.drawImage(di, Math.round(dc.x + dx - di.width / 2), Math.round(dc.y + dy - di.height + 1));
   const ni = g.what?.kind === 'deco' && decoImg(g.what.item);   // món mới đặt: vẽ mờ theo ngón tay
   if (ni) ctx.drawImage(ni, Math.round(g.c * TS + 8 - ni.width / 2), Math.round(g.r * TS + 13 - ni.height));
+  const ci = g.what?.kind === 'cathouse' && SPR3?.cathouse?.[0];   // nhà mèo mới xây
+  if (ci) ctx.drawImage(ci, Math.round(g.c * TS - 5), Math.round(g.r * TS - 8));
   ctx.globalAlpha = 1;
 }
 
@@ -511,6 +620,14 @@ export function render(ctx, f) {
   drawStatic(ctx, m, camX / scale, camY / scale, (camX + width) / scale, (camY + height) / scale);
 
   const blit = (img, x, y) => { if (img) ctx.drawImage(img, Math.round(x), Math.round(y)); };
+  // Biển "đã về" trên cửa chuồng: SPR3.homeBoard nếu có, không thì tấm gỗ vẽ tạm. Còn con chưa về thì chữ đỏ.
+  const homeSign = (g, h) => {
+    const im = SPR3?.homeBoard, x = Math.round(g.x), y = Math.round(g.y) - 12;
+    if (im) blit(im, x - im.width / 2, y - im.height);
+    else { rect(ctx, '#6b4020', x - 13, y - 9, 26, 9); rect(ctx, '#fff6dc', x - 12, y - 8, 24, 7); }
+    ctx.font = '6px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = h.home < h.total ? '#7a1f10' : '#1d5a1d';
+    ctx.fillText(`${h.home}/${h.total}`, x, y - 2);
+  };
   const shadow = (x, y, rx) => {
     ctx.fillStyle = 'rgba(20,40,10,0.22)';
     ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y) - 0.5, rx, rx * 0.38, 0, 0, 7); ctx.fill();
@@ -536,16 +653,21 @@ export function render(ctx, f) {
 
   // 2) bóng dưới chân
   shadow(state.player.x, state.player.y, 6);
-  const animals = farm ? state.animals : [], threats = farm ? state.threats ?? [] : [];
-  for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : a.adult ? 6 : 4);
+  const animals = farm ? state.animals : [], threats = farm ? state.threats ?? [] : [], preds = farm ? state.preds ?? [] : [];
+  const small = { non: 0.6, nho: 0.8 };
+  for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, Math.round((a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : 6) * (small[a.stage] ?? 1)));
   if (farm && state.dog.x != null && vis(state.dog.x, state.dog.y)) shadow(state.dog.x, state.dog.y, 6);
+  const cats = catsIn(state, m.scene);
+  for (const c of cats) if (c.x != null && vis(c.x, c.y)) shadow(c.x, c.y, Math.round(5 * (small[c.stage] ?? 1)));
   for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
+  for (const p of preds) if (p.x != null && vis(p.x, p.y, 40) && p.kind !== 'hawk') shadow(p.x, p.y, p.kind === 'rat' ? 4 : 6);
 
   // 3) các vật nhô lên, sắp theo y chân
   const items = [];
   const add = (y, fn) => items.push({ y, fn });
   const bubbles = [];
-  const bub = (x, y, icon, key) => { if (icon) bubbles.push({ x, y, icon, key }); };
+  // tone: 'warn' bong bóng vàng (mệt) · 'bad' bong bóng đỏ nhấp nháy (bệnh nặng, nguy kịch)
+  const bub = (x, y, icon, key, tone) => { if (icon) bubbles.push({ x, y, icon, key, tone }); };
 
   for (const t of [...m.trees, ...m.border]) if (vis(t.x, t.y, 30)) add(t.y, () => blit(SPR.tree, t.x - 16, t.y - 44));
   for (const b of m.bushes) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
@@ -564,7 +686,7 @@ export function render(ctx, f) {
     if (!img || !vis(b.x + img.width / 2, b.y + img.height / 2, Math.max(img.width, img.height) / 2)) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
     if (b.npc) {   // người đứng cạnh công trình (Bà Tư), thở nhẹ hai nhịp
-      const idle = SPR2?.[b.npc.key + 'Idle'], im = idle?.[Math.floor(now / 700) % idle.length];
+      const idle = SPR2?.[b.npc.key + 'Idle'] ?? SPR3?.[b.npc.key + 'Idle'], im = idle?.[Math.floor(now / 700) % idle.length];
       if (im) add(b.npc.y, () => blit(im, b.npc.x - 8, b.npc.y - 24));
     }
     if (b.id === 'market' && SPR2?.marketClosed && !marketOpen(state)) add((b.foot.r + b.foot.h) * TS + 0.5, () => blit(SPR2.marketClosed, b.x + 12, b.y + 22));
@@ -576,14 +698,22 @@ export function render(ctx, f) {
       });
     }
   }
-  for (const [pen, p] of Object.entries(m.pens)) {
-    const tr = p.trough, n = state.troughs?.[pen] ?? 0;
-    if (!vis(tr.x, tr.y, 20)) continue;
+  for (const p of m.penList) {   // nhà/mái chuồng theo cấp, rồi máng
+    const hs = p.house, hi = hs.sprite === 'quarantine' ? SPR3?.quarantine : SPR3?.pen?.[hs.sprite]?.[p.lv - 1];
+    if (hi && vis(hs.x, hs.y - hi.height / 2, hi.width)) add(hs.y, () => blit(hi, hs.x - hi.width / 2, hs.y - hi.height));
+    const hm = farm && isDusk(state) ? penHome(state, p.id) : null, gt = hm?.total ? gateOf(state, p.id) : null;
+    if (gt && vis(gt.x, gt.y, 24)) add(gt.y + 3, () => homeSign(gt, hm));   // biển số con đã về trên cửa chuồng
+    const tr = p.trough, n = state.troughs?.[p.type] ?? 0;
+    if (!tr || !vis(tr.x, tr.y, 20)) continue;
     add(tr.y, () => {
       blit(SPR.trough, tr.x - 13, tr.y - 12);
       if (n <= 0) { rect(ctx, '#8a5a2b', tr.x - 12, tr.y - 9, 24, 3); rect(ctx, '#6b4020', tr.x - 12, tr.y - 9, 24, 1); }
       else { rect(ctx, '#3b2412', tr.x - 10, tr.y + 1, 20, 3); rect(ctx, '#5fd35f', tr.x - 9, tr.y + 2, Math.max(1, Math.round(18 * Math.min(1, n / 20))), 1); }
     });
+  }
+  for (const p of m.penList) {   // cân heo, mỗi chuồng heo một cái
+    const sc = p.scale, im = SPR3?.scale;
+    if (sc && im && vis(sc.x, sc.y, 20)) add(sc.y, () => blit(im, sc.x - 8, sc.y - 14));
   }
   // ổ ấp trứng cạnh chuồng gà nhỏ
   const coop = m.building('coop');
@@ -594,7 +724,7 @@ export function render(ctx, f) {
       rect(ctx, '#3b2412', coop.at.x - 8, coop.at.y - 6, 16, 6); rect(ctx, '#e8c34a', coop.at.x - 7, coop.at.y - 5, 14, 4);
       if (state.nest?.egg) { rect(ctx, '#3b2412', coop.at.x - 3, coop.at.y - 9, 6, 6); rect(ctx, '#fff8e0', coop.at.x - 2, coop.at.y - 8, 4, 4); }
     }
-    if (state.nest?.egg) bub(coop.at.x, coop.at.y - 12, SPR.product.trung, 'nest');
+    if (state.nest?.egg) bub(coop.at.x, coop.at.y - 12, (state.nest.sp === 'vit' ? SPR3?.eggDuck : null) ?? SPR.product.trung, 'nest');
   });
 
   // cây trồng, cỏ, sâu
@@ -624,7 +754,14 @@ export function render(ctx, f) {
   }
 
   // trứng, phân
-  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => { const im = eggImg(); blit(im, e.x - im.width / 2, e.y - im.height + 1); });
+  // trứng trong bụi: vẽ ổ cỏ (đã soi thì vẽ như trứng đã soi)
+  for (const e of farm ? state.eggs ?? [] : []) if (e.x != null && vis(e.x, e.y)) add(e.y, () => {
+    const im = (e.tile && !e.candled && (e.sp === 'vit' ? SPR3?.eggNestDuck : SPR3?.eggNest)) || eggImgOf(e);
+    blit(im, e.x - im.width / 2, e.y - im.height + 1);
+    // chó vừa đánh hơi ra (lệnh Tìm trứng): treo dấu mùi cho dễ thấy
+    const sn = e.found && SPR3?.sniffMark;
+    if (sn) { const f = sn.left[Math.floor(now / 320) % sn.left.length]; blit(f, e.x - f.width / 2, e.y - im.height - f.height - 1); }
+  });
   for (const p of farm ? state.poops ?? [] : []) {
     if (p.x == null || !vis(p.x, p.y)) continue;
     add(p.y, () => {
@@ -636,9 +773,25 @@ export function render(ctx, f) {
       ctx.globalAlpha = 1;
     });
   }
+  // thóc vừa rải ở cửa chuồng: bao cám nghiêng xuống rồi hạt nằm trên đất, mờ dần
+  for (const g of farm ? wd.grains ?? [] : []) {
+    const u = (now - g.t0) / GRAIN_MS;
+    if (u < 0 || u > 1 || !vis(g.x, g.y)) continue;
+    add(g.y - 1, () => {
+      ctx.globalAlpha = u > 0.75 ? (1 - u) / 0.25 : 1;
+      const im = SPR3?.grainScatter;
+      if (im) blit(im, g.x - im.width / 2, g.y - im.height + 5);
+      else { rect(ctx, '#e8c34a', g.x - 6, g.y - 2, 12, 3); }
+      const sk = SPR3?.feedSack;
+      if (sk && u < 0.45) blit(sk, g.x + 5, g.y - sk.height - 3 + Math.round(u * 6));
+      ctx.globalAlpha = 1;
+    });
+  }
   // đồ trang trí
   for (const d of m.decos) {
     if (!vis(d.x, d.y)) continue;
+    if (d.kind === 'deco_lowfence') { const fe = lowFenceAt(m, d.ent); add(d.y, () => blit(fe, d.ent.c * TS, d.ent.r * TS)); continue; }   // hàng rào thấp: vẽ theo ô, ngang hay dọc tùy hàng xóm
+    if (d.kind === 'deco_rattrap') { const tp = trapImg(d.ent); add(d.y, () => blit(tp, d.x - tp.width / 2, d.y - tp.height + 1)); continue; }   // bẫy chuột: gài / đã sập
     const im = decoImg(d.kind);
     add(d.y, () => blit(im, d.x - im.width / 2, d.y - im.height + 1));
   }
@@ -648,27 +801,103 @@ export function render(ctx, f) {
     if (a.x == null || !vis(a.x, a.y)) continue;
     const rt = wd.rt.get('a' + a.id) ?? {};
     const frame = rt.walking ? Math.floor(rt.anim * 7) % 2 : rt.peck ? Math.floor(rt.anim * 6) % 2 : 0;
-    const im = animalImg(a.type, a.adult, rt.face ?? 'left', frame);
+    const sleeping = !rt.walking && (night > 0.6 || rt.nap || a.stray);   // ban đêm, hoặc con già ngủ gật
+    let im = animalImg(a, rt.face ?? 'left', frame, sleeping, rt.scared);
     if (!im) continue;
+    if (a.pregnant && !sleeping) im = bellied(im);
     const dy = rt.peck && frame ? 1 : 0;
-    add(a.y, () => blit(im, a.x - im.width / 2, a.y - im.height + 1 + dy));
+    const bath = (wd.baths ?? []).find(b => b.id === a.id && !b.wallow), ph = bath && bathPhase(bath, now);
+    const wal = !bath && (wd.baths ?? []).some(b => b.id === a.id && b.wallow && now - b.t0 < WALLOW_MS);
+    // dơ: bùn bám đúng dáng con vật, dơ nhiều thì ruồi bay quanh; đang tắm thì hiện sạch
+    const lv = bath ? 0 : a.dirty >= 80 ? 3 : a.dirty >= 55 ? 2 : a.dirty >= 30 ? 1 : 0;
+    const body = lv ? muddy(im, lv) : im;
+    const shake = ph?.name === 'shake' ? Math.round(Math.sin(now / 38) * 2) : 0;
+    add(a.y, () => {
+      const bx = a.x - im.width / 2 + shake, by = a.y - im.height + 1 + dy;
+      if (wal && a.type === 'heo' && SPR3?.heoMud) { const m = SPR3.heoMud[Math.floor(now / 220) % 2]; blit(m, a.x - m.width / 2, a.y - m.height + 1); }
+      else blit(body, bx, by);
+      if (lv >= 2 && SPR3?.fx?.flies) { const f = SPR3.fx.flies[Math.floor(now / 160 + a.id) % 3]; blit(f, a.x - f.width / 2, by - f.height + 2); }
+      if (ph?.name === 'soap') { const sz = im.width < 14 ? 's' : im.width < 20 ? 'm' : 'l', o = SPR3.fx.soap[sz][Math.floor(now / 250) % 2]; blit(o, a.x - o.width / 2, a.y - (im.height + o.height) / 2 + 1); }
+      if (ph?.name === 'shake') { const sp = SPR3.fx.splash[Math.floor(ph.t * 3.2) % 3]; blit(sp, a.x - sp.width / 2, a.y - im.height - sp.height / 2); }
+      if (ph?.name === 'sparkle') { const sp = SPR3.fx.sparkleClean[Math.floor(ph.t * 3) % 3]; blit(sp, a.x - sp.width / 2, a.y - im.height - sp.height / 2 + 2); }
+      if (a.hurt && SPR3?.hurtPatch) { const hp = SPR3.hurtPatch; blit(hp, a.x - hp.width / 2 + 1, a.y - im.height / 2 - hp.height / 2 + 1); }   // băng gạc vết chuột cắn
+    });
     const emote = wd.emotes.get('a' + a.id);
-    let icon = null;
+    let icon = null, tone = null;
     if (emote && emote.until > now) icon = statusIcon(emote.icon);
     else if (state.time < (a.scaredUntil ?? 0)) icon = statusIcon('scared');
-    else if (a.sick) icon = statusIcon('sick');
+    else if (a.hurt) { icon = statusIcon('hurtIcon') ?? statusIcon('sick'); tone = 'bad'; }   // con non bị chuột cắn: băng gạc nhấp nháy đỏ
+    else if (a.sick) { icon = statusIcon('sick'); tone = a.sick >= 2 ? 'bad' : 'warn'; }
+    else if (rt.scared) icon = statusIcon('scared');
+    else if (a.stray) icon = SPR3?.strayIcon ?? statusIcon('zzz');   // con lạc ngủ ngoài 💤
     else if (a.hunger < 35) icon = statusIcon('hungry');
     else if (a.ready) icon = statusIcon(a.type === 'cuu' ? 'wool' : 'milk');
     else if (a.pregnant) icon = statusIcon('pregnant');
-    else if (night > 0.6 && !rt.walking) icon = statusIcon('zzz');
-    bub(a.x, a.y - im.height - 1, icon, 'a' + a.id);
+    else if (sleeping) icon = statusIcon('zzz');
+    bub(a.x, a.y - im.height - 1, icon, 'a' + a.id, tone);
+    // nguy kịch: đếm ngược trên đầu
+    const left = sickLeft(a);
+    if (left != null) add(a.y + 2, () => {
+      const t = mmss(left), w = t.length * 4 + 5, tx = Math.round(a.x), ty = Math.round(a.y - im.height - 24);
+      rect(ctx, '#3b2412', tx - w / 2 - 1, ty - 1, w + 2, 9);
+      rect(ctx, now % 700 < 350 ? '#e5452f' : '#ff8a72', tx - w / 2, ty, w, 7);
+      ctx.font = '6px ' + FONT; ctx.textAlign = 'center'; ctx.fillStyle = '#fff6dc'; ctx.fillText(t, tx, ty + 6);
+    });
+    if (a.retired) add(a.y + 1, () => { ctx.font = '7px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🪑', a.x + im.width / 2 + 1, a.y); });   // nghỉ hưu: ghế bên cạnh
   }
-  // chó (issue 31: ngủ gật 💤, sủa "GÂU GÂU!", chạy đuổi khách lạ, khúc xúc xích dưới đất)
+  // Chú Ba tới cổng, dắt con vật vừa bán đi (cảnh thuần hiển thị; main.js đẩy vào wd.deals khi bán xong)
+  const gin = m.gateIn;
+  for (const d of farm && gin ? wd.deals ?? [] : []) {
+    const u = (now - d.t0) / DEAL_MS, spot = { x: d.x, y: d.y };
+    if (u < 0 || u > 1) continue;
+    const lerp = (p, q, k) => ({ x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k });
+    const out = u > 0.47, cb = u < 0.35 ? lerp(gin, spot, u / 0.35) : !out ? spot : lerp(spot, gin, (u - 0.47) / 0.53);
+    const from = u < 0.35 ? gin : spot, to = u < 0.35 ? spot : gin, mv = u < 0.35 || out;
+    const dx = to.x - from.x, dy = to.y - from.y, dir = !mv ? 0 : Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : dy < 0 ? 3 : 0;
+    const set = SPR3?.npcChuBa?.[dir], im = set ? set[mv ? Math.floor(now / 140) % set.length : 0] : null;
+    const pet = animalImg({ type: d.type, stage: d.stage, sex: d.sex }, dx < 0 ? 'left' : 'right', out ? Math.floor(now / 160) % 2 : 0);
+    const L = Math.hypot(dx, dy) || 1, ap = out ? { x: cb.x - dx / L * 18, y: cb.y - dy / L * 18 } : spot;
+    add(Math.max(cb.y, ap.y), () => {
+      ctx.globalAlpha = u > 0.92 ? (1 - u) / 0.08 : 1;
+      if (pet) blit(pet, ap.x - pet.width / 2, ap.y - pet.height + 1);
+      if (out) { ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(cb.x + (dx < 0 ? -5 : 5), cb.y - 9); ctx.lineTo(ap.x, ap.y - 4); ctx.stroke(); }
+      if (im) blit(im, cb.x - 8, cb.y - 23);
+      if (u > 0.3 && u < 0.62) {   // bong bóng báo giá
+        const t = d.kg != null ? `${d.kg} kg × ${d.unit} = ${d.price} xu` : `${d.price} xu`;
+        ctx.font = '6px sans-serif'; ctx.textAlign = 'center';
+        const w = ctx.measureText(t).width + 6, bx = Math.round(cb.x - w / 2), by = Math.round(cb.y - 36);
+        rect(ctx, '#3b2412', bx - 1, by - 1, w + 2, 11); rect(ctx, '#fff6dc', bx, by, w, 9);
+        ctx.fillStyle = '#3b2412'; ctx.fillText(t, cb.x, by + 7);
+      }
+      ctx.globalAlpha = 1;
+    });
+  }
+  // con vật già ra đi: thiên thần bay lên rồi mờ dần (main.js đẩy vào wd.angels khi có event 'passed')
+  for (const g of wd.angels ?? []) {
+    const t = (now - g.t0) / ANGEL_MS;
+    if (t < 0 || t > 1 || !vis(g.x, g.y, 60)) continue;
+    const im = SPR3?.angel?.[Math.floor(now / 250) % 2] ?? angelFallback();
+    add(g.y + 100, () => {
+      ctx.globalAlpha = t < 0.7 ? 1 : (1 - t) / 0.3;
+      blit(im, g.x - im.width / 2 + Math.round(Math.sin(t * 9) * 2), g.y - im.height - t * 46);
+      ctx.globalAlpha = 1;
+    });
+  }
+  // chỗ chó đang gác (lệnh Canh khu)
+  const post = farm && dogPost(state);
+  if (post && SPR3?.guardPost) {
+    const px = post.c * TS + 8, py = post.r * TS + 14;
+    if (vis(px, py)) add(py, () => blit(SPR3.guardPost, px - SPR3.guardPost.width / 2, py - SPR3.guardPost.height));
+  }
+  // chó (đi theo chủ thì vẽ cả ở làng, trong nhà; issue 31: ngủ gật 💤, sủa "GÂU GÂU!", chạy đuổi khách lạ, khúc xúc xích dưới đất)
   const dog = state.dog;
-  if (farm && dog.x != null && vis(dog.x, dog.y)) {
+  if ((dog.scene ?? 'farm') === m.scene && dog.x != null && vis(dog.x, dog.y)) {
     const rt = wd.rt.get('dog') ?? {};
     const face = rt.face ?? 'right', nap = dogNapping(state), quiet = dogQuiet(state);
-    const im = guardImg(dog.adult, face, rt, nap, now);
+    const moving = rt.walking || rt.pose === 'herd';
+    const im = rt.bark ? guardImg(dog, face, rt, now)   // đang sủa, đuổi khách lạ
+      : rt.pose ? dogPoseImg(dog, rt.pose, face, Math.floor(rt.anim * (rt.pose === 'herd' ? 9 : 3)))
+      : dogImg(dog, face, moving ? Math.floor(rt.anim * (rt.run ? 10 : 7)) % 2 : 0, nap || (!moving && rt.nap));
     if (im) {
       add(dog.y, () => {
         if (quiet) blit(SPR2?.sausageGround ?? SPR.items?.dogfood, dog.x - 4, dog.y - 5);   // khúc xúc xích nó đang gặm
@@ -676,25 +905,87 @@ export function render(ctx, f) {
       });
       if (rt.bark) add(dog.y + 0.5, () => barkBubble(ctx, blit, dog.x, dog.y - im.height - 2));
       const emote = wd.emotes.get('dog');
-      // đang ngủ gật thì 💤 đã nằm sẵn trong sprite, khỏi thêm bong bóng nữa
-      const icon = emote && emote.until > now ? statusIcon(emote.icon) : nap || dog.hunger >= 30 ? null : statusIcon('hungry');
+      const icon = emote && emote.until > now ? statusIcon(emote.icon) : nap || rt.nap ? statusIcon('zzz') : dog.hunger < 30 ? statusIcon('hungry') : null;
       if (!rt.bark) bub(dog.x, dog.y - im.height - 1, icon, 'dog');
+      // bong bóng lệnh đang thi hành
+      const tr = dog.cmd && TRICKS[dog.cmd.id], bb = SPR3?.cmdBubble, ti = tr && SPR3?.trickIcon?.[dog.cmd.id];
+      if (tr && bb && ti) add(dog.y + 1, () => {
+        // lòng bong bóng 12x10 (5 hàng dưới là đuôi nhọn): thu icon 16x16 cho vừa
+        const bx = Math.round(dog.x + im.width / 2 - 2), by = Math.round(dog.y - im.height - bb.height - 1);
+        const w = Math.min(12, ti.width), hh = Math.min(10, ti.height);
+        blit(bb, bx, by);
+        ctx.drawImage(ti, bx + Math.round((bb.width - w) / 2), by + 2, w, hh);
+      });
     }
   }
-  // quạ & thằng Tèo
+  // cửa mèo trên nhà: mèo ra vào tự do (chỉ hiện khi đã nuôi mèo hoặc đã xây nhà mèo)
+  const cd = farm && m.catDoor, cdi = SPR3?.catDoor;
+  if (cd && cdi && (cats.length || state.cats?.length || catHouses(state).length) && vis(cd.x, cd.y)) add(cd.y + 7, () => blit(cdi, cd.x - cdi.width / 2, cd.y - cdi.height + 1));
+  // mèo (issue 44): ban ngày ngoài vườn, ban đêm ngủ trong nhà
+  for (const c of cats) {
+    if (c.x == null || !vis(c.x, c.y)) continue;
+    const rt = wd.rt.get('c' + c.id) ?? {};
+    const im = catImg(c, rt);
+    if (!im) continue;
+    add(c.y, () => {
+      blit(im, c.x - im.width / 2, c.y - im.height + 1);
+      const side = rt.face === 'right' ? 1 : -1;
+      // mèo con vờn cuộn len cạnh chân
+      const yn = rt.yarn && SPR3?.catYarn?.[rt.face ?? 'left'];
+      if (yn) { const f = yn[Math.floor(now / 260) % yn.length]; blit(f, c.x + side * (im.width / 2 + 1) - (side < 0 ? f.width : 0), c.y - f.height + 1); }
+      // tới chỗ người chơi rồi: thả con chuột xuống trước mặt để khoe
+      const tp = c.trophy && rt.shown && SPR3?.ratTrophy;
+      if (tp) blit(rt.face === 'right' ? derived(tp, 'flip', () => flip(tp)) : tp, c.x + side * (im.width / 2) - (side < 0 ? tp.width : 0), c.y - tp.height + 2);
+    });
+    // cãi nhau với chó: bong bóng ồn ào trên đầu (vui thôi, không hại gì)
+    const sb = state.time < (c.spatUntil || 0) && SPR3?.spatBubble?.left;
+    if (sb) { const f = sb[Math.floor(now / 200) % sb.length]; add(c.y + 1, () => blit(f, c.x - f.width / 2, c.y - im.height - f.height - 2)); }
+    const emote = wd.emotes.get('c' + c.id);
+    const icon = emote && emote.until > now ? statusIcon(emote.icon) : c.sick ? statusIcon('sick') : c.sleep ? statusIcon('zzz') : c.hunger < 15 ? statusIcon('hungry') : null;
+    if (!sb) bub(c.x, c.y - im.height - 1, icon, 'c' + c.id, c.sick >= 2 ? 'bad' : c.sick ? 'warn' : null);
+  }
+  // quạ & trộm NPC (thằng Tèo, Tí Sún, chồn hương)
   for (const t of threats) {
     if (t.x == null || !vis(t.x, t.y, 40)) continue;
     const rt = wd.rt.get('t' + t.id) ?? {};
+    const face = rt.dir === 2 ? 'right' : 'left';
     if (t.kind === 'crow') {
       const alt = rt.alt ?? 0, frame = t.state === 'eating' ? Math.floor(now / 350) % 2 : Math.floor(now / 90) % 2;
       const im = crowImg(rt.face ?? 'left', frame);
       add(t.y + alt + 20, () => blit(im, t.x - im.width / 2, t.y - alt - im.height + 1));
+    } else if (t.kind === 'civet') {
+      const pose = t.state === 'eating' ? 'catch' : t.state === 'leaving' ? 'flee' : 'walk';
+      const im = civetImg(pose, face, Math.floor(now / (pose === 'flee' ? 110 : 190)));
+      if (im) add(t.y, () => blit(im, t.x - Math.round(im.width / 2), t.y - im.height + 1));
     } else {
-      const frames = wd.teoFrames();
       const dir = rt.dir ?? 0, fr = rt.walking ? [1, 0, 2, 0][Math.floor(rt.anim * 8) % 4] : 0;
-      const im = frames[dir][dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr];
-      add(t.y, () => blit(im, t.x - 8, t.y - 23));
+      const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
+      // Tí Sún rón rén lúc đang lục trứng; lúc đi thì dùng bộ khung đi riêng của nó
+      const im = t.kind === 'tisun'
+        ? (t.state === 'eating' ? tisunImg('sneak', face, Math.floor(now / 280)) : null) ?? tisunImg('walk', face, k, dir) ?? wd.teoFrames()[dir][k]
+        : wd.teoFrames()[dir][k];
+      add(t.y, () => { blit(im, t.x - 8, t.y - 23); if (t.kind === 'thief') teoGear(blit, state, t, face); });
     }
+    // bong bóng báo trộm: nhấp nháy trên đầu kẻ đang ra tay
+    const bb = t.kind !== 'crow' && t.state === 'eating' && SPR3?.thiefBubble;
+    if (bb) add(t.y + 0.5, () => {
+      ctx.globalAlpha = 0.6 + 0.4 * Math.abs(Math.sin(now / 240));
+      blit(bb, Math.round(t.x - bb.width / 2), Math.round(t.y - (t.kind === 'civet' ? 14 : 28) - bb.height));
+      ctx.globalAlpha = 1;
+    });
+  }
+  // kẻ săn mồi: chuột lon ton dưới đất, chồn men theo đất, diều hâu bay có bóng riêng in trên mặt đất
+  for (const p of preds) {
+    if (p.x == null || !vis(p.x, p.y, 48)) continue;
+    const rt = wd.rt.get('p' + p.id) ?? {};
+    const im = predImg(p, rt);
+    if (!im) continue;
+    if (p.kind === 'hawk') {
+      const gy = rt.ground ?? p.y, sh = SPR3?.hawkShadow;
+      if (sh) add(gy - 0.5, () => { ctx.globalAlpha = 0.7; blit(sh, p.x - sh.width / 2, gy - sh.height / 2); ctx.globalAlpha = 1; });
+      add(gy + 24, () => blit(im, p.x - im.width / 2, p.y - im.height + 1));
+    } else add(p.y, () => blit(im, p.x - im.width / 2, p.y - im.height + 1));
+    if (p.state !== 'leaving' && p.strikeAt - state.time <= 10_000) bub(p.x, p.y - im.height - 1, statusIcon('predIcon') ?? statusIcon('warn'), 'pred' + p.id, 'bad');   // bong bóng cảnh báo 🔴
   }
   // người chơi
   {
@@ -731,8 +1022,9 @@ export function render(ctx, f) {
     if (!vis(b.x, b.y)) continue;
     const bob = Math.round(Math.sin(now / 320 + bi++) * 1);
     const bx = Math.round(b.x - 6), by = Math.round(b.y - 15 + bob);
-    ctx.globalAlpha = 0.92;
-    ctx.drawImage(SPR.bubble, bx, by);
+    const blink = b.tone === 'bad' ? 0.55 + 0.45 * Math.abs(Math.sin(now / 240)) : 1;   // đỏ thì nhấp nháy
+    ctx.globalAlpha = 0.92 * blink;
+    ctx.drawImage(b.tone === 'warn' ? tinted(SPR.bubble, '#f7d547', 0.55) : b.tone === 'bad' ? tinted(SPR.bubble, '#e5452f', 0.6) : SPR.bubble, bx, by);
     ctx.globalAlpha = 1;
     ctx.drawImage(b.icon, Math.round(bx + 6.5 - b.icon.width / 2), Math.round(by + 5.5 - b.icon.height / 2));
   }
@@ -864,6 +1156,12 @@ export function render(ctx, f) {
     if (b.sub && !(b.id === 'friendGate' && state.mode === 'online')) outlined(b.sub, toSX(cx), toSY(b.y + img.height) + 11 * scale, Math.round(11 * dpr), '#ffe9a0');
     if (b.id === 'market' && !marketOpen(state)) fit('Đóng cửa', toSX(b.x + 24), toSY(b.y + 22 + 9), 20 * scale, Math.round(5.5 * scale), '#ffe9a0');
     if (b.id === 'friendGate') fit('Bạn bè', toSX(b.x + 20), toSY(b.y + 18), 14 * scale, Math.round(4.5 * scale), '#4a2c14');
+  }
+  // biển chuồng: tên ngắn + số con/sức chứa
+  for (const p of m.penList) {
+    const cx = (p.rect.c + p.rect.w / 2) * TS, y = p.rect.r * TS - 1;
+    if (!vis(cx, y, 40)) continue;
+    outlined(`${PEN_SHORT[p.type]} ${penUse(state, p.id)}/${penCapOf(p.ent)}`, toSX(cx), toSY(y), Math.round(10 * dpr), '#fff6d8');
   }
   // tên người chơi
   {

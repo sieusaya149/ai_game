@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
-import { createGame } from '../public/state.js';
+import { createGame, stageStart } from '../public/state.js';
 import { GUARD } from '../public/data.js';
 
 const LV5 = 500;
@@ -43,7 +43,7 @@ async function poll(get, pred, ms = 3000) {
   }
 }
 // Vườn chủ có chó Mực trưởng thành, no và vui
-const guarded = s => { Object.assign(s.dog, { adult: true, hunger: 100, happy: 100 }); };
+const guarded = s => { Object.assign(s.dog, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100 }); };
 
 test('chủ đang online: chó sủa được đẩy thẳng sang trình duyệt chủ kèm chỗ thấy khách', async t => {
   const { player } = await setup(t);

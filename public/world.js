@@ -1,16 +1,18 @@
 // Thế giới: di chuyển, va chạm, tìm đường, AI con vật/chó/quạ/trộm, tìm target. Không vẽ gì.
 import { TS, GROUND } from './layout.js';
-import { ANIMALS, CROPS, DOG, GUARD, WALK_SPEED, DIR_NAME } from './data.js';
+import { ANIMALS, CROPS, DOG, GUARD, WALK_SPEED, DIR_NAME, BOND, FREE, PREDATOR } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
+import { troughOf } from './farm.js';
 import { aiStep } from './perf.js';
-import { animalImg, dogImg, crowImg, eggSize, poopSize, buildingImg, decoSize } from './render.js';
+import { animalImg, dogImg, catImg, crowImg, eggSize, poopSize, buildingImg, decoSize, TEO_LOOK } from './render.js';
 
 const SPEED = WALK_SPEED;         // px/s của người chơi (luật chó đuổi tính theo con số này)
 const HW = 5, HH = 3;             // nửa hộp chân 10x6
 const DIRV = [[0, 1], [-1, 0], [1, 0], [0, -1]];
-const TEO_LOOK = { skin: 1, hair: 0, hairColor: 4, shirt: 4, pants: 2, hat: 2, acc: 1 };
-const A_SPEED = { ga: 20, heo: 16, bo: 11, cuu: 13 };
+const THREAT_NAME = { crow: 'Con quạ', thief: 'Thằng Tèo', tisun: 'Tí Sún', civet: 'Con chồn hương' };
+const isBeast = t => t.kind === 'crow' || t.kind === 'civet';   // con thú: chạm nhỏ, không có bong bóng cao như người
+const A_SPEED = { ga: 20, vit: 17, heo: 16, bo: 11, cuu: 13 };
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -22,6 +24,12 @@ const dirOf = (dx, dy) => Math.abs(dy) > Math.abs(dx) ? (dy > 0 ? 0 : 3) : (dx <
 let M = null;
 const use = s => (M = ST.sceneMap(s));
 const atFarm = () => !!M.garden;   // vườn mình hoặc vườn người khác đang thăm
+// Bản đồ đang đứng theo cách chó/mèo ghi chỗ ở: thăm vườn người khác thì chó mèo của chủ vườn ở 'farm'
+const here = s => (s.scene === 'visit' ? 'farm' : s.scene);
+// Chó đang ở cùng bản đồ với người chơi? Bình thường nó ở vườn; có lệnh Đi theo thì nó lẽo đẽo sang làng, vào nhà (issue 45)
+export const dogHere = s => (s.dog.scene ?? 'farm') === here(s);
+// Mèo ở cùng bản đồ với người chơi (ban ngày ngoài vườn, ban đêm ngủ trong nhà; issue 44)
+const catsHere = s => ST.catsIn(s, here(s));
 export const nextLockedIdx = s => ST.nextLockedPlot(s);
 
 export function createWorld() {
@@ -106,7 +114,10 @@ export function ensurePositions(state) {
   const p = state.player, F = ST.mapOf(state);
   if (p.x == null || p.y == null) { p.x = M.spawn.x; p.y = M.spawn.y; }
   p.dir ??= 0;
-  for (const a of state.animals) if ((a.x == null || a.y == null) && F.pens[ANIMALS[a.type].pen]) Object.assign(a, inArea(F.pens[ANIMALS[a.type].pen].area));
+  for (const a of state.animals) {
+    if ((a.x == null || a.y == null) && a.tile) { a.x = a.tile.c * TS + 8; a.y = a.tile.r * TS + 8; continue; }
+    const pn = (a.x == null || a.y == null) && ST.animalPen(state, a); if (pn) Object.assign(a, inArea(pn.area));
+  }
   const d = state.dog;
   if (d.x == null || d.y == null) { d.x = F.dogHome.x; d.y = F.dogHome.y; }
   for (const e of state.eggs ?? []) if (e.x == null) Object.assign(e, inArea((F.pens.chicken ?? Object.values(F.pens)[0]).area));
@@ -116,20 +127,83 @@ export function ensurePositions(state) {
 // ---------- Con vật trong chuồng ----------
 // w.view (main.js đặt): khung nhìn của camera theo điểm ảnh bản đồ. Con vật ngoài khung chỉ cập nhật AI 2 lần/giây (gom dt).
 const onScreen = (w, o) => !w.view || (o.x >= w.view.x0 && o.x <= w.view.x1 && o.y >= w.view.y0 && o.y <= w.view.y1);
-function updateAnimals(state, w, dt0) {
+// Tốc độ theo giai đoạn: con non lon ton, con già chậm chạp
+const STAGE_SPEED = { non: 1.25, nho: 1.1, truong: 1, gia: 0.6 };
+// Gà/vịt mẹ gần nhất cùng loài cho con non chạy theo
+const POULTRY = ['ga', 'vit'];
+const henOf = (state, a) => POULTRY.includes(a.type) && a.stage === 'non'
+  ? state.animals.filter(h => h.type === a.type && h.sex === 'f' && (h.stage === 'truong' || h.stage === 'gia') && h.x != null).sort((u, v) => dist(u, a) - dist(v, a))[0] : null;
+// Vịt con đi thành hàng sau vịt mẹ: con thứ k cách mẹ (k+1) bước, phía sau hướng mẹ đang đi
+function duckRow(state, w, a, hen) {
+  const k = state.animals.filter(o => o.type === 'vit' && o.stage === 'non' && o.id < a.id && henOf(state, o) === hen).length;
+  const hr = rtOf(w, 'a' + hen.id), back = (hr.tx ?? hen.x) >= hen.x ? -1 : 1;
+  return { x: hen.x + back * (7 + 6 * k), y: hen.y + 1 };
+}
+// Gà thả rông (luật chọn ô a.tile, ở đây chỉ đi tới đó): thẳng tới điểm trong ô, không bước vào ô ngoài vùng đi lại; kẹt lâu thì nhảy tới nơi.
+// Lùa một con thả rông ra xa điểm src (người chơi lát 42, con chó lát 45): nó chạy ngược hướng src, tới cửa chuồng thì
+// luật ghi là đã về (ST.passGate). radius px, speed px/giây. Trả true nếu con này đang bị lùa (đã xử lý xong lượt đi của nó).
+export function shoo(state, a, src, dt, { radius = FREE.shyRadius, speed = 46, w } = {}) {
+  const rt = rtOf(w ?? { rt: new Map() }, 'a' + a.id);
+  if (!a.tile || a.x == null) return false;
+  return herd(state, a, rt, dt, ST.roamOf(state), src, radius, speed);
+}
+function herd(state, a, rt, dt, R, src = state.player, radius = FREE.shyRadius, speed = 46) {
+  const dx = a.x - src.x, dy = a.y - src.y, d = Math.hypot(dx, dy);
+  rt.scared = false;
+  if (d >= radius) return false;
+  const gates = ST.animalPen(state, a)?.gates ?? [];
+  const ok = (x, y) => { const c = Math.floor(x / TS), r = Math.floor(y / TS); return R.has(c, r) || gates.some(g => g[0] === c && g[1] === r); };
+  const st = speed * (STAGE_SPEED[a.stage] ?? 1) * dt, ux = dx / (d || 1), uy = d ? dy / d : 1;
+  let nx = a.x + ux * st, ny = a.y + uy * st;
+  if (!ok(nx, ny)) { if (ok(nx, a.y)) ny = a.y; else if (ok(a.x, ny)) nx = a.x; else { nx = a.x; ny = a.y; } }
+  a.x = nx; a.y = ny;
+  const c = Math.floor(a.x / TS), r = Math.floor(a.y / TS);
+  if (gates.some(g => g[0] === c && g[1] === r)) { ST.passGate(state, a.id); return true; }
+  if (R.has(c, r)) a.tile = { c, r };
+  if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
+  rt.walking = true; rt.peck = false; rt.scared = true; rt.anim += dt * 2;
+  return true;
+}
+function freeWalk(state, a, w, dt0) {
+  const rt = rtOf(w, 'a' + a.id), dt = aiStep(rt, dt0, onScreen(w, a));
+  if (!dt) return;
+  const R = ST.roamOf(state);
+  if (a.stray && herd(state, a, rt, dt, R)) return;
+  const tx = a.tile.c * TS + 3 + (a.id * 7) % 10, ty = a.tile.r * TS + 6 + (a.id * 5) % 8;
+  const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
+  rt.walking = false; rt.peck = false;
+  if (d < 1.5) { rt.stuck = 0; rt.peck = true; rt.anim += dt; return; }   // tới nơi: bới đất
+  const st = Math.min(d, (A_SPEED[a.type] ?? 14) * (STAGE_SPEED[a.stage] ?? 1) * dt), nx = a.x + dx / d * st, ny = a.y + dy / d * st;
+  const ok = (x, y) => R.has(Math.floor(x / TS), Math.floor(y / TS));
+  if (ok(nx, ny) || !ok(a.x, a.y)) { a.x = nx; a.y = ny; rt.stuck = 0; } else if ((rt.stuck = (rt.stuck || 0) + dt) > 1.5) { a.x = tx; a.y = ty; rt.stuck = 0; }
+  if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
+  rt.walking = true; rt.anim += dt;
+}
+function updateAnimals(state, w, dt0, out) {
   const p = state.player;
   const ms = M.mudSpot;
   const inMudSpot = a => !!ms && Math.abs(a.x - ms.x) < ms.rx && Math.abs(a.y - ms.y) < ms.ry;
   for (const a of state.animals) {
-    const pen = M.pens[ANIMALS[a.type].pen];
+    if (a.tile && state.scene === 'farm') { freeWalk(state, a, w, dt0); continue; }
+    const pen = ST.animalPen(state, a);
     if (!pen) continue;
-    const area = pen.area, rt = rtOf(w, 'a' + a.id);
-    const dt = aiStep(rt, dt0, onScreen(w, a));
+    const area = pen.area, rt = rtOf(w, 'a' + a.id), seen = onScreen(w, a);
+    const dt = aiStep(rt, dt0, seen);
     if (!dt) continue;
+    if (a.sick >= 2) { rt.walking = false; rt.peck = false; rt.nap = false; rt.mode = 'idle'; rt.timer = 1; continue; }   // bệnh nặng: nằm một chỗ
     const near = Math.hypot(p.x - a.x, p.y - a.y) < 26;
     const scared = state.time < (a.scaredUntil ?? 0);   // vừa bị dời chuồng: chạy loạn một lúc
-    const speed = (A_SPEED[a.type] ?? 14) * (a.adult ? 1 : 1.25) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
+    const speed = (A_SPEED[a.type] ?? 14) * (STAGE_SPEED[a.stage] ?? 1) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
     rt.walking = false; rt.peck = false;
+    // gà con kêu chiếp (thỉnh thoảng, khi đang ở trên màn hình)
+    if (POULTRY.includes(a.type) && a.stage === 'non' && seen && out && state.scene === 'farm' && Math.random() < dt * 0.06) {
+      out.results.push({ ok: true, sound: 'chirp', fx: [{ text: 'chiếp', color: '#fff6a0', x: a.x, y: a.y + 14 }] });
+    }
+    // ❤️4+ chạy lại khi người chơi tới gần, ❤️5 đi theo từ xa (trong phạm vi chuồng)
+    const bp = ST.bondPerk(a), pd = Math.hypot(p.x - a.x, p.y - a.y);
+    if (!scared && !a.sick && state.scene === 'farm' && pd >= 30 && ((bp.runTo && pd < BOND.runRange) || bp.follow)) {
+      rt.tx = clamp(p.x, area.x, area.x + area.w); rt.ty = clamp(p.y + 4, area.y, area.y + area.h); rt.mode = 'walk';
+    }
     if (scared && rt.mode !== 'walk') { const t = inArea(area, 2); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk'; }
     if (rt.mode === 'walk') {
       if (near && !scared) { rt.mode = 'idle'; rt.timer = 0.8; }
@@ -140,6 +214,7 @@ function updateAnimals(state, w, dt0) {
           const st = Math.min(d, speed * dt);
           a.x = clamp(a.x + dx / d * st, area.x, area.x + area.w);
           a.y = clamp(a.y + dy / d * st, area.y, area.y + area.h);
+          a.walk = (a.walk || 0) + st;   // quãng đã đi (heo ít đi thì mau béo)
           if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
           rt.walking = true; rt.anim += dt;
         }
@@ -147,14 +222,24 @@ function updateAnimals(state, w, dt0) {
     } else {
       rt.timer -= dt;
       if (rt.mode === 'peck') { rt.peck = true; rt.anim += dt; if (rt.timer <= 0) rt.mode = 'idle'; }
+      if (rt.mode === 'nap' && (rt.timer <= 0 || scared)) { rt.mode = 'idle'; rt.nap = false; }
       if (rt.timer <= 0 && !near) {
+        rt.nap = false;
         const inMud = a.type === 'heo' && inMudSpot(a);
-        const trough = state.troughs?.[ANIMALS[a.type].pen] ?? 0;
-        if (a.hunger < 60 && trough > 0 && Math.random() < 0.6) {
+        const trough = pen.trough ? state.troughs?.[ANIMALS[a.type].pen] ?? 0 : 0;   // chuồng cách ly không có máng
+        const hen = henOf(state, a);
+        if (hen && a.type === 'vit' && Math.random() < 0.9) {   // vịt con đi hàng theo vịt mẹ
+          const r = duckRow(state, w, a, hen);
+          rt.tx = clamp(r.x, area.x, area.x + area.w); rt.ty = clamp(r.y, area.y, area.y + area.h); rt.mode = 'walk';
+        } else if (hen && Math.random() < 0.75) {   // gà con lon ton theo gà mẹ
+          rt.tx = clamp(hen.x + rnd(-9, 9), area.x, area.x + area.w); rt.ty = clamp(hen.y + rnd(2, 7), area.y, area.y + area.h); rt.mode = 'walk';
+        } else if (a.stage === 'gia' && Math.random() < 0.45) {   // con già hay ngủ gật
+          rt.mode = 'nap'; rt.nap = true; rt.timer = rnd(4, 9);
+        } else if (a.hunger < 60 && trough > 0 && Math.random() < 0.6) {
           rt.tx = clamp(pen.trough.x + rnd(-14, 14), area.x, area.x + area.w); rt.ty = area.y + rnd(1, 8); rt.mode = 'walk';
         } else if (a.type === 'heo' && ms && !inMud && Math.random() < 0.45) {
           rt.tx = rnd(ms.x0, ms.x1); rt.ty = rnd(ms.y0, ms.y1); rt.mode = 'walk';
-        } else if (a.type === 'ga' && Math.random() < 0.4) {
+        } else if (POULTRY.includes(a.type) && Math.random() < (a.stage === 'nho' ? 0.7 : 0.4)) {   // gà nhỡ bới đất nhiều
           rt.mode = 'peck'; rt.timer = rnd(0.8, 1.8);
         } else {
           const t = inArea(area, 2); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk';
@@ -167,10 +252,11 @@ function updateAnimals(state, w, dt0) {
 // ---------- Chó Mực ----------
 // Chó chỉ chạy trên cỏ/đường trong đất nhà, không vào chuồng, không giẫm ruộng (chừa 1 ô quanh khối ruộng)
 const dogAllowed = (c, r) => {
+  if (M.scene !== 'farm') return !M.isSolid(c, r);   // đi theo chủ sang làng, vào nhà: chỗ nào người đi được thì chó đi được
   if (!M.isOwned(c, r) || M.isSolid(c, r)) return false;
   const g = M.ground[r * M.mw + c];
   if (g !== GROUND.GRASS && g !== GROUND.ROAD) return false;
-  for (const { rect } of Object.values(M.pens)) if (c >= rect.c && c < rect.c + rect.w && r >= rect.r && r < rect.r + rect.h) return false;
+  for (const { rect } of M.penList) if (c >= rect.c && c < rect.c + rect.w && r >= rect.r && r < rect.r + rect.h) return false;
   return !M.fields.some(f => c >= f.c - 1 && c < f.c + 4 && r >= f.r - 1 && r < f.r + 4);
 };
 const dogCan = (x, y) => dogAllowed(Math.floor(x / TS), Math.floor(y / TS)) && dogAllowed(Math.floor((x - 3) / TS), Math.floor(y / TS)) && dogAllowed(Math.floor((x + 3) / TS), Math.floor(y / TS));
@@ -180,7 +266,13 @@ function updateDog(state, w, dt0, out) {
   const chasing = state.scene === 'visit' && w.guard?.chasing;
   const dt = chasing ? dt0 : aiStep(rt, dt0, onScreen(w, d));
   if (!dt) return;
-  if (!dogCan(d.x, d.y)) { d.x = M.dogHome.x; d.y = M.dogHome.y; }
+  // chó nhỡ sủa lung tung cả ngày (issue 45)
+  rt.barkT = Math.max(0, (rt.barkT ?? 0) - dt);
+  if (d.stage === 'nho' && out && !rt.barkT && onScreen(w, d) && Math.random() < dt * 0.09) {
+    rt.barkT = 0.7;
+    out.results.push({ ok: true, sound: 'bark', fx: [{ text: 'Gâu!', color: '#fff6a0', x: d.x, y: d.y - 14 }] });
+  }
+  if (!dogCan(d.x, d.y)) { const home = atFarm() ? M.dogHome : p; d.x = home.x; d.y = home.y; }
   const dp = dist(d, p);
   rt.walking = false; rt.run = false;
   rt.timer -= dt;
@@ -197,6 +289,38 @@ function updateDog(state, w, dt0, out) {
     return false;
   };
   if (guardStep(state, w, rt, dt, goTo, out)) return;   // canh khách lạ: sủa rồi đuổi
+  // đang có lệnh (issue 45): luật đã quyết kết quả, đây chỉ là diễn hoạt
+  const cmd = d.cmd?.id;
+  rt.pose = rt.barkT ? 'bark' : null;
+  if (cmd === 'sit') { rt.pose = 'sit'; rt.anim += dt; rt.mode = 'idle'; return; }
+  if (cmd === 'guard') {
+    const sp = ST.dogPost(state);
+    if (sp && atFarm()) {
+      const tx = sp.c * TS + 8, ty = sp.r * TS + 8;
+      if (goTo(tx, ty, 50)) { rt.pose = 'bark'; rt.anim += dt; }
+      return;
+    }
+  }
+  if (cmd === 'herd' && atFarm()) {
+    rt.pose = 'herd'; rt.run = true;
+    // chạy tới con ở ngoài chuồng gần nhất rồi lùa nó về phía cửa chuồng
+    const near = ST.outOfPen(state).filter(a => a.x != null).sort((u, v) => dist(u, d) - dist(v, d))[0];
+    if (near) {
+      goTo(near.x + (near.x > d.x ? -10 : 10), near.y, 78);
+      shoo(state, near, d, dt, { radius: 40, speed: 58, w });
+    } else goTo(p.x, p.y, 70);
+    rt.anim += dt * 1.6;
+    return;
+  }
+  if (cmd === 'follow') {
+    rt.run = dp > 70;
+    if (dp > 18) goTo(p.x, p.y, rt.run ? 72 : 44);
+    else { rt.walking = false; rt.anim += dt; }
+    return;
+  }
+  // chó già hay ngủ gật tại chỗ
+  if (d.stage === 'gia' && rt.mode === 'idle' && rt.timer > 0 && dp > 40) { rt.nap = true; rt.anim += dt; return; }
+  rt.nap = false;
   if (rt.mode === 'follow') {
     rt.run = dp > 70;
     if (dp < 22 || rt.timer <= 0 || rt.stuck > 0.5) { rt.mode = 'idle'; rt.timer = rnd(0.6, 2); rt.stuck = 0; }
@@ -249,10 +373,46 @@ function guardStep(state, w, rt, dt, goTo, out) {
   return true;
 }
 
-// ---------- Quạ & thằng Tèo ----------
+// ---------- Mèo (issue 44) ----------
+// Luật (state.js) đã chọn ô đi tuần, ô con chuột bị vồ, lúc về cửa mèo; ở đây chỉ diễn hoạt:
+// đi tới (tx, ty), chạy vồ chuột, ngậm chiến lợi phẩm chạy tới khoe người chơi, mèo con vờn cuộn len, mèo nhỡ tập vồ.
+function updateCats(state, w, dt0) {
+  const p = state.player;
+  for (const c of catsHere(state)) {
+    const rt = rtOf(w, 'c' + c.id);
+    const dt = aiStep(rt, dt0, onScreen(w, c));
+    if (!dt) continue;
+    rt.walking = false; rt.anim += dt;
+    rt.pounceT = Math.max(0, (rt.pounceT ?? 0) - dt);
+    if (c.trophy && !rt.trophy) rt.pounceT = 0.7;   // vừa vồ trúng: dáng vồ một nhịp rồi mới ngậm chuột
+    rt.trophy = !!c.trophy;
+    if (c.sleep || c.sun || c.sick >= 2) { rt.yarn = false; rt.shown = false; continue; }   // ngủ, phơi nắng, bệnh nặng: nằm yên một chỗ
+    // ngậm chuột thì chạy tới đứng cạnh người chơi để khoe, không thì tới chỗ luật chọn
+    const show = c.trophy && !rt.pounceT;
+    const tx = show ? p.x + (c.x < p.x ? -12 : 12) : c.tx ?? c.x, ty = show ? p.y + 2 : c.ty ?? c.y;
+    const dx = tx - c.x, dy = ty - c.y, d = Math.hypot(dx, dy);
+    rt.shown = show && d <= 2;   // đã tới đứng cạnh người chơi: thả chuột xuống khoe
+    const rat = !show &&(state.preds ?? []).some(r => r.kind === 'rat' && Math.abs(r.x - tx) < 2 && Math.abs(r.y - ty) < 2);
+    rt.run = show || rat || !!c.inAt;
+    if (d > 1 && !rt.pounceT) {
+      const st = Math.min(d, (rt.run ? 64 : 26) * STAGE_SPEED[c.stage] * dt);
+      c.x += dx / d * st; c.y += dy / d * st;
+      if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
+      rt.walking = true;
+      rt.yarn = false;
+    } else if (!rt.pounceT) {
+      // đứng yên: mèo con nghịch cuộn len, mèo nhỡ thỉnh thoảng tập vồ
+      if (c.stage === 'non') rt.yarn = true;
+      else if (c.stage === 'nho' && Math.random() < dt * 0.25) rt.pounceT = 0.6;
+      if (show && Math.abs(p.x - c.x) > 0.4) rt.face = p.x < c.x ? 'left' : 'right';
+    }
+  }
+}
+
+// ---------- Quạ & trộm NPC (thằng Tèo, Tí Sún, chồn hương) ----------
 function updateThreats(state, w, dt) {
   for (const t of state.threats ?? []) {
-    const rt = rtOf(w, 't' + t.id), pc = M.plotCenter(t.plot);
+    const rt = rtOf(w, 't' + t.id), pc = t.at ?? M.plotCenter(t.plot);
     rt.walking = false;
     if (t.kind === 'crow') {
       const { x0, y0, x1, y1 } = M.view;
@@ -284,14 +444,17 @@ function updateThreats(state, w, dt) {
       if (t.state !== 'leaving') rt.alt = d < 2 ? Math.max(0, rt.alt - 40 * dt) : Math.min(14, Math.max(rt.alt, d / 4));
     } else {
       if (t.x == null) { t.x = M.gateIn.x; t.y = M.gateIn.y; }
-      const want = t.state === 'leaving' ? 'out' : 'in';
+      // đang ra tay thì đứng yên một chỗ (luật đã chốt vị trí), chưa tới thì đi vào, xong thì chuồn ra cổng
+      const want = t.state === 'leaving' ? 'out' : t.state === 'eating' ? 'stay' : 'in';
+      if (want === 'stay') { rt.pathFor = want; rt.path = null; continue; }
       if (rt.pathFor !== want) {
         rt.pathFor = want;
         rt.path = want === 'in' ? findPath(t.x, t.y, pc.x, pc.y) : [...findPath(t.x, t.y, M.gateIn.x, M.gateIn.y), { x: M.gateIn.x, y: M.view.y1 + 30 }];
       }
       const wp = rt.path?.[0];
       if (wp) {
-        const dx = wp.x - t.x, dy = wp.y - t.y, d = Math.hypot(dx, dy), st = Math.min(d, 44 * dt);
+        const sp = t.kind === 'civet' ? 62 : 44;   // chồn hương chạy nhanh hơn người
+        const dx = wp.x - t.x, dy = wp.y - t.y, d = Math.hypot(dx, dy), st = Math.min(d, sp * dt);
         if (d < 0.8) rt.path.shift();
         else { t.x += dx / d * st; t.y += dy / d * st; rt.dir = dirOf(dx, dy); rt.walking = true; rt.anim += dt; }
       }
@@ -299,11 +462,54 @@ function updateThreats(state, w, dt) {
   }
 }
 
+// ---------- Kẻ săn mồi: chuột, diều hâu, chồn (issue 43) ----------
+// Luật (state.js) đã chọn ô của chuột và con mồi của diều hâu/chồn; ở đây chỉ diễn hoạt cho đẹp:
+// chuột lon ton tới ô luật chọn, diều hâu lượn vòng trên cao rồi sà xuống, chồn men theo đất tới con mồi.
+function updatePreds(state, w, dt) {
+  for (const p of state.preds ?? []) {
+    const rt = rtOf(w, 'p' + p.id);
+    rt.walking = false; rt.eat = false;
+    const tx = p.tx ?? p.x, ty = p.ty ?? p.y;
+    if (p.state === 'leaving') {   // bị đuổi hay vừa xong việc: chuồn thẳng
+      const away = rt.face === 'right' ? 1 : -1;
+      p.x += (p.kind === 'rat' ? 80 : 70) * dt * away;
+      if (p.kind === 'hawk') p.y -= 50 * dt;
+      rt.walking = true; rt.anim += dt * 4;
+      continue;
+    }
+    if (p.kind === 'rat') {
+      const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+      if (d > 1) {
+        const st = Math.min(d, 40 * dt);
+        p.x += dx / d * st; p.y += dy / d * st;
+        if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
+        rt.walking = true;
+      } else rt.eat = true;   // tới ô rồi thì gặm nhấm tại chỗ
+      rt.anim += dt * (rt.walking ? 2.6 : 1.2);
+      continue;
+    }
+    // Diều hâu lượn vòng thu hẹp dần rồi sà xuống; chồn men tới con mồi. t = 0 lúc mới tới, 1 lúc ra tay.
+    const t = clamp(1 - (p.strikeAt - state.time) / PREDATOR.warnMs, 0, 1);
+    rt.a = (rt.a ?? Math.random() * 6.28) + dt * (p.kind === 'hawk' ? 1.8 : 0.9);
+    const rr = (1 - t) * (p.kind === 'hawk' ? 30 : 26);
+    const gx = tx + Math.cos(rt.a) * rr, gy = ty + Math.sin(rt.a) * rr * 0.6 - (p.kind === 'hawk' ? 10 + 28 * (1 - t) : 0);
+    const k = Math.min(1, dt * 6);
+    p.x += (gx - p.x) * k; p.y += (gy - p.y) * k;
+    rt.face = Math.cos(rt.a) < 0 ? 'left' : 'right';
+    rt.ground = ty;                               // chỗ đổ bóng (mặt đất dưới con mồi)
+    rt.dive = p.kind === 'hawk' && t > 0.55;      // đã cụp cánh sà xuống
+    rt.pounce = p.kind === 'weasel' && t > 0.7;   // chồn chồm lên vồ
+    rt.walking = p.kind === 'weasel';
+    rt.anim += dt * 3;
+  }
+}
+
 // ---------- Target & phạm vi tương tác ----------
 export const keyOf = t => t.kind + (t.id ?? t.idx ?? t.pen ?? t.to ?? t.dir ?? '');
 const doorOf = to => M.doors.find(d => d.to === to);
 const inDoor = (d, x, y) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h;
-const troughAnchor = pen => { const t = M.pens[pen].trough; return { x: t.x, y: t.r * TS + 8 }; };
+const troughAnchor = tg => { const t = troughOf(M, tg); return t ? { x: t.x, y: t.r * TS + 8 } : null; };
+const scaleOf = t => (M.penById[t.id] ?? M.pens[t.pen])?.scale;   // cân của chuồng heo { pen, id }
 const coop = () => M.building('coop');
 // Điểm trên ranh đất nhà theo hướng dir, thẳng với người chơi (target mua đất: đứng sát mép là chạm được)
 function stripEdge(state, dir) {
@@ -313,6 +519,7 @@ function stripEdge(state, dir) {
   const y = dir === 'S' ? (o.r + o.h) * TS : dir === 'N' ? o.r * TS : clamp(p.y, o.r * TS, (o.r + o.h) * TS);
   return { x, y };
 }
+const gateOn = (state, id) => ST.isDusk(state) && ST.penHome(state, id).total > 0;   // cửa chuồng chỉ là target từ chạng vạng (rải thóc, xem số con đã về)
 const findBy = (list, id) => (list ?? []).find(e => e.id === id);
 
 // Bụi/đá theo id (bản đồ vườn lớn có hàng trăm cái, tìm mỗi khung hình thì chậm): bảng tra nhớ theo bản đồ
@@ -330,8 +537,12 @@ export function targetPos(state, t) {
     case 'egg': return findBy(state.eggs, t.id);
     case 'poop': return findBy(state.poops, t.id);
     case 'threat': return findBy(state.threats, t.id);
+    case 'pred': return findBy(state.preds, t.id);
     case 'dog': return state.dog;
-    case 'trough': return troughAnchor(t.pen);
+    case 'cat': return findBy(state.cats, t.id);
+    case 'trough': return troughAnchor(t);
+    case 'gate': return ST.gateOf(state, t.id);
+    case 'scale': { const c = scaleOf(t); return c ? { x: c.x, y: c.y + 8 } : null; }
     case 'nest': return coop()?.at ?? null;
     case 'building': return M.buildings.find(b => b.id === t.id)?.at ?? null;
     case 'door': return doorOf(t.to)?.at ?? null;
@@ -343,14 +554,17 @@ export function targetPos(state, t) {
 }
 export function exists(state, t) {
   use(state);
-  if (!atFarm() && !['building', 'door'].includes(t.kind)) return false;
+  if (!atFarm() && !['building', 'door'].includes(t.kind) && !(t.kind === 'dog' && dogHere(state)) && t.kind !== 'cat') return false;
+  if (t.kind === 'cat') return catsHere(state).some(c => c.id === t.id);
   if (t.kind === 'plot') return !!state.plots[t.idx]?.unlocked;
   if (t.kind === 'lockedPlot') return t.idx === ST.nextLockedPlot(state);
   if (t.kind === 'strip' && !atFarm()) return false;
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
 }
-const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
+// Đồ đặt trong vườn chạm vào được (ngồi ghế đá, đặt hoa lên mộ)
+const TAPPABLE_DECO = new Set(['deco_bench', 'grave', 'grave_flower', 'deco_rattrap']);
+const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, pred: 26, dog: 20, cat: 20, trough: 22, gate: 24, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -364,7 +578,14 @@ export function rangeDist(state, t) {
   return d <= RANGE[t.kind] ? d : Infinity;
 }
 export const inRange = (state, t) => rangeDist(state, t) < Infinity;
-const BIAS = { threat: 10, poop: 3, egg: 3, animal: 2, dog: 2, lockedPlot: -2 };
+const BIAS = { threat: 10, pred: 12, poop: 3, egg: 3, animal: 2, dog: 2, cat: 2, lockedPlot: -2 };
+// Kẻ săn mồi chỉ được ưu tiên khi đang trong khoảng cảnh báo (sắp ra tay). Con chuột lang thang ngang qua
+// không được giành mất ô ruộng, quả trứng hay cái máng ngay dưới chân người chơi.
+function biasOf(state, t) {
+  if (t.kind !== 'pred') return BIAS[t.kind] ?? 0;
+  const p = findBy(state.preds, t.id);
+  return p?.state === 'hunt' && p.strikeAt - state.time <= PREDATOR.warnMs ? BIAS.pred : -4;
+}
 
 export function findTarget(state, w) {
   use(state);
@@ -374,7 +595,7 @@ export function findTarget(state, w) {
     const d = rangeDist(state, t);
     if (d === Infinity) return;
     const pos = targetPos(state, t), vx = pos.x - p.x, vy = pos.y - p.y, len = Math.hypot(vx, vy);
-    let s = d - (BIAS[t.kind] ?? 0);
+    let s = d - biasOf(state, t);
     if (len > 3 && (vx * face[0] + vy * face[1]) / len > 0.5) s -= 8;
     if (w.curKey === keyOf(t)) s -= 3;
     if (s < bestS) { bestS = s; best = t; }
@@ -391,13 +612,17 @@ export function findTarget(state, w) {
     for (const e of state.eggs ?? []) consider({ kind: 'egg', id: e.id });
     for (const o of state.poops ?? []) consider({ kind: 'poop', id: o.id });
     for (const t of state.threats ?? []) consider({ kind: 'threat', id: t.id });
-    consider({ kind: 'dog' });
+    for (const p of state.preds ?? []) consider({ kind: 'pred', id: p.id });
     consider({ kind: 'nest' });
     for (const c of M.clutter) if (Math.abs(c.x + 8 - p.x) <= RANGE.clutter && Math.abs(c.y + 8 - p.y) <= RANGE.clutter) consider({ kind: 'clutter', id: c.id });   // ngoài tầm thì khỏi xét
     for (const dir of ['N', 'S', 'E', 'W']) consider({ kind: 'strip', dir });
   }
-  for (const { pen } of M.troughs) consider({ kind: 'trough', pen });
-  for (const d of M.decos) if (d.kind === 'deco_bench') consider({ kind: 'deco', id: d.id });
+  if (dogHere(state)) consider({ kind: 'dog' });
+  for (const c of catsHere(state)) consider({ kind: 'cat', id: c.id });
+  for (const { pen, id } of M.troughs) consider({ kind: 'trough', pen, id });
+  for (const p of M.penList) if (p.scale) consider({ kind: 'scale', pen: p.type, id: p.id });
+  if (atFarm()) for (const p of M.penList) if (gateOn(state, p.id)) consider({ kind: 'gate', id: p.id });
+  for (const d of M.decos) if (TAPPABLE_DECO.has(d.kind)) consider({ kind: 'deco', id: d.id });
   for (const b of M.buildings) if (b.at && b.id !== 'coop') consider({ kind: 'building', id: b.id });
   if (!atFarm()) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì sang nhà/làng bằng nút của nhà/cổng
   w.curKey = best ? keyOf(best) : null;
@@ -409,16 +634,20 @@ export function nameOf(state, t) {
   switch (t.kind) {
     case 'plot': { const c = state.plots[t.idx]?.crop; return c ? (CROPS[c.id]?.name ?? 'Cây trồng') : `Ô ruộng ${t.idx + 1}`; }
     case 'lockedPlot': return 'Đất hoang';
-    case 'animal': { const a = findBy(state.animals, t.id); return a ? (a.name || (a.adult ? ANIMALS[a.type].name : ANIMALS[a.type].baby)) : 'Vật nuôi'; }
-    case 'egg': return 'Quả trứng';
+    case 'animal': { const a = findBy(state.animals, t.id); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}` : 'Vật nuôi'; }
+    case 'egg': { const e = findBy(state.eggs, t.id); return e?.candled ? (e.fertile ? 'Trứng có phôi ✨' : 'Trứng trống') : 'Quả trứng'; }
     case 'poop': return 'Phân chó';
-    case 'threat': return findBy(state.threats, t.id)?.kind === 'thief' ? 'Thằng Tèo' : 'Con quạ';
+    case 'threat': return THREAT_NAME[findBy(state.threats, t.id)?.kind] ?? 'Con quạ';
+    case 'pred': { const p = findBy(state.preds, t.id); return p ? 'Con ' + ST.PRED_NAME[p.kind].toLowerCase() : ''; }
     case 'dog': return state.dog.name || DOG.name;
-    case 'trough': return `Máng ăn (${M.pens[t.pen].name})`;
+    case 'cat': { const c = findBy(state.cats, t.id); return c ? `${ST.animalLabel(c)} ${'❤️'.repeat(c.bond || 1)}` : 'Mèo'; }
+    case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;
+    case 'gate': { const h = ST.penHome(state, t.id); return `Cửa ${M.penById[t.id]?.name?.toLowerCase() ?? 'chuồng'} (${h.home}/${h.total} đã về)`; }
+    case 'scale': return 'Cân heo';
     case 'nest': return 'Ổ ấp trứng';
     case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
-    case 'deco': return 'Ghế đá';
+    case 'deco': { const d = M.decos.find(o => o.id === t.id); return d ? ST.entName(d.ent) : 'Đồ trang trí'; }
     case 'clutter': return M.clutter.find(o => o.id === t.id) ? ST.entName(M.clutter.find(o => o.id === t.id).ent) : '';
     case 'strip': return `Đất phía ${DIR_NAME[t.dir]}`;
   }
@@ -431,12 +660,16 @@ export function anchorOf(state, t) {
   if (!pos || pos.x == null) return null;
   switch (t.kind) {
     case 'plot': case 'lockedPlot': return { x: pos.x, top: M.plotTile(t.idx).r * TS + 1 };
-    case 'animal': { const a = findBy(state.animals, t.id); const im = animalImg(a.type, a.adult, 'left', 0); return { x: a.x, top: a.y - (im?.height ?? 12) - 1 }; }
+    case 'animal': { const a = findBy(state.animals, t.id); const im = animalImg(a, 'left', 0); return { x: a.x, top: a.y - (im?.height ?? 12) - 1 }; }
     case 'egg': return { x: pos.x, top: pos.y - eggSize().h - 1 };
     case 'poop': return { x: pos.x, top: pos.y - poopSize().h - 8 };
-    case 'dog': { const im = dogImg(state.dog.adult, 'left', 0); return { x: pos.x, top: pos.y - (im?.height ?? 12) - 1 }; }
-    case 'threat': { const th = pos; const alt = 0; return th.kind === 'crow' ? { x: th.x, top: th.y - 16 - alt } : { x: th.x, top: th.y - 26 }; }
+    case 'dog': { const im = dogImg(state.dog, 'left', 0); return { x: pos.x, top: pos.y - (im?.height ?? 12) - 1 }; }
+    case 'cat': { const im = catImg(pos); return { x: pos.x, top: pos.y - (im?.height ?? 10) - 1 }; }
+    case 'threat': { const th = pos; return isBeast(th) ? { x: th.x, top: th.y - 16 } : { x: th.x, top: th.y - 26 }; }
+    case 'pred': { const p = findBy(state.preds, t.id); return { x: pos.x, top: pos.y - (p?.kind === 'rat' ? 9 : p?.kind === 'weasel' ? 11 : 15) }; }
     case 'trough': return { x: pos.x, top: pos.y - 12 };
+    case 'gate': return { x: pos.x, top: pos.y - 16 };
+    case 'scale': return { x: pos.x, top: pos.y - 24 };
     case 'nest': return { x: pos.x, top: pos.y - 14 };
     case 'building': {
       const b = M.buildings.find(bb => bb.id === t.id);
@@ -457,20 +690,39 @@ export function hitTest(state, wx, wy) {
   if (!atFarm()) for (const d of M.doors) if (hitRect(d.x, d.y - TS, d.w, d.h + TS, wx, wy, 0)) return { kind: 'door', to: d.to };   // ô cửa + thảm chùi chân
   for (const t of atFarm() ? state.threats ?? [] : []) {
     if (t.x == null) continue;
-    if (t.kind === 'crow' ? Math.hypot(wx - t.x, wy - t.y + 6) < 12 : hitRect(t.x - 8, t.y - 24, 16, 26, wx, wy)) return { kind: 'threat', id: t.id };
+    const hit = t.kind === 'crow' ? Math.hypot(wx - t.x, wy - t.y + 6) < 12
+      : t.kind === 'civet' ? hitRect(t.x - 10, t.y - 11, 20, 13, wx, wy)
+      : hitRect(t.x - 8, t.y - 24, 16, 26, wx, wy);
+    if (hit) return { kind: 'threat', id: t.id };
+  }
+  // diều hâu, chồn đang rình con mồi: chạm trúng chúng trước cả con vật (phải đuổi kịp trong 10 giây)
+  for (const p of atFarm() ? state.preds ?? [] : []) {
+    if (p.x == null || p.kind === 'rat') continue;
+    const [hw, hh] = p.kind === 'weasel' ? [10, 11] : [12, 14];
+    if (hitRect(p.x - hw, p.y - hh, hw * 2, hh + 4, wx, wy, 4)) return { kind: 'pred', id: p.id };
   }
   if (atFarm()) {
     for (const a of [...state.animals].sort((u, v) => v.y - u.y)) {
-      const im = animalImg(a.type, a.adult, 'left', 0);
+      const im = animalImg(a, 'left', 0);
       if (im && hitRect(a.x - im.width / 2, a.y - im.height, im.width, im.height, wx, wy)) return { kind: 'animal', id: a.id };
     }
-    const dog = state.dog, di = dogImg(dog.adult, 'left', 0);
-    if (di && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
     for (const o of state.poops ?? []) if (Math.hypot(wx - o.x, wy - o.y + 3) < 9) return { kind: 'poop', id: o.id };
     for (const e of state.eggs ?? []) if (Math.hypot(wx - e.x, wy - e.y + 3) < 8) return { kind: 'egg', id: e.id };
+    // con chuột chạy ngang: xét sau trứng, phân... để nó không giành mất cái đang nằm dưới chân
+    for (const p of state.preds ?? []) if (p.kind === 'rat' && p.x != null && hitRect(p.x - 8, p.y - 9, 16, 13, wx, wy, 0)) return { kind: 'pred', id: p.id };
   }
-  for (const d of M.decos) if (d.kind === 'deco_bench') { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
-  for (const { pen } of M.troughs) { const tr = M.pens[pen].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen }; }
+  for (const c of catsHere(state)) {
+    const im = catImg(c);
+    if (im && hitRect(c.x - im.width / 2, c.y - im.height, im.width, im.height, wx, wy)) return { kind: 'cat', id: c.id };
+  }
+  if (dogHere(state)) {
+    const dog = state.dog, di = dogImg(dog, 'left', 0);
+    if (di && dog.x != null && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
+  }
+  for (const d of M.decos) if (TAPPABLE_DECO.has(d.kind)) { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
+  for (const { pen, id } of M.troughs) { const tr = M.penById[id].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen, id }; }
+  if (atFarm()) for (const p of M.penList) { const g = gateOn(state, p.id) && ST.gateOf(state, p.id); if (g && hitRect(g.x - 14, g.y - 16, 28, 22, wx, wy)) return { kind: 'gate', id: p.id }; }
+  for (const p of M.penList) if (p.scale && hitRect(p.scale.x - 8, p.scale.y - 14, 16, 16, wx, wy)) return { kind: 'scale', pen: p.type, id: p.id };
   const cp = coop();
   if (cp && hitRect(cp.x, cp.y, 30, 28, wx, wy, 0) || cp && hitRect(cp.at.x - 9, cp.at.y - 12, 18, 12, wx, wy)) return { kind: 'nest' };
   for (const b of M.buildings) {
@@ -574,8 +826,10 @@ export function update(state, w, dt) {
   const door = M.doors.find(d => inDoor(d, p.x, p.y));
   if (!door) w.doorArmed = true;
   else if (w.doorArmed && w.moving) { w.doorArmed = false; w.path = null; w.pending = null; out.door = door; }
-  // ở trong nhà: con vật, chó, quạ ngoài vườn đứng yên (luật vẫn chạy trong tick)
+  // ở trong nhà: con vật, quạ ngoài vườn đứng yên (luật vẫn chạy trong tick)
   if (atFarm()) updateFarm(state, w, dt, out);
+  if (dogHere(state)) updateDog(state, w, dt, out);   // chó đi theo thì chạy cả ở làng, trong nhà
+  updateCats(state, w, dt);
 
   // đang đi tới thứ được chạm
   const t = w.pending;
@@ -613,7 +867,7 @@ function updateFarm(state, w, dt, out) {
     }
   }
 
-  updateAnimals(state, w, dt);
-  updateDog(state, w, dt, out);
+  updateAnimals(state, w, dt, out);
   updateThreats(state, w, dt);
+  updatePreds(state, w, dt);
 }

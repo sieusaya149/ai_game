@@ -27,12 +27,12 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1) cho chuyển v2→v3: nạp bản v2 mẫu có đủ loài và cả con non lẫn trưởng thành → ra v3 đủ số con, giai đoạn đúng, giới tính theo id chẵn lẻ, độ thân 2, sạch. Chạy hai lần cho cùng kết quả (prior art `tests/save-v2.test.mjs`). Key v2 còn nguyên. Bản v2 hỏng thì báo lỗi và không ghi đè.
-- [ ] Unit test: tuổi chỉ tăng khi giờ vườn chạy và đứng yên khi vườn đóng băng; con vật qua đúng từng mốc giờ của bảng tuổi thọ cho mỗi loài; chó không bao giờ chuyển sang "chết vì già".
-- [ ] Unit test: mỗi giai đoạn có đúng hành vi (con non không đẻ/không cho sữa, bò tơ kéo cày được, cừu nhỡ không xén được, con già cho sản phẩm thưa hơn).
-- [ ] Unit test: có thông báo 🟡 báo trước khi một con bước vào giai đoạn già; con hết giai đoạn già thì có thể ra đi.
-- [ ] E2E (Playwright, desktop + 360px): nạp bản lưu v2 cũ ghi sẵn → vườn hiện đủ con vật như cũ → tua giờ vườn tới mốc đổi giai đoạn thì thấy hình con vật đổi → thấy thông báo con vào giai đoạn già.
-- [ ] Pixel art của 5 loài × 4 giai đoạn có đủ, nhìn rõ khác nhau ở cỡ hiển thị trên 360px.
+- [x] Unit test (seam 1) cho chuyển v2→v3: nạp bản v2 mẫu có đủ loài và cả con non lẫn trưởng thành → ra v3 đủ số con, giai đoạn đúng, giới tính theo id chẵn lẻ, độ thân 2, sạch. Chạy hai lần cho cùng kết quả (prior art `tests/save-v2.test.mjs`). Key v2 còn nguyên. Bản v2 hỏng thì báo lỗi và không ghi đè.
+- [x] Unit test: tuổi chỉ tăng khi giờ vườn chạy và đứng yên khi vườn đóng băng; con vật qua đúng từng mốc giờ của bảng tuổi thọ cho mỗi loài; chó không bao giờ chuyển sang "chết vì già".
+- [x] Unit test: mỗi giai đoạn có đúng hành vi (con non không đẻ/không cho sữa, bò tơ kéo cày được, cừu nhỡ không xén được, con già cho sản phẩm thưa hơn).
+- [x] Unit test: có thông báo 🟡 báo trước khi một con bước vào giai đoạn già; con hết giai đoạn già thì có thể ra đi.
+- [x] E2E (Playwright, desktop + 360px): nạp bản lưu v2 cũ ghi sẵn → vườn hiện đủ con vật như cũ → tua giờ vườn tới mốc đổi giai đoạn thì thấy hình con vật đổi → thấy thông báo con vào giai đoạn già.
+- [x] Pixel art của 5 loài × 4 giai đoạn có đủ, nhìn rõ khác nhau ở cỡ hiển thị trên 360px. (art3.js của agent vẽ; đã chụp kiểm tra bằng mắt ở 1280 và 360px)
 
 ## Blocked by
 

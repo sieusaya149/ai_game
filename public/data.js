@@ -60,14 +60,30 @@ export const FARMING = {
 };
 
 // ---------- Vật nuôi ----------
-// price: giá mua con non · grow: thời gian lớn (chỉ lớn khi no) · every: chu kỳ ra sản phẩm khi trưởng thành · sell: giá bán con trưởng thành
+// price: giá mua con non · every: chu kỳ ra sản phẩm khi trưởng thành (thời gian lớn: bảng LIFE) · sell: giá bán con trưởng thành
 export const ANIMALS = {
-  ga:  { name: 'Gà',  baby: 'Gà con',  lv: 1, price: 40,  grow: 4 * MIN,  feed: 'feed_ga',  pen: 'chicken', product: 'trung', every: 2.5 * MIN, sell: 90,  exp: 3 },
-  heo: { name: 'Heo', baby: 'Heo con', lv: 3, price: 120, grow: 8 * MIN,  feed: 'feed_heo', pen: 'pig',     product: null,    every: 0,         sell: 380, exp: 12 },
-  bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, grow: 10 * MIN, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
-  cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, grow: 10 * MIN, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
+  ga:  { name: 'Gà',  baby: 'Gà con',  lv: 1, price: 40,  feed: 'feed_ga',  pen: 'chicken', product: 'trung', every: 2.5 * MIN, sell: 90,  exp: 3 },
+  vit: { name: 'Vịt', baby: 'Vịt con', lv: 2, price: 55,  feed: 'feed_ga',  pen: 'chicken', product: 'trung_vit', every: 3 * MIN, sell: 120, exp: 4 },
+  heo: { name: 'Heo', baby: 'Heo con', lv: 3, price: 120, feed: 'feed_heo', pen: 'pig',     product: null,    every: 0,         sell: 380, exp: 12 },
+  bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
+  cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
+  // Mèo là thú cưng (issue 44): ở nhà mèo chứ không ở chuồng có rào, không cho sản phẩm, không bán được, không dơ
+  meo: { name: 'Mèo', baby: 'Mèo con', lv: 4, price: 180, feed: 'catfood', pen: 'cathouse', product: null,    every: 0,         sell: 0,   exp: 6, pet: true },
 };
-export const PEN_CAP = { chicken: 10, pig: 6, pasture: 5 };
+// Dơ và tắm (lát 37). Độ dơ 0..100 theo giờ vườn; từ sạch tới dơ hẳn mất fullMs, mưa hoặc chuồng bẩn thì nhanh gấp đôi.
+export const DIRT = {
+  fullMs: 3 * 60 * MIN,
+  fastMul: 2,                 // mưa hoặc chuồng bẩn
+  high: 60,                   // từ mức này là "dơ": mất vui, dễ bệnh hơn
+  unhappyPerMin: 1.5,         // con dơ (trừ heo, bò) mất vui mỗi phút
+  sickMul: 2,                 // con dơ dễ bệnh gấp đôi
+  mud: ['heo', 'bo'],         // đầm bùn: dơ ngay, không mất vui
+  wallowAfterMs: 20 * MIN,    // tắm xong chừng này lâu mới lăn bùn lại
+  sandCap: 30,                // gà có ổ cát tự tắm cát: dơ không vượt mức này (trừ khi trời mưa)
+  bathHappy: 15, bathBond: 0.2,
+};
+// Phân chuồng tích dần theo giờ vườn (0..100); đầy thì chuồng bẩn
+export const MANURE = { fullMs: 2 * 60 * MIN, dirtyAt: 100, perScoop: 25 };   // xúc: nhận 1 phân chuồng mỗi perScoop độ đầy (tối thiểu 1)
 export const HUSBANDRY = {
   hungerMs: 5 * MIN,          // từ no (100) xuống đói hẳn (0)
   autoEatBelow: 60,           // đói hơn mức này thì tự ra máng ăn nếu máng còn cám
@@ -84,26 +100,174 @@ export const HUSBANDRY = {
   pigBreedChancePerMin: 0.25, // có ≥2 heo trưởng thành no & vui: mỗi phút 25% có heo nái mang bầu
   pigGestation: 6 * MIN,
   pigLitter: [1, 3],          // đẻ 1–3 heo con
-  vitaminBoost: 0.5,          // vitamin: cộng ngay 50% thời gian lớn cho con non
+  vitaminBoost: 0.5,          // vitamin: cộng ngay nửa giai đoạn đang ở cho con non, con nhỡ
 };
 
+// ---------- Vòng đời 4 giai đoạn (Phase 2) ----------
+// Tuổi tính bằng GIỜ VƯỜN đã chạy (simMs, ADR 0003): vườn đóng băng thì con vật không già đi.
+// LIFE[loài][giai đoạn] = thời lượng giai đoạn đó. Infinity = ở mãi giai đoạn đó (chó, mèo không già, không chết vì già).
+// Hết giai đoạn già thì con vật ra đi (hóa thiên thần); chết vì già được phép cả lúc chạy bù (ADR 0004).
+const HOUR = 60 * MIN;
+export const STAGES = ['non', 'nho', 'truong', 'gia'];
+export const STAGE_NAME = { non: 'Non', nho: 'Nhỡ', truong: 'Trưởng thành', gia: 'Già' };
+export const LIFE = {
+  ga:  { non: 5 * MIN,  nho: 10 * MIN, truong: 20 * HOUR, gia: 4 * HOUR },
+  vit: { non: 5 * MIN,  nho: 10 * MIN, truong: 20 * HOUR, gia: 4 * HOUR },
+  heo: { non: 10 * MIN, nho: 20 * MIN, truong: 30 * HOUR, gia: 6 * HOUR },
+  bo:  { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
+  cuu: { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
+  cho: { non: 30 * MIN, nho: HOUR,     truong: 40 * HOUR, gia: Infinity },   // chó có tuổi già nhưng không bao giờ ra đi
+  meo: { non: 20 * MIN, nho: 40 * MIN, truong: 40 * HOUR, gia: Infinity },   // mèo cũng vậy: già thì lười chứ không chết vì già
+};
+// Tuổi lúc bắt đầu một giai đoạn · giai đoạn ở tuổi `age` · tuổi ra đi (Infinity = không bao giờ)
+export const stageStart = (kind, stage) => STAGES.slice(0, STAGES.indexOf(stage)).reduce((t, k) => t + LIFE[kind][k], 0);
+export const stageAt = (kind, age) => STAGES.findLast(k => age >= stageStart(kind, k)) ?? 'non';
+export const lifeEnd = kind => stageStart(kind, 'gia') + LIFE[kind].gia;
+export const AGING = {
+  warnMs: HOUR,       // báo trước 🟡 khi còn chừng này giờ vườn nữa là vào giai đoạn già
+  oldEvery: 2,        // con già: chu kỳ ra sản phẩm dài gấp đôi (đẻ thưa, ít sữa, lông mỏng)
+  pigHungry: 1.5,     // heo nhỡ ăn khỏe: đói nhanh ×1.5 ...
+  pigGain: 2,         // ... và tăng cân nhanh ×2
+};
+// ---------- Bệnh 4 giai đoạn (Phase 2, issue 38) ----------
+// a.sick: 0 khỏe · 1 mệt · 2 bệnh nặng · 3 nguy kịch; a.sickMs = tiến triển bệnh (giờ vườn, con già nhân đôi tốc độ).
+// Mất khi sickMs >= deadAt. Chạy bù offline: bệnh dừng ở Bệnh nặng, không chuyển Nguy kịch, không chết (ADR 0004).
+export const SICK = {
+  toSevere: HOUR, toCritical: HOUR + 30 * MIN, deadAt: HOUR + 45 * MIN,
+  oldMul: 2,                          // con già: bệnh tiến triển nhanh gấp đôi
+  quarantineMul: 1.5,                 // chuồng cách ly: hồi bệnh nhanh ×1.5 (bệnh tiến triển chậm lại chừng đó)
+  catchUpCap: HOUR + 10 * MIN,        // chạy bù: tiến triển không vượt mức này (còn trong Bệnh nặng); Nguy kịch hạ về mức này
+  spread: { everyMs: 10 * MIN, p: 0.1 },   // con Bệnh nặng: mỗi 10 phút 10% lây một con cùng chuồng
+  doses: [0, 1, 2],                   // số liều thuốc để chữa: Mệt 1, Bệnh nặng 2, Nguy kịch chỉ bác sĩ
+  vaccineMs: 10 * HOUR,               // vắc-xin chống bệnh chừng này giờ vườn
+  minLevel: 5,                        // dưới cấp này bệnh không vượt quá Mệt
+  vetPrice: 300,                      // gọi bác sĩ thú y qua điện thoại ở nhà
+  oldChanceMul: 2,                    // con già dễ mắc bệnh gấp đôi
+  dirtyPenMul: 2,                     // chuồng bẩn dễ bệnh gấp đôi
+  griefMs: 30 * MIN, griefHappy: 15, griefCap: 40,   // có con mất: cả trại buồn (vui không quá griefCap) chừng này lâu
+  flowerGriefMul: 1 / 3,              // đặt hoa lên mộ: phần buồn còn lại co còn chừng này
+};
+// Chỉ bán ở trạm thú y Cô Út trong làng (không có ở quầy vật tư chợ Bà Tư)
+export const VET_ITEMS = ['medicine', 'vaccine'];
+// ---------- Nhiệm vụ làm quen của Cô Út (issue 48) ----------
+// Mở khi mua con heo đầu tiên lúc đã đủ cấp nuôi heo (ANIMALS.heo.lv). Mỗi bước mở khi bước trước xong, bỏ qua được.
+export const CO_UT_QUEST = ['bathe', 'cure', 'vaccinate'];
+// ---------- Đực/cái và sinh sản (Phase 2, issue 36) ----------
+export const BREED = {
+  femaleMul: 1.3,          // con cái đắt hơn con đực chừng 30%
+  fertile: 0.4,            // có ≥1 gà trống trưởng thành: 40% trứng có phôi
+  gestation: { bo: 10 * HOUR, cuu: 8 * HOUR },   // bò đực + cái chung chuồng: mỗi 10 giờ vườn một bê; cừu 8 giờ
+  litterOld: [1, 2],       // heo nái già đẻ ít con hơn (heo thường: HUSBANDRY.pigLitter)
+  nameMax: 16,             // tên con vật tối đa chừng này ký tự
+  cockHour: 6,             // gà trống gáy lúc 6h sáng
+};
+export const animalPrice = (type, sex) => Math.round(ANIMALS[type].price * (sex === 'f' ? BREED.femaleMul : 1));
+// Việc từng giai đoạn làm được: theo loài, thiếu loài thì lấy `all`.
+// product: đẻ trứng / cho sữa / cho lông · plow: kéo cày (bò tơ kéo được cả hàng ruộng) · sell: bán được · vitamin: còn lớn được
+export const STAGE_CAN = {
+  product: { all: ['truong', 'gia'] },
+  plow:    { bo: ['nho', 'truong'] },
+  sell:    { all: ['nho', 'truong', 'gia'] },
+  vitamin: { all: ['non', 'nho'] },
+};
+// Cân nặng (kg): lúc mới sinh, lúc lớn hẳn. Con non, nhỡ ăn no thì lên cân dần trong hai giai đoạn đầu.
+export const WEIGHT = { ga: [0.2, 2.5], vit: [0.2, 3], heo: [3, 100], bo: [30, 450], cuu: [4, 60], meo: [0.3, 4] };
+export const weightAt = (type, stage) => {
+  const [w0, w1] = WEIGHT[type] ?? [1, 1];
+  return stage === 'non' ? w0 : stage === 'nho' ? (w0 + w1) / 2 : w1;
+};
+
+// ---------- Bán cho Chú Ba, heo theo cân, nghỉ hưu (issue 40) ----------
+// Con thường: giá bán ANIMALS[].sell × stageMul × bondMul (heo: số ký × giá chợ hôm đó × bondMul, không nhân stageMul vì cân đã nói lên giai đoạn)
+// Con bệnh / dơ thì nhân thêm sickMul / dirtyMul. Bán con ❤️confirmBond+ phải xác nhận `confirms` lần.
+export const TRADE = {
+  stageMul: { non: 0, nho: 0.6, truong: 1, gia: 0.6 },
+  bondMul: [0.85, 1, 1.15, 1.3, 1.5],   // ❤️1..5
+  sickMul: 0.6, dirtyMul: 0.8,
+  confirmBond: 4, confirms: 2,
+  pigKg: [4, 5, 5, 6, 7, 6, 4],         // lịch giá heo hơi (xu/kg) theo ngày game, lặp mỗi 7 ngày
+  walkPx: 16,                           // px/giây heo đi hết ga; ít đi hơn thì coi là ít vận động
+  gainActive: 0.6, gainLazy: 1.5,       // hệ số tăng cân khi hay vận động / nằm ườn
+  gainFull: 1.25, fullAt: 90,           // ăn no (đói ≥ fullAt) tăng thêm
+  retireHappy: 75,                      // có con nghỉ hưu: cả chuồng vui tối thiểu mức này
+  retireUndo: false,                    // nghỉ hưu có đảo ngược được không
+  visitMs: 6200,                        // Chú Ba dắt con vật đi: cảnh dài chừng này (chỉ hiển thị)
+};
+export const pigKgPrice = day => TRADE.pigKg[((day | 0) % 7 + 7) % 7];
 // ---------- Chó ----------
 export const DOG = {
   name: 'Mực',
-  growMs: 8 * MIN,            // chó con lớn thành chó trưởng thành (khi no)
   hungerMs: 8 * MIN,
   poopEvery: [2 * MIN, 4 * MIN], // chó ỉa bậy ngẫu nhiên trong khoảng này
   maxPoops: 8,
+  poopPupMul: 0.55,           // chó con nghịch và ỉa nhiều hơn hẳn
   poopFertChance: 0.5,        // xúc phân chó: 50% được 1 bao phân bón
   stinkUnhappyPerPoop: 2,     // mỗi bãi phân làm vật nuôi giảm vui mỗi phút
   slipStunMs: 900,            // giẫm phải phân: trượt, đứng hình 0.9 giây
   guardChance: 0.7,           // chó no & vui đuổi được trộm/quạ
+  guardRadius: { non: 0, nho: 4, truong: 6, gia: 4 },   // bán kính phát hiện trộm (ô): chó con chưa canh, chó già mắt kém lại
+  guardPostMul: 2,            // đang gác một chỗ (lệnh Canh khu): bán kính ×2 tại chỗ gác
+};
+
+// ---------- Mèo (issue 44) ----------
+// Mèo sống ở nhà mèo, ra vào tự do qua cửa mèo, tối ngủ trong bản đồ nhà. Không dạy được lệnh, không dơ, không bán.
+// Săn chuột là luật trừu tượng theo ô và xác suất (ADR 0013): mỗi huntEvery một lượt rình, nhắm con chuột gần nhất
+// theo ô, trúng với xác suất catchChance[giai đoạn] × hệ số theo mức đói. Chạy bù offline ra đúng kết quả đó.
+export const CAT = {
+  hungerMs: 12 * MIN,         // từ no (100) xuống đói hẳn (0)
+  happyDecayPerMin: 3,
+  sickMul: 0.25,              // thú cưng khỏe hơn vật nuôi: nguy cơ mắc bệnh chỉ bằng chừng này
+  petHappy: 25,
+  lazyFull: 85,               // no hơn mức này: mèo lười, nằm phơi nắng, không săn
+  bestHunger: [15, 75],       // "đói vừa phải": săn tốt nhất trong khoảng này
+  offBand: 0.5,               // ngoài khoảng đó (mà chưa no quá) thì chỉ còn chừng này
+  oldHungry: 40,              // mèo già lười, chỉ chịu săn khi đói dưới mức này
+  huntEvery: 2 * MIN,         // mỗi lượt rình cách nhau chừng này giờ vườn
+  catchChance: { non: 0, nho: 0.1, truong: 0.2, gia: 0.2 },   // trưởng thành: 0.2 mỗi 2 phút ≈ 1 con chuột mỗi 10 phút
+  catchExp: 3,
+  trophyMs: 60_000,           // mang chuột tới khoe người chơi trong chừng này
+  praiseHappy: 15, praiseExp: 2,
+  herdHappy: 60,              // vui từ mức này mèo mới chịu lùa (mỏng hơn chó: chỉ 1 con gần nhất)
+  herdStages: ['nho', 'truong', 'gia'],
+  spatPerMin: 0.05,           // thỉnh thoảng cãi nhau với chó: vui thôi, không hại gì, không đổi chỉ số
+  spatMs: 5000,
+  spatRadius: 4,              // ô: phải đứng gần chó mới cãi nhau được
+  moveMs: [5000, 12000],      // đổi ô sau khoảng này
+  roamRadius: 6,              // ô kế tiếp cách ô hiện tại tối đa chừng này
+  houseSpot: { x: 34, y: 78 },   // chỗ mèo nằm ngủ trong bản đồ nhà (dưới chân giường)
+  doorMs: 20_000,             // tối: mèo đi về cửa mèo trên nhà trong chừng này rồi mới chui vào nhà
+};
+
+// ---------- Dạy lệnh cho chó (issue 45) ----------
+// sessions = số buổi phải đạt. Ngồi là lệnh nền, phải học trước mọi lệnh khác.
+export const TRICKS = {
+  sit:    { name: 'Ngồi',      icon: '🪑', sessions: 2, desc: 'Mực ngồi yên một chỗ, không chạy lung tung.' },
+  follow: { name: 'Đi theo',   icon: '🚶', sessions: 3, desc: 'Mực đi sát bên bạn, kể cả khi sang làng.' },
+  guard:  { name: 'Canh khu',  icon: '🛡️', sessions: 4, desc: 'Mực gác một chỗ bạn chọn, phát hiện trộm xa gấp đôi ở đó.' },
+  herd:   { name: 'Lùa',       icon: '🐑', sessions: 5, desc: 'Mực lùa cả đàn về chuồng trong khoảng 20 giây, tối nào cũng tự lùa nếu no và vui.' },
+  egg:    { name: 'Tìm trứng', icon: '👃', sessions: 4, desc: 'Mực đánh hơi tìm trứng giấu trong bụi.' },
+  bird:   { name: 'Đuổi chim', icon: '🐦', sessions: 3, auto: true, desc: 'Mực tự đuổi quạ, không cần bạn chạy ra.' },
+};
+export const TRICK_BASE = 'sit';          // lệnh nền, khóa các lệnh khác tới khi học xong
+export const TRAIN = {
+  stages: ['nho', 'truong'],   // chó con chưa học được, chó già không học thêm nữa
+  treat: 'treat',              // mỗi buổi tốn 1 bánh thưởng (mất cả khi chó bỏ giữa chừng)
+  fastHappy: 70,               // chó vui từ mức này thì học nhanh: một buổi đạt ăn 2 buổi
+  quitHunger: 40,              // đói dưới mức này ...
+  quitHappy: 35,               // ... hay buồn dưới mức này thì có thể bỏ buổi giữa chừng
+  quitChance: 0.5,
+  happyGain: 10,               // học xong một buổi chó vui thêm
+  rounds: 3, need: 2,          // minigame: 3 lượt bấm, trúng từ 2 lượt là đạt
+  zone: 0.26, sweepMs: 1500,   // bề rộng vạch khen (phần của thanh) và thời gian con trỏ chạy hết một lượt
+  herdMs: 20_000,              // lệnh Lùa: cả đàn về chuồng trong khoảng này
+  stayMs: 2 * MIN,             // bị lùa về rồi thì ở yên trong chuồng chừng này mới ra lại
+  autoHunger: 50, autoHappy: 60,   // tối nào chó no & vui tới mức này thì tự lùa đàn
 };
 
 // ---------- Chó canh khách lạ (issue 31, DESIGN §6.1) ----------
 // Luật bán kính và ngủ gật nằm trong state.js; world.js chỉ diễn hoạt (ADR 0013).
 export const GUARD = {
-  radius: { pup: 4, adult: 6 },   // bán kính phát hiện khách (ô): chó con 4, chó trưởng thành 6
+  // bán kính phát hiện theo giai đoạn: DOG.guardRadius (chung cho trộm NPC và khách online)
   sadHappy: 50,               // vui dưới mức này: bán kính còn một nửa
   hungryStop: 30,             // đói dưới mức này: nằm bẹp, không canh nữa
   napRadius: 1,               // đang ngủ gật: chỉ thấy khách đứng sát bên
@@ -128,9 +292,79 @@ export const WALK_SPEED = 70;  // px/s của người đi bộ (world.js dùng; 
 export const THREATS = {
   crowChancePerMin: 0.3,      // có cây chín mà không có bù nhìn: mỗi phút 30% có quạ bay tới
   crowEatMs: 25_000,          // quạ đậu 25 giây không bị đuổi thì ăn mất ô đó
-  thiefChancePerNightMin: 0.15, // ban đêm có ≥2 ô chín: thằng Tèo lẻn vào hái trộm
   thiefStealMs: 15_000,
-  thiefCaughtCoins: [20, 60], // bắt được thằng Tèo: nó xin lỗi, đền xu
+  thiefCaughtCoins: [20, 60], // bắt được trộm người: nó xin lỗi, đền xu
+};
+
+// ---------- Trộm NPC: thằng Tèo, Tí Sún, chồn hương (issue 46) ----------
+// Mỗi đêm luật chốt đúng một vụ (hoặc không vụ nào) nên không bao giờ quá 1 vụ mỗi đêm.
+export const RAID = {
+  minLevel: 5,            // bảo hộ người mới: dưới cấp này chưa có Tí Sún và chồn hương
+  nightly: 0.5,           // vườn vừa đủ đồ đáng trộm: trung bình 1 vụ mỗi 2 đêm
+  lootBase: 3,            // số món đáng trộm của một vườn "thường"
+  lootRich: 9,            // nhiều hơn lootBase chừng này món nữa là vườn giàu nhất
+  richMul: 2,             // vườn giàu nhất: tần suất gấp đôi (vẫn chỉ 1 vụ mỗi đêm)
+  max: 0.9,               // giàu tới mấy thì thỉnh thoảng vẫn có một đêm yên
+  lampMul: 0.8, lampMax: 3,  // mỗi đèn lồng (tính tối đa 3 cái) làm trộm ngại hơn
+  fenceMul: 0.85,         // vườn có hàng rào thấp
+  dogMul: 0.6,            // chó đang canh nhà (trưởng thành, no và vui)
+  ripeNeed: 3,            // thằng Tèo chỉ tới khi có ≥ 3 ô chín
+  eggNeed: 3,             // Tí Sún chỉ tới khi có ≥ 3 trứng dưới đất (trứng trong bụi cũng tính)
+  eggTake: [2, 3],        // mỗi vụ Tí Sún ôm đi mấy quả
+  eggStealMs: 12_000,     // Tí Sún lục chừng này rồi mới ôm trứng chạy
+  civetCatchMs: 18_000,   // chồn hương rình chừng này rồi mới tha con vật đi
+  arriveSpan: 0.6,        // vụ trộm rơi vào khoảng đầu đêm (phần của đêm)
+  stealthPerCatch: 0.85,  // thằng Tèo bị bắt mỗi lần lại sắm thêm đồ: bán kính chó phát hiện ×0.85
+  stealthMin: 0.5,        // lặng lẽ nhất cũng chỉ tới mức này
+  torchAt: 1, shoesAt: 3, // bị bắt 1 lần mua đèn pin, 3 lần mua giày êm
+};
+
+// ---------- Thả rông ban ngày (ADR 0013) ----------
+export const FREE = {
+  types: ['ga', 'vit'],       // loài được thả rông
+  max: 30,                    // tối đa 30 con thả rông; con vượt giới hạn ở trong chuồng
+  moveMs: [8000, 20000],      // mỗi lần đổi ô sau khoảng này
+  radius: 5,                  // ô kế tiếp cách ô hiện tại tối đa 5 ô
+  seedLoss: 0.05,             // 5% lần mổ ruộng mất hạt vừa gieo
+  layRadius: 4,               // trứng đẻ cách con mái tối đa 4 ô
+  duskAt: 0.5,                // 18h (ngày trong game bắt đầu 6h sáng): chạng vạng, gà vịt về chuồng
+  strayPerDusk: [1, 3],       // chạng vạng: 1-3 con lạc ngủ ngoài (đàn nhỏ thì tối đa nửa đàn)
+  stormMin: 4, stormShare: 0.4, // đêm mưa bão: ít nhất 4 con, hoặc 40% đàn
+  lureRadius: 5,              // rải thóc ở cửa chuồng: con trong 5 ô chạy về
+  shyRadius: 32,              // px: con lạc chạy tránh người trong khoảng 2 ô
+};
+
+// ---------- Kẻ săn mồi: chuột, diều hâu, chồn (issue 43, ADR 0004 + 0013) ----------
+// Luật ở state.js quyết định theo ô và xác suất; world.js chỉ diễn hoạt. Chạy bù offline: chỉ chuột, và chuột chỉ ăn cám, trộm trứng.
+export const PREDATOR = {
+  minLevel: 5,                // bảo hộ người mới: dưới cấp này chưa có chuột, diều hâu, chồn
+  warnMs: 10_000,             // khi online: báo 🔴 trước chừng này rồi kẻ săn mồi mới ra tay (đuổi kịp thì không ai bị hại)
+  leaveMs: 6000,              // ra tay xong (hay bị đuổi) thì còn nán lại chừng này rồi biến mất
+  rat: {
+    max: 8,                   // tối đa 8 con chuột trong trại
+    spawnPerMin: 0.02,        // ~1 con mỗi giờ nếu không ai bắt (sinh ở kho, đống rơm, máng)
+    actMs: 5 * MIN,           // mỗi con chuột ra tay một lần sau chừng này
+    moveMs: 6000,             // đổi ô sau chừng này
+    radius: 3,                // ô kế tiếp cách ô hiện tại tối đa 3 ô
+    biteChance: 0.004,        // còn cám hay trứng thì thỉnh thoảng vẫn cắn con non; hết sạch thì cắn chắc
+    hurtDeadMs: 2 * HOUR,     // con non bị thương không chữa trong chừng này giờ vườn thì mất (chỉ khi đang chơi, ADR 0004)
+    hurtCapMs: 1.5 * HOUR,    // chạy bù offline: vết thương nặng nhất tới mức này rồi dừng, không bao giờ gây chết
+    hurtUnhappyPerMin: 2,     // con bị thương mất vui mỗi phút
+  },                          // ổ chuột (state.js nestTiles): ô cạnh nhà kho, đống rơm (nhà chuồng đồng cỏ) và máng ăn
+  hawk: {
+    chancePerMin: 0.001,      // hiếm; chỉ ban ngày, chỉ khi có con non đang thả rông
+    coverRadius: 4,           // con non trong chừng này ô quanh mái che thì diều hâu không nhắm
+  },
+  weasel: {
+    chancePerMin: 0.004,      // chỉ trong khung giờ nửa đêm, chỉ khi có con ngủ ngoài chuồng
+    from: 23, to: 2,          // khung giờ (giờ trong game) chồn mò tới
+    lampMul: 0.6,             // mỗi đèn lồng trong vườn nhân xác suất chừng này (tối đa 3 cái, như thằng Tèo)
+  },
+  trap: {
+    lure: 6,                  // chuột trong chừng này ô ngửi thấy mồi, mò tới bẫy
+    exp: 3,                   // bắt được một con chuột: cộng chừng này EXP
+  },
+  shooExp: 2,                 // đuổi được một kẻ săn mồi
 };
 
 // ---------- Vật phẩm ----------
@@ -142,19 +376,27 @@ export const ITEMS = {
   pesticide:  { name: 'Thuốc trừ sâu',     kind: 'supply', price: 15, lv: 1, desc: 'Diệt sâu và chữa cây bệnh ngay lập tức.' },
   growth:     { name: 'Thuốc tăng trưởng', kind: 'supply', price: 30, lv: 2, desc: 'Cây lớn vọt thêm 50% thời gian. Tối đa 2 lần mỗi cây.' },
   fertilizer: { name: 'Phân bón',          kind: 'supply', price: 12, lv: 1, desc: 'Bón trước khi chín: +50% sản lượng, lớn nhanh hơn.' },
-  medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 3, desc: 'Chữa khỏi vật nuôi bị bệnh.' },
-  vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non lớn vọt thêm 50% thời gian.' },
-  feed_ga:    { name: 'Cám gà',            kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
+  medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 3, desc: 'Mệt: 1 liều là khỏi. Bệnh nặng: 2 liều. Nguy kịch: phải gọi bác sĩ thú y.' },
+  vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 60, lv: 3, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
+  vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
+  soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
+  manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Hố ủ phân sẽ dùng sau.' },
+  feed_ga:    { name: 'Cám gà',           kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
   feed_heo:   { name: 'Cám heo',           kind: 'feed',   price: 10, lv: 3, desc: 'Thức ăn cho heo.' },
   hay:        { name: 'Cỏ khô',            kind: 'feed',   price: 8,  lv: 5, desc: 'Thức ăn cho bò và cừu.' },
   wood:       { name: 'Gỗ',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi dọn bụi cây trên đất mới.' },
   stone:      { name: 'Đá',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi đập đá trên đất mới.' },
   dogfood:    { name: 'Xương cho chó',     kind: 'feed',   price: 8,  lv: 1, desc: 'Cho chó Mực ăn để nó lớn và chịu giữ nhà.' },
   sausage:    { name: 'Xúc xích',          kind: 'feed',   price: 30, lv: 5, desc: 'Ném cho chó nhà người ta: nó mải ăn thì quên sủa 60 giây.' },
+  treat:      { name: 'Bánh thưởng',       kind: 'feed',   price: 15, lv: 1, desc: 'Bánh quy hình xương để dạy lệnh cho chó. Mỗi buổi dạy tốn 1 cái.' },
+  catfood:    { name: 'Cá khô cho mèo',    kind: 'feed',   price: 9,  lv: 4, desc: 'Cho mèo ăn. Đừng cho no quá: mèo no là nằm phơi nắng, không thèm săn chuột đâu.' },
   deco_scarecrow: { name: 'Bù nhìn',       kind: 'deco',   price: 150, lv: 2, desc: 'Cắm gần ruộng, quạ không dám tới.' },
   deco_flower:    { name: 'Chậu hoa',      kind: 'deco',   price: 30,  lv: 1, desc: 'Cho nông trại thêm xinh.' },
   deco_lamp:      { name: 'Đèn lồng',      kind: 'deco',   price: 90,  lv: 3, desc: 'Sáng lung linh ban đêm, trộm ngại vào hơn.' },
   deco_bench:     { name: 'Ghế đá',        kind: 'deco',   price: 70,  lv: 2, desc: 'Ngồi nghỉ chân.' },
+  deco_lowfence:  { name: 'Hàng rào thấp', kind: 'deco',   price: 8,   lv: 2, desc: 'Đặt quanh khối ruộng: gà không vào được, nhưng cũng hết gà mổ sâu giúp. Bạn bước qua được.' },
+  deco_rattrap:   { name: 'Bẫy chuột',     kind: 'deco',   price: 60,  lv: 5, desc: 'Đặt trong trại, bắt con chuột đi qua. Sập rồi thì phải gài lại.' },
+  deco_canopy:    { name: 'Mái che sân',   kind: 'deco',   price: 180, lv: 5, desc: 'Gà con, vịt con chơi gần mái che thì diều hâu không cắp được.' },
 };
 
 // ---------- Mua đất ----------
@@ -173,8 +415,26 @@ export const CLUTTER = {
 // Nông sản & sản phẩm bán ở kho.
 export const PRODUCTS = {
   trung: { name: 'Trứng gà', price: 14 },
+  trung_phoi: { name: 'Trứng có phôi', price: 14 },   // đã soi: nở được trong ổ ấp
+  trung_vit: { name: 'Trứng vịt', price: 18 },
+  trung_vit_phoi: { name: 'Trứng vịt có phôi', price: 18 },   // đã soi: nở thành vịt con trong ổ ấp
   sua:   { name: 'Sữa bò',   price: 40 },
   len:   { name: 'Lông cừu', price: 60 },
+  sua_ngon: { name: 'Sữa ngon',    price: 60 },   // sao: bò được vuốt ve đều
+  len_xoan: { name: 'Lông xoăn',   price: 90 },   // sao: cừu vui vẻ
+};
+// ---------- Độ thân ❤️1–5 (Phase 2) ----------
+// Mỗi tim = perHeart điểm ẩn (a.bondXp). gain: điểm mỗi lần · perDay: số lần được tính mỗi ngày game cho mỗi cách (chống cày)
+export const BOND = {
+  perHeart: 20,
+  gain: { feed: 5, pet: 5, bath: 8, cure: 10 },
+  perDay: { feed: 2, pet: 3, bath: 1, cure: 1 },
+  hungerBelow: 10, dirtyAbove: 70, lossPerMin: 1,   // đói / dơ lâu thì tụt điểm
+  star: { base: 0.1, heart3: 0.25, petStreak: 0.05, petStreakMax: 5, sheepHappy: 80, sheepBonus: 0.25 },   // tỉ lệ sản phẩm sao
+  starOf: { sua: 'sua_ngon', len: 'len_xoan' },
+  sickMul: 0.5,      // ❤️4+: nguy cơ bệnh nhân hệ số này
+  lifeMul: 1.1,      // ❤️5: tuổi thọ (mốc già, mốc ra đi) +10%
+  runRange: 80,      // ❤️4+: chạy lại khi người chơi trong tầm này
 };
 export const sellPrice = k => CROPS[k]?.price ?? PRODUCTS[k]?.price ?? 0;
 // Thùng giao hàng: lái buôn trả 80% giá chợ cho đồ trong thùng, chốt lúc 6h sáng (làm tròn xuống)
@@ -205,8 +465,8 @@ export const DEFAULT_LOOK = { skin: 0, hair: 0, hairColor: 0, shirt: 0, pants: 0
 export const START = {
   coins: 250,
   items: { seed_cai: 6, seed_carot: 3, feed_ga: 3, dogfood: 3, pesticide: 1, fertilizer: 1 },
-  animals: [{ type: 'ga', adult: true }, { type: 'ga', adult: false }],
-  dogAdult: false,
+  animals: [{ type: 'ga', stage: 'truong', sex: 'f' }, { type: 'ga', stage: 'non', sex: 'm' }],
+  dogStage: 'non',
 };
 export const expandCost = n => Math.round(60 * 1.2 ** (n - START_PLOTS) / 10) * 10;
 export const expandLevel = n => 1 + Math.floor((n - START_PLOTS) / 3);
@@ -214,7 +474,20 @@ export const expandLevel = n => 1 + Math.floor((n - START_PLOTS) / 3);
 export const FIELD_LIMITS = [[1, 1], [4, 2], [8, 3], [12, 4], [16, 5], [20, 6], [25, 7], [30, 8]];
 export const FIELD_PRICES = [300, 600, 1000, 1500, 2200, 3000, 4000];
 // Giá xây chuồng (mở theo cấp mua được con vật tương ứng trong ANIMALS)
-export const PEN_PRICES = { chicken: 200, pig: 600, pasture: 1500 };
+export const PEN_PRICES = { chicken: 200, pig: 600, pasture: 1500, quarantine: 400 };
+// Bảng chuồng theo (loại, cấp). cap: sức chứa 3 cấp; lv: cấp người chơi để xây; limit: [cấp, số chuồng tối đa] (như FIELD_LIMITS);
+// up: giá nâng lên cấp 2, 3; upLv: cấp người chơi để nâng; extra3: đồ có thêm ở cấp 3 (shower để dành Phase 3, cách ly nhận mọi loài).
+export const PEN_TABLE = {
+  chicken:    { cap: [6, 12, 18], lv: 1, limit: [[1, 1], [4, 2], [8, 3]],  up: [300, 800],   upLv: [2, 4], extra3: ['autoNest', 'sandbox'] },
+  pig:        { cap: [3, 5, 8],   lv: 3, limit: [[3, 1], [6, 2], [10, 3]], up: [800, 2000],  upLv: [4, 6], extra3: ['mudPit', 'shower'] },
+  pasture:    { cap: [3, 6, 9],   lv: 5, limit: [[5, 1], [8, 2], [12, 3]], up: [2000, 4500], upLv: [6, 8], extra3: ['autoGrass'] },
+  quarantine: { cap: [1, 2, 3],   lv: 3, limit: [[3, 1], [7, 2]],         up: [500, 1200],  upLv: [5, 7], extra3: [] },
+  doghouse:   { cap: [1, 1, 1],   lv: 1, limit: [[1, 1]],                 up: [150, 400],   upLv: [2, 4], extra3: ['bed', 'toy'] },
+  cathouse:   { cap: [1, 2, 3],   lv: 4, limit: [[4, 1], [9, 2]],         up: [250, 600],   upLv: [5, 7], extra3: ['bed', 'toy'] },
+};
+// Công trình đặt được ở chế độ xây dựng mà không phải chuồng có rào (nhà mèo): giá xây
+export const BUILD_PRICES = { cathouse: 350 };
+export const PEN_LEVELS = 3;
 export const expNeed = level => Math.floor(25 * level ** 1.5);
 export function levelInfo(exp) {
   let level = 1;
@@ -281,6 +554,8 @@ export const NOTIFY_CATS = {
   ripe: 'Cây chín', spoil: 'Cây héo, cây chết', hungry: 'Con vật đói', loss: 'Quạ, trộm lấy mất cây',
   levelup: 'Lên cấp', order: 'Đơn hàng mới', help: 'Khách giúp vườn', gate: 'Quà và lời nhắn ở cổng',
   guard: 'Chó canh khách lạ', visit: 'Bạn bè ghé',
+  old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài', ill: 'Con vật mệt',
+  pest: 'Chuột ăn cám, trộm trứng', birth: 'Vật nuôi sinh con',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -291,7 +566,7 @@ export function hourText(t) {
   return `${h % 12 || 12}h ${h < 4 ? 'đêm' : h < 11 ? 'sáng' : h < 13 ? 'trưa' : h < 18 ? 'chiều' : h < 22 ? 'tối' : 'đêm'}`;
 }
 export const EVENT_LEVEL = {
-  sick:      { level: 'urgent', group: e => 'sick:' + e.animal, label: 'Con vật bị bệnh' },
+  sick:      { level: 'important', cat: 'ill', group: e => 'sick:' + e.animal, label: 'Con vật mệt', text: (n, e) => `${n} con ${animalN(e.animal)} bị mệt 🤒` },
   eating:    { level: 'urgent', group: e => 'eating:' + e.kind, label: 'Quạ, trộm đang ăn cây' },
   ripe:      { level: 'important', cat: 'ripe', group: e => 'ripe:' + e.crop, label: 'Cây chín', text: (n, e) => `${n} ô ${cropN(e.crop)} đã chín 🌾` },
   rotten:    { level: 'important', cat: 'spoil', group: e => 'rotten:' + e.crop, label: 'Cây héo', text: (n, e) => `${n} ô ${cropN(e.crop)} đã héo 🥀` },
@@ -299,6 +574,8 @@ export const EVENT_LEVEL = {
   hungry:    { level: 'important', cat: 'hungry', group: e => 'hungry:' + e.animal, label: 'Con vật đói', text: (n, e) => `${n} con ${animalN(e.animal)} đói lả` },
   crow:      { level: 'important', cat: 'loss', group: () => 'loss:crow', label: 'Quạ ăn mất cây', text: (n, e) => n > 1 ? `Quạ đã ăn mất ${n} cây 😢` : `Quạ đã ăn mất ${(e.name ?? 'cây').toLowerCase()} 😢` },
   thief:     { level: 'important', cat: 'loss', group: () => 'loss:thief', label: 'Trộm hái mất cây', text: (n, e) => n > 1 ? `Thằng Tèo đã hái trộm ${n} cây 😢` : `Thằng Tèo đã hái trộm ${(e.name ?? 'cây').toLowerCase()} 😢` },
+  tisun:     { level: 'important', cat: 'loss', group: () => 'loss:tisun', label: 'Tí Sún trộm trứng', text: (n, e) => `Tí Sún lấy trộm mất ${e.n ?? n} quả trứng 😢` },
+  civet:     { level: 'important', cat: 'loss', group: () => 'loss:civet', label: 'Chồn hương bắt con vật', text: (n, e) => `Chồn hương tha mất ${n} con ${animalN(e.animal)} 😿` },
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   helped:    { level: 'important', cat: 'help', group: e => `helped:${e.by}:${e.act}`, label: 'Khách giúp vườn', text: (n, e) => `${e.by} đã ${helpN(e.act)} ${n} ${HELP_JOBS[e.act]?.unit ?? 'việc'} giúp bạn 🙏` },
@@ -311,8 +588,35 @@ export const EVENT_LEVEL = {
   barked:    { level: 'urgent', group: () => 'barked', label: 'Chó sủa báo có người lạ', text: (n, e) => `${e.dog} đang sủa ở ${e.where}! 🐕` },
   bitten:    { level: 'important', cat: 'guard', group: e => 'bitten:' + e.by, label: 'Chó đớp được khách lạ', text: (n, e) => `${e.dog} đã đớp được ${e.by}, phạt ${e.fine} xu 🐕` },
   sausaged:  { level: 'important', cat: 'guard', group: e => 'sausaged:' + e.by, label: 'Khách ném xúc xích cho chó', text: (n, e) => (e.ate ? `${e.by} ném xúc xích, ${e.dog} mải ăn quên sủa 🌭` : `${e.by} ném xúc xích nhưng ${e.dog} không thèm 🌭`) },
+  oldSoon:   { level: 'important', cat: 'old', group: e => 'oldSoon:' + e.animal, label: 'Con vật sắp già', text: (n, e) => `${n} con ${animalN(e.animal)} sắp già, chuẩn bị hoặc bán đi nhé 👵` },
+  passed:    { level: 'important', cat: 'old', group: e => 'passed:' + e.animal, label: 'Con vật già ra đi', text: (n, e) => `${n} con ${animalN(e.animal)} đã già và ra đi thanh thản 😇` },
+  stray:     { level: 'important', cat: 'stray', group: e => 'stray:' + e.animal, label: 'Con lạc chưa về chuồng', text: (n, e) => `${n} con ${animalN(e.animal)} lạc, chưa về chuồng 💤` },
+  predator:  { level: 'urgent', group: e => 'pred:' + e.id, label: 'Kẻ săn mồi mò vào trại' },
+  hurt:      { level: 'urgent', group: e => 'hurt:' + e.id, label: 'Con non bị chuột cắn' },
+  taken:     { level: 'important', cat: 'loss', group: e => 'taken:' + e.pred, label: 'Kẻ săn mồi bắt mất con vật', text: (n, e) => `${e.pred === 'hawk' ? 'Diều hâu' : 'Chồn'} đã bắt mất ${n} con ${animalN(e.animal)} 😢` },
+  ratFeed:   { level: 'important', cat: 'pest', group: () => 'ratFeed', label: 'Chuột ăn cám', text: n => `Chuột đã ăn mất ${n} phần cám 🐀` },
+  ratEgg:    { level: 'important', cat: 'pest', group: () => 'ratEgg', label: 'Chuột trộm trứng', text: n => `Chuột đã trộm mất ${n} quả trứng 🐀` },
+  trapped:   { level: 'info', group: () => 'trapped', label: 'Bẫy chuột sập' },
+  catRat:    { level: 'info', group: () => 'catRat', label: 'Mèo bắt được chuột' },
+  catTrophy: { level: 'info', group: e => 'catTrophy:' + e.id, label: 'Mèo mang chuột tới khoe' },
+  catSpat:   { level: 'info', group: () => 'catSpat', label: 'Mèo với chó cãi nhau' },
+  catHerd:   { level: 'info', group: () => 'catHerd', label: 'Mèo lùa một con về chuồng' },
+  shooed:    { level: 'info', group: e => 'shooed:' + e.pred, label: 'Đã đuổi kẻ săn mồi' },
+  sickSevere:   { level: 'urgent', group: e => 'sick2:' + e.animal, label: 'Con vật bệnh nặng' },
+  sickCritical: { level: 'urgent', group: e => 'sick3:' + e.animal, label: 'Con vật nguy kịch' },
+  died:      { level: 'important', cat: 'old', group: e => 'died:' + e.animal, label: 'Con vật mất vì bệnh', text: (n, e) => `${n} con ${animalN(e.animal)} đã mất vì bệnh 😇` },
+  cured:     { level: 'info', group: e => 'cured:' + e.animal, label: 'Con vật khỏi bệnh' },
+  grave:     { level: 'none', group: e => 'grave:' + e.id, label: 'Ngôi mộ mới' },
   egg:       { level: 'info', group: () => 'egg', label: 'Gà đẻ trứng' },
+  born:      { level: 'important', cat: 'birth', group: e => 'born:' + e.kind, label: 'Con vật chào đời', text: (n, e) => `${n} ${animalN(e.animal)} con mới chào đời 🐣` },
+  cockcrow:  { level: 'none', group: () => 'cockcrow', label: 'Gà trống gáy' },
   guard:     { level: 'info', group: e => 'guard:' + e.who, label: 'Chó đuổi quạ, trộm' },
+  trick:     { level: 'info', group: e => 'trick:' + e.trick, label: 'Chó học xong một lệnh' },
+  dogHerd:   { level: 'info', group: () => 'dogHerd', label: 'Chó lùa đàn về chuồng' },
+  wallow:    { level: 'none', group: e => 'wallow:' + e.id, label: 'Heo, bò lăn bùn' },
+  bathed:    { level: 'info', group: e => 'bathed:' + e.id, label: 'Đã tắm cho vật nuôi' },
+  vaccinated: { level: 'info', group: e => 'vaccinated:' + e.id, label: 'Đã tiêm vắc-xin' },
+  mucked:    { level: 'info', group: e => 'mucked:' + e.pen, label: 'Đã xúc phân chuồng' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },
   log:       { level: 'info', group: () => 'log', label: 'Nhật ký' },
   toast:     { level: 'direct', group: e => 'toast:' + e.text, label: 'Thông báo của luật chơi' },

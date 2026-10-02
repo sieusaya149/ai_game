@@ -157,10 +157,10 @@ test('làm việc khác hay sang bản đồ khác thì đứng dậy khỏi gh�
 test('bản lưu cũ chưa có thể lực thì thể lực đầy; bản có thì giữ nguyên', () => {
   const old = newGame();
   delete old.stamina;
-  store['nongtrai-save-v2'] = JSON.stringify(migrate(old));
+  store[G.SAVE_KEY] = JSON.stringify(migrate(old));
   assert.equal(G.loadGame().stamina, STAMINA.max);
   const tired = newGame(); tired.stamina = 0; tired.savedAt = Date.now();
-  store['nongtrai-save-v2'] = JSON.stringify(tired);
+  store[G.SAVE_KEY] = JSON.stringify(tired);
   const l = G.loadGame();
   assert.equal(l.stamina, 0);
   assert.equal(l.sit, false);

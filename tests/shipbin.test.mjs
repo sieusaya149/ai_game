@@ -82,7 +82,7 @@ test('chạy bù offline qua 6h cũng chốt đúng, đồ không bị trừ hai
   const s = newGame(); s.time = 0.8 * DAY_MS; s.day = 1; s.inv.cai = 6; G.shipAdd(s, 'cai', 6);
   const want = G.shipPreview(s), coins = s.coins;
   s.savedAt = Date.now() - 0.3 * DAY_MS;
-  store['nongtrai-save-v2'] = JSON.stringify(s);
+  store[G.SAVE_KEY] = JSON.stringify(s);
   const r = Math.random; Math.random = () => 0.99;
   let l; try { l = G.loadGame(); } finally { Math.random = r; }
   assert.ok(l.time > DAY_MS);
@@ -94,7 +94,7 @@ test('bản lưu v2 chưa có thùng: tự thêm một thùng ở chỗ trống 
   const s = newGame();
   s.farm.ents = s.farm.ents.filter(e => e.kind !== 'shipbin'); s.farm.rev++; delete s.shipbin;
   s.savedAt = Date.now();
-  store['nongtrai-save-v2'] = JSON.stringify(s);
+  store[G.SAVE_KEY] = JSON.stringify(s);
   const l = G.loadGame();
   assert.equal(l.farm.ents.filter(e => e.kind === 'shipbin').length, 1);
   assert.deepEqual(l.shipbin, { items: {} });

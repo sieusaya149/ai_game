@@ -7,11 +7,11 @@ import assert from 'node:assert/strict';
 import {
   createGame, startVisit, tick, actionsFor, perform, takeGuestLog,
   guestOpApply, guestReward, guardRadius, guardArea, dogAsleep, dogQuiet, dogSees,
-  walkSpeed, chaseSpeed, setChained, barkOp, biteOp, keepLoot, mapOf, urgentSpots,
+  walkSpeed, chaseSpeed, setChained, barkOp, biteOp, keepLoot, mapOf, urgentSpots, commandDog, dogPost, stageStart,
 } from '../public/state.js';
 import { todoList } from '../public/todo.js';
 import { setClock, serverDay } from '../public/clock.js';
-import { GUARD, GUEST, CROPS, DAY_MS, NIGHT_FROM, EVENT_LEVEL } from '../public/data.js';
+import { GUARD, DOG, GUEST, CROPS, DAY_MS, NIGHT_FROM, EVENT_LEVEL, TRICKS } from '../public/data.js';
 import { TS } from '../public/layout.js';
 import { eventMeta } from '../public/notify.js';
 
@@ -32,7 +32,7 @@ const ripe = (p, id = 'bap') => {
 // Vườn chủ Lan cấp 5, chó Mực trưởng thành no và vui, ô 0..5 bắp đã chín
 function host(mutate) {
   const s = createGame({ name: 'Lan' }); s.tutorial = 99; s.exp = LV5;
-  Object.assign(s.dog, { adult: true, hunger: 100, happy: 100, chained: false });
+  Object.assign(s.dog, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false });
   for (let i = 0; i <= 5; i++) ripe(s.plots[i]);
   mutate?.(s);
   return s;
@@ -44,20 +44,22 @@ const op = (kind, act, extra) => ({ id: `op-${++seq}`, kind, act, at: clock, ...
 // Chỗ đứng cách chó `n` ô về phía đông
 const away = (s, n) => ({ x: s.dog.x + n * TS, y: s.dog.y });
 
-test('bán kính phát hiện: chó con 4 ô, chó trưởng thành 6 ô; vui dưới 50 còn một nửa; đói dưới 30 thì không canh', () => {
+test('bán kính phát hiện: chó con chưa canh, chó nhỡ 4 ô, chó trưởng thành 6 ô; vui dưới 50 còn một nửa; đói dưới 30 thì không canh', () => {
   const s = host();
-  assert.equal(guardRadius(s), GUARD.radius.adult);
+  assert.equal(guardRadius(s), DOG.guardRadius.truong);
   assert.equal(dogSees(s, away(s, 5)), true);
   assert.equal(dogSees(s, away(s, 7)), false, 'ngoài 6 ô thì không thấy');
 
-  s.dog.adult = false;
-  assert.equal(guardRadius(s), GUARD.radius.pup);
+  s.dog.stage = 'non';
+  assert.equal(guardRadius(s), 0, 'chó con chưa biết canh');
+  s.dog.stage = 'nho';
+  assert.equal(guardRadius(s), DOG.guardRadius.nho);
   assert.equal(dogSees(s, away(s, 3)), true);
-  assert.equal(dogSees(s, away(s, 5)), false, 'chó con chỉ thấy trong 4 ô');
+  assert.equal(dogSees(s, away(s, 5)), false, 'chó nhỡ chỉ thấy trong 4 ô');
 
   // vui dưới 50: bán kính còn một nửa
-  s.dog.adult = true; s.dog.happy = 20;
-  assert.equal(guardRadius(s), GUARD.radius.adult / 2);
+  s.dog.stage = 'truong'; s.dog.happy = 20;
+  assert.equal(guardRadius(s), DOG.guardRadius.truong / 2);
   assert.equal(dogSees(s, away(s, 2)), true);
   assert.equal(dogSees(s, away(s, 5)), false);
 
@@ -171,10 +173,10 @@ test('xúc xích: chó no dưới 50 chắc chắn ăn và im lặng 60 giây, h
   assert.equal(r.ate, true);
   assert.deepEqual(r.reward.lose, { sausage: 1 });
   assert.equal(dogQuiet(s, clock), true);
-  assert.equal(dogSees(s, spot, clock), false, 'chó mải ăn thì không phát hiện ai');
-  assert.equal(dogSees(s, spot, clock + GUARD.quietMs - 500), false);
+  assert.equal(dogSees(s, spot, { t: clock }), false, 'chó mải ăn thì không phát hiện ai');
+  assert.equal(dogSees(s, spot, { t: clock + GUARD.quietMs - 500 }), false);
   assert.equal(dogQuiet(s, clock + GUARD.quietMs + 1), false);
-  assert.equal(dogSees(s, spot, clock + GUARD.quietMs + 1), true, 'hết 60 giây chó canh lại');
+  assert.equal(dogSees(s, spot, { t: clock + GUARD.quietMs + 1 }), true, 'hết 60 giây chó canh lại');
 
   // không có xúc xích trong giỏ thì ném gì
   assert.equal(guestOpApply(s, who('Bình', { sausage: 0 }), op('sausage', 'sausage')).reason, 'no_item');
@@ -299,4 +301,36 @@ test('trong vườn khách: nút Ném xúc xích ở con chó, hết xúc xích 
   const none = actionsFor(v, t).find(a => a.id === 'sausage');
   assert.match(none.disabled, /xúc xích/i, 'hết xúc xích thì nút mờ kèm lý do');
   assert.ok(CROPS.bap && GUEST.stealLv === 5 && serverDay(clock));
+});
+
+// Gộp Phase 1 + Phase 2: một con chó, một bộ luật cho cả khách online lẫn trộm NPC
+const allTricks = s => { s.dog.tricks = Object.fromEntries(Object.entries(TRICKS).map(([id, t]) => [id, t.sessions])); };
+
+test('chó thuộc đủ 6 lệnh thì không bao giờ ăn xúc xích của người lạ, kể cả lúc đói', () => {
+  const s = host(h => { h.dog.hunger = 40; allTricks(h); });
+  for (let i = 0; i < 50; i++) {
+    const r = guestOpApply(s, who('Bình', { sausage: 1 }), { id: `tp-${i}`, kind: 'sausage', act: 'sausage', at: clock });
+    assert.equal(r.ok, true);
+    assert.equal(r.ate, false);
+  }
+  assert.equal(dogQuiet(s, clock), false);
+  assert.equal(dogSees(s, away(s, 2)), true, 'vẫn canh như thường');
+});
+
+test('Canh khu nhân đôi bán kính với cả khách online; xích chó thì thôi gác và không nhận lệnh đi lại', () => {
+  const s = host(allTricks);
+  const spot = { c: Math.floor(s.dog.x / TS) + 20, r: Math.floor(s.dog.y / TS) };
+  assert.equal(commandDog(s, 'guard', spot).ok, true);
+  assert.equal(guardRadius(s), DOG.guardRadius.truong * DOG.guardPostMul);
+  const at = { x: spot.c * TS + 8 + 10 * TS, y: spot.r * TS + 8 };
+  assert.equal(dogSees(s, at), true, 'khách đứng cách chỗ gác 10 ô vẫn bị thấy');
+
+  setChained(s, true);
+  assert.equal(dogPost(s), null, 'xích thì thôi gác');
+  assert.equal(guardRadius(s), GUARD.chainRadius);
+  assert.equal(dogSees(s, at), false);
+  const r = commandDog(s, 'follow');
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'chained');
+  assert.equal(commandDog(s, 'sit').ok, true, 'ngồi thì xích vẫn ngồi được');
 });

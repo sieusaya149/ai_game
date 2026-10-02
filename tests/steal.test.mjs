@@ -5,10 +5,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, startVisit, guestCheck, guestOps, guestOpApply, guestReward, actionsFor, perform,
-  takeGuestLog, stealsToday, stolenToday, robsToday, stealLeft, ripeValue, tick,
+  takeGuestLog, stealsToday, stolenToday, robsToday, stealLeft, ripeValue, tick, raidTonight,
 } from '../public/state.js';
 import { setClock, serverDay } from '../public/clock.js';
-import { GUEST, STAMINA, CROPS, PRODUCTS, THREATS } from '../public/data.js';
+import { GUEST, STAMINA, CROPS, PRODUCTS, RAID } from '../public/data.js';
 import { eventMeta } from '../public/notify.js';
 
 const store = {};
@@ -164,11 +164,12 @@ test('đêm đã có người chơi sang trộm thì Thằng Tèo không tới; 
       h.today = { day: serverDay(T0), helps: 0, steals, stolen: 0 };
     });
     try { Math.random = () => 0.0001; tick(s, 60_000); } finally { Math.random = rand; }
-    return s.threats.some(t => t.kind === 'thief');
+    // trộm NPC chốt mỗi đêm đúng một vụ (issue 46); tick 60 giây có khi Tèo đã hái xong và chuồn rồi
+    return raidTonight(s)?.kind === 'thief';
   };
   assert.equal(nightRun(0), true, 'đêm chưa ai trộm: Thằng Tèo vẫn lẻn vào');
   assert.equal(nightRun(1), false, 'đêm đã có người sang trộm: Tèo nhường');
-  assert.ok(THREATS.thiefChancePerNightMin > 0);
+  assert.ok(RAID.nightly > 0);
 });
 
 test('nhật ký vườn: mỗi vụ trộm ghi người trộm, món gì, bao nhiêu, mấy giờ; chủ chỉ được báo một lần', () => {

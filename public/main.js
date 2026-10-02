@@ -1,11 +1,11 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf,
+  startVisit, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, commandDog,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
-import { DIR_NAME, LIVE, itemName } from './data.js';
+import { DIR_NAME, LIVE, itemName, ANIMALS } from './data.js';
 import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
@@ -96,8 +96,25 @@ let shakeUntil = 0;
 // ---------- API cho ui.js ----------
 function changed() { dirty = true; }
 
-function doAction(target, id) {
+// Bán con vật: báo giá, con ❤️4+ phải xác nhận 2 lần. Nghỉ hưu: hỏi một lần (không quay lại được)
+async function askAnimal(target, id) {
+  const a = state.animals.find(x => x.id === target.id);
+  if (!a) return null;
+  const nm = ANIMALS[a.type].name.toLowerCase();
+  if (id === 'retire') return await ui.confirmBox(`Cho ${nm} nghỉ hưu? Nó ở lại trại nhưng không cho sản phẩm nữa.`, 'Nghỉ hưu', 'Thôi') ? target : null;
+  const q = sellQuote(state, a);
+  const ask = q.kg != null ? `Chú Ba trả ${q.price} xu cho ${q.kg} kg (${q.unit} xu/kg hôm nay). Bán ${nm} này?` : `Chú Ba trả ${q.price} xu. Bán ${nm} này?`;
+  for (let i = 0; i < Math.max(1, q.need); i++) {
+    const text = q.need ? (i ? `Chắc chắn bán ${nm} ${'❤️'.repeat(a.bond)} chứ? Không đón lại được đâu!` : `${ask} Con này thân với bạn lắm ${'❤️'.repeat(a.bond)}`) : ask;
+    if (!await ui.confirmBox(text, i ? 'Bán thật' : 'Bán', 'Thôi', !!q.need)) return null;
+  }
+  return { ...target, confirms: q.need };
+}
+
+async function doAction(target, id) {
   if (!state || busy || fading || world.stun > 0) return;
+  if (target.kind === 'animal' && (id === 'sell' || id === 'retire') && !(target = await askAnimal(target, id))) return;
+  if (busy || !V.exists(state, target)) return;
   const pos = V.targetPos(state, target);
   if (pos) V.faceTo(state, pos.x, pos.y);
   V.cancelMove(world);
@@ -117,12 +134,18 @@ function applyResult(res, target, id) {
   if (target?.id === 'friendGate' && sync) { ui.openPanel('friends'); changed(); return; }   // cổng bạn bè: mở bảng bạn bè khi đang online
   if (res.msg && (!res.ok || !res.fx?.length)) ui.toast(res.msg);
   if (res.open) ui.openPanel(res.open);
+  if (res.sold) (world.deals ??= []).push({ ...res.sold, t0: now });   // Chú Ba tới dắt đi
+  if (res.rename) ui.askRename(res.rename).then(r => r && changed());
   if (res.go) goScene(res.go);
+  if (res.bath != null) (world.baths ??= []).push({ id: res.bath, t0: now });
+  if (res.grain) (world.grains ??= []).push({ ...res.grain, t0: now });   // nắm thóc vừa rải ở cửa chuồng
+  if (res.pickSpot) { world.pick = res.pickSpot; ui.toast('Chạm vào chỗ muốn ' + state.dog.name + ' gác 🛡️'); }   // lệnh Canh khu: chọn ô gác
+  if (res.punish) ui.askPunish(res.punish).then(() => changed());   // bắt được trộm: hộp thoại chọn kiểu phạt
   if (res.buyStrip) askStrip(res.buyStrip);
   if (res.sleep) goSleep();
   if (res.guestOp) sync?.send({ t: 'guest', op: res.guestOp });   // việc giúp trong vườn người khác (issue 28): server kiểm tra rồi xếp hàng
-  if (res.ok && target && /pet|vuot|stroke|love/i.test(id ?? '')) {
-    const key = target.kind === 'dog' ? 'dog' : target.kind === 'animal' ? 'a' + target.id : null;
+  if (res.ok && target && (/pet|vuot|stroke|love|praise/i.test(id ?? '') || ((target.kind === 'animal' || target.kind === 'cat') && id === 'feed'))) {
+    const key = target.kind === 'dog' ? 'dog' : target.kind === 'animal' ? 'a' + target.id : target.kind === 'cat' ? 'c' + target.id : null;
     if (key) world.emotes.set(key, { icon: 'heart', until: now + 1600 });
   }
   changed();
@@ -375,6 +398,17 @@ const api = {
     ui.buildTray(state, b);
     changed();
   },
+  // Nâng cấp chuồng đang chọn trong chế độ xây dựng
+  buildUpgrade() {
+    const b = world.build;
+    if (!b?.sel) return;
+    const r = upgradePen(state, b.sel);
+    ui.buildMsg(r.msg, r.ok);
+    ui.handleEvents([{ type: 'sound', name: r.ok ? 'coin' : 'error' }]);
+    ui.buildSel(null, upgradeInfo(state, b.sel));
+    ui.buildTray(state, b);
+    changed();
+  },
   // Đi tới chỗ gần nhất có việc loại kind (không tự làm). Ở bản đồ khác thì ra cửa/cổng trước, sang vườn rồi đi tiếp.
   todoGo(kind) {
     if (!state || busy || fading || world.build || world.stun > 0) return false;
@@ -605,6 +639,11 @@ function onTap(cx, cy) {
   plan = null;
   const r = canvas.getBoundingClientRect();
   const wx = ((cx - r.left) * dpr + view.camX) / scale, wy = ((cy - r.top) * dpr + view.camY) / scale;
+  if (world.pick) {   // đang chọn ô gác cho chó
+    const what = world.pick; world.pick = null;
+    applyResult(commandDog(state, what, { c: Math.floor(wx / TS), r: Math.floor(wy / TS) }));
+    return;
+  }
   const hit = V.hitTest(state, wx, wy);
   if (!hit) { V.walkTo(state, world, wx, wy); return; }
   if (V.inRange(state, hit)) autoAct(hit);
@@ -665,6 +704,7 @@ function buildUp(e) {
   if (d.tap && !g) {   // chạm không kéo: chọn món, hiện nút Cất nếu cất được
     const ent = state.farm.ents.find(x => x.id === d.id);
     if (ent && (ent.kind === 'deco' || ent.kind === 'field')) { b.sel = ent.id; ui.buildSel(entName(ent)); }
+    else if (ent && upgradeInfo(state, ent.id)) { b.sel = ent.id; ui.buildSel(null, upgradeInfo(state, ent.id)); }   // chuồng, chuồng chó: nâng cấp
     ui.buildMsg(BUILD_HINT, null);
     return;
   }
@@ -753,6 +793,15 @@ function frame(now) {
   view = { camX: Math.round(cam.x * scale), camY: Math.round(cam.y * scale) };
   world.fx = world.fx.filter(f => now - f.t0 < 1500);
   if (state.scene === 'farm') for (const e of events) if (e.type === 'fx') world.fx.push({ text: e.text, color: e.color, x: e.x, y: e.y, t0: now });
+  // gà trống gáy: bong bóng nốt nhạc trên đầu nó
+  for (const e of events) if (e.type === 'cockcrow') world.emotes.set('a' + e.id, { icon: 'crow', until: now + 2600 });
+  // con vật già ra đi: thiên thần bay lên
+  world.angels = (world.angels ?? []).filter(g => now - g.t0 < R.ANGEL_MS);
+  if (state.scene === 'farm') for (const e of events) if ((e.type === 'passed' || e.type === 'died') && e.x != null) world.angels.push({ x: e.x, y: e.y, t0: now });
+  for (const e of events) if (e.type === 'sickSevere') browserNotify(`${e.animal} bệnh nặng rồi!`, 'Cho uống 2 liều thuốc hoặc gọi bác sĩ thú y nhé.');
+  world.baths = (world.baths ?? []).filter(b => now - b.t0 < R.BATH_MS);
+  world.grains = (world.grains ?? []).filter(g => now - g.t0 < R.GRAIN_MS);
+  if (state.scene === 'farm') for (const e of events) if (e.type === 'wallow') world.baths.push({ id: e.id, t0: now, wallow: true });
   R.render(ctx, {
     state, w: world, cam, scale, width: canvas.width, height: canvas.height, dpr, now,
     target: curTarget ? { target: curTarget } : null,
@@ -769,6 +818,18 @@ function frame(now) {
   if (now - lastHud > 250) { lastHud = now; ui.renderHUD(state); if (state.visit) ui.setVisit(state.visit.owner, helpLeft(state)); }
   if (joy.el) joy.el.style.display = ui.isBlocking() ? 'none' : '';
   if (now - lastSave > 5000) { lastSave = now; save(); }
+}
+
+// Thông báo trình duyệt khi có con vào Bệnh nặng: xin quyền một lần (nhớ đã hỏi), chỉ gửi khi tab đang ẩn
+let askedNotify = false;
+function browserNotify(title, body) {
+  try {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default' && !askedNotify && !localStorage.getItem('nongtrai-asked-notify')) {
+      askedNotify = true; localStorage.setItem('nongtrai-asked-notify', '1');
+      Notification.requestPermission();
+    } else if (Notification.permission === 'granted' && document.hidden) new Notification(title, { body, tag: 'sick' });
+  } catch { /* trình duyệt không cho: bỏ qua */ }
 }
 
 // Ẩn tab / đóng trang: lưu ngay; vườn online gửi luôn lên làng (keepalive, vẫn đi khi trang đã đóng)

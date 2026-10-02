@@ -19,10 +19,10 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): ban ngày con thả rông có vị trí hợp lệ (không trong nhà, nhà kính, ngoài cổng); số thả rông không bao giờ vượt 30; mổ ruộng giảm sâu và 5% mất hạt (thống kê hạt giống cố định); hàng rào thấp chặn gà vào ô.
-- [ ] Unit test: gà mái đẻ trứng ở ô cỏ do luật chọn, nhặt được và cộng vào kho; chạy bù nhiều giờ có trứng trong bụi và không con nào chết.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có đàn gà ban ngày → gà đi khắp trại, vào ruộng mổ sâu; mua hàng rào thấp đặt quanh ruộng → gà không vào; đi tìm và nhặt trứng trong bụi.
-- [ ] Pixel art ổ trứng trong bụi và hàng rào thấp có đủ.
+- [x] Unit test (seam 1): ban ngày con thả rông có vị trí hợp lệ (không trong nhà, nhà kính, ngoài cổng); số thả rông không bao giờ vượt 30; mổ ruộng giảm sâu và 5% mất hạt (thống kê hạt giống cố định); hàng rào thấp chặn gà vào ô.
+- [x] Unit test: gà mái đẻ trứng ở ô cỏ do luật chọn, nhặt được và cộng vào kho; chạy bù nhiều giờ có trứng trong bụi và không con nào chết.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có đàn gà ban ngày → gà đi khắp trại, vào ruộng mổ sâu; mua hàng rào thấp đặt quanh ruộng → gà không vào; đi tìm và nhặt trứng trong bụi. (Dùng tick() công khai để tua luật; chưa có hiệu ứng mổ sâu riêng.)
+- [x] Pixel art ổ trứng trong bụi và hàng rào thấp có đủ.
 
 ## Blocked by
 

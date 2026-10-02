@@ -1,8 +1,34 @@
 // Chuyển bản lưu cũ lên phiên bản mới. Mỗi hàm chuyển đúng một bậc (v1→v2, sau này v2→v3...).
 // Thuần JS, không ngẫu nhiên, không đọc đồng hồ: cùng bản cũ luôn ra cùng bản mới.
 import { TS, MAP, V1, START_FARM, FIELD_SIZE } from './layout.js';
+import { ANIMALS, stageStart, weightAt } from './data.js';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
+
+// Hình dạng một con vật từ v3 (SPEC.md "Con vật"). Lát sau cần trường mới thì thêm giá trị mặc định ở đây,
+// không cần tăng phiên bản: fillAnimal chạy cho mọi con vật mỗi lần nạp bản lưu và khi sinh con mới.
+export const animalDefaults = a => ({
+  name: ANIMALS[a.type]?.name ?? '',
+  sex: a.id % 2 ? 'm' : 'f',            // 'f' cái · 'm' đực
+  stage: 'non', age: 0,                 // giai đoạn · tuổi = giờ vườn đã sống (ms)
+  hunger: 100, happy: 60,
+  sick: 0, sickSince: 0, starvingSince: 0,   // sick: 0 khỏe · 1 mệt · 2 bệnh nặng · 3 nguy kịch
+  sickMs: 0, dose: 0, vaccUntil: 0,     // tiến triển bệnh (giờ vườn) · liều thuốc đã uống ở giai đoạn Bệnh nặng · vắc-xin hết hạn lúc simMs này
+  dirty: 0,                             // độ dơ 0..100
+  hurt: false, hurtMs: 0,               // con non bị chuột cắn (issue 43): vết thương theo giờ vườn, chữa bằng thuốc thú y
+  bond: 2, bondXp: 0,                   // độ thân ❤️1..5 · điểm ẩn trong tim hiện tại (BOND.perHeart)
+  weight: weightAt(a.type, a.stage ?? 'non'),   // kg
+  mom: null, dad: null,                 // { id, name } của cha mẹ nếu đẻ trong trại
+  pen: null,                            // id thực thể chuồng đang ở (xếp tự động khi null, xem settlePens ở state.js)
+  stray: false,                         // chạng vạng chưa về chuồng, ngủ ngoài tới sáng (issue 42)
+  tile: null,                          // { c, r } ô đang đứng khi thả rông (ADR 0013); null = trong chuồng
+  nextProduct: 0, ready: false, pregnant: false, dueAt: 0,
+  mate: null,                           // { id, name } con đực đã làm cha lứa đang mang (nái/bò/cừu cái)
+});
+export function fillAnimal(a) {
+  for (const [k, v] of Object.entries(animalDefaults(a))) if (a[k] === undefined) a[k] = v;
+  return a;
+}
 
 const rectTiles = rects => rects.flatMap(([c, r, w, h]) => {
   const out = [];
@@ -50,7 +76,24 @@ function v1to2(s) {
   return out;
 }
 
-const STEPS = { 1: v1to2 };
+// Con vật đổi hình dạng: 2 giai đoạn (adult) thành 4 giai đoạn theo giờ vườn, thêm giới tính, độ thân, độ dơ, bệnh theo mức...
+// Con trưởng thành cũ thành "Trưởng thành" ở đầu giai đoạn, con non thành "Non". Giới tính theo id (chẵn cái, lẻ đực).
+function v2to3(s) {
+  if (s.animals != null && !Array.isArray(s.animals)) throw new Error('Bản lưu v2 hỏng danh sách con vật');
+  const animals = (s.animals ?? []).map(({ adult, ...a }) => {
+    if (!ANIMALS[a.type] || !Number.isFinite(a.id)) throw new Error('Bản lưu v2 có con vật lạ');
+    const stage = adult ? 'truong' : 'non';
+    return fillAnimal({ ...a, stage, age: stageStart(a.type, stage), sex: a.id % 2 ? 'm' : 'f', sick: a.sick ? 1 : 0, bond: 2, dirty: 0 });
+  });
+  const out = { ...s, v: 3, animals };
+  if (s.dog) {
+    const { adult, ...dog } = s.dog, stage = adult ? 'truong' : 'non';
+    out.dog = { ...dog, stage, age: stageStart('cho', stage) };
+  }
+  return out;
+}
+
+const STEPS = { 1: v1to2, 2: v2to3 };
 const RETIRED = ['shop'];
 
 // Đưa một bản lưu bất kỳ (đã parse) lên SAVE_VERSION. Bản không hợp lệ thì ném lỗi.
@@ -65,6 +108,7 @@ export function migrate(raw) {
   }
   if (s.v !== SAVE_VERSION || !s.farm) throw new Error('Bản lưu không đúng định dạng');
   s.basket ??= {};   // bản lưu chưa có giỏ: đồ cũ nằm ở kho (inv), giỏ trống
+  for (const a of s.animals ?? []) fillAnimal(a);   // trường con vật thêm sau v3
   // Công trình đã bỏ khỏi game (sạp hàng giờ nằm ở chợ trong làng), cả ở vườn v2 đã lưu từ trước
   if (s.farm.ents.some(e => RETIRED.includes(e.kind))) {
     s.farm.ents = s.farm.ents.filter(e => !RETIRED.includes(e.kind));

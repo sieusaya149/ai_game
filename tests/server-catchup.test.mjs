@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
 import { createGame, loadGame, tick } from '../public/state.js';
 import { setClock } from '../public/clock.js';
-import { MAX_CATCHUP_MS } from '../public/data.js';
+import { MAX_CATCHUP_MS, SICK, PREDATOR } from '../public/data.js';
+import { TS } from '../public/layout.js';
+import { serverDay } from '../public/clock.js';
+import { readFileSync } from 'node:fs';
 
 const H = 3600_000, T = Date.now();
 // ngẫu nhiên (sâu, bệnh) cố định để so được kết quả hai lần chạy
@@ -106,4 +109,66 @@ test('visit: cần đăng nhập, vườn không có thì 404', async t => {
   const { srv, user } = await setup(t);
   assert.equal((await srv.json('/api/visit?name=Lan', undefined, {})).status, 401);
   assert.equal((await (await user('Bình')).visit('Ai đó')).body.code, 'no_farm');
+});
+
+// Gộp Phase 1 + Phase 2: vườn online lưu từ trước bằng bản v2 (có trường online) vẫn chạy bù và lên v3 không mất gì
+test('chạy bù vườn lưu bằng bản v2 có trường online: thành v3, giữ nhật ký khách, thống kê hôm nay, xích chó', async t => {
+  const { user } = await setup(t);
+  const v2 = JSON.parse(readFileSync(new URL('./fixtures/v2-farm.json', import.meta.url), 'utf8'));
+  const guest = { id: 'op-v2-0001', kind: 'help', act: 'water', by: 'Bình', lv: 5, at: T - 4 * H, seen: false };
+  Object.assign(v2, { tutorial: 99, mode: 'online', account: 'Lan', guests: [guest], savedAt: T - 3 * H,
+    today: { day: serverDay(T), helps: 2, steals: 1, stolen: 30, robs: 0 } });
+  Object.assign(v2.dog, { chained: true, nap: 0, napCheck: 0, quiet: 0, barkAt: 0, barkX: 0, barkY: 0 });
+  Object.assign(v2.stats, { chased: 3, barks: 7, robStreak: 4, helps: 5 });
+  assert.equal(v2.v, 2);
+  const u = await user('Lan');
+  const { play } = (await u.play()).body;
+  assert.equal((await u.save(play, v2)).status, 200);
+
+  const f = (await (await user('Bình')).visit('Lan')).body.farm;
+  assert.equal(f.v, 3);
+  assert.equal(f.simMs - v2.simMs, 3 * H, 'chạy bù đủ 3 giờ');
+  assert.equal(f.dog.stage, 'truong'); assert.equal(f.dog.adult, undefined);
+  assert.equal(f.dog.chained, true);
+  assert.equal(f.animals.length, v2.animals.length);
+  assert.ok(f.animals.every(a => a.stage && a.sex && a.adult === undefined));
+  assert.deepEqual(f.guests, [guest]);
+  assert.deepEqual(f.today, v2.today);
+  for (const k of ['chased', 'barks', 'robStreak', 'helps']) assert.equal(f.stats[k], v2.stats[k], k);
+  assert.equal(f.mode, 'online'); assert.equal(f.account, 'Lan');
+});
+// Tiêu chí seam 3 đã hoãn của issue 38 và 43 (lúc đó nhánh phase2 chưa có server): server chạy bù 8 giờ theo ADR 0004
+const more = (s, extra) => { const a = { ...structuredClone(s.animals[0]), id: s.nextId++, ...extra }; s.animals.push(a); return a; };
+test('server chạy bù 8 giờ (issue 38): con Bệnh nặng và Nguy kịch vẫn sống, Nguy kịch hạ về Bệnh nặng', async t => {
+  const { user, owner } = await setup(t);
+  let ids, crit;
+  await owner('Lan', 8 * H, s => {
+    more(s, { sick: 2, sickMs: SICK.toSevere });
+    crit = more(s, { sick: 3, sickMs: SICK.toCritical }).id;
+    ids = s.animals.map(a => a.id);
+  });
+  const f = (await (await user('Bình')).visit('Lan')).body.farm;
+  assert.deepEqual(f.animals.map(a => a.id).sort(), [...ids].sort(), 'không con nào chết');
+  assert.ok(f.animals.every(a => a.sick <= 2), 'chạy bù không để con nào ở mức Nguy kịch');
+  assert.ok(f.animals.find(a => a.id === crit).sick <= 2, 'con nguy kịch hạ xuống (Bệnh nặng hay nhẹ hơn), không chết');
+});
+
+test('server chạy bù 8 giờ (issue 43): có chuột, diều hâu, chồn thì không con nào chết hay bị cắn', async t => {
+  const { user, owner } = await setup(t);
+  let ids;
+  await owner('Lan', 8 * H, s => {
+    s.exp = 5000; s.troughs.chicken = 20;
+    const a = s.animals[0], b = more(s, {}), c = Math.floor(a.x / TS), r = Math.floor(a.y / TS);
+    const pred = (kind, extra) => s.preds.push({ id: s.nextId++, kind, state: 'hunt', since: s.time, warned: false, strikeAt: s.time + PREDATOR.warnMs, tile: null, target: null, ...extra });
+    for (let i = 0; i < 3; i++) pred('rat', { tile: { c, r }, x: c * TS + 8, y: r * TS + 8, tileAt: s.time + 1e9 });
+    pred('hawk', { x: a.x, y: a.y, target: a.id });
+    pred('weasel', { x: b.x, y: b.y, target: b.id });
+    ids = s.animals.map(x => x.id);
+  });
+  const f = (await (await user('Bình')).visit('Lan')).body.farm;
+  assert.deepEqual(f.animals.map(a => a.id).sort(), [...ids].sort(), 'không con nào chết hay bị bắt đi');
+  assert.equal(f.animals.filter(a => a.hurt).length, 0, 'không con nào bị cắn');
+  assert.equal(f.preds.some(p => p.kind !== 'rat'), false, 'diều hâu, chồn bỏ đi tay không');
+  assert.ok(f.troughs.chicken < 20, 'cám trong máng có hao');
+  assert.ok(f.preds.filter(p => p.kind === 'rat').length <= PREDATOR.rat.max, 'chuột không sinh quá trần');
 });

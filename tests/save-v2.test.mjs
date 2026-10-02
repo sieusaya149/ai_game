@@ -11,10 +11,10 @@ const fixture = name => JSON.parse(readFileSync(new URL(`./fixtures/${name}.json
 const seedV1 = name => { clear(); const s = fixture(name); s.savedAt = Date.now(); store['nongtrai-save-v1'] = JSON.stringify(s); return s; };
 const quiet = fn => { const r = Math.random; Math.random = () => 0.99; try { return fn(); } finally { Math.random = r; } };
 
-test('mở bản v1 đang chơi dở: thành v2, không mất xu, đồ, cấp, cây, con vật', () => {
+test('mở bản v1 đang chơi dở: chuyển lên bản mới nhất, không mất xu, đồ, cấp, cây, con vật', () => {
   const old = seedV1('v1-mid');
   const s = G.loadGame();
-  assert.equal(s.v, 2);
+  assert.equal(s.v, 3);
   assert.equal(s.coins, old.coins);
   assert.equal(s.exp, old.exp);
   assert.deepEqual(s.inv, old.inv);
@@ -50,8 +50,8 @@ test('bản v1 vẫn còn nguyên sau khi chuyển; chuyển hai lần cho cùng
   const v1Before = store['nongtrai-save-v1'];
   const a = quiet(() => G.loadGame());
   assert.equal(store['nongtrai-save-v1'], v1Before);
-  assert.ok(store['nongtrai-save-v2'], 'đã ghi bản v2');
-  delete store['nongtrai-save-v2']; delete store['nongtrai-migrated'];   // như mở trên máy khác
+  assert.ok(store[G.SAVE_KEY], 'đã ghi bản mới');
+  delete store[G.SAVE_KEY]; delete store['nongtrai-migrated']; delete store['nongtrai-migrated-v3'];   // như mở trên máy khác
   const b = quiet(() => G.loadGame());
   for (const s of [a, b]) { delete s.savedAt; s.log = []; }
   assert.deepEqual(a, b);
@@ -66,7 +66,7 @@ test('chơi lại từ đầu thì không lôi bản v1 cũ lên nữa', () => {
   assert.ok(store['nongtrai-save-v1'], 'bản v1 vẫn còn');
 });
 
-test('đã có v2 thì đọc v2, không chuyển lại từ v1', () => {
+test('đã có bản mới thì đọc bản mới, không chuyển lại từ v1', () => {
   seedV1('v1-fresh');
   const s = G.loadGame();
   s.coins = 777; G.saveGame(s);
@@ -80,7 +80,7 @@ test('bản v1 hỏng: không ghi đè, báo lỗi, không treo', () => {
   assert.equal(G.loadGame(), null);
   assert.match(G.loadProblem(), /.+/);
   assert.equal(store['nongtrai-save-v1'], '{"v":1,"plots":"hỏng"');
-  assert.equal(store['nongtrai-save-v2'], undefined);
+  assert.equal(store[G.SAVE_KEY], undefined);
   clear();
   assert.equal(G.loadGame(), null);
   assert.equal(G.loadProblem(), null);   // không có bản lưu thì không phải lỗi
@@ -89,7 +89,7 @@ test('bản v1 hỏng: không ghi đè, báo lỗi, không treo', () => {
 test('vườn mới: 1 khối ruộng, đủ công trình, 2 con gà trong chuồng gà, đi được từ cổng vào nhà', () => {
   clear();
   const s = G.createGame({ name: 'Mới' }), m = G.mapOf(s);
-  assert.equal(s.v, 2);
+  assert.equal(s.v, 3);
   assert.equal(s.plots.length, 9);
   assert.ok(s.plots.every(p => p.unlocked));
   for (const id of ['house', 'gate', 'well', 'shed', 'board', 'doghouse', 'coop']) assert.ok(m.building(id), id);

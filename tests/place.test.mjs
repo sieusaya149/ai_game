@@ -65,7 +65,7 @@ test('đặt khối ruộng cũng theo luật chung: chồng lên, thiếu xu', 
   assert.equal(r.ok, false); assert.equal(r.reason, 'coins'); assert.equal(fields(p).length, 1);
 });
 
-test('đặt chuồng heo: cần cấp, tốn xu, chỉ một chuồng mỗi loại', () => {
+test('đặt chuồng heo: cần cấp, tốn xu, số chuồng mỗi loại theo cấp', () => {
   const lo = game(1, 5000);
   assert.equal(G.placeEntity(lo, { kind: 'pen', pen: 'pig' }, 34, 18).reason, 'level');
   const s = game(3, 5000);
@@ -73,8 +73,8 @@ test('đặt chuồng heo: cần cấp, tốn xu, chỉ một chuồng mỗi lo�
   const r = G.placeEntity(s, { kind: 'pen', pen: 'pig' }, 34, 18);
   assert.equal(r.ok, true, r.msg);
   assert.ok(s.coins < 5000);
-  assert.equal(G.placeEntity(s, { kind: 'pen', pen: 'pig' }, 33, 24).reason, 'exists');
-  assert.equal(G.canPlace(s, { kind: 'pen', pen: 'chicken' }, 33, 24).reason, 'exists');
+  assert.equal(G.placeEntity(s, { kind: 'pen', pen: 'pig' }, 33, 24).reason, 'max_pens');   // chuồng thứ hai cần cấp cao hơn
+  assert.equal(G.canPlace(s, { kind: 'pen', pen: 'chicken' }, 33, 24).reason, 'max_pens');
 });
 
 test('đặt đồ trang trí từ túi: trừ túi, hết thì từ chối', () => {

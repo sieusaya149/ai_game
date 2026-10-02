@@ -17,7 +17,7 @@ export function dirtyChunks(a, b) {
     for (let y = Math.max(0, r - pad); y <= Math.min(mh - 1, r + pad); y++) for (let x = Math.max(0, c - pad); x <= Math.min(mw - 1, c + pad); x++) out.add(Math.floor(y / CHUNK) * cw + Math.floor(x / CHUNK));
   };
   for (let i = 0; i < mw * mh; i++) if (a.ground[i] !== b.ground[i] || a.solid[i] !== b.solid[i]) mark(i % mw, Math.floor(i / mw));
-  const fk = f => f.c + ',' + f.r + f.kind, was = new Set(a.fences.map(fk)), now = new Set(b.fences.map(fk));
+  const fk = f => f.c + ',' + f.r + f.kind + (f.lv ?? 1), was = new Set(a.fences.map(fk)), now = new Set(b.fences.map(fk));
   for (const f of a.fences) if (!now.has(fk(f))) mark(f.c, f.r);
   for (const f of b.fences) if (!was.has(fk(f))) mark(f.c, f.r);
   const same = (p, q) => (!p && !q) || (p && q && p.x === q.x && p.y === q.y && p.w === q.w && p.h === q.h);

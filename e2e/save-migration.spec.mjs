@@ -19,7 +19,7 @@ test('người chơi cũ mở game: vườn v1 hiện lại đủ, bản v1 vẫ
     const st = globalThis.__farm.state;
     return { v: st.v, coins: st.coins, p0: st.plots[0].crop?.progress, unlocked: st.plots.filter(p => p.unlocked).length, animals: st.animals.length };
   });
-  expect(s.v).toBe(2);
+  expect(s.v).toBe(3);
   expect(Math.abs(s.coins - old.coins)).toBeLessThan(300);   // game có thể tự tiêu chút ít (thức ăn...) ngay khi chạy
   expect(s.p0).toBeGreaterThanOrEqual(old.plots[0].crop.progress);
   expect(s.unlocked).toBe(old.plots.filter(p => p.unlocked).length);

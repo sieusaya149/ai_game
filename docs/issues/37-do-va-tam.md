@@ -19,11 +19,11 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): độ dơ tăng từ 0 tới 100 trong khoảng 3 giờ vườn; nhanh gấp đôi khi mưa và khi chuồng bẩn; không tăng khi vườn đóng băng; heo đầm bùn dơ ngay mà vui không giảm.
-- [ ] Unit test: tắm trừ đúng 1 nước và 1 xà phòng, đặt dơ về 0, vui +15, phát sự kiện "đã tắm"; bị từ chối khi thiếu nước hay thiếu xà phòng; con dơ thì mất vui và nguy cơ bệnh tăng.
-- [ ] Unit test: xúc phân làm chuồng hết bẩn và cộng phân chuồng vào kho; ổ ở chuồng gia cầm cấp 3 giữ dơ gà vịt thấp.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có heo dơ → mua xà phòng ở chợ Bà Tư → tắm → thấy bọt, rồi heo lắc mình, rồi sạch lấp lánh; xúc phân ở chuồng bẩn.
-- [ ] Pixel art vệt bùn, ruồi, bọt xà phòng và lấp lánh có đủ.
+- [x] Unit test (seam 1): độ dơ tăng từ 0 tới 100 trong khoảng 3 giờ vườn; nhanh gấp đôi khi mưa và khi chuồng bẩn; không tăng khi vườn đóng băng; heo đầm bùn dơ ngay mà vui không giảm.
+- [x] Unit test: tắm trừ đúng 1 nước và 1 xà phòng, đặt dơ về 0, vui +15, phát sự kiện "đã tắm"; bị từ chối khi thiếu nước hay thiếu xà phòng; con dơ thì mất vui và nguy cơ bệnh tăng.
+- [x] Unit test: xúc phân làm chuồng hết bẩn và cộng phân chuồng vào kho; ổ ở chuồng gia cầm cấp 3 giữ dơ gà vịt thấp.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có heo dơ → mua xà phòng ở chợ Bà Tư → tắm → thấy bọt, rồi heo lắc mình, rồi sạch lấp lánh; xúc phân ở chuồng bẩn.
+- [x] Pixel art (dùng art3.js sẵn có) vệt bùn, ruồi, bọt xà phòng và lấp lánh có đủ.
 
 ## Blocked by
 

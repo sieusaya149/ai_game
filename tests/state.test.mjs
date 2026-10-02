@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
-import { CROPS, FARMING, HUSBANDRY, DOG, THREATS, DAY_MS } from '../public/data.js';
+import { CROPS, FARMING, HUSBANDRY, DOG, THREATS, DAY_MS, FREE } from '../public/data.js';
 
 const MIN = 60_000;
 // localStorage giả cho Node
@@ -154,9 +154,11 @@ test('mở rộng đất theo thứ tự (vườn chuyển từ v1 còn ô khóa
 test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () => {
   const s = newGame();
   s.animals = [];
+  s.exp = 1e4; s.coins = 5000;
+  assert.ok(G.placeEntity(s, { kind: 'pen', pen: 'pig' }, 34, 18).ok);   // chuồng heo (sức chứa cấp 1: 3 con)
   const troughOk = () => { s.troughs.pig = 20; };
   for (let i = 0; i < 2; i++) {
-    const a = { id: s.nextId++, type: 'heo', adult: true, age: 1e9, hunger: 100, happy: 100, sick: false, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 330, y: 320, name: 'Heo' };
+    const a = { id: s.nextId++, type: 'heo', stage: 'truong', age: G.stageStart('heo', 'truong'), hunger: 100, happy: 100, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 330, y: 320, name: 'Heo', sex: i ? 'f' : 'm' };
     s.animals.push(a);
   }
   let events = [];
@@ -165,7 +167,7 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
   const sow = s.animals.find(a => a.pregnant);
   sow.dueAt = s.time + 1000;
   withRandom(0.5, () => { for (let i = 0; i < 3; i++) { troughOk(); s.animals.forEach(a => { a.hunger = 100; a.happy = 100; }); events.push(...run(s, 1000)); } });
-  const piglets = s.animals.filter(a => !a.adult);
+  const piglets = s.animals.filter(a => a.stage === 'non');
   assert.ok(piglets.length >= 1 && piglets.length <= 3);
   assert.equal(s.stats.piglets, piglets.length);
   assert.ok(events.some(e => e.type === 'spawn' && e.what === 'piglet'));
@@ -173,21 +175,24 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
 });
 
 test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () => {
-  const s = newGame();
-  const hen = s.animals.find(a => a.type === 'ga' && a.adult);
+  const s = newGame(); FREE.types = [];   // ở yên trong chuồng (thả rông có test riêng: free.test.mjs)
+  const hen = s.animals.find(a => a.type === 'ga' && a.stage === 'truong');
   hen.x = 100; hen.y = 320; s.troughs.chicken = 20;
   const ev = noBugs(() => run(s, 3 * MIN));
   assert.ok(s.eggs.length >= 1);
   assert.ok(ev.some(e => e.type === 'spawn' && e.what === 'egg'));
   assert.equal(s.eggs[0].x, 100);
+  FREE.types = ['ga'];
   const egg = s.eggs[0];
-  assert.match(G.actionsFor(s, { kind: 'egg', id: egg.id })[0].label, /Nhặt trứng/);
+  assert.match(G.actionsFor(s, { kind: 'egg', id: egg.id }).find(a => a.id === 'collect').label, /Nhặt trứng/);
   const r = G.perform(s, { kind: 'egg', id: egg.id }, 'collect');
   assert.ok(r.ok);
   assert.equal(s.basket.trung, 1);
   assert.equal(s.stats.eggs, 1);
-  // ổ ấp
+  // ổ ấp: chỉ nhận trứng có phôi (đã soi)
   const nest = { kind: 'nest' };
+  assert.equal(G.actionsFor(s, nest)[0].disabled !== undefined, true);
+  s.inv.trung_phoi = 1;
   assert.ok(G.perform(s, nest, 'incubate').ok);
   assert.equal(s.nest.egg, true);
   const n0 = s.animals.length;
@@ -201,11 +206,11 @@ test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () 
 test('trứng bỏ quên tự nở', () => {
   const s = newGame();
   s.animals = [];
-  s.eggs.push({ id: 99, x: 60, y: 300, laidAt: 0 });
+  s.eggs.push({ id: 99, x: 60, y: 300, laidAt: 0, fertile: true });
   withRandom(LUCKY, () => run(s, HUSBANDRY.eggForgetMs + 2000));
   assert.equal(s.eggs.length, 0);
   assert.equal(s.animals.length, 1);
-  assert.equal(s.animals[0].adult, false);
+  assert.equal(s.animals[0].stage, 'non');
 });
 
 test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
@@ -213,15 +218,15 @@ test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
   s.level = 1;
   s.exp = 1e6;
   s.animals = [];
-  s.animals.push({ id: 50, type: 'bo', adult: true, age: 1e9, hunger: 100, happy: 60, sick: false, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 440, y: 320, name: 'Bò' });
+  s.animals.push({ id: 50, type: 'bo', stage: 'truong', age: G.stageStart('bo', 'truong'), hunger: 100, happy: 60, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 440, y: 320, name: 'Bò' });
   s.troughs.pasture = 20;
   noBugs(() => run(s, 1000));
   assert.equal(s.animals[0].ready, true);
   assert.equal(G.actionsFor(s, { kind: 'animal', id: 50 })[0].id, 'milk');
-  G.perform(s, { kind: 'animal', id: 50 }, 'milk');
+  withRandom(0.99, () => G.perform(s, { kind: 'animal', id: 50 }, 'milk'));   // không ra sữa ngon ⭐ (tỉ lệ ngẫu nhiên, lát 39)
   assert.equal(s.basket.sua, 1);
   const sellAct = G.actionsFor(s, { kind: 'animal', id: 50 }).find(a => a.id === 'sell');
-  assert.match(sellAct.label, /Bán bò \(700 xu\)/);
+  assert.match(sellAct.label, /Bán bò cho Chú Ba \(700 xu\)/);
   const c = s.coins;
   G.perform(s, { kind: 'animal', id: 50 }, 'sell');
   assert.equal(s.coins, c + 700);
@@ -236,11 +241,11 @@ test('vật nuôi: tự ăn ở máng, đói -> bệnh -> thuốc thú y', () =>
   assert.equal(s.troughs.chicken, 0);
   // đói lả
   noBugs(() => run(s, 10 * MIN));
-  assert.equal(hen.sick, true);
+  assert.equal(hen.sick, 1);   // mức Mệt
   s.inv.medicine = 1;
   assert.equal(G.actionsFor(s, { kind: 'animal', id: hen.id })[0].id, 'medicine');
   G.perform(s, { kind: 'animal', id: hen.id }, 'medicine');
-  assert.equal(hen.sick, false);
+  assert.equal(hen.sick, 0);
 });
 
 test('chó ỉa bậy -> xúc phân -> phân bón; giẫm phân trượt chân', () => {
@@ -262,11 +267,11 @@ test('chó ỉa bậy -> xúc phân -> phân bón; giẫm phân trượt chân',
   assert.equal(s.stats.slips, 1);
 });
 
-test('chó con lớn thành chó trưởng thành', () => {
+test('chó con lớn thành chó trưởng thành theo giờ vườn', () => {
   const s = newGame();
   s.dog.hunger = 100;
-  for (let i = 0; i < 9; i++) { s.dog.hunger = 100; noBugs(() => run(s, MIN)); }
-  assert.equal(s.dog.adult, true);
+  for (let i = 0; i < 91; i++) { s.dog.hunger = 100; noBugs(() => run(s, MIN)); }
+  assert.equal(s.dog.stage, 'truong');
 });
 
 test('quạ đậu ô chín rồi ăn cây; bù nhìn chặn; đuổi quạ', () => {
@@ -288,7 +293,7 @@ test('quạ đậu ô chín rồi ăn cây; bù nhìn chặn; đuổi quạ', ()
   // để nó ăn
   withRandom(LUCKY, () => run(s, 1000));
   assert.equal(s.threats.length, 1);
-  s.dog.adult = false;
+  s.dog.stage = 'non';
   s.dog.hunger = 100;
   noBugs(() => run(s, THREATS.crowEatMs + 90_000));
   assert.equal(s.plots[0].crop, null);
@@ -302,9 +307,9 @@ test('quạ đậu ô chín rồi ăn cây; bù nhìn chặn; đuổi quạ', ()
   assert.equal(s2.threats.length, 0);
 });
 
-test('thằng Tèo ban đêm, bắt được thì đền xu', () => {
+test('thằng Tèo ban đêm khi có từ 3 ô chín, bắt được thì chọn phạt và đền xu', () => {
   const s = newGame(); s.animals = [];
-  for (const i of [0, 1]) { G.perform(s, T(i), 'till'); G.perform(s, T(i), 'plant'); s.plots[i].crop.progress = 1; }
+  for (const i of [0, 1, 2]) { G.perform(s, T(i), 'till'); G.perform(s, T(i), 'plant'); s.plots[i].crop.progress = 1; }
   s.weather = 'rain';
   s.time = DAY_MS * 0.8; s.day = 1;
   assert.equal(G.isNight(s), true);
@@ -315,6 +320,8 @@ test('thằng Tèo ban đêm, bắt được thì đền xu', () => {
   const c = s.coins;
   const r = withRandom(0.5, () => G.perform(s, { kind: 'threat', id: th.id }, 'catch'));
   assert.ok(r.ok);
+  assert.ok(r.punish, 'hiện hộp thoại chọn kiểu phạt');
+  assert.ok(withRandom(0.5, () => G.punishThief(s, 'pay')).ok);
   assert.ok(s.coins >= c + 20 && s.coins <= c + 60);
   assert.equal(s.stats.thieves, 1);
 });
@@ -347,7 +354,7 @@ test('mua bán: kiểm tra cấp, xu, chuồng', () => {
   assert.ok(G.buyAnimal(s, 'ga').ok);
   s.coins = 1e6;
   while (G.buyAnimal(s, 'ga').ok);
-  assert.equal(s.animals.filter(a => a.type === 'ga').length, 10);
+  assert.equal(s.animals.filter(a => a.type === 'ga').length, 6);   // chuồng gà cấp 1 chứa 6
   assert.ok(G.buyOutfit(s, 'hat', 2).ok);
   assert.equal(G.buyOutfit(s, 'hat', 2).ok, false);
   G.setLook(s, { hat: 2, acc: 2 });

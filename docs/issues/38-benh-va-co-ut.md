@@ -26,13 +26,13 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): bệnh đi đủ Mệt → Bệnh nặng → Nguy kịch → Mất đúng mốc giờ; mỗi giai đoạn chữa đúng thuốc (1 liều cho Mệt, 2 liều hoặc bác sĩ cho Bệnh nặng, chỉ bác sĩ cho Nguy kịch); sai cách chữa bị từ chối.
-- [ ] Unit test: lây 10% mỗi 10 phút trong chuồng thường (thống kê hạt giống cố định), không lây trong chuồng cách ly, hồi nhanh ×1.5 trong cách ly; vắc-xin chống bệnh khoảng 10 giờ; con già tiến triển nhanh gấp đôi; dưới cấp 5 bệnh không vượt quá Mệt.
-- [ ] **Unit test riêng cho ADR 0004:** chạy bù nhiều giờ vườn với con đang Bệnh nặng, đói lâu, dơ lâu → không con nào chuyển Nguy kịch hay chết, bệnh dừng ở Bệnh nặng. Cùng cảnh đó khi chơi trực tiếp thì chuyển tiếp bình thường.
-- [ ] Unit test: con mất để lại ngôi mộ ở chỗ hợp lệ; đặt hoa làm cả trại hết buồn nhanh hơn; mọi sự kiện bệnh có mức và khóa gộp.
-- [ ] Giao thức server (seam 3): server chạy bù vườn 8 tiếng có con Bệnh nặng và Nguy kịch hạ về Bệnh nặng thì không con nào chết.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có con Mệt → mua thuốc ở trạm thú y của Cô Út → chữa khỏi; dựng bản lưu có hai con cùng chuồng, một con Bệnh nặng → chuyển vào chuồng cách ly; dựng con Nguy kịch → gọi bác sĩ ở điện thoại nhà → khỏi; dựng bản lưu có con vừa mất → thấy thiên thần và ngôi mộ → đặt hoa.
-- [ ] Pixel art bong bóng, trạng thái bệnh, Cô Út, ngôi mộ có đủ.
+- [x] Unit test (seam 1): bệnh đi đủ Mệt → Bệnh nặng → Nguy kịch → Mất đúng mốc giờ; mỗi giai đoạn chữa đúng thuốc (1 liều cho Mệt, 2 liều hoặc bác sĩ cho Bệnh nặng, chỉ bác sĩ cho Nguy kịch); sai cách chữa bị từ chối.
+- [x] Unit test: lây 10% mỗi 10 phút trong chuồng thường (thống kê hạt giống cố định), không lây trong chuồng cách ly, hồi nhanh ×1.5 trong cách ly; vắc-xin chống bệnh khoảng 10 giờ; con già tiến triển nhanh gấp đôi; dưới cấp 5 bệnh không vượt quá Mệt.
+- [x] **Unit test riêng cho ADR 0004:** chạy bù nhiều giờ vườn với con đang Bệnh nặng, đói lâu, dơ lâu → không con nào chuyển Nguy kịch hay chết, bệnh dừng ở Bệnh nặng. Cùng cảnh đó khi chơi trực tiếp thì chuyển tiếp bình thường.
+- [x] Unit test: con mất để lại ngôi mộ ở chỗ hợp lệ; đặt hoa làm cả trại hết buồn nhanh hơn; mọi sự kiện bệnh có mức và khóa gộp.
+- [x] Giao thức server (seam 3): server chạy bù vườn 8 tiếng có con Bệnh nặng và Nguy kịch hạ về Bệnh nặng thì không con nào chết. — làm lúc gộp `phase2` vào `main`: `tests/server-catchup.test.mjs`.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có con Mệt → mua thuốc ở trạm thú y của Cô Út → chữa khỏi; dựng bản lưu có hai con cùng chuồng, một con Bệnh nặng → chuyển vào chuồng cách ly; dựng con Nguy kịch → gọi bác sĩ ở điện thoại nhà → khỏi; dựng bản lưu có con vừa mất → thấy thiên thần và ngôi mộ → đặt hoa.
+- [x] Pixel art bong bóng, trạng thái bệnh, Cô Út, ngôi mộ có đủ.
 
 ## Blocked by
 

@@ -35,7 +35,7 @@ test('mọi loại event luật chơi phát ra đều có mức và khóa gộp'
 
 test('event thật khi chạy game đều có mức', () => {
   const s = newGame();
-  s.dog.adult = false; s.speed = 1;
+  s.dog.stage = 'non'; s.speed = 1;
   for (const p of s.plots.slice(0, 3)) { p.soil = 'tilled'; p.water = 100; p.crop = { id: 'cai', progress: 0.99, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 }; }
   const seen = new Set(), r = Math.random;
   try {
@@ -61,10 +61,20 @@ test('gộp: 5 ô cải chín liền nhau chỉ ra một toast, cách xa ra toas
   assert.equal(new Set(shown.map(x => x.id)).size, 3);
 });
 
+test('đẻ con là mức quan trọng 🟡 (gộp theo loài), tắt/bật được; nhặt trứng trong bụi vẫn chỉ mức thông tin', () => {
+  const shown = [];
+  const push = createNotifier({ show: (id, text) => shown.push(text) });
+  assert.equal(push({ type: 'born', kind: 'heo', animal: 'Heo' }, 0), true);
+  assert.match(shown[0], /1 heo con mới chào đời/);
+  assert.equal(EVENT_LEVEL.born.cat, 'birth');
+  assert.ok('birth' in NOTIFY_CATS);
+  assert.equal(eventMeta({ type: 'egg' }).level, 'info');
+});
+
 test('mức thông tin, gấp, thẳng không thành toast gộp', () => {
   const shown = [];
   const push = createNotifier({ show: (id, text) => shown.push(text) });
-  for (const e of [{ type: 'egg' }, { type: 'shipped', coins: 5 }, { type: 'sick', animal: 'Gà' }, { type: 'toast', text: 'x' }, { type: 'fx' }]) assert.equal(push(e, 0), false);
+  for (const e of [{ type: 'egg' }, { type: 'shipped', coins: 5 }, { type: 'sickSevere', animal: 'Gà' }, { type: 'toast', text: 'x' }, { type: 'fx' }]) assert.equal(push(e, 0), false);
   assert.deepEqual(shown, []);
 });
 
@@ -105,7 +115,7 @@ test('urgentSpots: quạ đang ăn và con vật bệnh; ở bản đồ khác m
   s.threats = [{ id: 7, kind: 'crow', plot: 0, x: 0, y: 0, arriveAt: 0, state: 'coming', since: 0 }];
   assert.deepEqual(G.urgentSpots(s), [], 'mới bay tới thì chưa gấp');
   s.threats[0].state = 'eating';
-  s.animals[0].sick = true;
+  s.animals[0].sick = 2;
   const spots = G.urgentSpots(s), c = G.mapOf(s).plotCenter(0);
   assert.equal(spots.length, 2);
   assert.deepEqual([spots[0].x, spots[0].y], [c.x, c.y]);

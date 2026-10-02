@@ -21,11 +21,11 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1) cho bảng chuồng: sức chứa đúng 6/12/18, 3/5/8, 3/6/9 và 1/2/3 cho cách ly; nâng cấp trừ đúng xu, giữ nguyên con vật; từ chối khi thiếu xu hay thiếu cấp.
-- [ ] Unit test: giới hạn số chuồng mỗi loại theo cấp; chuồng cách ly không xây được dưới cấp người chơi yêu cầu; chuồng mới đi qua hàm kiểm tra vị trí và bị từ chối khi chặn đường cổng-nhà.
-- [ ] Unit test: mua con vật khi chuồng đầy bị từ chối; sức chứa tính cả con thả rông; chuyển lên v3 không làm con nào ra khỏi chuồng.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có chuồng gà đầy cấp 1 → nâng lên cấp 2 → mua thêm gà được; xây chuồng gà thứ hai trong chế độ xây dựng; xây chuồng cách ly ở cấp 3.
-- [ ] Pixel art chuồng 3 cấp cho từng loại và chuồng cách ly có đủ, nhìn ra khác nhau giữa các cấp.
+- [x] Unit test (seam 1) cho bảng chuồng: sức chứa đúng 6/12/18, 3/5/8, 3/6/9 và 1/2/3 cho cách ly; nâng cấp trừ đúng xu, giữ nguyên con vật; từ chối khi thiếu xu hay thiếu cấp.
+- [x] Unit test: giới hạn số chuồng mỗi loại theo cấp; chuồng cách ly không xây được dưới cấp người chơi yêu cầu; chuồng mới đi qua hàm kiểm tra vị trí và bị từ chối khi chặn đường cổng-nhà.
+- [x] Unit test: mua con vật khi chuồng đầy bị từ chối; sức chứa tính cả con thả rông; chuyển lên v3 không làm con nào ra khỏi chuồng.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có chuồng gà đầy cấp 1 → nâng lên cấp 2 → mua thêm gà được; xây chuồng gà thứ hai trong chế độ xây dựng; xây chuồng cách ly ở cấp 3.
+- [x] Pixel art chuồng 3 cấp cho từng loại và chuồng cách ly có đủ, nhìn ra khác nhau giữa các cấp.
 
 ## Blocked by
 

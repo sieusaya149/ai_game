@@ -149,7 +149,7 @@ test('đang ở làng: quạ ăn cây trong vườn vẫn có thông báo', () =
   const s = newGame(); s.animals = [];
   G.perform(s, { kind: 'plot', idx: 0 }, 'till'); G.perform(s, { kind: 'plot', idx: 0 }, 'plant');
   s.plots[0].crop.progress = 1; s.weather = 'rain';
-  s.dog.adult = false;
+  s.dog.stage = 'non';
   G.enterScene(s, 'village');
   const events = [];
   const r = Math.random; Math.random = () => 0.0001;

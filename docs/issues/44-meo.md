@@ -17,11 +17,11 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): mèo đói vừa phải bắt chuột khoảng mỗi 10 phút (thống kê hạt giống cố định); mèo no quá thì không bắt; mèo già chỉ bắt khi đói; mèo không chết vì già; số chuột giảm khi có mèo và không bao giờ vượt 8.
-- [ ] Unit test: mèo chỉ lùa 1 con gần nhất khi đang vui; tối mèo ngủ trong nhà; mua mèo bị từ chối khi chưa có nhà mèo; mèo không học được lệnh.
-- [ ] Unit test: chạy bù offline có mèo và chuột → chuột ít đi, không con nào chết (ADR 0004).
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có chuột và mèo đói vừa → mèo đuổi và bắt chuột → mang chiến lợi phẩm tới khoe; dựng bản lưu có mèo no quá → mèo nằm phơi nắng không săn; dựng bản lưu ở tối → mèo vào nhà ngủ qua cửa mèo.
-- [ ] Pixel art mèo, cửa mèo, nhà mèo có đủ.
+- [x] Unit test (seam 1): mèo đói vừa phải bắt chuột khoảng mỗi 10 phút (thống kê hạt giống cố định); mèo no quá thì không bắt; mèo già chỉ bắt khi đói; mèo không chết vì già; số chuột giảm khi có mèo và không bao giờ vượt 8.
+- [x] Unit test: mèo chỉ lùa 1 con gần nhất khi đang vui; tối mèo ngủ trong nhà; mua mèo bị từ chối khi chưa có nhà mèo; mèo không học được lệnh.
+- [x] Unit test: chạy bù offline có mèo và chuột → chuột ít đi, không con nào chết (ADR 0004).
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có chuột và mèo đói vừa → mèo đuổi và bắt chuột → mang chiến lợi phẩm tới khoe; dựng bản lưu có mèo no quá → mèo nằm phơi nắng không săn; dựng bản lưu ở tối → mèo vào nhà ngủ qua cửa mèo.
+- [x] Pixel art mèo, cửa mèo, nhà mèo có đủ.
 
 ## Blocked by
 

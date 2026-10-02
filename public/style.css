@@ -113,15 +113,16 @@ kbd {
 @keyframes bump { 40% { transform: scale(1.18); } }
 @keyframes blink { 50% { opacity: 0.6; } }
 
-#tutorial {
+#tutorial, #coutquest {
   position: relative; max-width: 330px; min-height: 44px; padding: 6px 40px 7px 12px; border-radius: 14px;
   background: #fff8dc; border: 3px solid var(--orange); box-shadow: 0 3px 0 var(--orange-d), 0 6px 10px rgba(0, 0, 0, 0.22);
   pointer-events: none;
 }
-#tutorial.pop { animation: pop 0.35s; }
+#coutquest { background: #ffeef7; border-color: #d9609a; box-shadow: 0 3px 0 #a84576, 0 6px 10px rgba(0, 0, 0, 0.22); }
+#tutorial.pop, #coutquest.pop { animation: pop 0.35s; }
 .tut-step { font-size: 10.5px; font-weight: 900; color: var(--orange-d); text-transform: uppercase; letter-spacing: 0.05em; }
 .tut-text { font-size: 13.5px; font-weight: 800; line-height: 1.25; }
-.tut-x { position: absolute; top: 0; right: 0; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #a07a45; font-size: 15px; cursor: pointer; }
+.tut-x { position: absolute; top: 0; right: 0; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #a07a45; font-size: 15px; cursor: pointer; pointer-events: auto; }
 @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 60% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
 
 /* ---------- Hành động (góc dưới phải) ---------- */
@@ -221,6 +222,10 @@ kbd {
 .row.locked .ico { filter: grayscale(1) brightness(0.8); }
 .row.done { background: #eaf7d8; border-color: #b6dc8c; }
 .qtys { display: flex; gap: 6px; }
+.sexbuy { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.sexopt { display: flex; align-items: center; gap: 6px; }
+.name-input { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 12px; border: 3px solid var(--wood); background: #fff; font: 800 17px inherit; font-family: inherit; color: var(--ink); }
+.dialog-err { min-height: 18px; margin: 6px 0 8px; font-size: 13px; font-weight: 800; color: #b3261e; }
 .price { font-weight: 900; font-size: 14px; color: var(--orange-d); white-space: nowrap; }
 .lock { font-weight: 900; font-size: 13px; color: #8a6a3a; white-space: nowrap; }
 .tick { font-weight: 900; font-size: 22px; color: var(--green-d); }
@@ -410,7 +415,7 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 .guide-open { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 4px; padding: 8px 12px; border-radius: 15px; border: 2px solid var(--orange-d); background: var(--paper); color: var(--ink); font-family: inherit; font-size: 15px; text-align: left; cursor: pointer; }
 .guide-open small { flex: 1; font-size: 12px; opacity: 0.7; font-weight: 700; text-align: right; }
 .guide-ico { width: 24px; height: 24px; image-rendering: pixelated; flex: none; }
-.guide-dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.guide-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 10px; }   /* nhiều trang thì chấm xuống hàng, giữ nguyên cỡ chạm */
 .guide-dot { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid var(--wood); background: var(--paper); cursor: pointer; }
 .guide-dot.on { background: var(--orange); border-color: var(--orange-d); }
 .guide-page { padding: 12px; border-radius: 18px; background: var(--paper); border: 2px solid var(--line); box-shadow: 0 2px 0 var(--line); }
@@ -424,6 +429,27 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 .dialog-btns { display: flex; gap: 10px; }
 .dialog-btns .btn { flex: 1; }
 
+/* ---------- Bắt được trộm: chọn kiểu phạt (issue 46) ---------- */
+.dialog.punish .thumb { display: block; margin: 0 auto 6px; height: 72px; width: auto; image-rendering: pixelated; }
+.punish-opts { display: flex; flex-direction: column; gap: 8px; }
+.punish-opts .btn { width: 100%; justify-content: center; }
+.punish-opts .btn[disabled] { opacity: 0.5; }
+.punish-opts .ico { height: 20px; width: auto; vertical-align: -4px; image-rendering: pixelated; }
+
+/* ---------- Minigame dạy lệnh cho chó ---------- */
+.dialog.train { width: min(360px, 100%); }
+.train-dog { display: block; margin: 0 auto 8px; width: 96px; height: 80px; image-rendering: pixelated; }
+.train-wrap { position: relative; margin: 4px 0 8px; }
+.train-bar, .train-zone, .train-mark, .train-praise { background-size: 100% 100%; background-repeat: no-repeat; image-rendering: pixelated; }
+.train-bar { position: relative; height: 26px; border-radius: 13px; background-color: #f3e3c2; border: 3px solid var(--wood); overflow: hidden; }
+.train-bar.good { box-shadow: 0 0 0 3px var(--green, #4caf50); }
+.train-bar.bad { box-shadow: 0 0 0 3px #b3261e; }
+.train-zone { position: absolute; top: 0; bottom: 0; background-color: #8fd65a; border-left: 2px solid #3d8c2a; border-right: 2px solid #3d8c2a; }
+.train-mark { position: absolute; top: 0; bottom: 0; width: 7px; margin-left: -3px; background-color: #e8541f; box-shadow: 0 0 0 1px #7a2a08; }
+.train-praise { position: absolute; top: -26px; width: 28px; height: 28px; margin-left: -14px; opacity: 0; transition: opacity 0.12s, transform 0.5s; pointer-events: none; }
+.train-praise.on { opacity: 1; transform: translateY(-6px); }
+.train-score { font-size: 14px; font-weight: 900; color: var(--wood); margin-bottom: 10px; }
+
 /* ---------- Màn hình nhỏ ---------- */
 /* Điện thoại: đồng hồ HUD xuống hai dòng (mùa + thời tiết / ngày giờ) để hàng thứ hai vừa 320px; nút nào cũng >= 40px */
 @media (max-width: 440px) {
@@ -436,7 +462,7 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
   .btn.sm { min-height: 40px; min-width: 40px; }
   .chk { min-height: 44px; }
   .le-row .btn.sm { height: 40px; }
-  .guide-dot { position: relative; width: 40px; height: 40px; background: none; border: 0; }
+  .guide-dot { position: relative; flex: 0 0 40px; width: 40px; height: 40px; background: none; border: 0; }
   .guide-dot::before { content: ""; position: absolute; inset: 11px; border-radius: 50%; border: 2px solid var(--wood); background: var(--paper); }
   .guide-dot.on::before { background: var(--orange); border-color: var(--orange-d); }
   .guide-dots { gap: 0; }
@@ -497,7 +523,8 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 #ui #build-msg { pointer-events: none; max-width: 420px; padding: 7px 14px; font-size: 14px; font-weight: 900; text-align: center; }
 #build-msg[data-ok="1"] { background: #dff7d4; border-color: var(--green-d); }
 #build-msg[data-ok="0"] { background: #ffd9d2; border-color: var(--red-d); }
-#build-store { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
+#build-store, #build-upgrade { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
+#build-upgrade.dim { opacity: 0.65; }
 #ui #build-tray { pointer-events: auto; width: 100%; max-width: 560px; padding: 6px; }
 .bt-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
 .bt-tab { flex: 1; min-height: 44px; border: 2px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; font-weight: 900; cursor: pointer; }

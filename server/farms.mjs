@@ -1,4 +1,4 @@
-// Kho vườn online (issue 22, ADR 0002, 0012): mỗi tài khoản một bản lưu v2 + "phiên chơi" đang giữ quyền ghi.
+// Kho vườn online (issue 22, ADR 0002, 0012): mỗi tài khoản một bản lưu (v3; bản v2 cũ tự lên qua migrate/loadGame) + "phiên chơi" đang giữ quyền ghi.
 // Một thiết bị mỗi tài khoản: máy mới xin phiên chơi (claimPlay) thì máy cũ nhận lệnh `kicked` qua WebSocket,
 // gửi bản lưu cuối bằng phiên cũ; server chờ bản đó (tối đa FINAL_MS) rồi mới đổi phiên và trao vườn cho máy mới.
 // Sau đó mọi bản lưu mang phiên cũ bị từ chối (409 play_replaced).

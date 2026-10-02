@@ -24,11 +24,11 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): mỗi lệnh cần đúng số buổi (2/3/4/5/4/3); phải học Ngồi trước khi học lệnh khác; mỗi ngày game chỉ dạy 1 buổi; mỗi buổi trừ 1 bánh thưởng; kết quả "không đạt" không tăng tiến độ; chó đói/buồn có thể bỏ giữa chừng (hạt giống cố định); chó con không dạy được.
-- [ ] Unit test: Canh khu nhân đôi bán kính phát hiện tại ô gác; Lùa đưa cả đàn kể cả bò, cừu lạc về chuồng; chó đã học Lùa tự lùa mỗi tối khi no và vui; chó học đủ 6 lệnh thì miễn nhiễm xúc xích người lạ; chó già phát hiện trộm chậm hơn (bán kính 4 ô).
-- [ ] Giao thức server (seam 3): chó canh vườn online dùng lệnh Canh khu của chủ, kết quả khớp với luật trong `state.js`.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có chó nhỡ, đủ bánh thưởng → dạy lệnh Ngồi bằng minigame hai buổi (qua hai ngày game) → học xong thì ra lệnh Ngồi được; dựng bản lưu ở 18h với đàn lạc và chó đã học Lùa → gọi chó lùa đàn về chuồng.
-- [ ] Pixel art chó và minigame dạy lệnh có đủ.
+- [x] Unit test (seam 1): mỗi lệnh cần đúng số buổi (2/3/4/5/4/3); phải học Ngồi trước khi học lệnh khác; mỗi ngày game chỉ dạy 1 buổi; mỗi buổi trừ 1 bánh thưởng; kết quả "không đạt" không tăng tiến độ; chó đói/buồn có thể bỏ giữa chừng (hạt giống cố định); chó con không dạy được.
+- [x] Unit test: Canh khu nhân đôi bán kính phát hiện tại ô gác; Lùa đưa cả đàn kể cả bò, cừu lạc về chuồng; chó đã học Lùa tự lùa mỗi tối khi no và vui; chó học đủ 6 lệnh thì miễn nhiễm xúc xích người lạ; chó già phát hiện trộm chậm hơn (bán kính 4 ô).
+- [ ] Giao thức server (seam 3): chó canh vườn online dùng lệnh Canh khu của chủ, kết quả khớp với luật trong `state.js`. — **Hoãn:** nhánh `phase2` chưa có luật chó canh vườn online của Phase 1 (issue 31 làm song song trên `main`). Luật thuần đã sẵn sàng (`guardRadius`, `dogSees`, `dogPost`), làm seam 3 sau khi gộp `phase2` vào `main`.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có chó nhỡ, đủ bánh thưởng → dạy lệnh Ngồi bằng minigame hai buổi (qua hai ngày game) → học xong thì ra lệnh Ngồi được; dựng bản lưu ở 18h với đàn lạc và chó đã học Lùa → gọi chó lùa đàn về chuồng.
+- [x] Pixel art chó và minigame dạy lệnh có đủ.
 
 ## Blocked by
 

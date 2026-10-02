@@ -70,6 +70,21 @@ test('checkSaveJump: bán cả kho một lúc là hợp lý (của cải không 
   assert.equal(G.checkSaveJump(sold, bought, 1000).ok, true);
 });
 
+test('checkSaveJump: bán một đàn bò thân cho Chú Ba một lúc là hợp lý (con vật đổi thành xu), xu tăng vọt không bán gì vẫn bị chặn', () => {
+  const a = G.createGame({ name: 'Lan' });
+  a.mode = 'online';
+  const base = a.animals[0];
+  for (let i = 0; i < 6; i++) a.animals.push({ ...structuredClone(base), id: 9000 + i, type: 'bo', stage: 'truong', bond: 5, sick: 0, dirty: 0, pen: null });
+  const sold = structuredClone(a);
+  sold.simMs += 1000;
+  for (let i = 0; i < 6; i++) assert.equal(G.sellAnimal(sold, 9000 + i, 2).ok, true);
+  assert.ok(sold.coins - a.coins > G.SAVE_JUMP.wealth, 'đàn bò bán được nhiều hơn mức cho sẵn');
+  assert.equal(G.checkSaveJump(a, sold, 1000).ok, true);
+  const cheat = structuredClone(a);
+  cheat.simMs += 1000; cheat.coins = sold.coins;
+  assert.equal(G.checkSaveJump(a, cheat, 1000).reason, 'coins', 'không bán con nào mà xu tăng vọt thì vẫn chặn');
+});
+
 test('checkSaveJump: giờ vườn chạy nhanh hơn thời gian thật cho phép (kể cả x20 và một đêm ngủ) thì từ chối', () => {
   const a = G.createGame({ name: 'Lan' });
   const b = structuredClone(a);

@@ -146,9 +146,9 @@ test('v1 vắng nhà lâu: màn "Trong lúc bạn vắng nhà" trước, đóng 
   await expect(page.locator('#whatsnew')).toBeVisible();
 });
 
-test('sổ tay mở từ túi đồ, lật đủ 6 trang', async ({ page, context }) => {
+test('sổ tay mở từ túi đồ, lật đủ 14 trang (cấp cao)', async ({ page, context }) => {
   await noHint(context);
-  await seedSave(context, makeSave());
+  await seedSave(context, makeSave(s => { s.exp = 1e6; }));
   await page.goto('/');
   await page.waitForFunction(() => globalThis.__farm?.state);
   await page.keyboard.press('Shift');
@@ -156,14 +156,30 @@ test('sổ tay mở từ túi đồ, lật đủ 6 trang', async ({ page, contex
   await page.getByRole('button', { name: /Sổ tay hướng dẫn/ }).click();
   const head = page.locator('.sheet-head h2'), body = page.locator('.guide-page');
   await expect(head).toHaveText(/Sổ tay/);
-  const titles = ['Thể lực', 'Công cụ', 'Chế độ xây dựng', 'Mở đất', 'Thùng giao hàng', 'Chợ và giờ mở cửa'];
+  const titles = ['Thể lực', 'Công cụ', 'Chế độ xây dựng', 'Mở đất', 'Thùng giao hàng', 'Chợ và giờ mở cửa', 'Đực, cái và sinh sản', 'Vịt', 'Chó Mực và dạy lệnh',
+    'Vòng đời', 'Tắm cho vật nuôi', 'Bệnh và thú y', 'Lùa về chuồng', 'Kẻ săn mồi'];
   for (let i = 0; i < titles.length; i++) {
     await expect(body.locator('h3')).toHaveText(titles[i]);
     await expect(body.locator('canvas.guide-art')).toBeVisible();
-    await expect(page.locator('.guide-nav .mini')).toHaveText(`Trang ${i + 1}/6`);
+    await expect(page.locator('.guide-nav .mini')).toHaveText(`Trang ${i + 1}/${titles.length}`);
     await page.screenshot({ path: `test-results/guide-${i + 1}-${test.info().project.name}.png` });
     if (i < titles.length - 1) await page.getByRole('button', { name: 'Sau ▶' }).click();
   }
   await page.getByRole('button', { name: '◀ Trước' }).click();
-  await expect(body.locator('h3')).toHaveText('Thùng giao hàng');
+  await expect(body.locator('h3')).toHaveText(titles.at(-2));
+});
+
+test('sổ tay mở dần theo cấp: cấp 1 chỉ có 10 trang, chưa thấy tắm, bệnh, lùa, kẻ săn mồi', async ({ page, context }) => {
+  await noHint(context);
+  await seedSave(context, makeSave());
+  await page.goto('/');
+  await page.waitForFunction(() => globalThis.__farm?.state);
+  await page.keyboard.press('Shift');
+  await page.locator('.bb-btn[data-panel="bag"]').click();
+  await page.getByRole('button', { name: /Sổ tay hướng dẫn/ }).click();
+  await expect(page.locator('.guide-nav .mini')).toHaveText('Trang 1/10');
+  const dots = page.locator('.guide-dot');
+  await expect(dots).toHaveCount(10);
+  await expect(dots.nth(9)).toHaveAttribute('title', 'Vòng đời');
+  for (const t of ['Tắm cho vật nuôi', 'Bệnh và thú y', 'Lùa về chuồng', 'Kẻ săn mồi']) await expect(page.locator(`.guide-dot[title="${t}"]`)).toHaveCount(0);
 });

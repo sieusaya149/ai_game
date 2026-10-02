@@ -19,7 +19,7 @@ function host(name = 'Lan') {
   Object.assign(s.plots[0], { soil: 'tilled', water: 100, crop: crop('bap', 1) });
   Object.assign(s.plots[1], { soil: 'tilled', water: 0, crop: crop('carot', 0.4) });
   Object.assign(s.plots[2], { soil: 'tilled', water: 100, weeds: true, crop: crop('carot', 0.4) });
-  Object.assign(s.dog, { adult: true, hunger: 100, happy: 100, chained: false, nap: 0, napCheck: 1e15 });
+  Object.assign(s.dog, { stage: 'truong', age: G.stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false, nap: 0, napCheck: 1e15 });
   return s;
 }
 const guest = (name = 'Bình') => ({ name, level: 6, room: 50, sausage: 0 });

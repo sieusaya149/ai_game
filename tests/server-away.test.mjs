@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
-import { createGame } from '../public/state.js';
+import { createGame, stageStart } from '../public/state.js';
 
 const LV5 = 500;
 const crop = (id, progress) => ({ id, progress, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 });
@@ -12,7 +12,7 @@ const crop = (id, progress) => ({ id, progress, planted: 0, bugs: false, bugSinc
 const garden = s => {
   for (let i = 0; i < 3; i++) Object.assign(s.plots[i], { soil: 'tilled', water: 100, crop: crop('bap', 1) });
   Object.assign(s.plots[3], { soil: 'tilled', water: 0, crop: crop('carot', 0.4) });
-  Object.assign(s.dog, { adult: true, hunger: 100, happy: 100, chained: false });
+  Object.assign(s.dog, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false });
 };
 
 async function setup(t) {
