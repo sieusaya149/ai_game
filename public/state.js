@@ -4,7 +4,7 @@ import {
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
-  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND,
+  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
@@ -408,6 +408,7 @@ function stepPlot(s, p, d) {
 // ---------- Vòng đời ----------
 // Việc con vật làm được ở giai đoạn hiện tại: 'product' | 'plow' | 'sell' | 'vitamin' (bảng STAGE_CAN)
 export function animalCan(a, what) {
+  if (what === 'product' && a.retired) return false;   // nghỉ hưu: không cho sản phẩm
   const t = STAGE_CAN[what];
   return !!t && (t[a.type] ?? t.all ?? []).includes(a.stage);
 }
@@ -482,6 +483,7 @@ function passAway(s, a, def) {
 
 function stepAnimals(s, d) {
   const stink = s.poops.length * DOG.stinkUnhappyPerPoop * (d / MIN);
+  const joy = new Set(s.animals.filter(a => a.retired).map(a => ANIMALS[a.type].pen));   // chuồng có con nghỉ hưu
   for (const a of [...s.animals]) {
     const def = ANIMALS[a.type];
     // tuổi theo giờ vườn: step chỉ chạy khi vườn chạy nên đóng băng thì không già
@@ -496,6 +498,7 @@ function stepAnimals(s, d) {
     // vui: trôi dần về 50, mùi hôi kéo xuống
     if (a.happy > 50) a.happy = Math.max(50, a.happy - HUSBANDRY.happyDecayPerMin * d / MIN);
     a.happy = Math.max(0, a.happy - stink);
+    if (joy.has(def.pen)) a.happy = Math.max(a.happy, TRADE.retireHappy);
     // để đói hay dơ lâu thì bớt thân
     if (a.hunger <= BOND.hungerBelow || (a.dirty || 0) >= BOND.dirtyAbove) bondShift(a, -BOND.lossPerMin * d / MIN);
     // đói lả -> bệnh
@@ -506,7 +509,12 @@ function stepAnimals(s, d) {
     if (a.sick || a.hunger <= HUSBANDRY.growNeedsHunger) continue;
     // con non, nhỡ ăn no thì lên cân dần tới cân lớn hẳn
     const [w0, w1] = WEIGHT[a.type] ?? [1, 1];
-    if (a.stage === 'non' || a.stage === 'nho') a.weight = Math.min(w1, (a.weight || w0) + (w1 - w0) * d / stageStart(a.type, 'truong') * (pigNho ? AGING.pigGain : 1));
+    // heo lên cân cả khi lớn: ăn no và nằm ườn thì mau béo, hay đi lại thì chậm (a.walk = px đã đi, do world cộng)
+    if (a.type === 'heo' || a.stage === 'non' || a.stage === 'nho') {
+      const moved = Math.min(1, (a.walk || 0) / (TRADE.walkPx * d / 1000)), k = a.type === 'heo' ? (TRADE.gainActive + (TRADE.gainLazy - TRADE.gainActive) * (1 - moved)) * (a.hunger >= TRADE.fullAt ? TRADE.gainFull : 1) : 1;
+      a.weight = Math.min(w1, (a.weight || w0) + (w1 - w0) * d / stageStart(a.type, 'truong') * (pigNho ? AGING.pigGain : 1) * k);
+    }
+    a.walk = 0;
     if (!animalCan(a, 'product') || a.type === 'heo' || s.time < a.nextProduct) continue;
     if (a.type === 'ga') {
       if (s.eggs.length < 30) { const e = { id: s.nextId++, x: a.x, y: a.y, laidAt: s.time }; s.eggs.push(e); emit({ type: 'egg' }); spawnEv('egg', e.x, e.y); }
@@ -736,7 +744,7 @@ const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở chợ nhé`;
 export function actionsFor(s, t) {
   if (!t) return [];
   const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: s => [mk('collect', '🥚', 'Nhặt trứng', room(s) < 1 ? FULL : null)],
-    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
+    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, scale: () => [mk('weigh', '⚖️', 'Cân heo xem số ký')], nest: nestActs, dog: dogActs, threat: threatActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
   return f ? f(s, t) : [];
 }
 
@@ -786,7 +794,10 @@ function animalActs(s, t) {
   if (animalCan(a, 'vitamin') && !a.sick) A.vitamin = mk('vitamin', '💉', `Cho uống vitamin (còn ${have(s, 'vitamin')})`, have(s, 'vitamin') <= 0 ? noItem('vitamin') : null);
   const first = a.sick ? 'medicine' : a.ready ? 'collect' : a.hunger < 40 ? 'feed' : 'pet';
   const list = [A[first], ...Object.entries(A).filter(([k]) => k !== first).map(([, v]) => v)];
-  if (animalCan(a, 'sell')) list.push(mk('sell', ICON[a.type], `Bán ${def.name.toLowerCase()} (${def.sell} xu)`));
+  const q = sellQuote(s, a);
+  if (animalCan(a, 'sell')) list.push(mk('sell', ICON[a.type], `Bán ${def.name.toLowerCase()} cho Chú Ba (${q.kg != null ? q.kg + ' kg · ' : ''}${q.price} xu)`));
+  if (a.stage === 'gia' && !a.retired) list.push(mk('retire', '🪑', 'Cho nghỉ hưu (ở lại trại, không cho sản phẩm, cả chuồng vui hơn)'));
+  if (a.retired && TRADE.retireUndo) list.push(mk('unretire', '🪑', 'Cho đi làm lại'));
   return list;
 }
 
@@ -816,8 +827,43 @@ function threatActs(s, t) {
   return [mk('catch', '🧢', 'Bắt thằng Tèo', th.state === 'leaving' && !th.loot ? 'Nó chuồn mất rồi' : null)];
 }
 
+// ---------- Bán cho Chú Ba, nghỉ hưu (issue 40) ----------
+// Báo giá: { price, kg (heo, null với loài khác), unit (xu/kg hôm nay), need (số lần phải xác nhận) }
+export function sellQuote(s, a) {
+  const pig = a.type === 'heo', kg = pig ? Math.round((a.weight || WEIGHT.heo[0]) * 10) / 10 : null;
+  const mul = TRADE.bondMul[(a.bond || 2) - 1] * (a.sick ? TRADE.sickMul : 1) * ((a.dirty || 0) >= BOND.dirtyAbove ? TRADE.dirtyMul : 1);
+  const base = pig ? kg * pigKgPrice(s.day) : ANIMALS[a.type].sell * TRADE.stageMul[a.stage];
+  return { price: Math.floor(base * mul), kg, unit: pig ? pigKgPrice(s.day) : null, need: a.bond >= TRADE.confirmBond ? TRADE.confirms : 0 };
+}
+// Bán con `id`: `confirms` = số lần người chơi đã xác nhận (con ❤️4+ cần 2). → R { coins, kg, sold } (sold: để vẽ cảnh Chú Ba dắt đi)
+export function sellAnimal(s, id, confirms = 0) {
+  const a = s.animals.find(x => x.id === id);
+  if (!a) return bad('Không thấy con vật này');
+  const at = { x: a.x ?? 0, y: a.y ?? 0 }, nm = ANIMALS[a.type].name.toLowerCase();
+  if (!animalCan(a, 'sell')) return bad('Còn bé quá, Chú Ba chưa mua đâu', at);
+  const q = sellQuote(s, a);
+  if (confirms < q.need) return bad(`Con ${nm} này thân lắm ${'❤️'.repeat(a.bond)}, phải xác nhận ${q.need} lần mới bán`, at);
+  s.animals.splice(s.animals.indexOf(a), 1); addCoins(s, q.price);
+  log(s, `Bán ${nm}${q.kg != null ? ` ${q.kg} kg` : ''} cho Chú Ba được ${q.price} xu`);
+  return res(true, `Chú Ba trả ${q.price} xu`, [say(at, `+${q.price} xu`, COL.coin)], 'coin',
+    { coins: q.price, kg: q.kg, sold: { type: a.type, stage: a.stage, sex: a.sex, x: a.x, y: a.y, price: q.price, kg: q.kg, unit: q.unit } });
+}
+// Cho con già nghỉ hưu: ở lại trại, chiếm một chỗ, không cho sản phẩm, cả chuồng vui hơn
+export function retireAnimal(s, id) {
+  const a = s.animals.find(x => x.id === id);
+  if (!a) return bad('Không thấy con vật này');
+  if (a.stage !== 'gia') return bad('Chỉ con già mới nghỉ hưu được');
+  if (a.retired) return bad('Nó nghỉ hưu rồi');
+  a.retired = true; a.ready = false;
+  log(s, `${ANIMALS[a.type].name} đã nghỉ hưu, ở lại trại hưởng phúc`);
+  return res(true, 'Nghỉ hưu rồi 🪑', [say({ x: a.x ?? 0, y: a.y ?? 0 }, 'Nghỉ hưu 🪑', COL.info)], 'pop');
+}
+// Cân heo ở chuồng heo: [{ id, name, kg }] của từng con
+export const weighPigs = s => s.animals.filter(a => a.type === 'heo').map(a => ({ id: a.id, name: a.name, kg: Math.round((a.weight || WEIGHT.heo[0]) * 10) / 10 }));
+
 // Chỗ trong làng chưa mở: chạm vào chỉ có lời nhắn
 const TALK = {
+  houseC: { icon: '🤝', label: 'Chào Chú Ba', msg: 'Chú Ba: muốn bán con vật thì chọn Bán, tôi sẽ tới cổng trại dắt đi. Heo thì tính theo ký nhé!' },
   friendGate: { icon: '🚪', label: 'Xem cổng bạn bè', msg: 'Sắp ra mắt: thăm bạn bè' },
 };
 function buildingActs(s, t) {
@@ -870,6 +916,7 @@ function posOf(s, t) {
   const m = mapOf(s);
   if (t.kind === 'plot' || t.kind === 'lockedPlot') return m.plotCenter(t.idx) ?? s.player;
   if (t.kind === 'trough') return m.pens[t.pen]?.trough ?? s.player;
+  if (t.kind === 'scale') return m.pens[t.pen]?.scale ?? s.player;
   if (t.kind === 'nest') return m.building('coop')?.at ?? s.player;
   if (t.kind === 'building') return sceneMap(s).building(t.id)?.at ?? s.player;
   if (t.kind === 'door') return doorOf(s, t.to)?.at ?? s.player;
@@ -981,9 +1028,9 @@ const DO = {
         a.ready = false; a.nextProduct = s.time + productEvery(a); give(s, prod); addExp(s, def.exp);
         return res(true, `Được 1 ${PRODUCTS[prod].name}`, [say(at, `+1 ${PRODUCTS[prod].name}${star ? ' ⭐' : ''}`)], sound);
       }
-      case 'sell':
-        s.animals.splice(s.animals.indexOf(a), 1); addCoins(s, def.sell);
-        return res(true, `Đã bán ${def.name.toLowerCase()} được ${def.sell} xu`, [say(at, `+${def.sell} xu`, COL.coin)], 'coin');
+      case 'sell': return sellAnimal(s, a.id, t.confirms ?? 0);
+      case 'retire': return retireAnimal(s, a.id);
+      case 'unretire': a.retired = false; return res(true, 'Đi làm lại thôi', [say(at, 'Làm lại! 💪')], 'pop');
     }
   },
 
@@ -999,6 +1046,11 @@ const DO = {
     const fert = Math.random() < DOG.poopFertChance;
     if (fert) give(s, 'fertilizer');
     return res(true, fert ? 'Xúc được 1 phân bón' : 'Đã dọn sạch bãi phân', [say(at, fert ? '+1 Phân bón' : '✨ Sạch rồi')], 'dig');
+  },
+
+  scale(s, t, id, at) {   // cân heo: báo số ký từng con
+    const w = weighPigs(s);
+    return res(true, w.length ? 'Cân heo: ' + w.map(p => `${p.name || 'Heo'} ${p.kg} kg`).join(' · ') : 'Chưa có con heo nào để cân', [], 'click');
   },
 
   trough(s, t, id, at) {

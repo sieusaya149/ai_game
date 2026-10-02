@@ -73,6 +73,10 @@ function build(f) {
       pens[e.pen] = { name: d.name, rect, gates, trough, area: { x: px + d.area.x, y: py + d.area.y, w: d.area.w, h: d.area.h }, ent: e };
       troughs.push({ pen: e.pen, c: trough.c, r: trough.r, w: 2 });
       block(trough.c, trough.r, 2, 1);
+      if (d.scale) {   // cân heo đặt cạnh máng
+        pens[e.pen].scale = { c: e.c + d.scale.c, r: e.r + d.scale.r, x: px + d.scale.x, y: py + d.scale.y };
+        block(e.c + d.scale.c, e.r + d.scale.r, 1, 1);
+      }
       if (d.nest) {
         const n = d.nest;
         buildings.push({ id: 'coop', kind: 'coop', name: 'Ổ ấp trứng', sprite: 'coop', x: px + n.spr.x, y: py + n.spr.y,

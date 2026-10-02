@@ -36,6 +36,7 @@ export const PEN_DEFS = {
   pig: {
     name: 'Chuồng heo', w: 6, h: 9, gates: [[2, 0]],
     trough: { c: 3, r: 1, x: 64, y: 30 }, area: { x: 22, y: 42, w: 52, h: 84 },
+    scale: { c: 1, r: 1, x: 24, y: 30 },   // cân heo (ô c, r + điểm chân x, y)
     ground: { kind: 'MUD', c: 1, r: 1, w: 4, h: 7 },
     mud: { x: 24, y: 84, w: 40, h: 22 }, mudSpot: { x: 44, y: 95, rx: 22, ry: 14, x0: 28, x1: 60, y0: 88, y1: 102 },
   },
@@ -110,7 +111,8 @@ export const SCENES = {
     npc: { key: 'npcOngSau', x: 60, y: 38 } },
       { kind: 'houseA', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 6, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
       { kind: 'houseB', name: 'Nhà dân', sprite: 'villageHouses.1', foot: { c: 11, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
-      { kind: 'houseC', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 33, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
+      { kind: 'houseC', name: 'Nhà Chú Ba', sprite: 'villageHouses.0', foot: { c: 33, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: { x: 24, y: 40 },
+        npc: { key: 'npcChuBa', x: 24, y: 52 } },   // lái buôn Chú Ba đứng trước nhà
       { kind: 'friendGate', name: 'Cổng bạn bè', sprite: 'friendGate', foot: { c: 29, r: 21, w: 3, h: 1 }, spr: { x: 4, y: -20 }, at: { x: 24, y: 28 }, sub: 'Sắp ra mắt: thăm bạn bè' },
       ...[[8, 13], [16, 13], [22, 13], [28, 13], [35, 13]].map(([c, r], i) => ({ kind: 'lamp' + i, name: 'Đèn đường', sprite: 'lampPost', foot: { c, r, w: 1, h: 1 }, spr: { x: 2, y: -14 }, at: null })),
       ...[[11, 14], [23, 14]].map(([c, r], i) => ({ kind: 'bench' + i, name: 'Ghế đá', sprite: 'bench', foot: { c, r, w: 2, h: 1 }, spr: { x: 4, y: 2 }, at: { x: 16, y: 26 } })),
