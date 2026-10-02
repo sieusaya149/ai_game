@@ -6,9 +6,9 @@ import { randomBytes } from 'node:crypto';
 import { HttpError } from './router.mjs';
 import { migrate } from '../public/migrate.js';
 import { checkSaveJump, loadGame } from '../public/state.js';
-import { now as clock } from '../public/clock.js';
+import { now as clock, serverDay } from '../public/clock.js';
 import { MAX_CATCHUP_MS } from '../public/data.js';
-import { runGuestQueue } from './guests.mjs';
+import { runGuestQueue, stealsOf } from './guests.mjs';
 
 export const FINAL_MS = 3000;    // chờ bản lưu cuối của máy cũ tối đa chừng này
 const waiting = new Map();       // phiên cũ đang bị thay → hàm báo "đã nhận bản lưu cuối"
@@ -92,6 +92,10 @@ export function storeFarm({ db }, a, { play, save } = {}) {
       const chk = checkSaveJump(prev, s, dt);
       if (!chk.ok) throw new HttpError(422, chk.msg, { code: 'implausible', reason: chk.reason });
     }
+    // Chống gian lận nhẹ (issue 30): bản lưu không được khai nhiều vụ trộm hôm nay hơn số server đã nhận,
+    // nên xu và đồ "trộm được" cũng không vượt quá các vụ trộm hợp lệ
+    const claimed = s.today?.day === serverDay(now) ? Math.floor(s.today.robs || 0) : 0;
+    if (claimed > stealsOf(db, a.id, now)) throw new HttpError(422, 'Số vụ trộm trong bản lưu không khớp với làng', { code: 'implausible', reason: 'steals' });
     db.prepare('UPDATE farms SET save = ?, saved_at = ?, updated = ?, rev = rev + 1 WHERE account_id = ?').run(JSON.stringify(s), s.savedAt, now, a.id);
     return { rev: r.rev + 1, savedAt: s.savedAt };
   } finally {

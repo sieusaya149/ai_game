@@ -135,7 +135,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     // Trường cho online (issue 22, không đổi phiên bản v2): chơi đơn hay vườn trên làng, tên tài khoản,
     // thống kê hôm nay theo ngày ngoài đời (giúp/trộm, issue 28/30), nhật ký khách ghé vườn (mới nhất ở đầu)
     mode: 'offline', account: null,
-    today: { day: '', helps: 0, steals: 0, stolen: 0 },
+    today: { day: '', helps: 0, steals: 0, stolen: 0, robs: 0 },
     guests: [],
   };
   const m = mapOf(s);
@@ -566,8 +566,8 @@ function stepThreats(s, d) {
     s.threats.push({ id: s.nextId++, kind: 'crow', plot: p.idx, x, y, arriveAt: s.time + Math.hypot(c.x - x, c.y - y) / 60 * 1000, state: 'coming', since: s.time });
     spawnEv('crow', x, y); snd('crow');
   }
-  // thằng Tèo
-  if (isNight(s) && ripe.length >= 2 && !s.threats.some(t => t.kind === 'thief') && chance(THREATS.thiefChancePerNightMin * Math.pow(0.6, lamps), d)) {
+  // thằng Tèo: đêm nào đã có người chơi sang trộm thì trộm NPC nhường (issue 30)
+  if (isNight(s) && !stealsToday(s) && ripe.length >= 2 && !s.threats.some(t => t.kind === 'thief') && chance(THREATS.thiefChancePerNightMin * Math.pow(0.6, lamps), d)) {
     const p = pick(ripe), c = plotCenter(s, p.idx);
     s.threats.push({ id: s.nextId++, kind: 'thief', plot: p.idx, x: gateIn.x, y: gateIn.y, arriveAt: s.time + Math.hypot(c.x - gateIn.x, c.y - gateIn.y) / 40 * 1400, state: 'coming', since: s.time, loot: false });
     spawnEv('thief', gateIn.x, gateIn.y);
@@ -836,7 +836,9 @@ function doorActs(s, t) {
 }
 
 // ---------- perform ----------
-const harvestQty = c => Math.round(CROPS[c.id].yield * (c.fert ? 1 + FARMING.fertYield : 1));
+// Sản lượng một ô: trừ phần khách đã trộm mất (issue 30, `crop.stolen`)
+const cropYield = c => Math.round(CROPS[c.id].yield * (c.fert ? 1 + FARMING.fertYield : 1));
+const harvestQty = c => Math.max(0, cropYield(c) - (c.stolen || 0));
 const res = (ok, msg, fx = [], sound, extra) => ({ ok, msg, fx, ...(sound ? { sound } : {}), ...extra });
 const bad = (msg, at) => res(false, msg, at ? [{ text: msg, color: COL.bad, x: at.x, y: at.y }] : [], 'error');
 
@@ -1111,7 +1113,8 @@ export function startVisit(me, raw, owner) {
   const h = raw && loadGame(structuredClone(raw));
   if (!h) return null;
   // quạ của chủ đi theo (khách đuổi giúp được); thằng Tèo thì không, bắt trộm là việc của chủ
-  const v = { ...me, threats: (h.threats ?? []).filter(t => t.kind === 'crow'), sit: false, scene: 'visit', visit: { owner, fed: false } };
+  // visit.level = cấp của chủ vườn: trong bản đi dạo `exp` là của khách, nên luật trộm phải đọc cấp chủ ở đây
+  const v = { ...me, threats: (h.threats ?? []).filter(t => t.kind === 'crow'), sit: false, scene: 'visit', visit: { owner, fed: false, level: levelInfo(h.exp || 0).level } };
   for (const k of VISIT_LIVE) Object.defineProperty(v, k, { get: () => me[k], set: x => { me[k] = x; }, enumerable: true });
   for (const k of VISIT_WORLD) v[k] = h[k];
   const a = sceneMap(v).exit;
@@ -1120,12 +1123,17 @@ export function startVisit(me, raw, owner) {
 }
 
 // Khách được làm `id` với target `t` không (t.kind 'build' = chế độ xây dựng): { ok: true } hoặc { ok: false, reason, msg }.
-// Ra cổng, giúp vườn (id 'help_*', issue 28) và làm quen với chó: chó lạ phải được cho ăn (đồ trong giỏ của khách) rồi mới chịu cho vuốt ve.
+// Ra cổng, giúp vườn (id 'help_*', issue 28), trộm (id 'steal', issue 30) và làm quen với chó: chó lạ phải được
+// cho ăn (đồ trong giỏ của khách) rồi mới chịu cho vuốt ve.
 export function guestCheck(s, t, id) {
   if (t?.kind === 'build') return no('build', 'Chỉ chủ vườn mới sửa được vườn này');
   if (id?.startsWith('help_')) {
     if (helpLeft(s) <= 0) return no('help_full', HELP_FULL);
     return guestOps(s, t).some(o => o.act === id.slice(5)) ? { ok: true } : no('nothing', NOTHING);
+  }
+  if (id === 'steal') {
+    const o = guestOps(s, t).find(x => x.kind === 'steal');
+    return o ? guestOpCheck(s, meAsGuest(s), { ...o, id: 'xem-thu' }) : no('nothing', NOTHING_STEAL);
   }
   if (t?.kind === 'building') {
     const b = sceneMap(s).building(t.id);
@@ -1138,10 +1146,12 @@ export function guestCheck(s, t, id) {
 }
 function guestActs(s, t) {
   const why = id => guestCheck(s, t, id).msg ?? null;
-  const help = guestOps(s, t);
-  if (help.length) {   // ô ruộng, con quạ: các việc giúp làm được ở đây (hết lượt thì mờ kèm lý do)
+  const ops = guestOps(s, t);
+  if (ops.length) {   // ô ruộng, trứng, con vật, con quạ: việc giúp và việc trộm làm được ở đây (bị chặn thì mờ kèm lý do)
     const full = helpLeft(s) <= 0 ? HELP_FULL : null;
-    return help.map(o => mk('help_' + o.act, HELP_JOBS[o.act].icon, HELP_JOBS[o.act].label, full));
+    return ops.map(o => (o.kind === 'steal'
+      ? mk('steal', '😈', stealLabel(s, o), why('steal'))
+      : mk('help_' + o.act, HELP_JOBS[o.act].icon, HELP_JOBS[o.act].label, full)));
   }
   if (t.kind === 'building') {
     const b = sceneMap(s).building(t.id);
@@ -1153,6 +1163,7 @@ function guestActs(s, t) {
 }
 function guestDo(s, t, id, at) {
   if (id.startsWith('help_')) return helpDo(s, t, id.slice(5), at);
+  if (id === 'steal') return stealDo(s, t, at);
   if (t.kind === 'building') return DO.building(s, t, id, at);   // cổng: ra làng
   const g = s.dog;
   if (id === 'feed') {
@@ -1168,10 +1179,12 @@ function guestDo(s, t, id, at) {
 // trả kết quả hoặc lý do từ chối. Server kiểm tra bằng chính hàm này rồi xếp hàng; trình duyệt chủ áp dụng cũng
 // bằng hàm này. Không có gì ngẫu nhiên nên hai nơi luôn ra cùng kết quả. Mã thao tác `op.id` nhớ trong `host.guests`
 // nên áp dụng hai lần cùng mã thì lần sau không làm gì.
-// Thao tác: { id, kind, act, idx (ô ruộng) | crow (id con quạ), at (giờ ngoài đời) }.
-// Lát này mới có kind 'help'; các issue sau thêm 'gift', 'steal', 'pet', 'sausage' vào KINDS.
+// Thao tác: { id, kind, act, idx (ô ruộng) | crow (id con quạ) | egg (id quả trứng) | animal (id con vật),
+// at (giờ ngoài đời) }. `who` của việc trộm cần thêm `room` = chỗ trống trong giỏ khách.
+// Đã có kind 'help' (issue 28) và 'steal' (issue 30); các issue sau thêm 'pet', 'sausage' vào KINDS.
 export const HELP_FULL = 'Vườn này hôm nay đã được giúp đủ';
 const NOTHING = 'Ở đây không còn gì để làm';
+const NOTHING_STEAL = 'Ở đây không có gì để trộm';
 const SOUND_OF = { water: 'water', weed: 'pop', catch: 'pop', shoo: 'crow' };
 
 // Mỗi việc giúp: tìm chỗ đang cần giúp trong bản lưu chủ (null = không còn gì để làm) rồi làm
@@ -1183,41 +1196,128 @@ const HELP = {
   catch: { find: (s, o) => { const c = s.plots?.[o.idx]?.unlocked && s.plots[o.idx].crop; return c && c.bugs && !c.dead && !c.rotten ? s.plots[o.idx] : null; }, do: (s, p) => { p.crop.bugs = false; } },
   shoo: { find: (s, o) => (s.threats ?? []).find(t => t.id === o.crow && t.kind === 'crow' && t.state !== 'leaving') ?? null, do: (s, t) => { s.threats.splice(s.threats.indexOf(t), 1); } },
 };
-const KINDS = { help: HELP };
+
+// ---------- Trộm (issue 30, DESIGN §7.1) ----------
+// Trộm được: cây đã chín (act 'crop'), trứng dưới đất ('egg'), sữa và lông đang chờ lấy ('product').
+// Không trộm được: con vật, trái khổng lồ, đồ trong kho và trong nhà, cá — mỗi thứ một lý do rõ ràng.
+const NO_STEAL = {
+  animal: 'Con vật thì không trộm được đâu',
+  giant: 'Trái khổng lồ nặng quá, vác không nổi',
+  store: 'Đồ trong kho và trong nhà khóa kỹ rồi',
+  fish: 'Cá dưới ao thì không trộm được',
+};
+export const STEAL_SMALL = 'Vườn này còn quá nhỏ để trộm';
+const STEAL_YOUNG = `Phải tới cấp ${GUEST.stealLv} mới đi trộm được`;
+// Mỗi vụ lấy tối đa GUEST.stealPct phần còn lại của ô hay con đó, ít nhất 1 món (trứng, sữa, lông chỉ có 1)
+const stealQty = left => Math.max(1, Math.floor(left * GUEST.stealPct));
+// Trong bản đi dạo (startVisit) `exp` là của khách, nên cấp chủ vườn đọc ở visit.level
+const hostLevel = h => (h?.visit ? h.visit.level || 1 : level(h));
+const STEAL = {
+  crop: {
+    find: (s, o) => { const p = s.plots?.[o.idx]; return p?.unlocked && ripeCrop(p) ? p : null; },
+    item: p => p.crop.id,
+    left: p => harvestQty(p.crop),
+    thieves: p => p.crop.robbed ?? [],
+    do: (s, p, by, n) => { p.crop.stolen = (p.crop.stolen || 0) + n; p.crop.robbed = [...(p.crop.robbed ?? []), by]; },
+  },
+  egg: {
+    find: (s, o) => (s.eggs ?? []).find(e => e.id === o.egg) ?? null,
+    item: () => 'trung',
+    left: () => 1,
+    thieves: () => [],
+    do: (s, e) => { s.eggs.splice(s.eggs.indexOf(e), 1); },
+  },
+  product: {
+    find: (s, o) => (s.animals ?? []).find(a => a.id === o.animal && a.ready && ANIMALS[a.type]?.product) ?? null,
+    item: a => ANIMALS[a.type].product,
+    left: () => 1,
+    thieves: () => [],
+    do: (s, a) => { a.ready = false; a.nextProduct = s.time + ANIMALS[a.type].every; },
+  },
+};
+const KINDS = { help: HELP, steal: STEAL };
 
 // Số việc giúp vườn này đã nhận hôm nay (ngày ngoài đời) và số lượt còn lại
 export const helpsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.today.helps || 0 : 0);
 export const helpLeft = (s, t = now()) => Math.max(0, GUEST.helpMax - helpsToday(s, t));
+// Thống kê trộm hôm nay (ngày ngoài đời): của vườn = số vụ bị trộm (`steals`) và tổng giá trị đã mất (`stolen`);
+// của người chơi = số vụ chính mình đi trộm (`robs`, server dùng để chặn bản lưu khai khống)
+export const stealsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.today.steals || 0 : 0);
+export const stolenToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.today.stolen || 0 : 0);
+export const robsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.today.robs || 0 : 0);
+// Tổng giá trị đồ đang chín chờ lấy trong vườn (cây chín, trứng dưới đất, sữa và lông đang chờ)
+export function ripeValue(s) {
+  let v = 0;
+  for (const p of s?.plots ?? []) if (p.unlocked && ripeCrop(p)) v += sellPrice(p.crop.id) * harvestQty(p.crop);
+  v += (s?.eggs?.length ?? 0) * sellPrice('trung');
+  for (const a of s?.animals ?? []) if (a.ready && ANIMALS[a.type]?.product) v += sellPrice(ANIMALS[a.type].product);
+  return v;
+}
+// Giá trị vườn này còn chịu mất hôm nay: tối đa GUEST.dayPct tổng giá trị đồ chín (tính cả phần đã bị trộm)
+export const stealLeft = (s, t = now()) => Math.max(0, Math.floor((ripeValue(s) + stolenToday(s, t)) * GUEST.dayPct) - stolenToday(s, t));
 
 // Các thao tác khách làm được lên target `t` ngay lúc này (chưa có mã; không xét giới hạn mỗi ngày)
+const stealOp = (s, t) => {
+  const o = t?.kind === 'plot' ? { kind: 'steal', act: 'crop', idx: t.idx }
+    : t?.kind === 'egg' ? { kind: 'steal', act: 'egg', egg: t.id }
+    : t?.kind === 'animal' ? { kind: 'steal', act: 'product', animal: t.id } : null;
+  return o && STEAL[o.act].find(s, o) ? o : null;
+};
 export function guestOps(s, t) {
-  if (t?.kind === 'plot') return ['water', 'weed', 'catch'].filter(act => HELP[act].find(s, { idx: t.idx })).map(act => ({ kind: 'help', act, idx: t.idx }));
+  const steal = stealOp(s, t);
+  if (t?.kind === 'plot') return [...['water', 'weed', 'catch'].filter(act => HELP[act].find(s, { idx: t.idx })).map(act => ({ kind: 'help', act, idx: t.idx })), ...(steal ? [steal] : [])];
   if (t?.kind === 'threat') return HELP.shoo.find(s, { crow: t.id }) ? [{ kind: 'help', act: 'shoo', crow: t.id }] : [];
-  return [];
+  return steal ? [steal] : [];
 }
 
-// Kiểm tra thao tác, không đổi gì: { ok: true, target } hoặc { ok: false, reason, msg }.
+// Kiểm tra thao tác, không đổi gì: { ok: true, target } (trộm thì thêm { item, qty }) hoặc { ok: false, reason, msg }.
 // reason: 'op_invalid' (thao tác lạ) · 'done' (mã này đã áp dụng rồi) · 'help_full' (vườn đã nhận đủ 10 việc hôm nay)
-// · 'nothing' (chỗ đó không còn gì để làm, vd chủ vừa tưới xong)
+// · 'nothing' (chỗ đó không còn gì để làm, vd chủ vừa tưới xong hay vừa hái xong)
+// Riêng trộm: 'cant_steal' (thứ không trộm được) · 'host_new' / 'guest_new' (chưa tới cấp 5) · 'robbed' (người này
+// trộm ở đây rồi) · 'full' (giỏ khách đầy) · 'day_full' (vườn đã mất 30% giá trị đồ chín hôm nay)
 export function guestOpCheck(host, who, op) {
-  const job = KINDS[op?.kind]?.[op?.act];
-  if (!host || !op?.id || !job) return no('op_invalid', 'Thao tác này chưa làm được');
+  if (!host || !op?.id) return no('op_invalid', 'Thao tác này chưa làm được');
   if ((host.guests ?? []).some(g => g.id === op.id)) return no('done', 'Việc này làm rồi');
-  if (helpLeft(host, op.at ?? now()) <= 0) return no('help_full', HELP_FULL);
+  if (op.kind === 'steal' && NO_STEAL[op.act]) return no('cant_steal', NO_STEAL[op.act]);
+  const job = KINDS[op.kind]?.[op.act];
+  if (!job) return no('op_invalid', 'Thao tác này chưa làm được');
+  const t = op.at ?? now();
+  if (op.kind === 'steal') return stealCheck(host, who, op, job, t);
+  if (helpLeft(host, t) <= 0) return no('help_full', HELP_FULL);
   const target = job.find(host, op);
   return target ? { ok: true, target } : no('nothing', NOTHING);
 }
+function stealCheck(host, who, op, job, t) {
+  if (hostLevel(host) < GUEST.stealLv) return no('host_new', STEAL_SMALL);
+  if ((who?.level ?? 1) < GUEST.stealLv) return no('guest_new', STEAL_YOUNG);
+  const target = job.find(host, op);
+  if (!target) return no('nothing', NOTHING_STEAL);
+  const by = String(who?.name ?? 'Người lạ');
+  if (job.thieves(target).includes(by)) return no('robbed', 'Bạn trộm ở đây một lần rồi, để phần người khác');
+  const item = job.item(target), qty = stealQty(job.left(target));
+  if ((who?.room ?? 0) < qty) return no('full', FULL);
+  if (sellPrice(item) * qty > stealLeft(host, t)) return no('day_full', 'Vườn này hôm nay bị trộm nhiều rồi, mai quay lại nhé');
+  return { ok: true, target, item, qty };
+}
 
-// Áp dụng thao tác lên bản lưu chủ: { ok: true, msg, reward: { coins, exp }, event } hoặc lý do từ chối.
-// `event` là lời cảm ơn cho chủ vườn (gộp theo người và loại việc); `reward` là phần của khách (guestReward).
+// Áp dụng thao tác lên bản lưu chủ: { ok: true, msg, reward, event } hoặc lý do từ chối.
+// `event` là tin cho chủ vườn (giúp: lời cảm ơn 🟡 gộp theo người và việc; trộm: báo gấp 🔴);
+// `reward` là phần của khách (guestReward): { coins, exp } khi giúp, { items, steal } khi trộm.
 export function guestOpApply(host, who, op) {
   const c = guestOpCheck(host, who, op);
   if (!c.ok) return c;
   const t = op.at ?? now(), day = serverDay(t), by = String(who?.name ?? 'Người lạ');
-  KINDS[op.kind][op.act].do(host, c.target);
-  if (host.today?.day !== day) host.today = { day, helps: 0, steals: 0, stolen: 0 };
+  KINDS[op.kind][op.act].do(host, c.target, by, c.qty);
+  if (host.today?.day !== day) host.today = { day, helps: 0, steals: 0, stolen: 0, robs: 0 };
+  const entry = { id: op.id, kind: op.kind, act: op.act, by, lv: who?.level ?? 1, at: t, seen: false };
+  if (op.kind === 'steal') Object.assign(entry, { item: c.item, qty: c.qty });
+  host.guests = [entry, ...(host.guests ?? [])].slice(0, GUEST.logMax);
+  if (op.kind === 'steal') {
+    host.today.steals++;
+    host.today.stolen += sellPrice(c.item) * c.qty;
+    return { ok: true, msg: `Trộm được ${c.qty} ${itemName(c.item).toLowerCase()} 😈`, reward: { items: { [c.item]: c.qty }, steal: 1 }, event: { type: 'stolen', by, item: c.item, qty: c.qty, at: t } };
+  }
   host.today.helps++;
-  host.guests = [{ id: op.id, kind: op.kind, act: op.act, by, at: t, seen: false }, ...(host.guests ?? [])].slice(0, GUEST.logMax);
   return { ok: true, msg: `Đã ${HELP_JOBS[op.act].verb} giúp`, reward: { coins: GUEST.helpCoins, exp: GUEST.helpExp }, event: { type: 'helped', by, act: op.act, at: t } };
 }
 
@@ -1226,24 +1326,47 @@ export function guestReward(me, reward) {
   if (!me || !reward) return;
   addCoins(me, reward.coins || 0);
   addExp(me, reward.exp || 0);
+  for (const [k, n] of Object.entries(reward.items ?? {})) give(me, k, n);
+  if (reward.steal) {   // số vụ chính mình đi trộm hôm nay (server dùng để chặn bản lưu khai khống)
+    const day = serverDay(now());
+    if (me.today?.day !== day) me.today = { day, helps: 0, steals: 0, stolen: 0, robs: 0 };
+    me.today.robs = (me.today.robs || 0) + reward.steal;
+  }
 }
 
-// Việc khách làm mà chủ chưa được cảm ơn (server áp dụng lúc chủ offline, hoặc vừa nhận qua WebSocket):
-// trả các event theo thứ tự cũ → mới rồi đánh dấu đã xem, nên chỉ cảm ơn một lần.
+// Việc khách làm mà chủ chưa biết (server áp dụng lúc chủ offline, hoặc vừa nhận qua WebSocket):
+// trả các event theo thứ tự cũ → mới rồi đánh dấu đã xem, nên chỉ báo một lần.
 export function takeGuestLog(s) {
   const fresh = (s?.guests ?? []).filter(g => !g.seen);
   for (const g of fresh) g.seen = true;
-  return fresh.reverse().map(g => ({ type: 'helped', by: g.by, act: g.act, at: g.at }));
+  return fresh.reverse().map(g => (g.kind === 'steal'
+    ? { type: 'stolen', by: g.by, item: g.item, qty: g.qty, at: g.at }
+    : { type: 'helped', by: g.by, act: g.act, at: g.at }));
 }
 
-// Khách làm một việc giúp: áp dụng ngay trên bản đi dạo (chỉ để thấy liền) và trả kèm `guestOp` để main.js gửi lên server.
-// Thưởng chỉ cộng khi server xác nhận (main.js gọi guestReward).
+// Khách làm một việc giúp hay một vụ trộm: áp dụng ngay trên bản đi dạo (chỉ để thấy liền) và trả kèm `guestOp`
+// để main.js gửi lên server. Thưởng và đồ trộm được chỉ cộng khi server xác nhận (main.js gọi guestReward).
 const opId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+const meAsGuest = s => ({ name: s.name, level: level(s), room: room(s) });
 function helpDo(s, t, act, at) {
   const op = { id: opId(), kind: 'help', act, ...(t.kind === 'threat' ? { crow: t.id } : { idx: t.idx }), at: now() };
-  const r = guestOpApply(s, { name: s.name, level: level(s) }, op);
+  const r = guestOpApply(s, meAsGuest(s), op);
   if (!r.ok) return bad(r.msg, at);
   return res(true, r.msg, [say(at, HELP_JOBS[act].icon)], SOUND_OF[act], { guestOp: op });
+}
+// Nhãn nút Trộm: lấy được mấy món và ô (hay con) còn lại bao nhiêu
+function stealLabel(s, o) {
+  const job = STEAL[o.act], target = job.find(s, o), left = job.left(target), qty = stealQty(left);
+  return `Trộm ${qty} ${itemName(job.item(target)).toLowerCase()} (còn ${left - qty})`;
+}
+function stealDo(s, t, at) {
+  const o = stealOp(s, t);
+  if (!o) return bad(NOTHING_STEAL, at);
+  const op = { ...o, id: opId(), at: now() };
+  const r = guestOpApply(s, meAsGuest(s), op);
+  if (!r.ok) return bad(r.msg, at);
+  spend(s, STAMINA.cost.steal);
+  return res(true, r.msg, [say(at, '😈')], 'pop', { guestOp: op });
 }
 
 // ---------- Cửa hàng & kinh tế ----------

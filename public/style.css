@@ -333,6 +333,10 @@ body.alerting #hud { top: calc(50px + var(--st)); }
 /* ---------- Bản đồ nhỏ & Việc cần làm ---------- */
 #mini-wrap { position: absolute; right: calc(8px + var(--sr)); top: calc(120px + var(--st)); z-index: 8; width: 102px; height: 102px; }
 #mini-wrap[hidden], body.building #mini-wrap { display: none; }
+/* Máy nhỏ, nhiều nút hành động: bản đồ nhỏ thu lại còn nút Việc cần làm cho cột nút có chỗ (ui.js bật theo chỗ thật) */
+#mini-wrap.compact { width: 42px; height: 42px; }
+#mini-wrap.compact #minimap { display: none; }
+#mini-wrap.compact #todo-btn { left: auto; right: 0; bottom: 0; }
 #minimap { display: block; width: 102px; height: 102px; padding: 0; border: 3px solid var(--wood); border-radius: 14px; overflow: hidden; cursor: pointer; background: #25491a; box-shadow: 0 3px 0 var(--wood-d), 0 6px 10px rgba(0, 0, 0, 0.25); }
 #minimap:active { transform: translateY(2px); }
 #mini-cv { display: block; width: 96px; height: 96px; image-rendering: pixelated; }
@@ -433,6 +437,21 @@ body.alerting #hud { top: calc(50px + var(--st)); }
   .bb-ico { height: 34px; }
   #bottombar { gap: 3px; }
 }
+/* Điện thoại: chip hành động rộng hơn để chữ không xuống hai dòng, cột nút đỡ cao */
+@media (max-width: 440px) {
+  #actions { right: calc(8px + var(--sr)); max-width: calc(100% - 136px - var(--sl) - var(--sr)); }
+  .chip { font-size: 12px; gap: 4px; padding: 0 10px 0 6px; }
+  .chip .ico { width: 20px; height: 20px; }
+  .chip .ico.emo { font-size: 17px; line-height: 20px; }
+}
+/* Màn thấp (320x640, 360x640): thanh dưới và nút hành động chính gọn lại */
+@media (max-height: 680px) {
+  :root { --bar-h: 56px; }
+  #main-action { width: 80px; height: 80px; }
+  #main-action .ico { width: 32px; height: 32px; }
+  .ma-icon { height: 32px; }
+  .ma-label { font-size: 11px; }
+}
 @media (max-width: 380px) {
   .bb-lbl { font-size: 9px; letter-spacing: -0.2px; }
   .sheet-head h2 { font-size: 18px; }
@@ -513,6 +532,13 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 .fr-ico .ico { width: 22px; height: 22px; }
 .fr-del { flex: none; min-width: 44px; min-height: 44px; padding: 0; }
 .gate-row.pinned { background: #fff0c8; border-color: #e0b24a; }
+
+/* Nhật ký khách trong bảng Nhật ký (issue 28, 30): dòng bị trộm nổi màu đỏ, có nút sang trộm lại */
+.guest-row { margin-top: 6px; }
+.guest-row .row-ico { font-size: 20px; }
+.guest-row .row-name { font-weight: 700; white-space: normal; }
+.guest-row.stolen { background: #ffe9e4; border-color: #e5452f; }
+.guest-row .revenge { flex: none; white-space: nowrap; }
 
 /* ---------- Thăm vườn người khác (issue 27): thanh tên chủ vườn dưới HUD, chừa chỗ bản đồ nhỏ bên phải; bảng chọn vườn ---------- */
 #visit-bar { align-self: flex-start; max-width: calc(100% - 112px); display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px 4px 4px 12px; font-size: 13px; font-weight: 800; }

@@ -26,17 +26,17 @@ Khách từ cấp 5 trộm được vườn bạn, nhưng luật luôn chừa l�
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): trộm 1 ô chín chỉ lấy tối đa 25% sản lượng; người thứ hai trộm cùng ô khi là người khác vẫn được (nếu chưa chạm trần), còn cùng một người trộm lần hai cùng ô bị từ chối.
-- [ ] Unit test (seam 1): tổng giá trị đã bị trộm trong một ngày ngoài đời chạm 30% thì các vụ trộm tiếp theo trong ngày bị từ chối; sang ngày mới thì trộm lại được.
-- [ ] Unit test (seam 1): chủ dưới cấp 5 không bị trộm; khách dưới cấp 5 không trộm được; cả hai trả đúng lý do.
-- [ ] Unit test (seam 1): trộm con vật, trái khổng lồ, đồ trong kho/nhà, cá đều bị từ chối.
-- [ ] Unit test (seam 1): giỏ đầy thì từ chối; trộm trừ đúng thể lực theo bảng.
-- [ ] Unit test (seam 1): đêm có vụ trộm của người chơi thì trộm NPC không tới; đêm không có thì tính theo luật cũ.
-- [ ] Unit test (seam 3): vụ trộm hợp lệ được nhận, vào hàng đợi, đẩy tới chủ online, ghi nhật ký; áp dụng hai lần cùng mã chỉ tính một lần; vụ vượt giới hạn bị từ chối đúng lý do.
-- [ ] Unit test (seam 3): bản lưu của khách báo xu tăng quá mức so với các vụ trộm đã được nhận (vượt giới hạn) bị từ chối (chống gian lận nhẹ).
-- [ ] E2E (Playwright, 2 trình duyệt, desktop + 360px): B (cấp ≥ 5) sang vườn A (cấp ≥ 5, có ô cà chua chín dựng bằng bản lưu ghi sẵn) → trộm → B có cà chua trong giỏ, ô của A còn lại phần lớn; B thử trộm lần hai cùng ô thấy lý do bị chặn.
-- [ ] E2E: A mở nhật ký thấy dòng "B đã trộm ... lúc ..." → bấm "Sang trộm lại 😤" → A đi qua làng vào đúng vườn B.
-- [ ] E2E: vườn A cấp dưới 5 → B không thấy nút Trộm hoạt động, có lý do.
+- [x] Unit test (seam 1): trộm 1 ô chín chỉ lấy tối đa 25% sản lượng; người thứ hai trộm cùng ô khi là người khác vẫn được (nếu chưa chạm trần), còn cùng một người trộm lần hai cùng ô bị từ chối.
+- [x] Unit test (seam 1): tổng giá trị đã bị trộm trong một ngày ngoài đời chạm 30% thì các vụ trộm tiếp theo trong ngày bị từ chối; sang ngày mới thì trộm lại được.
+- [x] Unit test (seam 1): chủ dưới cấp 5 không bị trộm; khách dưới cấp 5 không trộm được; cả hai trả đúng lý do.
+- [x] Unit test (seam 1): trộm con vật, trái khổng lồ, đồ trong kho/nhà, cá đều bị từ chối.
+- [x] Unit test (seam 1): giỏ đầy thì từ chối; trộm trừ đúng thể lực theo bảng.
+- [x] Unit test (seam 1): đêm có vụ trộm của người chơi thì trộm NPC không tới; đêm không có thì tính theo luật cũ.
+- [x] Unit test (seam 3): vụ trộm hợp lệ được nhận, vào hàng đợi, đẩy tới chủ online, ghi nhật ký; áp dụng hai lần cùng mã chỉ tính một lần; vụ vượt giới hạn bị từ chối đúng lý do.
+- [x] Unit test (seam 3): bản lưu của khách báo xu tăng quá mức so với các vụ trộm đã được nhận (vượt giới hạn) bị từ chối (chống gian lận nhẹ).
+- [x] E2E (Playwright, 2 trình duyệt, desktop + 360px): B (cấp ≥ 5) sang vườn A (cấp ≥ 5, có ô cà chua chín dựng bằng bản lưu ghi sẵn) → trộm → B có cà chua trong giỏ, ô của A còn lại phần lớn; B thử trộm lần hai cùng ô thấy lý do bị chặn.
+- [x] E2E: A mở nhật ký thấy dòng "B đã trộm ... lúc ..." → bấm "Sang trộm lại 😤" → A đi qua làng vào đúng vườn B.
+- [x] E2E: vườn A cấp dưới 5 → B không thấy nút Trộm hoạt động, có lý do.
 
 ## Blocked by
 
