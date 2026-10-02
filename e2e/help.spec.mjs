@@ -45,7 +45,7 @@ function ownerGarden(s) {
   Object.assign(s.farm.ents.find(e => e.kind === 'house'), { c: 39, r: 27 });
   s.farm.rev++;
   const id = k => s.farm.ents.find(e => e.kind === k).id;
-  for (const [k, c, r] of [['shed', 39, 20], ['shipbin', 33, 22], ['doghouse', 42, 32]]) expect(moveEntity(s, id(k), c, r).ok, k).toBe(true);
+  for (const [k, c, r] of [['shed', 39, 20], ['shipbin', 33, 22], ['doghouse', 43, 32]]) expect(moveEntity(s, id(k), c, r).ok, k).toBe(true);
   Object.assign(s.dog, mapOf(s).dogHome);
   // dời khối ruộng có ô 0 tới chỗ hợp lệ gần cổng nhất: khách bước vào là thấy ngay ô cần tưới
   const t0 = mapOf(s).plotTile(0), exit = mapOf(s).arrive.village, o = s.farm.owned, spots = [];
