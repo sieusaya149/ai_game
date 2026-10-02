@@ -19,10 +19,10 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): độ thân tăng đúng với từng hành động (cho ăn tận tay, vuốt ve, tắm, chữa bệnh), giảm khi đói và khi dơ lâu, kẹp trong 1–5; giới hạn tăng mỗi ngày.
-- [ ] Unit test: ❤️3 tăng tỉ lệ ★ của sản phẩm (thống kê hạt giống cố định); ❤️4 giảm nguy cơ bệnh; ❤️5 kéo dài tuổi thọ +10% (mốc già đến muộn hơn 10%); sữa bò và lông xoăn cừu theo đúng luật riêng.
-- [ ] E2E (Playwright, desktop + 360px): dựng bản lưu có bò ❤️1 → vuốt ve và cho ăn tận tay nhiều lần → thấy tim bay và số tim tăng; dựng bản lưu có gà ❤️4 → đi lại gần thì gà chạy lại; dựng bản lưu có heo ❤️5 → heo đi theo người chơi.
-- [ ] Pixel art tim và biểu tượng có đủ.
+- [x] Unit test (seam 1): độ thân tăng đúng với từng hành động (cho ăn tận tay, vuốt ve, tắm, chữa bệnh), giảm khi đói và khi dơ lâu, kẹp trong 1–5; giới hạn tăng mỗi ngày.
+- [x] Unit test: ❤️3 tăng tỉ lệ ★ của sản phẩm (thống kê hạt giống cố định); ❤️4 giảm nguy cơ bệnh; ❤️5 kéo dài tuổi thọ +10% (mốc già đến muộn hơn 10%); sữa bò và lông xoăn cừu theo đúng luật riêng.
+- [x] E2E (Playwright, desktop + 360px): dựng bản lưu có bò ❤️1 → vuốt ve và cho ăn tận tay nhiều lần → thấy tim bay và số tim tăng; dựng bản lưu có gà ❤️4 → đi lại gần thì gà chạy lại; dựng bản lưu có heo ❤️5 → heo đi theo người chơi.
+- [x] Pixel art tim và biểu tượng có đủ. (SPR3.status.heart1..5 có sẵn; tim bay dùng chữ ❤️ trong fx)
 
 ## Blocked by
 

@@ -4,7 +4,7 @@ import {
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE,
-  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt,
+  LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
@@ -418,9 +418,50 @@ export const animalLabel = a => `${a.name || ANIMALS[a.type]?.name || 'Vật nu�
 // Chu kỳ ra sản phẩm theo giai đoạn: con già đẻ thưa, ít sữa, lông mỏng
 const productEvery = a => ANIMALS[a.type].every * (a.stage === 'gia' ? AGING.oldEvery : 1);
 
+// ---------- Độ thân ❤️ ----------
+// a.bond = số tim 1..5 (nguồn sự thật), a.bondXp = điểm ẩn trong tim hiện tại (0..perHeart).
+function bondShift(a, pts) {
+  a.bondXp = (a.bondXp || 0) + pts;
+  while (a.bondXp >= BOND.perHeart && a.bond < 5) { a.bond++; a.bondXp -= BOND.perHeart; }
+  while (a.bondXp < 0 && a.bond > 1) { a.bond--; a.bondXp += BOND.perHeart; }
+  a.bondXp = clamp(a.bondXp, 0, BOND.perHeart);
+}
+// Cộng độ thân vì `reason` ('feed' | 'pet' | 'bath' | 'cure'). Mỗi cách chỉ tính tối đa BOND.perDay lần mỗi ngày game.
+// Trả về số điểm được cộng (0 nếu hết lượt hôm nay). Lát tắm (37) và chữa bệnh (38) gọi hàm này.
+export function addBond(s, a, reason) {
+  const pts = BOND.gain[reason];
+  if (!pts) return 0;
+  if (a.bondDay?.day !== s.day) a.bondDay = { day: s.day };
+  if (reason === 'pet' && a.petLast !== s.day) { a.petStreak = a.petLast === s.day - 1 ? (a.petStreak || 0) + 1 : 1; a.petLast = s.day; }
+  const n = a.bondDay[reason] || 0;
+  if (n >= BOND.perDay[reason]) return 0;
+  a.bondDay[reason] = n + 1;
+  bondShift(a, pts);
+  return pts;
+}
+// Luật theo mức tim (world.js dùng để diễn hoạt): chạy lại khi người chơi tới gần ❤️4+, đi theo người chơi ❤️5
+export const bondPerk = a => ({ runTo: a.bond >= 4, follow: a.bond >= 5 });
+// Hệ số nguy cơ bệnh theo độ thân (lát 38 nhân vào xác suất bệnh)
+export const sickFactor = a => (a.bond >= 4 ? BOND.sickMul : 1);
+// Mốc già và mốc ra đi của con này (❤️5 sống lâu hơn 10%)
+export function lifeMarks(a) {
+  const k = a.bond >= 5 ? BOND.lifeMul : 1;
+  return { gia: stageStart(a.type, 'gia') * k, end: lifeEnd(a.type) * k };
+}
+// Xác suất sản phẩm được sao (sữa ngon, lông xoăn): ❤️3+ tốt hơn; bò được vuốt ve nhiều ngày liền, cừu đang vui thì thêm
+export function starChance(s, a) {
+  const B = BOND.star;
+  let p = B.base + (a.bond >= 3 ? B.heart3 : 0);
+  if (a.type === 'bo' && a.petLast >= s.day - 1) p += B.petStreak * Math.min(a.petStreak || 0, B.petStreakMax);
+  if (a.type === 'cuu' && a.happy >= B.sheepHappy) p += B.sheepBonus;
+  return Math.min(1, p);
+}
+
 // Bước sang giai đoạn mới (theo tuổi). Trả về false nếu con vật đã ra đi vì già.
 function ageUp(s, a, kind, def) {
-  const st = stageAt(kind, a.age);
+  const m = lifeMarks(a);
+  let st = stageAt(kind, a.age);
+  if (st === 'gia' && a.stage !== 'gia' && a.age < m.gia) st = 'truong';   // ❤️5: già đến muộn hơn
   if (st !== a.stage) {
     a.stage = st;
     const nm = def.name.toLowerCase();
@@ -428,7 +469,7 @@ function ageUp(s, a, kind, def) {
     if (st === 'truong') { log(s, `${def.name} đã trưởng thành`); fxEv(a.x, a.y, 'Trưởng thành! ✨', COL.good); if (def.every) a.nextProduct = s.time + productEvery(a); }
     if (st === 'gia') { log(s, `${def.name} đã già, đẻ thưa và hay ngủ hơn`); fxEv(a.x, a.y, 'Già rồi 👵', COL.info); }
   }
-  return a.age < lifeEnd(kind);
+  return a.age < m.end;
 }
 // Hết giai đoạn già: ra đi thanh thản, hóa thiên thần bay lên (mộ ở lát sau). Được phép cả lúc chạy bù (ADR 0004).
 function passAway(s, a, def) {
@@ -444,7 +485,7 @@ function stepAnimals(s, d) {
   for (const a of [...s.animals]) {
     const def = ANIMALS[a.type];
     // tuổi theo giờ vườn: step chỉ chạy khi vườn chạy nên đóng băng thì không già
-    const was = a.age || 0, warnAt = stageStart(a.type, 'gia') - AGING.warnMs;
+    const was = a.age || 0, warnAt = lifeMarks(a).gia - AGING.warnMs;
     a.age = was + d;
     if (was < warnAt && a.age >= warnAt) emit({ type: 'oldSoon', animal: def.name, id: a.id });
     if (!ageUp(s, a, a.type, def)) { passAway(s, a, def); continue; }
@@ -455,9 +496,11 @@ function stepAnimals(s, d) {
     // vui: trôi dần về 50, mùi hôi kéo xuống
     if (a.happy > 50) a.happy = Math.max(50, a.happy - HUSBANDRY.happyDecayPerMin * d / MIN);
     a.happy = Math.max(0, a.happy - stink);
+    // để đói hay dơ lâu thì bớt thân
+    if (a.hunger <= BOND.hungerBelow || (a.dirty || 0) >= BOND.dirtyAbove) bondShift(a, -BOND.lossPerMin * d / MIN);
     // đói lả -> bệnh
     if (a.hunger <= 0) { if (!a.starvingSince) { a.starvingSince = s.time; emit({ type: 'hungry', animal: def.name }); } } else a.starvingSince = 0;
-    if (!a.sick && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving) || chance(HUSBANDRY.sickChancePerMin, d))) {
+    if (!a.sick && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving) || chance(HUSBANDRY.sickChancePerMin * sickFactor(a), d))) {
       a.sick = 1; a.sickSince = s.time; emit({ type: 'sick', animal: def.name }); fxEv(a.x, a.y, `${def.name} bị bệnh 🤒`, COL.bad); log(s, `${def.name} bị bệnh, cho uống thuốc thú y nhé`);
     }
     if (a.sick || a.hunger <= HUSBANDRY.growNeedsHunger) continue;
@@ -865,6 +908,12 @@ function spend(s, n) {
 }
 
 const say = (at, text, color = COL.good) => ({ text, color, x: at.x, y: at.y });
+// Cộng độ thân và trả chữ bay "+❤️" (hoặc "❤️N!" khi lên tim); hết lượt trong ngày thì không bay thêm
+function heartFx(s, a, at, reason) {
+  const was = a.bond;
+  if (!addBond(s, a, reason)) return [];
+  return [say(at, a.bond > was ? `Thân hơn rồi ${'❤️'.repeat(a.bond)}` : '+❤️', '#ff7a9c')];
+}
 
 function doArea(s, tiles, id) {
   const rs = tiles.map(idx => { const c = plotCenter(s, idx); return DO.plot(s, { kind: 'plot', idx }, id, { x: c.x, y: c.y }); });
@@ -919,18 +968,18 @@ const DO = {
   animal(s, t, id, at) {
     const a = s.animals.find(x => x.id === t.id), def = ANIMALS[a.type], sound = SOUND[a.type];
     switch (id) {
-      case 'feed': take(s, def.feed); a.hunger = 100; return res(true, 'Ăn no nê', [say(at, 'Ngon quá! 😋')], 'eat');
-      case 'pet': a.happy = Math.min(100, a.happy + HUSBANDRY.petHappy); return res(true, 'Vui quá', [say(at, '❤️')], sound);
-      case 'medicine': take(s, 'medicine'); a.sick = 0; a.sickSince = 0; a.starvingSince = 0; a.hunger = Math.max(a.hunger, 30); return res(true, 'Đã khỏi bệnh', [say(at, 'Khỏe rồi! 💪')], 'spray');
+      case 'feed': take(s, def.feed); a.hunger = 100; return res(true, 'Ăn no nê', [say(at, 'Ngon quá! 😋'), ...heartFx(s, a, at, 'feed')], 'eat', { bond: a.bond });
+      case 'pet': a.happy = Math.min(100, a.happy + HUSBANDRY.petHappy); return res(true, 'Vui quá', [say(at, '❤️'), ...heartFx(s, a, at, 'pet')], sound, { bond: a.bond });
+      case 'medicine': take(s, 'medicine'); a.sick = 0; a.sickSince = 0; a.starvingSince = 0; a.hunger = Math.max(a.hunger, 30); return res(true, 'Đã khỏi bệnh', [say(at, 'Khỏe rồi! 💪'), ...heartFx(s, a, at, 'cure')], 'spray');
       case 'vitamin':
         // lớn vọt thêm một nửa giai đoạn đang ở (không vượt quá đầu giai đoạn trưởng thành)
         take(s, 'vitamin'); a.age = Math.min(stageStart(a.type, 'truong'), a.age + LIFE[a.type][a.stage] * HUSBANDRY.vitaminBoost);
         ageUp(s, a, a.type, def);
         return res(true, 'Lớn vọt lên', [say(at, 'Lớn vọt! ⚡')], 'spray');
       case 'milk': case 'shear': {
-        const prod = def.product;
+        const star = Math.random() < starChance(s, a), prod = star ? BOND.starOf[def.product] : def.product;
         a.ready = false; a.nextProduct = s.time + productEvery(a); give(s, prod); addExp(s, def.exp);
-        return res(true, `Được 1 ${PRODUCTS[prod].name}`, [say(at, `+1 ${PRODUCTS[prod].name}`)], sound);
+        return res(true, `Được 1 ${PRODUCTS[prod].name}`, [say(at, `+1 ${PRODUCTS[prod].name}${star ? ' ⭐' : ''}`)], sound);
       }
       case 'sell':
         s.animals.splice(s.animals.indexOf(a), 1); addCoins(s, def.sell);

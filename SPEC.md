@@ -139,7 +139,7 @@ Animal = {
   sick: 0|1|2|3, sickSince,                   // 0 khỏe · 1 Mệt · 2 Bệnh nặng · 3 Nguy kịch (lát 39). Hiện chỉ dùng 0/1; `if (a.sick)` vẫn đúng
   starvingSince,
   dirty: 0..100,                              // độ dơ (lát 38/dơ-tắm), mặc định 0 = sạch
-  bond: 1..5,                                 // độ thân ❤️ (lát độ thân), mặc định 2
+  bond: 1..5, bondXp: 0..20,                  // độ thân ❤️ (nguồn sự thật) · điểm ẩn trong tim hiện tại (BOND.perHeart), mặc định ❤️2; bondDay/petLast/petStreak: sổ đếm giới hạn mỗi ngày và chuỗi ngày vuốt ve
   weight,                                     // kg; con non/nhỡ ăn no thì lên cân tới WEIGHT[type][1] (lát bán theo cân dùng tiếp)
   mom: null | { id, name }, dad: null | { id, name },   // cha mẹ khi đẻ trong trại (lát sinh sản, phả hệ)
   tile: null | { c, r },                      // ô đang đứng khi thả rông (ADR 0013); null = trong chuồng
@@ -207,6 +207,16 @@ Luật:
 - Hết giai đoạn già: con vật ra đi (bỏ khỏi `animals`), event `passed` + `spawn` `angel`; được phép cả lúc chạy bù (ADR 0004). Chưa có mộ (lát 38). Chó không áp dụng (`LIFE.cho.truong = Infinity`).
 - Vitamin: cộng nửa giai đoạn đang ở (`vitaminBoost`), không vượt đầu giai đoạn trưởng thành.
 - Chó: lớn theo giờ vườn như con vật (`dog.stage`), canh nhà khi trưởng thành/già (`guardOn`).
+
+### Độ thân ❤️ (issue 39)
+```js
+addBond(s, a, reason)               // reason 'feed'|'pet'|'bath'|'cure'; cộng BOND.gain[reason] điểm, tối đa BOND.perDay[reason] lần/ngày game/con; trả số điểm cộng (0 = hết lượt). Lát tắm (37), chữa bệnh (38) gọi hàm này
+bondPerk(a)                       // { runTo: ❤️4+, follow: ❤️5 } cho world.js diễn hoạt
+sickFactor(a)                     // 1, hoặc BOND.sickMul (0.5) khi ❤️4+: nhân vào xác suất bệnh (lát 38)
+lifeMarks(a)                      // { gia, end }: mốc già / mốc ra đi của con này, ×BOND.lifeMul (1.1) khi ❤️5
+starChance(s, a)                  // xác suất milk/shear ra sữa ngon / lông xoăn (BOND.star): ❤️3+ cao hơn; bò vuốt ve nhiều ngày liền, cừu đang vui thì thêm
+```
+Đói (hunger ≤ BOND.hungerBelow) hoặc dơ (dirty ≥ BOND.dirtyAbove) thì tụt BOND.lossPerMin điểm/phút, không dưới ❤️1. Cho ăn tận tay, vuốt ve, thuốc thú y cộng độ thân; kết quả perform có ond. Sản phẩm sao: sua_ngon, lông xoăn = len_xoan (PRODUCTS, giá cao hơn).
 
 ### Target, hành động
 ```js

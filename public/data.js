@@ -188,6 +188,21 @@ export const PRODUCTS = {
   trung: { name: 'Trứng gà', price: 14 },
   sua:   { name: 'Sữa bò',   price: 40 },
   len:   { name: 'Lông cừu', price: 60 },
+  sua_ngon: { name: 'Sữa ngon',    price: 60 },   // sao: bò được vuốt ve đều
+  len_xoan: { name: 'Lông xoăn',   price: 90 },   // sao: cừu vui vẻ
+};
+// ---------- Độ thân ❤️1–5 (Phase 2) ----------
+// Mỗi tim = perHeart điểm ẩn (a.bondXp). gain: điểm mỗi lần · perDay: số lần được tính mỗi ngày game cho mỗi cách (chống cày)
+export const BOND = {
+  perHeart: 20,
+  gain: { feed: 5, pet: 5, bath: 8, cure: 10 },
+  perDay: { feed: 2, pet: 3, bath: 1, cure: 1 },
+  hungerBelow: 10, dirtyAbove: 70, lossPerMin: 1,   // đói / dơ lâu thì tụt điểm
+  star: { base: 0.1, heart3: 0.25, petStreak: 0.05, petStreakMax: 5, sheepHappy: 80, sheepBonus: 0.25 },   // tỉ lệ sản phẩm sao
+  starOf: { sua: 'sua_ngon', len: 'len_xoan' },
+  sickMul: 0.5,      // ❤️4+: nguy cơ bệnh nhân hệ số này
+  lifeMul: 1.1,      // ❤️5: tuổi thọ (mốc già, mốc ra đi) +10%
+  runRange: 80,      // ❤️4+: chạy lại khi người chơi trong tầm này
 };
 export const sellPrice = k => CROPS[k]?.price ?? PRODUCTS[k]?.price ?? 0;
 // Thùng giao hàng: lái buôn trả 80% giá chợ cho đồ trong thùng, chốt lúc 6h sáng (làm tròn xuống)

@@ -1,6 +1,6 @@
 // Thế giới: di chuyển, va chạm, tìm đường, AI con vật/chó/quạ/trộm, tìm target. Không vẽ gì.
 import { TS, GROUND } from './layout.js';
-import { ANIMALS, CROPS, DOG, DIR_NAME } from './data.js';
+import { ANIMALS, CROPS, DOG, DIR_NAME, BOND } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
 import { aiStep } from './perf.js';
@@ -138,6 +138,11 @@ function updateAnimals(state, w, dt0, out) {
     // gà con kêu chiếp (thỉnh thoảng, khi đang ở trên màn hình)
     if (a.type === 'ga' && a.stage === 'non' && seen && out && state.scene === 'farm' && Math.random() < dt * 0.06) {
       out.results.push({ ok: true, sound: 'chirp', fx: [{ text: 'chiếp', color: '#fff6a0', x: a.x, y: a.y + 14 }] });
+    }
+    // ❤️4+ chạy lại khi người chơi tới gần, ❤️5 đi theo từ xa (trong phạm vi chuồng)
+    const bp = ST.bondPerk(a), pd = Math.hypot(p.x - a.x, p.y - a.y);
+    if (!scared && !a.sick && state.scene === 'farm' && pd >= 30 && ((bp.runTo && pd < BOND.runRange) || bp.follow)) {
+      rt.tx = clamp(p.x, area.x, area.x + area.w); rt.ty = clamp(p.y + 4, area.y, area.y + area.h); rt.mode = 'walk';
     }
     if (scared && rt.mode !== 'walk') { const t = inArea(area, 2); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk'; }
     if (rt.mode === 'walk') {
@@ -388,7 +393,7 @@ export function nameOf(state, t) {
   switch (t.kind) {
     case 'plot': { const c = state.plots[t.idx]?.crop; return c ? (CROPS[c.id]?.name ?? 'Cây trồng') : `Ô ruộng ${t.idx + 1}`; }
     case 'lockedPlot': return 'Đất hoang';
-    case 'animal': { const a = findBy(state.animals, t.id); return a ? ST.animalLabel(a) : 'Vật nuôi'; }
+    case 'animal': { const a = findBy(state.animals, t.id); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}` : 'Vật nuôi'; }
     case 'egg': return 'Quả trứng';
     case 'poop': return 'Phân chó';
     case 'threat': return findBy(state.threats, t.id)?.kind === 'thief' ? 'Thằng Tèo' : 'Con quạ';
