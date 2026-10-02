@@ -1,7 +1,9 @@
 # Chạy trên VPS sau Caddy của ai_gateway: container nằm trong network `gateway`,
-# gateway chuyển game.huninna.com tới ai-game:80.
+# gateway chuyển game.huninna.com tới ai-game:80 (Node nghe cổng 80 trong container).
+# Dữ liệu SQLite nằm trên volume `data` (/data/farm.db), sao lưu ở /data/backups.
 #
 #   docker compose up -d --build
+#   docker compose exec web node server/admin.mjs backup
 name: ai-game
 
 services:
@@ -10,8 +12,13 @@ services:
     image: ai-game:latest
     container_name: ai-game
     restart: unless-stopped
+    volumes:
+      - data:/data
     networks:
       - gateway
+
+volumes:
+  data:
 
 networks:
   gateway:

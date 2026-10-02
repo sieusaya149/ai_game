@@ -690,10 +690,10 @@ Cây lâu năm, trồng một lần, thu hoạch nhiều lần.
   - **Chế độ offline giữ như cũ** (`localStorage`). Vườn offline và vườn online là hai vườn riêng, không đồng bộ sau lần chuyển đầu.
 - **Hosting (đã chốt):** VPS `image.huninna.com`, chạy sau Caddy của `ai_gateway` tại **https://game.huninna.com**.
   - Repo `~/project/ai_game`, deploy bằng `git pull && docker compose up -d --build`.
-  - Hiện chỉ phục vụ file tĩnh bằng nginx (bản chơi đơn). Bản online sẽ đổi container sang server Node, dữ liệu lưu trong Docker volume.
+  - Từ issue 20 container chạy server Node (`server/`, ADR 0010) thay nginx, dữ liệu SQLite lưu trong Docker volume.
   - Khóa gateway `ai-game` chỉ có quyền với `game.huninna.com`, lưu ở `~/.config/ai-game/gateway-key` trên VPS.
 - **Đối tượng:** nhóm ≤ 20–30 người quen, đăng nhập bằng tên + PIN + mã mời.
-- **`server.js` hiện đang hỏng** (import các hàm không còn trong `data.js`). Bản online sẽ viết lại file này theo kiến trúc trên.
+- **`server.js` cũ (hỏng) đã bị xóa** ở issue 20; server viết lại từ đầu trong `server/` theo kiến trúc trên.
 
 ---
 

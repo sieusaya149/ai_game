@@ -1,8 +1,12 @@
-// Cấu hình e2e chạy local: Chromium ẩn, 1 luồng, server tĩnh phục vụ public/.
+// Cấu hình e2e chạy local: Chromium ẩn, 1 luồng, server Node thật (server/main.mjs) phục vụ public/ + API + WebSocket.
 // Smoke (bản live) dùng playwright.smoke.config.mjs, không bật server.
 import { defineConfig } from '@playwright/test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const PORT = 4173;
+// SQLite riêng cho e2e, nằm ngoài repo (lệnh quản trị trong test dùng cùng đường dẫn này)
+export const E2E_DB = join(tmpdir(), 'ai-game-e2e.db');
 
 export const projects = [
   { name: 'desktop', use: { viewport: { width: 1280, height: 800 } } },
@@ -27,9 +31,9 @@ export default defineConfig({
   },
   projects,
   webServer: {
-    command: 'node scripts/static-server.mjs',
-    url: `http://127.0.0.1:${PORT}`,
-    env: { PORT: String(PORT) },
+    command: 'node --disable-warning=ExperimentalWarning server/main.mjs',
+    url: `http://127.0.0.1:${PORT}/api/health`,
+    env: { PORT: String(PORT), DB_FILE: E2E_DB },
     reuseExistingServer: false,
     timeout: 15_000,
   },

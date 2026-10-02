@@ -20,13 +20,13 @@
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 3): bật server với SQLite tạm → endpoint sức khỏe trả 200; mở WebSocket, gửi ping và nhận lại pong; tắt server thì kết nối đóng. Bật tắt hai lần liên tiếp trên hai file khác nhau đều chạy được.
-- [ ] Unit test (seam 3): yêu cầu một file tĩnh trong `public/` nhận đúng nội dung và kiểu MIME. Đường dẫn cố thoát ra ngoài `public/` (`..`) bị từ chối.
-- [ ] Unit test: lệnh sao lưu tạo ra file sao có thể mở lại bằng `node:sqlite` và đọc được bảng đã có.
-- [ ] E2E (Playwright, desktop + 360px): chạy bộ e2e bản chơi đơn hiện có trên server Node local thay cho server tĩnh cũ, tất cả vẫn pass.
-- [ ] Docker: `docker compose up -d --build` chạy được, container `ai-game` ở trạng thái Up, khởi động lại container thì file SQLite còn nguyên nhờ volume.
-- [ ] Smoke live (https://game.huninna.com) vẫn pass sau deploy: tải trang, tạo nhân vật, ra làng và về, endpoint sức khỏe trả 200 qua Caddy.
-- [ ] Không còn import hỏng: `server.js` mới không phụ thuộc hàm cũ đã bị xóa khỏi `data.js`.
+- [x] Unit test (seam 3): bật server với SQLite tạm → endpoint sức khỏe trả 200; mở WebSocket, gửi ping và nhận lại pong; tắt server thì kết nối đóng. Bật tắt hai lần liên tiếp trên hai file khác nhau đều chạy được.
+- [x] Unit test (seam 3): yêu cầu một file tĩnh trong `public/` nhận đúng nội dung và kiểu MIME. Đường dẫn cố thoát ra ngoài `public/` (`..`) bị từ chối.
+- [x] Unit test: lệnh sao lưu tạo ra file sao có thể mở lại bằng `node:sqlite` và đọc được bảng đã có.
+- [x] E2E (Playwright, desktop + 360px): chạy bộ e2e bản chơi đơn hiện có trên server Node local thay cho server tĩnh cũ, tất cả vẫn pass.
+- [x] Docker: `docker compose up -d --build` chạy được, container `ai-game` ở trạng thái Up, khởi động lại container thì file SQLite còn nguyên nhờ volume. (Thử trên Docker local: Up (healthy), restart và down/up giữ nguyên DB, gọi được `ai-game:80` từ network `gateway`.)
+- [ ] Smoke live (https://game.huninna.com) vẫn pass sau deploy: tải trang, tạo nhân vật, ra làng và về, endpoint sức khỏe trả 200 qua Caddy. (Chưa deploy: người điều phối chạy `npm run test:smoke` sau khi deploy; smoke đã có thêm test `/api/health`, chạy vào bản nginx cũ sẽ đỏ.)
+- [x] Không còn import hỏng: `server.js` mới không phụ thuộc hàm cũ đã bị xóa khỏi `data.js`.
 
 ## Blocked by
 

@@ -29,6 +29,12 @@ async function goTo(page, touch, to) {
   await expect(page.locator('#fade')).not.toHaveClass(/on/);
 }
 
+test('smoke live: endpoint sức khỏe của server Node trả 200 qua Caddy', async ({ request }) => {
+  const res = await request.get('/api/health');
+  expect(res.status()).toBe(200);
+  expect((await res.json()).ok).toBe(true);
+});
+
 test('smoke live: tải trang, tạo nhân vật, mở chế độ xây dựng, ra làng và về', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const touch = !!testInfo.project.use.hasTouch;

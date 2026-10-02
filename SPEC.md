@@ -1,7 +1,7 @@
 # Nông Trại Vui: đặc tả kỹ thuật (Phase 0 xong: bản lưu v2, đặt tự do, nhiều bản đồ)
 
 Game nông trại 2D nhìn từ trên xuống, kiểu **nông trại Avatar (TeaMobi)**. Người chơi điều khiển nhân vật đi tới tận nơi để làm mọi việc.
-Hiện là bản chơi đơn, chạy hoàn toàn trong trình duyệt, lưu vào `localStorage`. Phục vụ file tĩnh bằng nginx (xem mục Phát hành). Phase 1 sẽ thêm server Node và online.
+Người chơi hiện vẫn thấy bản chơi đơn, chạy hoàn toàn trong trình duyệt, lưu vào `localStorage`. Từ issue 20 (Phase 1) bản deploy chạy bằng **server Node** trong `server/` (file tĩnh + API HTTP JSON + WebSocket + SQLite, xem mục Server). Mở `public/` bằng server tĩnh bất kỳ vẫn chơi đơn được.
 
 - Chỉ dùng ES modules thuần, **không thư viện, không bước build**. Mọi file game nằm trong `public/`. (Ngoại lệ duy nhất sau này: `ws` phía server ở Phase 1, ADR 0007. Playwright chỉ là thư viện lúc phát triển.)
 - Chữ hiển thị cho người chơi: **tiếng Việt có dấu**, giọng vui vẻ, thân thiện kiểu gia đình.
@@ -39,10 +39,9 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/art.js`, `public/art2.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...). Thêm sprite mới thì giữ nguyên mọi export cũ |
 | `public/render.js`, `public/world.js`, `public/main.js` | Vẽ (theo khung nhìn, nền chia mảng 16x16 ô), di chuyển/tìm đường/AI/chế độ xây dựng/camera, vòng lặp, chuyển cảnh mờ dần, input. **Không tự quyết luật**, chỉ gọi `state.js` |
 | `public/index.html`, `public/style.css`, `public/ui.js`, `public/sound.js` | HUD, nút hành động, các bảng, tạo nhân vật, thông báo, âm thanh |
-| `server.js` | **Còn tồn tại nhưng hỏng và không dùng.** Nó import các tên đã bỏ khỏi `data.js` (`PENS`, `START_COINS`, `HELP_COINS`, `UNLOCK_ORDER`, `itemInfo`...) nên không chạy được. Hiện deploy là **nginx tĩnh**, không dùng `server.js`. Phase 1 sẽ **viết lại** (Node + `ws` + `node:sqlite`). Trước đó đừng sửa cho "chạy lại" |
-| `scripts/static-server.mjs` | Server tĩnh Node tối giản cho e2e, phục vụ `public/` (cổng `PORT`, mặc định 4173) |
-| `Dockerfile`, `compose.yml` | `nginx:1.27-alpine` copy `public/`; container `ai-game` trong network `gateway` |
-| `tests/` | Unit test `node --test` (seam 1) và `tests/fixtures/` (bản lưu v1 mẫu) |
+| `server/` | Server Node (ADR 0010), xem mục Server. `server.js` cũ (hỏng) và `scripts/static-server.mjs` đã bị xóa ở issue 20 |
+| `Dockerfile`, `compose.yml`, `.dockerignore` | `node:22-alpine` chạy `server/main.mjs`, nghe cổng 80; container `ai-game` trong network `gateway`, dữ liệu trên volume `data` (`/data/farm.db`) |
+| `tests/` | Unit test `node --test`: seam 1 (`state.js`), seam 3 (`server-*.test.mjs`, helper `tests/helpers/server.mjs`) và `tests/fixtures/` (bản lưu v1 mẫu) |
 | `e2e/`, `playwright*.config.mjs` | E2E và smoke Playwright (seam 2), `e2e/helpers.mjs` |
 
 ## Thời gian
@@ -354,13 +353,13 @@ Không có GitHub Actions. Mọi test chạy trên máy local, Chromium ẩn c�
 
 **Seam 1: API công khai của `state.js`**, chạy bằng Node, nơi test chính:
 ```
-npm test            # = node --test (tests/*.test.mjs)
+npm test            # = node --test (tests/*.test.mjs, gồm cả seam 3 tests/server-*.test.mjs)
 ```
 Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu, fixture), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `notify`, `todo`, `perf`, `tutorial`.
 
 **Seam 2: trình duyệt thật qua Playwright**, chỉ cho những gì seam 1 không thấy (kéo thả, đi qua cửa, chạm để tự đi tới, giao diện 360px):
 ```
-npm run test:e2e        # = playwright test: tự bật scripts/static-server.mjs (PORT 4173), chạy 2 project: desktop 1280x800 và mobile 360x740 (cảm ứng)
+npm run test:e2e        # = playwright test: tự bật server Node server/main.mjs (PORT 4173, SQLite ở <tmp>/ai-game-e2e.db = `E2E_DB` export từ playwright.config.mjs), chạy 2 project: desktop 1280x800 và mobile 360x740 (cảm ứng)
 npx playwright test e2e/place.spec.mjs --project=desktop   # chạy một file / một project
 npm run test:smoke      # = playwright test -c playwright.smoke.config.mjs, chỉ desktop, không bật server local
 SMOKE_URL=http://127.0.0.1:4173 npm run test:smoke   # đổi địa chỉ (mặc định https://game.huninna.com)
@@ -376,14 +375,48 @@ SMOKE_URL=http://127.0.0.1:4173 npm run test:smoke   # đổi địa chỉ (mặ
 - **Mẹo đã biết:** Chromium headless khựng khoảng 1 giây ở lần nhấn phím đầu tiên, nên các spec bấm `page.keyboard.press('Shift')` trước khi test di chuyển.
 - Nhớ hai cỡ màn hình: mỗi spec chạy ở cả desktop và mobile; viết spec dùng chuột lẫn chạm khi cần.
 
-Quy tắc: thêm tính năng thì thêm test seam 1 trước; chỉ thêm e2e cho phần seam 1 không nhìn thấy. Toàn bộ test cũ phải còn pass.
+**Seam 3: giao thức server (ADR 0011)**, `tests/server-*.test.mjs`, chạy chung trong `npm test`. Bật server thật trong tiến trình test với SQLite tạm, gọi bằng HTTP/WebSocket thật; không gọi hàm nội bộ server, không mock DB. Helper `tests/helpers/server.mjs`:
+- `bootServer(opts?)` → `{ url, dbPath, dir, get(path, init), json(path, body?, init), ws(path = '/ws'), admin(...args), close() }`. Cổng ngẫu nhiên, mỗi lần một thư mục tạm; `close()` tắt server rồi xóa thư mục (dùng `t.after(srv.close)`).
+  - `json(path)` = GET, `json(path, body)` = POST JSON; trả `{ status, body }`.
+  - `ws()` chờ mở xong, trả `{ raw, send(obj), next(ms) /* tin JSON kế tiếp */, closed /* promise mã đóng */, close() }`.
+  - `admin(...args)` chạy `node server/admin.mjs ...args --db <dbPath>` như quản trị, trả `{ code, out, err }`.
+- `runAdmin(...args)`: chạy lệnh quản trị với tham số tự chọn.
+
+Quy tắc: thêm tính năng thì thêm test seam 1 (luật) hoặc seam 3 (giao thức) trước; chỉ thêm e2e cho phần hai seam kia không nhìn thấy. Toàn bộ test cũ phải còn pass.
+
+## Server (`server/`, ADR 0010, 0011)
+
+Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSocket (`ws`, thư viện chạy thật duy nhất, ADR 0007), SQLite (`node:sqlite`). Không bước build.
+
+| File | Vai trò |
+|---|---|
+| `server/index.mjs` | `startServer({ port = 4173, host = '127.0.0.1', dbPath, publicDir = PUBLIC_DIR })` → `Promise<{ port, close() }>`. `port: 0` = cổng ngẫu nhiên; `close()` (gọi nhiều lần cũng được) đóng WebSocket (mã 1001), HTTP, rồi DB. Cách duy nhất để bật server |
+| `server/main.mjs` | Điểm vào (`npm start`, CMD Docker). Biến môi trường `PORT` (4173), `HOST` (127.0.0.1; container 0.0.0.0), `DB_FILE` (`./farm.db`; container `/data/farm.db`). SIGTERM/SIGINT thì đóng gọn |
+| `server/router.mjs` | `createRouter(ctx)` → `{ route(method, path, fn), handle(req, res, url) }`; `fn({ ...ctx, req, url, body })` trả object → `200 { ok: true, ...obj }`; `throw new HttpError(status, msg)` → `{ ok: false, error }`. Thân JSON tối đa 1 MB (413), JSON hỏng 400, không có đường 404, sai phương thức 405, lỗi khác 500 `Lỗi server`. Chỉ lo đường `/api/*` |
+| `server/api.mjs` | `addRoutes(router)`: nơi khai báo mọi route. `ctx` hiện có `db` |
+| `server/static.mjs` | `serveStatic(dir)`: GET/HEAD, MIME theo đuôi, `.html` `no-store`, file khác `no-cache` + ETag (304). `..`, `\`, byte 0, thoát khỏi `dir` → 403 |
+| `server/live.mjs` | WebSocket ở `/ws` (đường khác bị ngắt), tin tối đa 64 KB. Tin JSON `{ t, ... }` tra trong `HANDLERS`; tin hỏng/loại lạ bỏ qua, không ngắt. `send(sock, obj)` |
+| `server/db.mjs` | `openDb(file)`: WAL, `foreign_keys`, chạy `MIGRATIONS` theo `PRAGMA user_version` (mỗi phần tử một bản, trong transaction; chỉ thêm vào cuối). `backupTo(db, out)` = `VACUUM INTO` |
+| `server/admin.mjs` | Lệnh quản trị: `node server/admin.mjs <lệnh> [--db file]` (mặc định `DB_FILE` rồi `./farm.db`). In kết quả ra stdout, lỗi ra stderr + mã thoát 1. Thêm lệnh vào `COMMANDS` |
+
+**Schema SQLite** (`user_version`): v1 `meta(key TEXT PRIMARY KEY, value TEXT)` có dòng `created`.
+
+**HTTP:**
+- `GET /api/health` → `200 { ok: true, now }` (`now` = giờ server ms). Dùng cho Docker HEALTHCHECK, Playwright `webServer`, smoke.
+- Mọi đường khác ngoài `/api/` là file tĩnh của `public/` (`/` = `index.html`).
+
+**WebSocket `/ws`:** `{ t: 'ping', id? }` → `{ t: 'pong', id, now }`.
+
+**Lệnh quản trị:**
+- `backup [--out thư-mục]`: chép DB (an toàn khi server đang chạy) ra `<thư mục>/farm-YYYYMMDD-HHMMSS.db` (giờ UTC), mặc định `backups/` cạnh file DB (trong container: `/data/backups/`). In đường dẫn file sao lưu.
 
 ## Quy trình phát hành (DESIGN mục 9, ADR 0006)
 
 1. **Local:** `npm test` và `npm run test:e2e` pass hết (không GitHub Actions).
-2. **Deploy lên VPS** `image.huninna.com`: vào `~/project/ai_game`, chạy `git pull && docker compose up -d --build`. Container `ai-game` (nginx tĩnh, copy `public/`) nằm trong network `gateway`; Caddy của `ai_gateway` chuyển `game.huninna.com` tới `ai-game:80`. Khóa gateway lưu trên VPS, không nằm trong repo.
-3. **Smoke live từ máy local:** `npm run test:smoke` (tới `https://game.huninna.com`): trang tải được, không lỗi console, tạo nhân vật, gieo một ô, đi vào làng và về; tự dọn dữ liệu trình duyệt sau khi chạy.
-4. Mỗi phase xong là deploy; làm theo thứ tự trong `DESIGN.md` mục 9. Phase 1 sẽ viết lại `server.js` (Node + `ws` + `node:sqlite` trong Docker, dữ liệu trong volume) và đổi `Dockerfile`; lúc đó cập nhật lại mục này và bảng file ở trên.
+2. **Deploy lên VPS** `image.huninna.com`: vào `~/project/ai_game`, chạy `git pull && docker compose up -d --build`. Container `ai-game` (`node:22-alpine`, chạy `server/main.mjs` nghe cổng 80, người dùng `node`) nằm trong network `gateway`; Caddy của `ai_gateway` chuyển `game.huninna.com` tới `ai-game:80`. Dữ liệu ở volume `ai-game_data` (`/data`). Khóa gateway lưu trên VPS, không nằm trong repo.
+3. **Smoke live từ máy local:** `npm run test:smoke` (tới `https://game.huninna.com`): trang tải được, không lỗi console, tạo nhân vật, đi vào làng và về, `GET /api/health` trả 200 qua Caddy; tự dọn dữ liệu trình duyệt sau khi chạy.
+4. **Sao lưu:** `docker compose exec web node server/admin.mjs backup`, kéo về máy bằng `docker compose cp` + `scp` (xem README).
+5. Mỗi phase xong là deploy; làm theo thứ tự trong `DESIGN.md` mục 9.
 
 ## Giữ SPEC.md đúng với code
 
