@@ -259,13 +259,12 @@ export function catImg(c, rt = {}) {
   if (c.trophy && !rt.shown) return pose('catMouseBy') ?? animalImg(base, face, 0);
   return animalImg(base, face, rt.walking ? fr : 0);
 }
-// Chó canh khách (issue 31): đứng sủa thì dáng sủa theo giai đoạn (art3, issue 45); chạy đuổi thì dáng chạy của issue 31,
-// mới có bộ chó con / chó lớn (chó nhỡ dùng bộ chó con, chó già dùng bộ chó lớn). Thiếu art thì về dáng đi bộ.
-const dogSet = (key, dog) => SPR2?.[key]?.[dog.stage === 'truong' || dog.stage === 'gia' ? 'adult' : 'pup'];
+// Chó canh khách (issue 31): đứng sủa thì dáng sủa theo giai đoạn (art3, issue 45); chạy đuổi thì dáng chạy
+// theo giai đoạn (art3 dogRunBy, mỗi giai đoạn một bộ 3 khung riêng). Thiếu art thì về dáng đi bộ.
 function guardImg(dog, face, rt, now) {
   const fr = Math.floor(now / 110);
   if (!rt.walking) return dogPoseImg(dog, 'bark', face, fr);
-  const frames = dogSet('dogRun', dog)?.[face];
+  const frames = SPR3?.dogRunBy?.[dog.stage ?? 'truong']?.[face];
   if (frames?.length) return frames[fr % frames.length];
   return dogImg(dog, face, Math.floor(rt.anim * 10) % 2);
 }

@@ -42,8 +42,9 @@ for (const sp in SPR3.animal) {
   if (SPR3.sickBy[sp]) for (const st in SPR3.sickBy[sp]) put(r, SPR3.sickBy[sp][st], `bệnh ${st}`);
 }
 const groups = {
-  'Hành động': ['run', 'heoMud', 'catPounce', 'catNap', 'catMouse'],
+  'Hành động': ['run', 'heoMud', 'catPounceBy', 'catNapBy', 'catMouseBy'],
   'Chó Mực — tư thế lệnh theo giai đoạn': ['dogSitBy', 'dogBegBy', 'dogHerdBy', 'dogBarkBy'],
+  'Chó Mực — chạy đuổi khách theo giai đoạn (issue 31)': ['dogRunBy'],
   'Dạy lệnh': ['trainBar', 'praise', 'trickIcon', 'cmdBubble', 'guardPost', 'sniffMark'],
   'Hiệu ứng': ['fx'],
   'Săn mồi': ['rat', 'ratEat', 'ratFlee', 'hawk', 'hawkDive', 'hawkCarry', 'hawkShadow', 'weasel', 'weaselCatch', 'hurtPatch'],
@@ -88,8 +89,8 @@ function scene(scale, t) {
   // chó lùa, mèo
   feet(x, SPR3.dogHerd.right[t % 2], 330, 160); feet(x, SPR3.animal.cho.truong.left[t % 2], 370, 160);
   feet(x, SPR3.dogSit.left[0], 400, 160);
-  feet(x, SPR3.animal.meo.truong.left[t % 2], 20, 194); feet(x, SPR3.catNap.left[t % 2], 50, 194); feet(x, SPR3.catMouse.left[t % 2], 80, 194);
-  feet(x, SPR3.catPounce.left[t % 2], 110, 194); feet(x, SPR3.rat.left[t % 2], 130, 194);
+  feet(x, SPR3.animal.meo.truong.left[t % 2], 20, 194); feet(x, SPR3.catNapBy.truong.left[t % 2], 50, 194); feet(x, SPR3.catMouseBy.truong.left[t % 2], 80, 194);
+  feet(x, SPR3.catPounceBy.truong.left[t % 2], 110, 194); feet(x, SPR3.rat.left[t % 2], 130, 194);
   x.drawImage(SPR3.hawkShadow, 150, 186); x.drawImage(SPR3.hawk.left[t % 2], 148, 166);
   feet(x, SPR3.weasel.left[t % 2], 190, 194);
   feet(x, SPR3.npcTiSun[0][0], 220, 194); feet(x, SPR3.npcCoUt[0][0], 240, 194); feet(x, SPR3.npcChuBa[0][0], 260, 194);

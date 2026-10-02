@@ -996,8 +996,79 @@ function dogBarkPose(stage, f) {
   return c;
 }
 
+// Chạy đuổi khách lạ (issue 31): thân chồm về trước, đầu thấp, vừa chạy vừa sủa (há mõm), tai và đuôi bay ngược.
+// 3 khung: duỗi hết cỡ · thu chân dưới bụng, nảy lên · chân trước chạm đất, chân sau đạp.
+// non 14x12 (đầu to, tai cụp phất phơ, đuôi cụt) · nhỡ 18x13 (chân dài lêu nghêu) ·
+// trưởng thành 22x15 (vạm vỡ, tai vểnh rạp ra sau, đuôi duỗi thẳng) · già 22x15 (mõm bạc, lưng võng, đuôi rũ, sải ngắn)
+const CHASE = {
+  non: { w: 14, h: 12, body: [7.8, 6.2, 3.6, 2.0], head: [3.6, 4.6, 2.7, 2.5], snout: [1.3, 5.6, 1.0, 0.8], jaw: [2.1, 6.9, 1.4, 0.6], st: 2, lift: 1, tail: [11.6, 4.8, 0.9, 0.8] },
+  nho: { w: 18, h: 13, body: [9.4, 6.0, 4.8, 2.1], head: [4.0, 4.0, 2.4, 2.2], snout: [1.6, 5.0, 1.2, 0.9], jaw: [2.5, 6.3, 1.7, 0.6], st: 3, lift: 1, tail: [15.4, 4.3, 1.6, 0.6] },
+  truong: { w: 22, h: 15, body: [11, 7.4, 5.8, 2.5], head: [4.6, 5.0, 2.8, 2.5], snout: [1.8, 6.2, 1.5, 0.9], jaw: [2.8, 7.6, 2.0, 0.7], st: 4, lift: 1, tail: [18.4, 5.4, 2.0, 0.8] },
+  gia: { w: 22, h: 15, body: [11, 7.8, 5.6, 2.3], head: [5.0, 6.0, 2.8, 2.4], snout: [2.1, 7.2, 1.5, 0.9], jaw: [3.1, 8.5, 1.9, 0.7], st: 3, lift: 0.6, tail: [17.4, 8.4, 1.3, 1.0] },
+};
+
+// Một chân vẽ từng hàng: hàng nối điểm (x) của hàng này với hàng dưới để chân xiên không bị đứt.
+function legRows(ax, ay, fx, fy, r, near, lw = 2) {
+  const n = Math.max(1, fy - ay), xs = [];
+  for (let i = 0; i <= n; i++) xs.push(Math.round(ax + (fx - ax) * i / n));
+  return xs.map((x0, i) => {
+    const x1 = xs[i + 1] ?? x0;
+    return B(Math.min(x0, x1), ay + i, lw + Math.abs(x1 - x0), 1, r, near ? { sep: true, min: 1, noise: 0 } : { max: 1, noise: 0 });
+  });
+}
+
+function dogChase(stage, f) {
+  const D = P.dog, s = CHASE[stage], old = stage === 'gia';
+  const up = f === 1 ? -s.lift : 0, dip = f === 2 ? 0.6 : 0;         // khung 1 nảy lên; khung 2 đầu chúi xuống
+  const [bx, by0, brx, bry] = s.body, by = by0 + up;
+  const head = [s.head[0], s.head[1] + up + dip, s.head[2], s.head[3]];
+  const snout = [s.snout[0], s.snout[1] + up + dip, s.snout[2], s.snout[3]];
+  const jaw = [s.jaw[0], s.jaw[1] + up + dip + (f === 1 ? 0.3 : 0), s.jaw[2], s.jaw[3]];
+  const [hX, hY, , hry] = head, eY = hY - hry;
+  // chân: điểm neo ở vai / hông, bàn chân đặt theo từng khung (dx so với điểm neo, nhấc lên 0/1 hàng)
+  const g = s.h - 2, ay = Math.round(by + bry - 1), st = s.st, k = Math.floor(st / 2);
+  const sh = Math.round(bx - brx + 1.5), hp = Math.round(bx + brx - 2.5);
+  const FEET = [
+    { ff: [-st, 1], fn: [-st - 1, 0], hf: [st, 0], hn: [st + 1, 1] },   // duỗi hết cỡ
+    { ff: [k, 0], fn: [k - 1, 1], hf: [-k, 0], hn: [1 - k, 1] },        // thu chân dưới bụng
+    { ff: [-1, 0], fn: [0, 0], hf: [st - 1, 0], hn: [st, 1] },          // chân trước chạm đất
+  ][f];
+  const leg = (ax, [dx, lift], near) => legRows(ax, ay, Math.max(0, Math.min(s.w - 2, ax + dx)), g - lift, D, near);
+  // tai bay ngược theo gió: chó con tai cụp phất lên, nhỡ tai lưng chừng, trưởng thành tai vểnh rạp, già tai rũ
+  const ears = {
+    non: [E(hX + 2.0, eY + 1.4 - (f === 1 ? 0.8 : 0), 1.4, 0.9, D, { sep: true, max: 1 })],
+    nho: [E(hX + 1.7, eY + 0.4, 1.4, 0.7, D), E(hX + 3.1, eY + 0.7, 0.8, 0.5, D, { max: 1 })],
+    truong: [E(hX + 1.5, eY + 0.2, 1.8, 0.8, D), E(hX + 2.9, eY + 0.6, 1.3, 0.6, D, { max: 1 })],
+    gia: [E(hX + 2.0, eY + 1.3 - (f === 1 ? 0.4 : 0), 1.4, 1.1, D, { max: 1 })],
+  }[stage];
+  const front = stage === 'non' ? ears : [], back = stage === 'non' ? [] : ears;
+  const wav = f === 1 ? 0.6 : f === 2 ? -0.3 : 0;                     // đuôi phất theo nhịp chạy
+  const [tx, ty, trx, tr] = s.tail;
+  const c = fig(s.w, s.h, [
+    ...leg(sh + 1, FEET.ff, false), ...leg(hp + 1, FEET.hf, false),     // chân xa
+    E(tx, ty + up + (old ? 0 : -wav), trx, tr, D, { max: 2 }),
+    stage === 'truong' && E(tx + trx - 0.4, ty + up - wav - 0.6, 0.8, 0.6, D, { max: 2 }),   // chóp đuôi hếch
+    E(bx, by, brx, bry, D),
+    f === 1 && !old && E(bx + 0.6, by - bry + 0.5, brx * 0.6, 0.9, D),  // lưng cong lên khi thu chân
+    old && E(bx + 2.2, by - bry + 0.4, 1.9, 1.3, D, { max: 1 }),        // mông nhô, giữa lưng võng
+    E(bx - brx + 1.8, by - 0.2, 2, bry + 0.4, D),                       // ngực
+    ...leg(sh, FEET.fn, true), ...leg(hp, FEET.hn, true),               // chân gần
+    E(jaw[0], jaw[1], jaw[2], jaw[3], old ? P.dogG : D, { sep: true, max: 1 }),   // hàm dưới há ra
+    ...back,
+    E(head[0], head[1], head[2], head[3], D, { sep: true, pat: old ? dogGray(head[0], head[1]) : undefined }),
+    ...front,
+    E(snout[0], snout[1], snout[2], snout[3], old ? P.dogG : D, { sep: true, lift: old ? 0 : 0.25 }),
+  ]);
+  const x = c.getContext('2d'), hy = Math.round(hY);
+  dogFace(x, { stage, head, snout, eyes: [[Math.round(hX - 1.6), hy - 1], [Math.round(hX + 0.4), hy - 1]], brow: true });
+  R(x, '#f07a8a', Math.round(jaw[0] - jaw[2] + 1), Math.round(jaw[1] - jaw[3]));   // lưỡi trong miệng há
+  return c;
+}
+
 // Gom theo giai đoạn: {non, nho, truong, gia} → pair(2 khung). Dùng cho dáng lệnh của chó và dáng của mèo.
 const byStage = fn => Object.fromEntries(STAGES.map(st => [st, pair(f => fn(st, f))]));
+// Như byStage nhưng 3 khung (dáng chạy đuổi khách của chó).
+const byStage3 = fn => Object.fromEntries(STAGES.map(st => { const left = [0, 1, 2].map(f => fn(st, f)); return [st, { left, right: left.map(flip) }]; }));
 
 // Mèo: mỗi giai đoạn một bộ hình riêng cho từng dáng (vồ, phơi nắng, ngậm chuột) — hình nhỏ hơn
 // được dựng lại từ đầu theo hệ số CAT_K chứ không phóng to dùng chung ảnh của giai đoạn khác.
@@ -2817,6 +2888,8 @@ export const SPR3 = {
   dogBegBy: byStage((st, f) => dogSeat(st, f, true)),
   dogHerdBy: byStage(dogGallop),
   dogBarkBy: byStage(dogBarkPose),
+  // chạy đuổi khách lạ (issue 31): mỗi giai đoạn một bộ 3 khung riêng
+  dogRunBy: byStage3(dogChase),
   // đồ hoạ dạy lệnh
   trainBar: { track: trainTrack(), zone: trainZone(), mark: trainMark() },
   praise: pair(praiseFrame),
