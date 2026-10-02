@@ -40,7 +40,7 @@ Nguồn: [PRD 0002](../prd/0002-phase-1-online.md).
 |---|---|---|---|
 | 20 | [Server Node một container](20-server-node-mot-container.md) | 19 | ✅ |
 | 21 | [Tài khoản và đăng nhập](21-tai-khoan-va-dang-nhap.md) | 20 | ✅ |
-| 22 | [Vườn online và một thiết bị](22-vuon-online-va-mot-thiet-bi.md) | 21 | ⬜ |
+| 22 | [Vườn online và một thiết bị](22-vuon-online-va-mot-thiet-bi.md) | 21 | ✅ |
 | 23 | [Đồng hồ làng](23-dong-ho-lang.md) | 22 | ⬜ |
 | 24 | [Server chạy bù vườn offline](24-server-chay-bu-vuon-offline.md) | 22 | ⬜ |
 | 25 | [Làng real-time](25-lang-real-time.md) | 22 | ⬜ |
