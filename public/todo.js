@@ -1,6 +1,6 @@
 // Việc cần làm: đọc state, liệt kê việc trong vườn theo loại, mức gấp, số lượng và chỗ gần người chơi nhất. Thuần JS, không DOM.
 // Bảng 📋, bản đồ nhỏ và mũi tên chỉ hướng đều lấy vị trí từ đây.
-import { mapOf } from './state.js';
+import { mapOf, dirtyAnimals, dirtyPens } from './state.js';
 import { ANIMALS, HUSBANDRY } from './data.js';
 import { TS } from './layout.js';
 
@@ -14,6 +14,8 @@ const KINDS = [
   { kind: 'thief', kp: 'threat', level: 'urgent', icon: '🧢', label: () => 'Có trộm đang hái cây', spots: s => threats(s, 'thief') },
   { kind: 'sick', level: 'urgent', icon: '🤒', label: n => `${n} con vật bệnh`, spots: s => animals(s, a => a.sick) },
   { kind: 'hungry', level: 'normal', icon: '🍽️', label: n => `${n} con vật đói`, spots: s => animals(s, a => !a.sick && a.hunger < HUSBANDRY.growNeedsHunger) },
+  { kind: 'dirty', level: 'normal', icon: '🧼', label: n => ` con vật dơ`, spots: s => animals(s, a => dirtyAnimals(s).includes(a)) },
+  { kind: 'muck', level: 'normal', icon: '💩', label: n => ` chuồng bẩn`, spots: s => muckPens(s) },
   { kind: 'dry', level: 'normal', icon: '💧', label: n => `${n} ô khô`, spots: s => plots(s, p => alive(p) && p.water < DRY) },
   { kind: 'bugs', level: 'normal', icon: '🐛', label: n => `${n} ô có sâu`, spots: s => plots(s, p => alive(p) && p.crop.bugs) },
   { kind: 'weeds', level: 'normal', icon: '🌿', label: n => `${n} ô có cỏ`, spots: s => plots(s, p => p.weeds) },
@@ -33,6 +35,12 @@ function troughs(s) {
   const m = mapOf(s);
   return Object.entries(m.pens).filter(([pen]) => (s.troughs?.[pen] ?? 0) <= 0 && s.animals.some(a => ANIMALS[a.type].pen === pen))
     .map(([pen, p]) => ({ id: pen, x: p.trough.x, y: p.trough.r * TS + 8, target: { kind: 'trough', pen } }));
+}
+
+// Chuồng bẩn: đứng ở máng, chạm vào máng để xúc phân
+function muckPens(s) {
+  const m = mapOf(s);
+  return dirtyPens(s).filter(pen => m.pens[pen]).map(pen => ({ id: pen, x: m.pens[pen].trough.x, y: m.pens[pen].trough.r * TS + 8, target: { kind: 'trough', pen } }));
 }
 
 // Điểm tính khoảng cách: chỗ người chơi đứng; ở bản đồ khác thì chỗ sẽ đứng khi về vườn

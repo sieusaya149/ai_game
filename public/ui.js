@@ -4,6 +4,7 @@ import * as art from './art.js';
 import * as D from './data.js';
 import * as sound from './sound.js';
 import { SPR2 } from './art2.js';
+import { SPR3 } from './art3.js';
 import { createNotifier, arrowTargets, arrowFor } from './notify.js';
 import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
@@ -40,15 +41,17 @@ const EMOJI = {
   trung: '🥚', sua: '🥛', len: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑',
-  wood: '🪵', stone: '🪨',
+  wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩',
   ga: '🐔', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕',
 };
+const ITEM3 = { soap: 'soapBar', manure: 'manure' };
 const iconCache = new Map();
 function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
   let u = null;
   try { u = art.icon(key) || null; } catch { u = null; }
   if (!u) try { u = SPR2?.[key]?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá)
+  if (!u) try { u = SPR3?.items?.[ITEM3[key]]?.toDataURL?.() || null; } catch { u = null; }   // xà phòng, phân chuồng vẽ ở art3
   iconCache.set(key, u);
   return u;
 }

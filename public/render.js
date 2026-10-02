@@ -2,7 +2,7 @@
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
 import { TS, GROUND, tileHash } from './layout.js';
 import { SPR2 } from './art2.js';
-import { SPR3 } from './art3.js';
+import { SPR3, muddy } from './art3.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, actionsFor, nextStrip } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -188,6 +188,12 @@ export function animalImg(a, face, frame, sleep) {
   if (stage === 'non') return scaled(im, 0.62);
   if (stage === 'nho') return scaled(im, 0.8);
   return stage === 'gia' ? tinted(im, '#d8d0c0', 0.35) : im;
+}
+// Hoạt cảnh tắm: bọt phủ (1.2 giây), lắc mình văng nước (0.8), lấp lánh sạch (1.0). main.js đẩy vào wd.baths khi tắm.
+export const BATH_MS = 3000, WALLOW_MS = 2200;
+export function bathPhase(b, now) {
+  const e = now - b.t0;
+  return e < 1200 ? { name: 'soap', t: e / 1200 } : e < 2000 ? { name: 'shake', t: (e - 1200) / 800 } : e < BATH_MS ? { name: 'sparkle', t: (e - 2000) / 1000 } : null;
 }
 export const ANGEL_MS = 2600;   // thiên thần bay lên trong chừng này ms
 const angelFallback = () => once('angel', () => {
@@ -581,7 +587,21 @@ export function render(ctx, f) {
     const im = animalImg(a, rt.face ?? 'left', frame, sleeping);
     if (!im) continue;
     const dy = rt.peck && frame ? 1 : 0;
-    add(a.y, () => blit(im, a.x - im.width / 2, a.y - im.height + 1 + dy));
+    const bath = (wd.baths ?? []).find(b => b.id === a.id && !b.wallow), ph = bath && bathPhase(bath, now);
+    const wal = !bath && (wd.baths ?? []).some(b => b.id === a.id && b.wallow && now - b.t0 < WALLOW_MS);
+    // dơ: bùn bám đúng dáng con vật, dơ nhiều thì ruồi bay quanh; đang tắm thì hiện sạch
+    const lv = bath ? 0 : a.dirty >= 80 ? 3 : a.dirty >= 55 ? 2 : a.dirty >= 30 ? 1 : 0;
+    const body = lv ? muddy(im, lv) : im;
+    const shake = ph?.name === 'shake' ? Math.round(Math.sin(now / 38) * 2) : 0;
+    add(a.y, () => {
+      const bx = a.x - im.width / 2 + shake, by = a.y - im.height + 1 + dy;
+      if (wal && a.type === 'heo' && SPR3?.heoMud) { const m = SPR3.heoMud[Math.floor(now / 220) % 2]; blit(m, a.x - m.width / 2, a.y - m.height + 1); }
+      else blit(body, bx, by);
+      if (lv >= 2 && SPR3?.fx?.flies) { const f = SPR3.fx.flies[Math.floor(now / 160 + a.id) % 3]; blit(f, a.x - f.width / 2, by - f.height + 2); }
+      if (ph?.name === 'soap') { const sz = im.width < 14 ? 's' : im.width < 20 ? 'm' : 'l', o = SPR3.fx.soap[sz][Math.floor(now / 250) % 2]; blit(o, a.x - o.width / 2, a.y - (im.height + o.height) / 2 + 1); }
+      if (ph?.name === 'shake') { const sp = SPR3.fx.splash[Math.floor(ph.t * 3.2) % 3]; blit(sp, a.x - sp.width / 2, a.y - im.height - sp.height / 2); }
+      if (ph?.name === 'sparkle') { const sp = SPR3.fx.sparkleClean[Math.floor(ph.t * 3) % 3]; blit(sp, a.x - sp.width / 2, a.y - im.height - sp.height / 2 + 2); }
+    });
     const emote = wd.emotes.get('a' + a.id);
     let icon = null;
     if (emote && emote.until > now) icon = statusIcon(emote.icon);

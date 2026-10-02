@@ -95,6 +95,7 @@ state = {
              crop: null | { id, progress, planted, bugs, bugSince, sick, sickSince, fert, boosts, dead, rotten, ripeAt } } ],
   animals: [ Animal ],                        // xem "Con vật (v3)" ngay dưới
   troughs: { chicken, pig, pasture },
+  manure: { chicken, pig, pasture },          // phân chuồng tích dần 0..100 (đầy = chuồng bẩn), xúc ở máng (hành động `muck`)
   eggs: [ { id, x, y, laidAt } ],
   nest: { egg, hatchAt },
   dog: { stage, age, hunger, happy, x, y, nextPoop, name },   // stage/age như con vật, theo LIFE.cho
@@ -138,7 +139,7 @@ Animal = {
   hunger: 0..100, happy: 0..100,
   sick: 0|1|2|3, sickSince,                   // 0 khỏe · 1 Mệt · 2 Bệnh nặng · 3 Nguy kịch (lát 39). Hiện chỉ dùng 0/1; `if (a.sick)` vẫn đúng
   starvingSince,
-  dirty: 0..100,                              // độ dơ (lát 38/dơ-tắm), mặc định 0 = sạch
+  dirty: 0..100,                              // độ dơ (lát 37), mặc định 0 = sạch; thêm wallowAt (heo, bò: sau lúc này mới lăn bùn lại)
   bond: 1..5,                                 // độ thân ❤️ (lát độ thân), mặc định 2
   weight,                                     // kg; con non/nhỡ ăn no thì lên cân tới WEIGHT[type][1] (lát bán theo cân dùng tiếp)
   mom: null | { id, name }, dad: null | { id, name },   // cha mẹ khi đẻ trong trại (lát sinh sản, phả hệ)
@@ -338,7 +339,7 @@ Loại việc của `todoList`: `crow`, `thief`, `sick` (gấp); `hungry`, `dry`
 { kind: 'building', id }       // theo bản đồ đang đứng. Vườn: house, gate, shed, shipbin, board, well, doghouse (không tương tác).
                                //   Nhà: bed, wardrobe, (stove, table, plant chỉ để ngắm). Làng: market, smithy, friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill`; ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vitamin sell`; trứng `collect`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck`; ổ ấp `incubate`; chó `feed pet`; quạ/trộm `shoo catch`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 
@@ -472,3 +473,11 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
 ## Giữ SPEC.md đúng với code
 
 Mỗi issue/phase thêm hay đổi hàm công khai của `state.js`, target, event, trường bản lưu hoặc vai trò file thì cập nhật SPEC.md trong cùng lần làm. Nguồn sự thật cuối cùng là code (`public/state.js` export) và các test trong `tests/`.
+
+### Dơ, tắm, dọn chuồng (lát 37)
+- `DIRT`, `MANURE` (data.js). Độ dơ tăng 0→100 trong 3 giờ vườn, ×2 khi trời mưa hoặc chuồng bẩn (`manure[pen] >= 100`); không chạy khi vườn đóng băng. Dơ `>= DIRT.high` (60): mất vui dần, nguy cơ bệnh ×2 (đầu vào lát 38). Heo, bò đầm bùn: dơ 100 ngay, không mất vui; tắm xong `DIRT.wallowAfterMs` mới lăn lại.
+- `isDirty(a)`, `penDirty(s, pen)`, `dirtyAnimals(s)`, `dirtyPens(s)` (cho Việc cần làm).
+- Hành động `bath` trên con vật: tốn 1 `soap` + 1 nước trong bình; `dirty = 0`, vui +15, `bond` +0.2 (tối đa 5, lát 39 chuẩn hóa); result có `bath: id` (main.js phát hoạt cảnh), event `bathed {animal, id}`. Từ chối: `Hết xà phòng...` / `Bình hết nước...`.
+- Hành động `muck` trên máng (`{ kind: 'trough', pen }`): `manure[pen] = 0`, nhận `max(1, floor(độ đầy / 25))` `manure` (phân chuồng, kho), event `mucked {pen, qty}`.
+- Ổ cát: gà có tự tắm cát nếu thực thể chuồng có cờ `ent.sand` (lát 35 đặt); dơ không vượt `DIRT.sandCap` (30), trừ khi trời mưa.
+- Vật phẩm: `soap` (supply, bán ở chợ), `manure` (material). Render: `bathPhase(b, now)` (`soap` → `shake` → `sparkle`), `BATH_MS`.
