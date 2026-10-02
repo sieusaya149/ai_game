@@ -18,13 +18,13 @@ Chủ vườn tắt máy thì vườn của họ vẫn sống để bạn bè gh
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 3): đẩy bản lưu có cây đang lớn rồi lùi `savedAt` 3 tiếng, đọc vườn bằng tài khoản khác → cây đã lớn đúng 3 tiếng, trạng thái đã lưu lại trên server.
-- [ ] Unit test (seam 3): lùi `savedAt` 20 tiếng → chỉ tiến 8 tiếng mô phỏng (đóng băng đúng), lịch vẫn tiến đủ.
-- [ ] Unit test (seam 3): vườn có con vật đói và bệnh, lùi 20 tiếng → con vật vẫn sống, không có sự kiện chết.
-- [ ] Unit test (seam 3): hai người đọc vườn cùng lúc chỉ chạy bù một lần (cây không lớn gấp đôi); đọc lần hai ngay sau đó không đổi gì.
-- [ ] Unit test (seam 1): chạy bù một khoảng dài bằng một lần gọi cho kết quả giống với chạy chơi đơn cùng khoảng đó.
-- [ ] E2E (Playwright, desktop + 360px): tài khoản A đẩy bản lưu có cây sắp chín với `savedAt` lùi 2 tiếng, rồi tắt → đăng nhập lại thấy màn "Trong lúc bạn vắng nhà…" ghi đúng cây đã chín trong lúc vắng.
-- [ ] E2E: tài khoản A có vườn đóng băng (`savedAt` lùi 20 tiếng) → vào lại thấy con vật còn sống, không báo chết.
+- [x] Unit test (seam 3): đẩy bản lưu có cây đang lớn rồi lùi `savedAt` 3 tiếng, đọc vườn bằng tài khoản khác → cây đã lớn đúng 3 tiếng, trạng thái đã lưu lại trên server.
+- [x] Unit test (seam 3): lùi `savedAt` 20 tiếng → chỉ tiến 8 tiếng mô phỏng (đóng băng đúng), lịch vẫn tiến đủ.
+- [x] Unit test (seam 3): vườn có con vật đói và bệnh, lùi 20 tiếng → con vật vẫn sống, không có sự kiện chết.
+- [x] Unit test (seam 3): hai người đọc vườn cùng lúc chỉ chạy bù một lần (cây không lớn gấp đôi); đọc lần hai ngay sau đó không đổi gì.
+- [x] Unit test (seam 1): chạy bù một khoảng dài bằng một lần gọi cho kết quả giống với chạy chơi đơn cùng khoảng đó.
+- [x] E2E (Playwright, desktop + 360px): tài khoản A đẩy bản lưu có cây sắp chín với `savedAt` lùi 2 tiếng, rồi tắt → đăng nhập lại thấy màn "Trong lúc bạn vắng nhà…" ghi đúng cây đã chín trong lúc vắng.
+- [x] E2E: tài khoản A có vườn đóng băng (`savedAt` lùi 20 tiếng) → vào lại thấy con vật còn sống, không báo chết.
 
 ## Blocked by
 
