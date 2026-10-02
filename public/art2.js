@@ -1377,6 +1377,106 @@ const ARROW = [
 ];
 const alertArrow = () => spr(ARROW, { o: '#3b1208', w: '#ff9a7a', r: '#e5452f', R: '#9e2416' });
 
+// ---------- Hộp quà & sổ lưu bút ở cổng (issue 29) ----------
+// Mỗi trạng thái một sprite riêng: hộp quà đóng / có quà đang chờ / mở nắp (16x20) và sổ lưu bút đóng / mở (16x22).
+// Cùng kích thước trong mỗi bộ để vùng chạm không nhảy khi đổi trạng thái.
+const RIB = ['#9e2416', '#e5452f', '#ff9a7a'];   // nơ đỏ: tối, vừa, sáng
+const BOW = [
+  '..ooo....ooo..',
+  '.oprro..orrpo.',
+  '.orrrroorrrro.',
+  '..orrroorrro..',
+  '...ooRRRRoo...',
+  '.....oRRo.....',
+];
+const bowImg = () => spr(BOW, { o: OUT, r: RIB[1], p: RIB[2], R: RIB[0] });
+
+// Thân thùng gỗ: ván dọc, nẹp sáng bên trái, dải nơ đỏ chạy giữa
+function giftBody(x) {
+  const W = RAMP.wood;
+  shadow(x, 8, 18, 7, 2);
+  R(x, OUT, 2, 8, 12, 10);
+  R(x, W[1], 3, 9, 10, 8);
+  R(x, W[2], 3, 9, 1, 8); R(x, W[2], 3, 9, 10, 1);
+  R(x, W[0], 12, 9, 1, 8); R(x, W[0], 3, 16, 10, 1);
+  for (const px of [5, 10]) R(x, W[0], px, 10, 1, 6);
+  R(x, RIB[0], 7, 9, 3, 8); R(x, RIB[1], 7, 9, 2, 8); R(x, RIB[2], 7, 9, 1, 8);
+}
+// Nắp đậy (4 điểm ảnh) ở độ cao y, rộng hơn thân một chút
+function giftLid(x, y) {
+  const W = RAMP.wood;
+  R(x, OUT, 1, y, 14, 4);
+  R(x, W[2], 2, y + 1, 12, 2); R(x, W[3], 2, y + 1, 12, 1); R(x, W[0], 2, y + 2, 12, 1);
+  R(x, RIB[0], 7, y + 1, 3, 2); R(x, RIB[1], 7, y + 1, 2, 2); R(x, RIB[2], 7, y + 1, 1, 1);
+}
+const giftBoxClosed = () => draw(16, 20, x => { giftBody(x); giftLid(x, 4); x.drawImage(bowImg(), 1, 0); });
+// Có quà đang chờ: quà nhiều tới mức tràn ra, hai gói nằm trước hộp, trên nóc lấp lánh
+const giftBoxFull = () => draw(16, 20, x => {
+  giftBody(x); giftLid(x, 4); x.drawImage(bowImg(), 1, 0);
+  // gói đỏ bên trái
+  R(x, OUT, 0, 12, 6, 6); R(x, RIB[1], 1, 13, 4, 4); R(x, RIB[2], 1, 13, 4, 1);
+  R(x, '#f2c838', 2, 13, 2, 4); R(x, '#fff6a0', 2, 13, 1, 4); R(x, '#f2c838', 1, 14, 4, 1);
+  // bọc lá bên phải
+  R(x, OUT, 10, 13, 6, 5); R(x, '#3d8c2a', 11, 14, 4, 3); R(x, '#8fd65a', 11, 14, 3, 1); R(x, '#2f6b1f', 11, 16, 4, 1);
+  R(x, '#f3ead2', 12, 15, 2, 1);
+  // lấp lánh trên nóc
+  for (const [sx, sy] of [[13, 2], [12, 1], [14, 1], [12, 3], [14, 3]]) R(x, sx === 13 ? '#fff6a0' : '#f2c838', sx, sy);
+});
+// Mở nắp: nắp ngửa ra sau (thấy mặt trong nhạt), lòng hộp tối, quà nằm bên trong
+const giftBoxOpen = () => draw(16, 20, x => {
+  const W = RAMP.wood;
+  giftBody(x);
+  R(x, OUT, 1, 1, 14, 5);
+  R(x, W[3], 2, 2, 12, 3); R(x, '#f0cf9a', 2, 2, 12, 1); R(x, W[1], 2, 4, 12, 1);
+  R(x, RIB[1], 7, 2, 2, 3); R(x, RIB[0], 7, 4, 2, 1);
+  R(x, OUT, 2, 6, 12, 6);
+  R(x, '#2e1a0c', 3, 7, 10, 4); R(x, '#4a2c14', 3, 10, 10, 1);
+  R(x, OUT, 3, 5, 5, 5); R(x, RIB[1], 4, 6, 3, 3); R(x, RIB[2], 4, 6, 3, 1); R(x, '#f2c838', 5, 6, 1, 3); R(x, '#fff6a0', 5, 6, 1, 1);
+  R(x, OUT, 8, 6, 5, 5); R(x, '#3d8c2a', 9, 7, 3, 3); R(x, '#8fd65a', 9, 7, 2, 1); R(x, '#f3ead2', 10, 8, 2, 1);
+});
+
+// Giá gỗ đỡ sổ lưu bút: cột, đế và mặt giá nghiêng
+function bookStand(x) {
+  const W = RAMP.wood;
+  shadow(x, 8, 20, 6, 1.8);
+  R(x, OUT, 6, 13, 4, 7);
+  R(x, W[1], 7, 14, 2, 5); R(x, W[2], 7, 14, 1, 5);
+  R(x, OUT, 3, 18, 10, 4);
+  R(x, W[1], 4, 19, 8, 2); R(x, W[2], 4, 19, 8, 1); R(x, W[0], 4, 20, 8, 1);
+  R(x, OUT, 1, 11, 14, 4);
+  R(x, W[2], 2, 12, 12, 2); R(x, W[3], 2, 12, 12, 1); R(x, W[0], 2, 14, 12, 1);
+}
+// Sổ đóng: bìa da đỏ nâu, nhãn vàng, dây đánh dấu thò xuống
+const guestBookClosed = () => draw(16, 22, x => {
+  bookStand(x);
+  R(x, OUT, 3, 5, 10, 7);
+  R(x, '#8e2a20', 4, 6, 8, 5); R(x, '#b4463a', 4, 6, 8, 1); R(x, '#6e1c14', 4, 10, 8, 1);
+  R(x, '#f3ead2', 11, 6, 1, 5); R(x, '#ddd2b0', 11, 10, 1, 1);
+  R(x, '#8a6a28', 5, 7, 5, 3); R(x, '#c9a24a', 5, 7, 5, 2); R(x, '#f2c838', 5, 7, 5, 1);
+  R(x, RIB[0], 9, 11, 1, 3); R(x, RIB[1], 9, 11, 1, 2);
+});
+// Sổ mở: hai trang giấy có dòng chữ nguệch ngoạc, cây bút lông dựng bên phải
+const guestBookOpen = () => draw(16, 22, x => {
+  bookStand(x);
+  R(x, OUT, 0, 4, 16, 9);
+  R(x, '#f6efd8', 1, 5, 14, 7); R(x, '#fffbee', 1, 5, 14, 1); R(x, '#ddd2b0', 1, 11, 14, 1);
+  R(x, '#c9b88a', 7, 5, 2, 7); R(x, '#8a7a56', 8, 5, 1, 7);
+  for (const py of [7, 9]) { R(x, '#6b5a3a', 2, py, 4, 1); R(x, '#6b5a3a', 10, py, 4, 1); }
+  R(x, '#6b5a3a', 2, 11, 3, 1);
+  line(x, OUT, 11, 8, 14, 2);
+  line(x, '#f3ead2', 12, 7, 14, 1); R(x, '#d8cbaa', 13, 3); R(x, '#d8cbaa', 12, 5);
+  R(x, '#2e1a0c', 11, 8);
+});
+// Biểu tượng quà cho toast 🟡 (12x12)
+const giftIcon = () => draw(12, 12, x => {
+  R(x, OUT, 1, 4, 10, 8);
+  R(x, RAMP.wood[2], 2, 5, 8, 6); R(x, RAMP.wood[3], 2, 5, 8, 1); R(x, RAMP.wood[1], 2, 10, 8, 1);
+  R(x, RIB[1], 5, 5, 2, 6); R(x, RIB[2], 5, 5, 1, 6); R(x, RIB[0], 2, 7, 8, 1); R(x, RIB[1], 2, 7, 3, 1);
+  R(x, OUT, 2, 0, 8, 5);
+  for (const px of [3, 7]) { R(x, RIB[1], px, 1, 2, 3); R(x, RIB[2], px, 1, 2, 1); }
+  R(x, RIB[0], 5, 1, 2, 4); R(x, RIB[1], 5, 1, 2, 1);
+});
+
 // ---------- Xuất ----------
 
 const bushes = [0, 1, 2].map(bushV);
@@ -1411,6 +1511,12 @@ export const SPR2 = {
   villageHouse: villageHouses[0], villageHouses,
   friendGate: friendGate(),
   homeGate: homeGate(),
+  // cổng vườn: hộp quà (đóng / có quà / mở) và sổ lưu bút (đóng / mở)
+  giftBox: giftBoxClosed(),
+  giftBoxFull: giftBoxFull(),
+  giftBoxOpen: giftBoxOpen(),
+  guestBook: guestBookClosed(),
+  guestBookOpen: guestBookOpen(),
   lampPost: lampPost(),
   bench: benchStone(),
   npcBaTu: baTu.frames, npcBaTuIdle: baTu.idle,
@@ -1430,5 +1536,6 @@ export const SPR2 = {
   stone: stoneIcon(),
   guidebook: guidebookIcon(),
   todo: todoIcon(),
+  giftIcon: giftIcon(),
   alertArrow: alertArrow(),
 };

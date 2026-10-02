@@ -207,6 +207,7 @@ function playOnline(s) {
     onMessage: liveMsg,
   });
   begin();
+  ui.refreshGate();   // quà, lời nhắn đang chờ ở cổng (issue 29)
 }
 // Rời vườn đang chơi (không lưu): về trạng thái chưa vào game
 function quit() {
@@ -227,6 +228,8 @@ function liveReset() { peers.clear(); liveMap = null; ui.setLive(!!sync, 0); }
 function liveMsg(m) {
   if (m.t === 'hello' || m.t === 'down') { liveReset(); return; }
   if (m.t === 'visit') { ui.toast(`🟡 ${m.name} vừa ghé thăm vườn của bạn`); return; }   // bạn bè ghé vườn mình (issue 26; nguồn tin: issue 27)
+  // quà, lời nhắn mới ở cổng (issue 29): toast 🟡 gộp, và đếm lại để sprite hộp quà / sổ đổi theo
+  if (m.t === 'gift' || m.t === 'note') { ui.netEvent({ type: m.t, name: m.name, item: m.item, qty: m.qty }); ui.refreshGate(); return; }
   if (peers.receive(m, performance.now())) ui.setLive(true, peers.size);
 }
 // mỗi khung hình: đổi bản đồ thì báo join, đi thì gửi vị trí tối đa LIVE.hz lần mỗi giây
@@ -408,6 +411,7 @@ function leaveVisit() {
   state = home; home = null; plan = null;
   begin();
   ui.setVisit(null);
+  ui.refreshGate();   // về vườn mình: đếm lại quà, lời nhắn ở cổng
 }
 
 // ---------- Ngủ: mờ dần, chạy mô phỏng tới sáng (luật ở state.sleep), sáng dần ----------

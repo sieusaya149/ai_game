@@ -161,26 +161,37 @@ function res(r, okSound) {
 
 // ---------- Toast ----------
 // key: toast gộp. Cùng key thì đổi chữ và chạy lại thời gian hiện thay vì thêm toast mới.
-function pushToast(text, cls = '', key = '') {
+// icon: canvas pixel art hiện trước chữ (vd quà ở cổng).
+function pushToast(text, cls = '', key = '', icon = null) {
   const box = $('toasts');
   if (!box || !text) return;
+  const body = () => (icon ? [canvasIco(icon, 'toast-ico'), h('span', {}, text)] : [text]);
   const old = key && [...box.children].find(c => c.dataset.key === key);
   if (old) {
-    old.textContent = text;
+    old.replaceChildren(...body());
     old.style.animation = 'none'; void old.offsetWidth; old.style.animation = '';
     clearTimeout(old._t); old._t = setTimeout(() => old.remove(), 2800);
     return;
   }
   const dup = [...box.children].find(c => c.textContent === text);
   if (dup) dup.remove();
-  const t = h('div', { class: 'toast ' + cls }, text);
+  const t = h('div', { class: 'toast ' + cls }, ...body());
   if (key) t.dataset.key = key;
   box.append(t);
   while (box.children.length > 3) box.firstChild.remove();
   t._t = setTimeout(() => t.remove(), 2800);
 }
+// Pixel art (canvas) thành thẻ <canvas> dùng được trong DOM
+function canvasIco(src, cls = 'ico') {
+  const c = h('canvas', { class: cls, width: src.width, height: src.height });
+  c.getContext('2d').drawImage(src, 0, 0);
+  return c;
+}
+const TOAST_ICON = { gift: () => SPR2?.giftIcon };   // sprite riêng cho vài loại thông báo
 // 🟡 toast nhỏ, tự gộp cùng khóa; loại nào tắt trong cài đặt (s.notify) thì bỏ qua
-const notifier = createNotifier({ show: (id, text) => pushToast(text, '', 'n' + id), on: cat => !cat || S.notifyOn(st(), cat) });
+const notifier = createNotifier({ show: (id, text, e) => pushToast(text, '', 'n' + id, TOAST_ICON[e.type]?.() ?? null), on: cat => !cat || S.notifyOn(st(), cat) });
+// Tin từ server (quà, lời nhắn ở cổng): đi qua cùng đường gộp toast như event của luật chơi
+export const netEvent = e => notifier(e, Date.now());
 export function toast(text) { pushToast(text); }
 
 // ---------- Hộp xác nhận ----------
@@ -449,6 +460,7 @@ export function openPanel(id) {
 }
 function closePanel() {
   if (!panel) return;
+  PANELS[panel].close?.();
   panel = null;
   $('panel-root').hidden = true;
   $('panel-root').replaceChildren();
@@ -471,11 +483,13 @@ function refreshPanel() {
 const tabBar = (list, key, onPick) => h('div', { class: 'tabs' }, list.map(([id, label]) =>
   h('button', { class: 'tab nosound' + (tabs[key] === id ? ' on' : ''), type: 'button', on: { click: () => { tabs[key] = id; sound.play('click'); onPick?.(); refreshPanel(); } } }, label)));
 
-function row({ icon, name, desc, right, locked, cls = '' }) {
-  return h('div', { class: 'row ' + cls + (locked ? ' locked' : '') },
+function row({ icon, name, desc, right, locked, cls = '', data }) {
+  const e = h('div', { class: 'row ' + cls + (locked ? ' locked' : '') },
     h('div', { class: 'row-ico' }, icon),
     h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, name), desc && h('div', { class: 'row-desc' }, desc)),
     right && h('div', { class: 'row-act' }, right));
+  if (data) for (const [k, v] of Object.entries(data)) e.dataset[k] = v;
+  return e;
 }
 const empty = text => h('div', { class: 'empty' }, text);
 const section = t => h('h3', { class: 'sec' }, t);
@@ -950,6 +964,161 @@ PANELS.friends = {
       h('div', { class: 'row-act' }, btn('🚪 Vào', () => visitGate(g.name), 'green sm gate-go', { 'aria-label': `Vào vườn ${g.name}` }))));
   },
 };
+// ---------- Quà và sổ lưu bút ở cổng (issue 29) ----------
+// Hộp quà và sổ nằm trên server nên chủ offline vẫn nhận được. Khách bấm hộp quà thì chọn món trong giỏ / kho để tặng,
+// bấm sổ thì viết một dòng; chủ bấm thì nhận quà vào giỏ và đọc các dòng đã ký (mới nhất ở trên).
+const gt = { box: null, notes: null, err: '', msg: '', text: '', busy: false, sent: new Set() };
+const visitOwner = s => s?.visit?.owner ?? null;
+const dayText = d => { const [, m, n] = String(d).split('-'); return n ? `${n}/${m}` : d; };
+// Nắp hộp / sổ mở ra khi bảng đang mở (render.js đọc state.gate.open)
+function gateOpen(id) { const s = stOk(); if (s) s.gate = { ...(s.gate ?? {}), open: id }; }
+// Đếm lại quà, lời nhắn mới ở cổng vườn mình (đang thăm vườn người khác thì thôi)
+export async function refreshGate() {
+  const s = stOk();
+  if (!s || s.mode !== 'online' || s.visit) return;
+  const r = await net.gateNews();
+  const cur = stOk();
+  if (r.ok && cur && !cur.visit) cur.gate = { ...(cur.gate ?? {}), gifts: r.gifts, notes: r.notes };
+}
+const gateNote = body => {
+  if (gt.err) body.append(h('div', { class: 'note closed', role: 'alert', id: 'gate-err' }, gt.err));
+  else if (gt.msg) body.append(h('div', { class: 'note', id: 'gate-msg' }, gt.msg));
+};
+async function loadBox() {
+  gt.box = null;
+  const r = await net.myGifts();
+  gt.box = r.ok ? r.gifts : [];
+  if (!r.ok) gt.err = r.error;
+  if (panel === 'giftbox') refreshPanel();
+}
+// Khách tặng qty món k: hàng đợi nằm trên server nên hỏi server trước, được rồi mới trừ khỏi giỏ / kho khách.
+// Mã thao tác op tự chứa: cùng mã gửi lại (bấm hai lần, mạng chập chờn) chỉ tính một lần.
+async function giveGift(k, qty) {
+  const s = stOk(), owner = visitOwner(s);
+  if (!s || !owner || gt.busy) return;
+  const pre = S.giftCheck(s, null, k, qty);
+  if (!pre.ok) { gt.err = pre.msg; gt.msg = ''; sound.play('error'); return refreshPanel(); }
+  const op = 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  gt.busy = true; refreshPanel();
+  const r = await net.sendGift(owner, k, qty, op);
+  gt.busy = false;
+  if (!r.ok) { gt.err = r.error; gt.msg = ''; sound.play('error'); return refreshPanel(); }
+  const cur = stOk();
+  if (!cur) return;   // đã rời vườn trong lúc chờ mạng
+  if (!gt.sent.has(op)) { gt.sent.add(op); S.giftTo(cur, [], k, qty, op); }
+  gt.err = ''; gt.msg = `Đã bỏ ${qty} ${itemLabel(k).toLowerCase()} vào hộp quà của ${owner} 🎁`;
+  sound.play('pop');
+  commit();
+}
+// Chủ mở hộp: server chia theo chỗ trống trong giỏ (luật splitGifts của state.js), phần dư nằm lại hộp
+async function takeAllGifts() {
+  const s = stOk();
+  if (!s || gt.busy) return;
+  gt.busy = true; refreshPanel();
+  const r = await net.takeGifts(Math.max(0, S.basketCap(s) - S.basketCount(s)));
+  gt.busy = false;
+  if (!r.ok) { gt.err = r.error; gt.msg = ''; sound.play('error'); return refreshPanel(); }
+  const cur = stOk();
+  if (!cur) return;
+  const n = S.addGifts(cur, r.taken);
+  gt.err = '';
+  gt.msg = n ? `Đã nhận ${n} món` + (r.left ? ', giỏ đầy nên còn quà nằm lại trong hộp' : '') : r.left ? 'Giỏ đầy, về kho cất đồ rồi quay lại nhé' : 'Hộp quà đang trống';
+  sound.play(n ? 'pop' : 'error');
+  commit();
+  await loadBox();
+  refreshGate();
+}
+PANELS.giftbox = {
+  title: '🎁 Hộp quà ở cổng',
+  open() { gt.err = ''; gt.msg = ''; gateOpen('giftbox'); if (!visitOwner(stOk())) loadBox(); refreshPanel(); },
+  close() { gateOpen(null); },
+  render(body, s) {
+    const owner = visitOwner(s);
+    gateNote(body);
+    if (!owner && s.mode !== 'online') return body.append(empty('Hộp quà ở cổng chỉ có khi bạn chơi trong làng.'));
+    if (owner) {
+      body.append(h('div', { class: 'note' }, `Chọn hạt giống hoặc nông sản trong giỏ / kho của bạn để bỏ vào hộp quà ở cổng vườn ${owner}. Mỗi lần tối đa ${D.GIFT.perGift} món.`));
+      const keys = [...new Set([...Object.keys(s.basket || {}), ...Object.keys(s.inv || {})])].filter(k => S.giftable(k) && have(s, k) > 0).sort();
+      const list = h('div', { class: 'list gift-list' });
+      body.append(list);
+      if (!keys.length) return list.append(empty('Giỏ và kho chưa có gì để tặng. Mua hạt giống ở chợ Bà Tư nhé!'));
+      for (const k of keys) {
+        const n = have(s, k), many = Math.min(n, D.GIFT.perGift);
+        list.append(row({
+          icon: ico(k, 'big'), name: `${itemLabel(k)} ×${n}`, desc: D.ITEMS[k]?.kind === 'seed' ? 'Hạt giống' : 'Nông sản',
+          cls: 'gift-row', data: { item: k },
+          right: h('div', { class: 'qtys' },
+            btn('Tặng 1', () => giveGift(k, 1), 'green sm gift-1', { disabled: gt.busy }),
+            many > 1 && btn(`Tặng ${many}`, () => giveGift(k, many), 'green sm gift-many', { disabled: gt.busy })),
+        }));
+      }
+      return;
+    }
+    body.append(h('div', { class: 'sell-all' },
+      h('div', {}, '🧺 Giỏ ', h('b', {}, `${S.basketCount(s)}/${S.basketCap(s)}`)),
+      btn('Nhận hết vào giỏ', takeAllGifts, 'green', { id: 'gift-take', disabled: !gt.box?.length || gt.busy })));
+    if (!gt.box) return body.append(empty('Đang tải...'));
+    const list = h('div', { class: 'list gift-list' });
+    body.append(list);
+    if (!gt.box.length) return list.append(empty('Hộp quà đang trống. Bạn bè ghé vườn để quà ở đây nhé!'));
+    for (const g of gt.box) list.append(row({ icon: ico(g.item, 'big'), name: `${itemLabel(g.item)} ×${g.qty}`, desc: `${g.from} tặng`, cls: 'gift-row', data: { item: g.item } }));
+    body.append(h('p', { class: 'mini' }, 'Nông sản vào giỏ, hạt giống vào kho. Giỏ đầy thì phần dư nằm lại trong hộp, không mất đâu.'));
+  },
+};
+
+async function loadNotes() {
+  const s = stOk();
+  if (!s || s.mode !== 'online') return;
+  gt.notes = null;
+  const r = await net.readBook(visitOwner(s));
+  gt.notes = r.ok ? r.notes : [];
+  if (!r.ok) gt.err = r.error;
+  if (!visitOwner(s)) refreshGate();   // đọc sổ của mình xong thì hết "mới"
+  if (panel === 'guestbook') refreshPanel();
+}
+async function signNote(e) {
+  e?.preventDefault();
+  const s = stOk(), owner = visitOwner(s), text = ($('note-input')?.value ?? '').trim();
+  if (!s || !owner || gt.busy) return;
+  if (!text) { gt.err = 'Chưa viết gì cả'; gt.msg = ''; sound.play('error'); return refreshPanel(); }
+  gt.busy = true;
+  const r = await net.signBook(owner, text);
+  gt.busy = false;
+  if (!r.ok) { gt.err = r.error; gt.msg = ''; sound.play('error'); return refreshPanel(); }
+  gt.text = ''; gt.err = ''; gt.msg = `Đã ký sổ lưu bút của ${owner}. Cảm ơn bạn!`;
+  sound.play('pop');
+  await loadNotes();
+}
+PANELS.guestbook = {
+  title: '📖 Sổ lưu bút',
+  open() { gt.err = ''; gt.msg = ''; gt.notes = null; gateOpen('guestbook'); loadNotes(); refreshPanel(); },
+  close() { gateOpen(null); },
+  render(body, s) {
+    const owner = visitOwner(s);
+    if (!owner && s.mode !== 'online') return body.append(empty('Sổ lưu bút ở cổng chỉ có khi bạn chơi trong làng.'));
+    if (owner) {
+      const left = t => `${[...t].length}/${D.GIFT.noteMax}`;
+      body.append(h('form', { class: 'note-form', on: { submit: signNote } },
+        h('textarea', { id: 'note-input', class: 'note-input', rows: 2, maxlength: D.GIFT.noteMax, placeholder: `Viết một dòng cho ${owner}...`, value: gt.text,
+          on: { input: e => { gt.text = e.target.value; $('note-left').textContent = left(gt.text); } } }),
+        h('div', { class: 'note-send' },
+          h('span', { class: 'mini', id: 'note-left' }, left(gt.text)),
+          h('button', { class: 'btn green', id: 'note-sign', type: 'submit', disabled: gt.busy }, '✍️ Ký sổ'))));
+      body.append(h('p', { class: 'mini' }, `Mỗi ngày ký được một dòng ở mỗi sổ, tối đa ${D.GIFT.noteMax} ký tự.`));
+    }
+    gateNote(body);
+    body.append(section(owner ? `Mọi người đã viết cho ${owner}` : 'Mọi người đã viết cho bạn'));
+    if (!gt.notes) return body.append(empty('Đang tải...'));
+    if (!gt.notes.length) return body.append(empty(owner ? 'Sổ còn trắng tinh. Bạn ký dòng đầu tiên nhé!' : 'Chưa ai ký sổ của bạn.'));
+    const list = h('div', { class: 'list' });
+    body.append(list);
+    for (const n of gt.notes) list.append(h('div', { class: 'row note-row', 'data-from': n.from },
+      h('div', { class: 'row-main' },
+        h('div', { class: 'note-head' }, h('b', {}, n.from), h('span', { class: 'note-day' }, dayText(n.day))),
+        h('div', { class: 'note-text' }, n.text))));
+  },
+};
+
 // Thanh "đang ở vườn của X" + nút về làng; owner = null thì ẩn
 export function setVisit(owner) {
   const e = $('visit-bar');

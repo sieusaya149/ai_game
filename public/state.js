@@ -3,7 +3,7 @@ import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
   ANIMALS, PEN_CAP, HUSBANDRY, DOG, THREATS, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
-  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS,
+  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GIFT,
 } from './data.js';
 import { TS, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene } from './farm.js';
@@ -201,6 +201,7 @@ export function loadGame(raw) {
   for (const k of ['animals', 'eggs', 'poops', 'threats', 'orders', 'log']) s[k] ||= [];
   s.shipbin = { items: Object.fromEntries(Object.entries(s.shipbin?.items ?? {}).filter(([k, n]) => (CROPS[k] || PRODUCTS[k]) && n > 0)) };
   ensureShipbin(s);   // vườn cũ chưa có thùng: thêm một thùng cạnh nhà kho
+  ensureGateBoxes(s); // vườn cũ chưa có hộp quà, sổ lưu bút: thêm cạnh cổng
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
   s.stamina = clamp(s.stamina, 0, STAMINA.max); s.sit = false;
@@ -220,6 +221,7 @@ export function loadGame(raw) {
   s.guests = Array.isArray(s.guests) ? s.guests : [];
   s.dog.chained = !!s.dog.chained;
   s.frozenMs = 0; delete s.away;
+  delete s.gate;   // số quà, lời nhắn ở cổng là tin từ server, không nằm trong bản lưu
   const pend = s.awayPending; delete s.awayPending;   // server đã chạy bù lúc chủ vắng: tóm tắt chờ chủ về
   evq = [];
   const t = now(), gone = Math.max(0, t - (s.savedAt || t)), elapsed = Math.min(gone, MAX_CATCHUP_MS);
@@ -799,6 +801,8 @@ function buildingActs(s, t) {
   if (TALK[b.id]) return [mk('talk', TALK[b.id].icon, TALK[b.id].label)];
   if (b.id === 'house') return [mk('enter', '🏠', 'Vào nhà')];
   if (b.id === 'gate') return [mk('enter', '🚪', 'Ra làng')];
+  if (b.id === 'giftbox') return [mk('open', '🎁', s.visit ? 'Tặng quà cho chủ vườn' : 'Mở hộp quà')];
+  if (b.id === 'guestbook') return [mk('open', '📖', s.visit ? 'Ký sổ lưu bút' : 'Đọc sổ lưu bút')];
   if (b.id === 'bed') return [mk('sleep', '🛏️', 'Ngủ', canSleep(s) ? null : SLEEP_EARLY)];
   if (b.id.startsWith('bench')) return benchActs(s);
   if (b.id === 'well') return [mk('refill', '🪣', `Múc nước (bình ${s.can}/${canMax(s)})`, toolAway(s, 'can') ? awayMsg('can') : s.can >= canMax(s) ? 'Bình đầy rồi' : null)];
@@ -1040,6 +1044,63 @@ export function enterScene(s, to) {
   return R(true, '', { scene: to });
 }
 
+// ---------- Quà và sổ lưu bút ở cổng (issue 29, ADR 0012) ----------
+// Hộp quà là hàng đợi nằm trên server (chủ offline vẫn nhận): box là mảng quà đang chờ { id?, op, item, qty, from? }.
+// Khách tặng được hạt giống (trong kho) hoặc nông sản / sản phẩm (trong giỏ hoặc kho); chủ nhận nông sản vào giỏ (tới khi đầy),
+// hạt giống vào kho. Mỗi quà có mã thao tác op duy nhất: áp dụng lại cùng mã thì không làm gì.
+export const GATE_BOXES = ['giftbox', 'guestbook'];
+export const giftable = k => ITEMS[k]?.kind === 'seed' || !!CROPS[k] || !!PRODUCTS[k];
+// Hộp đã chứa thêm được một quà qty món item chưa (server gọi đúng hàm này; không biết giỏ khách nên chỉ kiểm hộp)
+export function giftBoxCheck(box, item, qty) {
+  if (!giftable(item)) return no('bad_item', 'Món này không tặng được');
+  if (!Number.isInteger(qty) || qty < 1) return no('bad_qty', 'Số lượng không hợp lệ');
+  if (qty > GIFT.perGift) return no('too_many', `Mỗi lần tặng tối đa ${GIFT.perGift} món`);
+  if ((box?.length ?? 0) >= GIFT.boxMax) return no('box_full', 'Hộp quà ở cổng đã đầy, đợi chủ vườn nhận bớt nhé');
+  return { ok: true };
+}
+// Khách s tặng được không: món phải có trong giỏ / kho, đủ số lượng, hộp (box; null = chưa biết) còn chỗ
+export function giftCheck(s, box, item, qty) {
+  if (!giftable(item)) return no('bad_item', 'Món này không tặng được');
+  if (!Number.isInteger(qty) || qty < 1) return no('bad_qty', 'Số lượng không hợp lệ');
+  if (!have(s, item)) return no('no_item', `Bạn không có ${itemName(item).toLowerCase()}`);
+  if (qty > have(s, item)) return no('not_enough', `Bạn chỉ có ${have(s, item)} ${itemName(item).toLowerCase()}`);
+  return box ? giftBoxCheck(box, item, qty) : qty > GIFT.perGift ? giftBoxCheck([], item, qty) : { ok: true };
+}
+// Khách tặng quà: trừ khỏi giỏ / kho của khách, xếp thêm vào hộp ox. Cùng op đã có trong hộp thì không làm gì (dup).
+export function giftTo(s, box, item, qty, op) {
+  if (op != null && box.some(g => g.op === op)) return R(true, '', { dup: true });
+  const c = giftCheck(s, box, item, qty);
+  if (!c.ok) return c;
+  take(s, item, qty);
+  const entry = { op, item, qty };
+  box.push(entry);
+  return R(true, `Đã bỏ ${qty} ${itemName(item).toLowerCase()} vào hộp quà`, { entry });
+}
+// Chia hộp: lấy từng quà theo thứ tự, nông sản / sản phẩm chỉ lấy tới khi hết chỗ trong giỏ (phần dư ở lại hộp),
+// hạt giống thì lấy hết. Trả { taken, rest }: các phần đã lấy và hộp còn lại (thuần, không sửa box).
+export function splitGifts(box, room) {
+  const taken = [], rest = [];
+  for (const g of box) {
+    const n = inBasket(g.item) ? Math.min(g.qty, Math.max(0, room)) : g.qty;
+    if (inBasket(g.item)) room -= n;
+    if (n > 0) taken.push({ ...g, qty: n });
+    if (n < g.qty) rest.push({ ...g, qty: g.qty - n });
+  }
+  return { taken, rest };
+}
+// Cho các phần quà đã lấy vào giỏ / kho (không kiểm sức chứa: splitGifts đã lo)
+export function addGifts(s, taken) {
+  for (const g of taken) give(s, g.item, g.qty);
+  return taken.reduce((a, g) => a + g.qty, 0);
+}
+// Chủ mở hộp: nhận hết phần vừa giỏ, phần dư để lại. Sửa s và box; trả { taken, moved }
+export function takeGifts(s, box) {
+  const { taken, rest } = splitGifts(box, room(s));
+  box.splice(0, box.length, ...rest);
+  const moved = addGifts(s, taken);
+  return R(true, moved ? `Đã nhận ${moved} món` + (rest.length ? ', giỏ đầy nên còn quà nằm lại trong hộp' : '') : rest.length ? FULL : 'Hộp quà đang trống', { taken, moved });
+}
+
 // ---------- Thăm vườn người khác (issue 27, ADR 0012) ----------
 // Khách `me` bước vào vườn `owner`: dựng bản đi dạo từ bản lưu chủ `raw` (server đã chạy bù). Đất, cây, con vật, chó...
 // là bản sao của chủ, không bao giờ lưu lại hay gửi đi. Phần của khách (tên, ngoại hình, giỏ, kho, đơn hàng...) dùng chung
@@ -1064,7 +1125,7 @@ export function guestCheck(s, t, id) {
   if (t?.kind === 'building') {
     const b = sceneMap(s).building(t.id);
     if (b?.guest) return no('private', b.guest);
-    if (b?.id === 'gate') return { ok: true };
+    if (b?.id === 'gate' || GATE_BOXES.includes(b?.id)) return { ok: true };
   }
   if (t?.kind === 'dog' && id === 'feed') return (s.basket.dogfood || 0) > 0 ? { ok: true } : no('no_food', `Trong giỏ không có ${itemName('dogfood').toLowerCase()}`);
   if (t?.kind === 'dog' && id === 'pet') return s.visit?.fed ? { ok: true } : no('stranger', `${s.dog.name} chưa quen bạn, cho ăn trước đã 🦴`);
@@ -1074,7 +1135,7 @@ function guestActs(s, t) {
   const why = id => guestCheck(s, t, id).msg ?? null;
   if (t.kind === 'building') {
     const b = sceneMap(s).building(t.id);
-    if (b?.id === 'gate') return buildingActs(s, t);
+    if (b?.id === 'gate' || GATE_BOXES.includes(b?.id)) return buildingActs(s, t);
     return b?.guest ? buildingActs(s, t).map(a => ({ ...a, disabled: b.guest })) : [];
   }
   if (t.kind === 'dog') return [mk('pet', '🤗', `Vuốt ve ${s.dog.name}`, why('pet')), mk('feed', '🦴', `Cho ${s.dog.name} ăn (giỏ còn ${s.basket.dogfood || 0})`, why('feed'))];
@@ -1186,6 +1247,23 @@ function ensureShipbin(s) {
     f.ents.push({ id: s.nextId++, kind: 'shipbin', c: p.c, r: p.r });
     bumpLayout(s);
     return;
+  }
+}
+
+// Vườn chưa có hộp quà / sổ lưu bút (issue 29): đặt ở ô hợp lệ gần cổng nhất (qua canPlace nên không chặn đường)
+function ensureGateBoxes(s) {
+  const f = s.farm, g = f.ents.find(e => e.kind === 'gate');
+  if (!g) return;
+  for (const [i, kind] of GATE_BOXES.entries()) {
+    if (f.ents.some(e => e.kind === kind)) continue;
+    const cand = [];
+    for (let r = f.owned.r; r < f.owned.r + f.owned.h; r++) for (let c = f.owned.c; c < f.owned.c + f.owned.w; c++) cand.push({ c, r, d: Math.hypot(c - g.c - 3 - i, r - g.r) });
+    for (const p of cand.sort((a, b) => a.d - b.d || a.r - b.r || a.c - b.c)) {
+      if (!canPlace(s, { kind }, p.c, p.r).ok) continue;
+      f.ents.push({ id: s.nextId++, kind, c: p.c, r: p.r });
+      bumpLayout(s);
+      break;
+    }
   }
 }
 
@@ -1312,6 +1390,7 @@ function moveGate(f, dy) {
   const g = f.ents.find(e => e.kind === 'gate'), o = f.owned;
   if (!g || g.r + 2 < o.r + o.h) return;
   const cols = [g.c - 2, g.c - 1], from = g.r + 1;
+  for (const e of f.ents) if (GATE_BOXES.includes(e.kind) && e.r === g.r) e.r += dy;   // hộp quà, sổ lưu bút đi theo cổng
   g.r += dy;
   for (let r = from; r <= g.r + 1; r++) for (const c of cols) f.paths.push([c, r]);
 }
@@ -1332,6 +1411,8 @@ export function buyStrip(s, dir) {
   const g = f.ents.find(e => e.kind === 'gate');
   if (g) for (const [dc, dr] of [[0, 0], [1, 0], [2, 0], [-2, 1], [-1, 1]]) taken.add((g.c + dc) + ',' + (g.r + dr));
   for (const e of f.ents) { const ft = footprint(e); for (let y = ft.r; y < ft.r + ft.h; y++) for (let x = ft.c; x < ft.c + ft.w; x++) taken.add(x + ',' + y); }
+  // chừa luôn chỗ đứng trước công trình (hộp quà, sổ lưu bút ở cổng nằm ngay trên dải mới): bụi đá không được chắn lối vào
+  for (const e of f.ents) { const a = BUILDING_DEFS[e.kind]?.at; if (a) taken.add((e.c + Math.floor(a.x / TS)) + ',' + (e.r + Math.floor(a.y / TS))); }
   for (let r = d.r; r < d.r + d.h; r++) for (let c = d.c; c < d.c + d.w; c++) {
     if (taken.has(c + ',' + r)) continue;
     const h = (tileHash(c, r) % 1000) / 1000;

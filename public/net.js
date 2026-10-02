@@ -76,3 +76,14 @@ export async function addFriend(who) {
   return call('/api/friends', { name: who });
 }
 export const removeFriend = name => call('/api/friends/remove', { name });
+
+// Quà và sổ lưu bút ở cổng (issue 29). `op` = mã thao tác tự chứa: gửi lại cùng mã thì server trả { dup: true }
+export const sendGift = (to, item, qty, op) => call('/api/gifts', { to, item, qty, op });
+export const myGifts = () => call('/api/gifts');
+// room = chỗ trống trong giỏ; server trả { taken: [{ id, from, item, qty }], left }
+export const takeGifts = room => call('/api/gifts/take', { room });
+export const signBook = (to, text) => call('/api/guestbook', { to, text });
+// name rỗng = sổ của mình (đọc xong thì hết "mới")
+export const readBook = name => call('/api/guestbook' + (name ? '?name=' + encodeURIComponent(name) : ''));
+// { gifts, notes }: số quà đang chờ và số lời nhắn chưa đọc ở cổng vườn mình
+export const gateNews = () => call('/api/gate');
