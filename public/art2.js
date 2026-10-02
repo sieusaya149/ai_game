@@ -1377,6 +1377,23 @@ const ARROW = [
 ];
 const alertArrow = () => spr(ARROW, { o: '#3b1208', w: '#ff9a7a', r: '#e5452f', R: '#9e2416' });
 
+// Điện thoại quay số treo tường (gọi bác sĩ thú y) — 16x30: hộp gỗ, ống nghe gác ngang, dây xoắn thả xuống.
+function phone() {
+  const W = RAMP.wood;
+  return draw(16, 30, x => {
+    R(x, OUT, 2, 2, 12, 18);                       // thùng máy
+    R(x, W[2], 3, 3, 10, 16); R(x, W[3], 3, 3, 10, 1); R(x, W[1], 3, 17, 10, 2); R(x, W[0], 12, 3, 1, 16);
+    R(x, OUT, 4, 12, 8, 6); R(x, '#1e3a2e', 5, 13, 6, 4);   // mặt số
+    for (const [dx, dy] of [[6, 14], [8, 14], [10, 14], [6, 16], [8, 16], [10, 16]]) R(x, '#cfeaff', dx, dy);
+    R(x, OUT, 6, 5, 4, 4); R(x, '#f2c838', 7, 6, 2, 2); R(x, '#fff4b0', 7, 6);   // chuông đồng
+    R(x, OUT, 1, 9, 14, 3); R(x, '#2e2e36', 2, 10, 12, 1);   // ống nghe gác ngang
+    R(x, '#4c4c58', 2, 9, 3, 1); R(x, '#4c4c58', 11, 9, 3, 1);
+    R(x, '#767686', 2, 10); R(x, '#767686', 13, 10);
+    for (let i = 0; i < 8; i++) R(x, i % 2 ? '#2e2e36' : '#4c4c58', 8 + (i % 2), 20 + i);   // dây xoắn
+    R(x, OUT, 7, 28, 3, 2); R(x, W[1], 8, 28, 1, 1);
+  });
+}
+
 // ---------- Xuất ----------
 
 const bushes = [0, 1, 2].map(bushV);
@@ -1404,6 +1421,7 @@ export const SPR2 = {
   rug: rug(),
   window: windowW(),
   pottedPlant: pottedPlant(),
+  phone: phone(),
   // làng
   marketStall: marketStall(),
   marketClosed: marketClosed(),

@@ -12,7 +12,8 @@ const DRY = 30;   // dưới mức này thì cây cần tưới (như hành đ�
 const KINDS = [
   { kind: 'crow', kp: 'threat', level: 'urgent', icon: '🪶', label: n => `${n} con quạ đang ăn cây`, spots: s => threats(s, 'crow') },
   { kind: 'thief', kp: 'threat', level: 'urgent', icon: '🧢', label: () => 'Có trộm đang hái cây', spots: s => threats(s, 'thief') },
-  { kind: 'sick', level: 'urgent', icon: '🤒', label: n => `${n} con vật bệnh`, spots: s => animals(s, a => a.sick) },
+  { kind: 'sick', level: 'urgent', icon: '🤒', label: n => `${n} con vật bệnh nặng`, spots: s => animals(s, a => a.sick >= 2) },
+  { kind: 'tired', level: 'normal', icon: '🥱', label: n => `${n} con vật mệt`, spots: s => animals(s, a => a.sick && a.sick < 2) },
   { kind: 'hungry', level: 'normal', icon: '🍽️', label: n => `${n} con vật đói`, spots: s => animals(s, a => !a.sick && a.hunger < HUSBANDRY.growNeedsHunger) },
   { kind: 'dirty', level: 'normal', icon: '🧼', label: n => ` con vật dơ`, spots: s => animals(s, a => dirtyAnimals(s).includes(a)) },
   { kind: 'muck', level: 'normal', icon: '💩', label: n => ` chuồng bẩn`, spots: s => muckPens(s) },

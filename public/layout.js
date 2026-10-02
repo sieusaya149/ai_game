@@ -89,6 +89,7 @@ export const SCENES = {
       { kind: 'stove', name: 'Bếp', sprite: 'stove', foot: { c: 6, r: 2, w: 2, h: 1 }, spr: { x: 4, y: -8 }, at: null },
       { kind: 'table', name: 'Bàn', sprite: 'table', foot: { c: 4, r: 5, w: 2, h: 1 }, spr: { x: 0, y: -4 }, at: null },
       { kind: 'plant', name: 'Chậu cây', sprite: 'pottedPlant', foot: { c: 10, r: 8, w: 1, h: 1 }, spr: { x: 0, y: -8 }, at: null },
+      { kind: 'phone', name: 'Điện thoại', sprite: 'phone', foot: { c: 4, r: 2, w: 1, h: 1 }, spr: { x: 0, y: -14 }, at: { x: 8, y: 26 } },
     ],
     props: [
       { sprite: 'window', x: 64, y: 6 }, { sprite: 'window', x: 128, y: 6 },
@@ -104,7 +105,7 @@ export const SCENES = {
   village: {
     name: 'Làng', mw: 40, mh: 28,
     walk: { c: 2, r: 3, w: 36, h: 22 },
-    paths: [[17, 5, 3, 5], [3, 10, 34, 3], [21, 9, 5, 1], [28, 9, 4, 1], [7, 9, 2, 1], [12, 9, 2, 1], [34, 9, 2, 1], [29, 13, 3, 8]],
+    paths: [[17, 5, 3, 5], [3, 10, 34, 3], [21, 9, 5, 1], [28, 9, 4, 1], [7, 9, 2, 1], [12, 9, 2, 1], [34, 9, 2, 1], [29, 13, 3, 8], [14, 9, 3, 1]],
     trees: [[4, 4], [9, 5], [15, 5], [21, 4], [26, 5], [32, 4], [37, 5],
       [4, 15], [6, 17], [3, 19], [8, 20], [5, 22], [10, 22], [12, 18], [15, 21], [18, 17], [20, 20], [23, 22], [26, 18], [34, 17], [36, 20], [33, 23], [25, 16]],
     clear: [{ x0: 256, x1: 336, y0: 0, y1: 70 }],
@@ -115,6 +116,8 @@ export const SCENES = {
         npc: { key: 'npcBaTu', x: 56, y: 36 } },
       { kind: 'smithy', name: 'Tiệm rèn Ông Sáu', sprite: 'smithy', foot: { c: 28, r: 7, w: 4, h: 2 }, spr: { x: 4, y: -16 }, at: { x: 32, y: 42 }, label: 'Tiệm rèn',
     npc: { key: 'npcOngSau', x: 60, y: 38 } },
+      { kind: 'vet', name: 'Trạm thú y Cô Út', sprite: 'vetClinic', foot: { c: 14, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -8 }, at: { x: 24, y: 40 }, label: 'Trạm thú y',
+        npc: { key: 'npcCoUt', x: 52, y: 40 } },
       { kind: 'houseA', name: 'Nhà dân', sprite: 'villageHouses.0', foot: { c: 6, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
       { kind: 'houseB', name: 'Nhà dân', sprite: 'villageHouses.1', foot: { c: 11, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: null },
       { kind: 'houseC', name: 'Nhà Chú Ba', sprite: 'villageHouses.0', foot: { c: 33, r: 7, w: 3, h: 2 }, spr: { x: 0, y: -16 }, at: { x: 24, y: 40 },

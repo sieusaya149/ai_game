@@ -64,7 +64,7 @@ test('gộp: 5 ô cải chín liền nhau chỉ ra một toast, cách xa ra toas
 test('mức thông tin, gấp, thẳng không thành toast gộp', () => {
   const shown = [];
   const push = createNotifier({ show: (id, text) => shown.push(text) });
-  for (const e of [{ type: 'egg' }, { type: 'shipped', coins: 5 }, { type: 'sick', animal: 'Gà' }, { type: 'toast', text: 'x' }, { type: 'fx' }]) assert.equal(push(e, 0), false);
+  for (const e of [{ type: 'egg' }, { type: 'shipped', coins: 5 }, { type: 'sickSevere', animal: 'Gà' }, { type: 'toast', text: 'x' }, { type: 'fx' }]) assert.equal(push(e, 0), false);
   assert.deepEqual(shown, []);
 });
 
@@ -105,7 +105,7 @@ test('urgentSpots: quạ đang ăn và con vật bệnh; ở bản đồ khác m
   s.threats = [{ id: 7, kind: 'crow', plot: 0, x: 0, y: 0, arriveAt: 0, state: 'coming', since: 0 }];
   assert.deepEqual(G.urgentSpots(s), [], 'mới bay tới thì chưa gấp');
   s.threats[0].state = 'eating';
-  s.animals[0].sick = true;
+  s.animals[0].sick = 2;
   const spots = G.urgentSpots(s), c = G.mapOf(s).plotCenter(0);
   assert.equal(spots.length, 2);
   assert.deepEqual([spots[0].x, spots[0].y], [c.x, c.y]);

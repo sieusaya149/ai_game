@@ -50,7 +50,8 @@ test('đang ở trong nhà: chạm việc ngoài vườn thì ra cửa rồi đi
 });
 
 test('bản đồ nhỏ: chấm đỏ cho việc gấp, chấm vàng cho việc thường, đúng màu đúng chỗ; chạm để phóng to', async ({ page, context }) => {
-  const save = makeSave(s => { dry3(s); s.animals[0].sick = true; });
+  // exp cao: trên cấp 5 thì bệnh mới được vượt mức Mệt (bảo hộ người mới, issue 38)
+  const save = makeSave(s => { dry3(s); s.exp = 1e6; s.animals[0].sick = 2; s.animals[0].sickMs = 60 * 60_000; });
   await seedSave(context, save);
   await page.goto('/');
   await ready(page);

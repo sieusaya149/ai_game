@@ -150,6 +150,7 @@ function updateAnimals(state, w, dt0, out) {
     const area = pen.area, rt = rtOf(w, 'a' + a.id), seen = onScreen(w, a);
     const dt = aiStep(rt, dt0, seen);
     if (!dt) continue;
+    if (a.sick >= 2) { rt.walking = false; rt.peck = false; rt.nap = false; rt.mode = 'idle'; rt.timer = 1; continue; }   // bệnh nặng: nằm một chỗ
     const near = Math.hypot(p.x - a.x, p.y - a.y) < 26;
     const scared = state.time < (a.scaredUntil ?? 0);   // vừa bị dời chuồng: chạy loạn một lúc
     const speed = (A_SPEED[a.type] ?? 14) * (STAGE_SPEED[a.stage] ?? 1) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
@@ -356,6 +357,8 @@ export function exists(state, t) {
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
 }
+// Đồ đặt trong vườn chạm vào được (ngồi ghế đá, đặt hoa lên mộ)
+const TAPPABLE_DECO = new Set(['deco_bench', 'grave', 'grave_flower']);
 const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, dog: 20, trough: 22, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
@@ -404,7 +407,7 @@ export function findTarget(state, w) {
   }
   for (const { pen, id } of M.troughs) consider({ kind: 'trough', pen, id });
   for (const p of M.penList) if (p.scale) consider({ kind: 'scale', pen: p.type, id: p.id });
-  for (const d of M.decos) if (d.kind === 'deco_bench') consider({ kind: 'deco', id: d.id });
+  for (const d of M.decos) if (TAPPABLE_DECO.has(d.kind)) consider({ kind: 'deco', id: d.id });
   for (const b of M.buildings) if (b.at && b.id !== 'coop') consider({ kind: 'building', id: b.id });
   if (!atFarm()) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì sang nhà/làng bằng nút của nhà/cổng
   w.curKey = best ? keyOf(best) : null;
@@ -426,7 +429,7 @@ export function nameOf(state, t) {
     case 'nest': return 'Ổ ấp trứng';
     case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
-    case 'deco': return 'Ghế đá';
+    case 'deco': { const d = M.decos.find(o => o.id === t.id); return d ? ST.entName(d.ent) : 'Đồ trang trí'; }
     case 'clutter': return M.clutter.find(o => o.id === t.id) ? ST.entName(M.clutter.find(o => o.id === t.id).ent) : '';
     case 'strip': return `Đất phía ${DIR_NAME[t.dir]}`;
   }
@@ -478,7 +481,7 @@ export function hitTest(state, wx, wy) {
     for (const o of state.poops ?? []) if (Math.hypot(wx - o.x, wy - o.y + 3) < 9) return { kind: 'poop', id: o.id };
     for (const e of state.eggs ?? []) if (Math.hypot(wx - e.x, wy - e.y + 3) < 8) return { kind: 'egg', id: e.id };
   }
-  for (const d of M.decos) if (d.kind === 'deco_bench') { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
+  for (const d of M.decos) if (TAPPABLE_DECO.has(d.kind)) { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
   for (const { pen, id } of M.troughs) { const tr = M.penById[id].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen, id }; }
   for (const p of M.penList) if (p.scale && hitRect(p.scale.x - 8, p.scale.y - 14, 16, 16, wx, wy)) return { kind: 'scale', pen: p.type, id: p.id };
   const cp = coop();

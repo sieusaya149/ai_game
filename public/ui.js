@@ -38,13 +38,13 @@ const btn = (label, onClick, cls = '', extra = {}) => h('button', { class: 'btn 
 // ---------- Biểu tượng (art.icon, không có thì dùng emoji) ----------
 const EMOJI = {
   cai: '🥬', carot: '🥕', lua: '🌾', cachua: '🍅', bap: '🌽', dau: '🍓', bingo: '🎃', duahau: '🍉',
-  trung: '🥚', trung_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💉', vitamin: '💊',
+  trung: '🥚', trung_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧',
   wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩',
   ga: '🐔', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕',
 };
-const ITEM3 = { soap: 'soapBar', manure: 'manure' };
+const ITEM3 = { soap: 'soapBar', manure: 'manure', medicine: 'medicine', vaccine: 'vaccine' };
 const iconCache = new Map();
 function iconUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
@@ -577,7 +577,8 @@ PANELS.market = {
       }
       return;
     }
-    const items = Object.entries(D.ITEMS).filter(([, it]) => it.kind === t).sort((a, b) => a[1].lv - b[1].lv);
+    // thuốc thú y, vắc-xin chỉ bán ở trạm thú y Cô Út
+    const items = Object.entries(D.ITEMS).filter(([id, it]) => it.kind === t && !D.VET_ITEMS.includes(id)).sort((a, b) => a[1].lv - b[1].lv);
     for (const [id, it] of items) {
       const locked = it.lv > lv;
       const c = it.crop && D.CROPS[it.crop];
@@ -665,6 +666,59 @@ PANELS.smithy = {
         right: away ? h('span', { class: 'lock' }, '🔥 Đang rèn')
           : cost == null ? h('span', { class: 'tick' }, '✓')
           : [coinTag(cost), btn('Nâng cấp', () => res(S.startUpgrade(st(), k), 'coin'), 'green', { disabled: !!s.smith || s.coins < cost })],
+      }));
+    }
+  },
+};
+
+// ---------- Trạm thú y Cô Út: bán thuốc thú y và vắc-xin ----------
+const SICK_TAG = S.SICK_NAME.map((n, i) => (i === 0 ? n : (i === 1 ? '🥱 ' : '🔴 ') + n));
+const sickOnes = s => s.animals.filter(a => a.sick);
+PANELS.vet = {
+  title: '💊 Trạm thú y Cô Út',
+  render(body, s) {
+    const shut = !S.marketOpen(s), lv = level(s);
+    if (shut) body.append(h('div', { class: 'note closed' }, `🔒 Cô Út nghỉ rồi. Trạm thú y mở từ ${D.MARKET.open}h tới ${D.MARKET.close}h nhé!`));
+    body.append(h('div', { class: 'note' }, 'Cô Út: "Con vật mệt thì 1 liều thuốc là khỏi, bệnh nặng phải 2 liều. Nguy kịch thì gọi bác sĩ ở điện thoại trong nhà. Tiêm vắc-xin trước cho đỡ lo!"'));
+    const list = h('div', { class: 'list' });
+    body.append(list);
+    for (const id of D.VET_ITEMS) {
+      const it = D.ITEMS[id], locked = it.lv > lv;
+      list.append(row({
+        icon: ico(id), name: it.name, locked,
+        desc: [it.desc, h('br'), `Đang có: ${have(s, id)}`],
+        right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + it.lv)
+          : [coinTag(it.price), h('div', { class: 'qtys' },
+            btn('×1', () => buyItem(id, 1), 'green sm', { disabled: shut || s.coins < it.price }),
+            btn('×5', () => buyItem(id, 5), 'green sm', { disabled: shut || s.coins < it.price * 5 }))],
+      }));
+    }
+    const ill = sickOnes(s);
+    body.append(section(ill.length ? `🤒 Đang bệnh (${ill.length})` : '🤒 Cả trại đang khỏe'));
+    const who = h('div', { class: 'list' });
+    body.append(who);
+    if (!ill.length) who.append(empty('Không con nào bị bệnh. Giữ chuồng sạch và cho ăn đủ nhé!'));
+    for (const a of ill) {
+      who.append(row({
+        icon: ico(a.type), name: `${a.name} · ${SICK_TAG[a.sick]}`,
+        desc: a.sick === 2 ? `Đã uống ${a.dose || 0}/${D.SICK.doses[2]} liều` : a.sick >= 3 ? `Còn ${S.mmss(S.sickLeft(a))} — chỉ bác sĩ thú y cứu được` : 'Cho uống 1 liều thuốc là khỏi',
+      }));
+    }
+  },
+};
+// ---------- Điện thoại trong nhà: gọi bác sĩ thú y ----------
+PANELS.phone = {
+  title: '📞 Điện thoại',
+  render(body, s) {
+    body.append(h('div', { class: 'note' }, `Gọi bác sĩ thú y tới tận vườn: ${D.SICK.vetPrice} xu một lần, cứu được cả con bệnh nặng lẫn nguy kịch.`));
+    const ill = sickOnes(s).filter(a => a.sick >= 2), list = h('div', { class: 'list' });
+    body.append(list);
+    if (!ill.length) return list.append(empty('Chưa có con nào bệnh nặng. Con mới mệt thì cho uống thuốc thú y là đủ rồi.'));
+    for (const a of ill) {
+      list.append(row({
+        icon: ico(a.type), name: `${a.name} · ${SICK_TAG[a.sick]}`,
+        desc: a.sick >= 3 ? `Còn ${S.mmss(S.sickLeft(a))}` : `Đã uống ${a.dose || 0}/${D.SICK.doses[2]} liều`,
+        right: [coinTag(D.SICK.vetPrice), btn('Gọi bác sĩ', () => res(S.callVet(st(), a.id), 'coin'), 'green', { disabled: s.coins < D.SICK.vetPrice })],
       }));
     }
   },
