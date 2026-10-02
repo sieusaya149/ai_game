@@ -113,6 +113,7 @@ export const GUARD = {
   napMs: 60_000,              // trúng thì ngủ gật suốt khe đó (napMs = napEvery nên đúng napRate thời gian ban đêm)
   chaseMul: 1.3,              // chó đuổi nhanh gấp 1.3 lần người đi bộ
   biteRange: 11,              // đớp được khi cách khách chừng này điểm ảnh
+  loseMs: 2000,               // mất dấu khách chừng này thì chó thôi đuổi, quay về chơi
   biteStunMs: 3000,           // bị đớp: khách đứng hình 3 giây
   fine: 30,                   // bị đớp: khách nộp phạt chừng này xu cho chủ vườn
   barkEvery: 20_000,          // một vườn chỉ ghi một dòng "chó sủa" trong chừng này (khỏi spam nhật ký)

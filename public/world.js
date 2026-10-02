@@ -231,8 +231,8 @@ function guardStep(state, w, rt, dt, goTo, out) {
     g.lost = 0;
     if (!g.chasing) { g.chasing = true; if (out) out.bark = true; }
   } else if (g.chasing) {
-    g.lost += dt;
-    if (g.lost > GUARD_LOST) g.chasing = false;
+    g.lost += dt * 1000;
+    if (g.lost > GUARD.loseMs) g.chasing = false;
   }
   rt.bark = g.chasing;
   if (!g.chasing) return false;
@@ -248,7 +248,6 @@ function guardStep(state, w, rt, dt, goTo, out) {
   if (out && dist(d, p) <= GUARD.biteRange) out.bite = true;
   return true;
 }
-const GUARD_LOST = 2;   // mất dấu chừng này giây thì chó thôi đuổi, quay về chơi
 
 // ---------- Quạ & thằng Tèo ----------
 function updateThreats(state, w, dt) {

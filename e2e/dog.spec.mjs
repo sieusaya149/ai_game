@@ -162,6 +162,7 @@ test('B trộm ô chín rồi bén mảng tới chó: Mực sủa "GÂU GÂU!" v
   const touch = !!testInfo.project.use.hasTouch;
   const A = await player(browser, opts(testInfo, baseURL), guardGarden);
   const B = await player(browser, opts(testInfo, baseURL), guestAt(GATE_AT.x, GATE_AT.y));
+  await A.open();   // chủ đang chơi: thao tác của khách đẩy thẳng sang trình duyệt chủ
   await B.open();
   await enterGarden(B.page, A.name);
 
@@ -177,6 +178,13 @@ test('B trộm ô chín rồi bén mảng tới chó: Mực sủa "GÂU GÂU!" v
   expect(await world(B.page, () => globalThis.__farm.world.rt.get('dog')?.bark)).toBe(true);
   await B.page.screenshot({ path: `test-results/dog-bark-${testInfo.project.name}.png` });
 
+  // A đang chơi: băng rôn báo gấp 🔴 "Mực đang sủa ở phía ... vườn!" và chó sủa được ghi vào vườn A.
+  // (Chỗ gấp cho mũi tên tắt sau GUARD.barkShowMs = 15 giây giờ thật, mà e2e cố tình chỉnh lệch giờ
+  //  làng để giữ ban ngày, nên phần mũi tên kiểm ở test seam 1 `urgentSpots` / `todoList`.)
+  await expect(A.page.locator('#alert-banner')).toContainText(/Mực đang sủa ở phía/, { timeout: 20_000 });
+  expect(await st(A.page, () => globalThis.__farm.state.stats.barks)).toBe(1);
+  await A.page.screenshot({ path: `test-results/dog-owner-alert-${testInfo.project.name}.png` });
+
   // B đứng im nên chó đuổi kịp: đứng hình 3 giây, rơi hết cà chua vừa trộm, nộp phạt cho chủ
   await expect.poll(() => st(B.page, () => !!globalThis.__farm.state.visit?.bitten), { timeout: 30_000 }).toBe(true);
   expect(await world(B.page, () => globalThis.__farm.world.stun)).toBeGreaterThan(GUARD.biteStunMs - 1500);
@@ -184,12 +192,11 @@ test('B trộm ô chín rồi bén mảng tới chó: Mực sủa "GÂU GÂU!" v
   await expect.poll(() => st(B.page, () => globalThis.__farm.state.basket.cachua ?? 0), { timeout: 15_000 }).toBe(0);
   expect(await st(B.page, () => globalThis.__farm.state.coins)).toBe(coins0 - GUARD.fine);
 
-  // A vào chơi: nhật ký khách có dòng chó đớp, chủ nhận tiền phạt và đếm được số người đã đuổi
-  await A.open();
+  // nhật ký khách của A có dòng chó đớp, chủ nhận tiền phạt và đếm được số người đã đuổi
+  await expect.poll(() => st(A.page, () => globalThis.__farm.state.stats.chased ?? 0), { timeout: 20_000 }).toBe(1);
   await A.page.locator('.bb-btn[data-panel="log"]').click();
   await expect(A.page.locator(`.guest-row[data-by="${B.name}"]`).first()).toContainText(new RegExp(`bị Mực đớp`));
   await expect(A.page.locator('.sheet-body')).toContainText('sủa vang');
-  expect(await st(A.page, () => globalThis.__farm.state.stats.chased)).toBe(1);
   await A.page.screenshot({ path: `test-results/dog-log-${testInfo.project.name}.png` });
   expect(A.errors.concat(B.errors)).toEqual([]);
   await A.context.close(); await B.context.close();
@@ -230,6 +237,7 @@ test('ban đêm Mực ngủ gật 💤: B đứng xa 1 ô không bị phát hi�
   };
   const A = await player(browser, opts(testInfo, baseURL), night, true);
   const B = await player(browser, opts(testInfo, baseURL), s => { guestAt(GATE_AT.x, GATE_AT.y)(s); s.inv.sausage = 2; }, true);
+  await A.open();   // chủ đang chơi: thao tác của khách đẩy thẳng sang trình duyệt chủ
   await B.open();
   await enterGarden(B.page, A.name);
 
@@ -256,7 +264,12 @@ test('ban đêm Mực ngủ gật 💤: B đứng xa 1 ô không bị phát hi�
   expect(await seesMe(B.page)).toBe(false);
   await expect.poll(() => st(B.page, () => globalThis.__farm.state.inv.sausage ?? 0), { timeout: 15_000 }).toBe(1);
   await B.page.screenshot({ path: `test-results/dog-sausage-${testInfo.project.name}.png` });
-  expect(B.errors).toEqual([]);
+
+  // chủ đang chơi cũng phải thấy: Mực của A mải ăn nên im lặng, nhật ký ghi dòng ném xúc xích
+  await expect.poll(() => st(A.page, () => (globalThis.__farm.state.dog.quiet || 0) > Date.now()), { timeout: 20_000 }).toBe(true);
+  await A.page.locator('.bb-btn[data-panel="log"]').click();
+  await expect(A.page.locator('.sheet-body')).toContainText('ném xúc xích');
+  expect(A.errors.concat(B.errors)).toEqual([]);
   await A.context.close(); await B.context.close();
 });
 
@@ -266,11 +279,15 @@ test('A xích Mực vào chuồng: B trộm ô ngoài 3 ô quanh chuồng thì k
   const A = await player(browser, opts(testInfo, baseURL), s => guardGarden(s, { far: 5 }));
   const B = await player(browser, opts(testInfo, baseURL), guestAt(GATE_AT.x, GATE_AT.y));
 
-  // A đang chơi, chạm vào Mực rồi bấm nút "Xích Mực vào chuồng"
+  // A đang chơi, chạm vào Mực rồi bấm nút "Xích Mực vào chuồng" (chó chạy lung tung, hụt thì chạm lại)
   await A.open();
-  await reachDog(A.page, touch);
-  await A.page.locator('#chips .chip', { hasText: 'Xích Mực' }).click();
-  await expect.poll(() => st(A.page, () => globalThis.__farm.state.dog.chained)).toBe(true);
+  const chained = () => st(A.page, () => !!globalThis.__farm.state.dog.chained);
+  for (let i = 0; i < 10 && !(await chained()); i++) {
+    await reachDog(A.page, touch);
+    await A.page.locator('#chips .chip', { hasText: 'Xích Mực' }).click({ timeout: 2000 }).catch(() => {});
+    await A.page.waitForTimeout(400);
+  }
+  expect(await chained()).toBe(true);
   await A.page.screenshot({ path: `test-results/dog-chain-${testInfo.project.name}.png` });
   // chờ bản lưu của A lên tới server thì khách mới thấy con chó đã bị xích
   await expect.poll(() => A.visit(A.name).then(r => !!r.farm?.dog?.chained), { timeout: 30_000 }).toBe(true);

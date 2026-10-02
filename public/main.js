@@ -265,7 +265,8 @@ function guestAck(m) {
 function guestDid(op) {
   const mine = home ?? state;
   if (!mine || !op) return;
-  guestOpApply(mine, { name: op.by, level: op.level, room: op.room }, op);
+  // `sausage` = số xúc xích khách đang có, server điền sẵn: thiếu thì luật tưởng khách tay không (issue 31)
+  guestOpApply(mine, { name: op.by, level: op.level, room: op.room, sausage: op.sausage }, op);
   const evs = takeGuestLog(mine);
   if (evs.length) ui.handleEvents(evs);
   changed();

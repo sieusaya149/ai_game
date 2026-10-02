@@ -9,6 +9,7 @@ import {
   guestOpApply, guestReward, guardRadius, guardArea, dogAsleep, dogQuiet, dogSees,
   walkSpeed, chaseSpeed, setChained, barkOp, biteOp, keepLoot, mapOf, urgentSpots,
 } from '../public/state.js';
+import { todoList } from '../public/todo.js';
 import { setClock, serverDay } from '../public/clock.js';
 import { GUARD, GUEST, CROPS, DAY_MS, NIGHT_FROM, EVENT_LEVEL } from '../public/data.js';
 import { TS } from '../public/layout.js';
@@ -214,8 +215,14 @@ test('chó sủa: chủ nhận sự kiện kèm hướng và mũi tên báo gấ
   // chỗ gấp 🔴 (cơ chế mũi tên issue 13) chỉ sáng một lúc rồi tắt
   const spots = urgentSpots(s);
   assert.ok(spots.some(p => p.kind === 'bark'), 'có chỗ gấp để mũi tên chỉ tới');
+  // mũi tên và bản đồ nhỏ lấy chỗ từ todoList: một việc gấp "chó đang sủa" đúng chỗ chó thấy khách
+  const job = todoList(s).find(i => i.kind === 'bark');
+  assert.ok(job, 'bảng Việc cần làm có dòng chó đang sủa');
+  assert.equal(job.level, 'urgent');
+  assert.deepEqual([job.x, job.y], [s.dog.barkX, s.dog.barkY]);
   clock += GUARD.barkShowMs + 1000;
   assert.equal(urgentSpots(s).some(p => p.kind === 'bark'), false);
+  assert.equal(todoList(s).some(i => i.kind === 'bark'), false);
 
   // sủa dồn dập thì chỉ ghi một dòng nhật ký (khỏi spam)
   clock = T0 + 1000;
