@@ -5,7 +5,7 @@ import { bootServer } from './helpers/server.mjs';
 import { createGame, loadGame, tick, canPlace, placeEntity, upgradePen, catHouses, buyCat, cats, stageStart, vaccinate } from '../public/state.js';
 import { setClock } from '../public/clock.js';
 import { SAVE_VERSION } from '../public/migrate.js';
-import { MAX_CATCHUP_MS, SICK, PREDATOR, DAY_MS } from '../public/data.js';
+import { CROPS, MAX_CATCHUP_MS, SICK, PREDATOR, DAY_MS } from '../public/data.js';
 import { TS } from '../public/layout.js';
 import { serverDay, villageCal } from '../public/clock.js';
 import { readFileSync } from 'node:fs';
@@ -94,17 +94,28 @@ test('chạy bù: chủ quay lại nhận vườn đã chạy bù cùng màn "Tr
   assert.ok(g.plots[0].crop.progress >= 1);
 });
 
-test('chạy bù (seam 1): một lần dài giống chạy chơi đơn cùng khoảng đó', t => {
+test('chạy bù (seam 1): cây lớn tới lúc chín như chơi đơn, rồi đứng yên chờ chủ về, không héo', t => {
   fixRandom(t);
   setClock(() => T);
   try {
     const s = createGame({ name: 'Lan' }); plant(s);
     const a = local(s, 5 * H);
     const b = structuredClone(s); b.threats = [];
-    tick(b, 5 * H);
-    assert.equal(a.plots[0].crop.progress, b.plots[0].crop.progress);
-    assert.equal(a.simMs, b.simMs);
+    tick(b, CROPS.cai.grow);
+    assert.ok(a.plots[0].crop.progress >= 1 && a.plots[0].crop.progress < 1.1, String(a.plots[0].crop.progress));
+    assert.equal(a.plots[0].crop.progress, local(s, 8 * H).plots[0].crop.progress);
+    assert.equal(a.plots[0].crop.rotten, false);
+    assert.equal(a.simMs, s.simMs + 5 * H);
   } finally { setClock(); }
+});
+
+test('chạy bù: chủ vắng 8 giờ, cây đã chín không héo, server khớp trình duyệt', async t => {
+  const { user, owner } = await setup(t);
+  const { s } = await owner('Lan', 8 * H, s => { plant(s); s.plots[0].crop.progress = 1.05; });
+  const f = (await (await user('Bình')).visit('Lan')).body.farm;
+  assert.equal(f.plots[0].crop.rotten, false);
+  assert.equal(f.plots[0].crop.progress, local(s, 8 * H).plots[0].crop.progress);
+  assert.ok(f.plots[0].crop.progress < 1.1);
 });
 
 test('visit: cần đăng nhập, vườn không có thì 404', async t => {
@@ -195,7 +206,7 @@ test('server chạy bù 8 giờ (issue 43): có chuột, diều hâu, chồn th�
   assert.deepEqual(f.animals.map(a => a.id).sort(), [...ids].sort(), 'không con nào chết hay bị bắt đi');
   assert.equal(f.animals.filter(a => a.hurt).length, 0, 'không con nào bị cắn');
   assert.equal(f.preds.some(p => p.kind !== 'rat'), false, 'diều hâu, chồn bỏ đi tay không');
-  assert.ok(f.troughs.chicken < 20, 'cám trong máng có hao');
+  assert.ok(Object.values(f.troughs).some(n => n < 20), 'cám trong máng có hao');
   assert.ok(f.preds.filter(p => p.kind === 'rat').length <= PREDATOR.rat.max, 'chuột không sinh quá trần');
 });
 

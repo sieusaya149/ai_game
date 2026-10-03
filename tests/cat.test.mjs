@@ -295,7 +295,7 @@ test('cho mèo ăn và vuốt ve: no, vui và thân hơn; mèo không có hành 
 test('ADR 0004: chạy bù offline có mèo và chuột thì chuột ít đi, không con nào chết', () => {
   const s = newGame();
   s.time = DAY_MS * 0.05;
-  s.troughs.chicken = 20;
+  s.troughs[G.mapOf(s).pens.chicken.id] = 20;
   const cat = addCat(s, 'truong', { hunger: 50 });
   s.inv.vaccine = 1;
   assert.equal(G.vaccinate(s, cat.id).ok, true, 'tiêm vắc-xin cho mèo được, nó khỏe suốt lúc mình vắng');
@@ -328,4 +328,49 @@ test('mèo có trong bảng loài, mua ở chợ Bà Tư, không bán được v
   const low = G.buyCat(s);
   assert.equal(low.ok, false);
   assert.match(low.msg, new RegExp(`cấp ${ANIMALS.meo.lv}`));
+});
+
+test('hotfix: mèo mở khoá cùng cấp với chuột (cấp 5): không có mèo mà chưa có chuột', () => {
+  assert.equal(ANIMALS.meo.lv, P.minLevel);
+  const s = newGame();
+  s.exp = 0;
+  while (G.levelInfo(s.exp).level < P.minLevel - 1) s.exp += 10;   // cấp 4: chưa mua mèo được, chuột cũng chưa có
+  assert.equal(G.levelInfo(s.exp).level, P.minLevel - 1);
+  assert.equal(G.buyCat(s).ok, false);
+  assert.equal(G.buy(s, 'catfood', 1).ok, false, 'cá khô cùng cấp với mèo');
+  while (G.levelInfo(s.exp).level < P.minLevel) s.exp += 10;
+  assert.equal(G.buyCat(s).ok, true);
+  assert.equal(G.buy(s, 'catfood', 1).ok, true);
+});
+
+test('hotfix: mèo trưởng thành khỏe ở trong trại thì chuột sinh ra ít đi một nửa', () => {
+  const spawns = (cat) => {
+    const s = newGame();
+    const c = cat ? addCat(s, cat.stage, cat.extra) : null;
+    let n = 0;
+    seeded(5, () => {
+      for (let i = 0; i < 4000; i++) {
+        s.preds = []; s.time = NOON;
+        if (c) { c.hunger = 100; c.sick = cat.extra?.sick ?? 0; c.stage = cat.stage; c.age = G.stageStart('meo', cat.stage); }
+        G.tick(s, MIN);
+        n += s.preds.filter(p => p.kind === 'rat').length;
+      }
+    });
+    return n;
+  };
+  const none = spawns(null), adult = spawns({ stage: 'truong' }), kitten = spawns({ stage: 'non' }), sick = spawns({ stage: 'truong', extra: { sick: 1 } });
+  assert.ok(none > 60, `đủ mẫu: ${none}`);
+  assert.ok(adult / none > 0.28 && adult / none < 0.72, `có mèo lớn khỏe: ${adult} so với ${none}`);
+  assert.ok(kitten / none > 0.8, `mèo con chưa có tác dụng: ${kitten} so với ${none}`);
+  assert.ok(sick / none > 0.8, `mèo ốm chưa có tác dụng: ${sick} so với ${none}`);
+});
+
+test('hotfix: mỗi con mèo nhớ số chuột đã bắt', () => {
+  const s = newGame();
+  const cat = addCat(s, 'truong');
+  assert.equal(cat.caught ?? 0, 0);
+  const got = seeded(101, () => hunt(s, cat, 100 * MIN, 45));
+  assert.ok(got > 0);
+  assert.equal(cat.caught, got);
+  assert.equal(G.catCatches(cat), got);
 });

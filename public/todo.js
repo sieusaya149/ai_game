@@ -58,8 +58,8 @@ const plots = (s, ok) => s.plots.filter(p => p.unlocked && ok(p) && mapOf(s).plo
 // Máng trống của chuồng đang có con vật ăn máng đó; đứng ở mép dưới máng như world.troughAnchor
 function troughs(s) {
   const m = mapOf(s);
-  return Object.entries(m.pens).filter(([pen]) => (s.troughs?.[pen] ?? 0) <= 0 && s.animals.some(a => ANIMALS[a.type].pen === pen))
-    .map(([pen, p]) => ({ id: pen, x: p.trough.x, y: p.trough.r * TS + 8, target: { kind: 'trough', pen } }));
+  return m.penList.filter(p => p.trough && (s.troughs?.[p.id] ?? 0) <= 0 && s.animals.some(a => (a.pen ?? m.pens[ANIMALS[a.type].pen]?.id) === p.id))
+    .map(p => ({ id: p.id, x: p.trough.x, y: p.trough.r * TS + 8, target: { kind: 'trough', pen: p.type, id: p.id } }));
 }
 
 // Chuồng bẩn: đứng ở máng, chạm vào máng để xúc phân

@@ -139,7 +139,7 @@ kbd {
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100% - 144px - var(--sl) - var(--sr));
 }
 #target-name {
-  max-width: 100%; padding: 4px 12px; border-radius: 14px; font-size: 13px; font-weight: 800; text-align: right;
+  max-width: 100%; padding: 4px 12px; border-radius: 14px; font-size: 13px; font-weight: 800; text-align: right; white-space: pre-line;
   background: rgba(60, 35, 10, 0.85); color: var(--cream); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 /* Nhiều nút trên màn thấp (con vật có tới 6 chip): danh sách cuộn dọc, không leo lên bản đồ nhỏ / HUD.
@@ -236,6 +236,13 @@ kbd {
 .qtys { display: flex; gap: 6px; }
 .sexbuy { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .sexopt { display: flex; align-items: center; gap: 6px; }
+/* chọn màu lông chó, mèo: mỗi nút là hình con vật đúng màu */
+.coats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.coat { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 52px; padding: 3px 4px 2px; border-radius: 10px; border: 2px solid var(--line); background: #fff8e6; font: 800 11.5px inherit; font-family: inherit; color: var(--ink); cursor: pointer; }
+.coat canvas { height: 26px; width: auto; image-rendering: pixelated; }
+.coat.on { border-color: var(--green-d); background: #e4f6cf; box-shadow: 0 0 0 2px #b6dc8c; }
+.coat:disabled { opacity: 0.55; cursor: default; }
+.creator-card .coats { justify-content: center; }
 .name-input { width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 12px; border: 3px solid var(--wood); background: #fff; font: 800 17px inherit; font-family: inherit; color: var(--ink); }
 .dialog-err { min-height: 18px; margin: 6px 0 8px; font-size: 13px; font-weight: 800; color: #b3261e; }
 .price { font-weight: 900; font-size: 14px; color: var(--orange-d); white-space: nowrap; }
@@ -263,6 +270,7 @@ kbd {
 .chips-line .mini { padding: 3px 10px; border-radius: 999px; background: var(--paper); border: 2px solid var(--line); opacity: 1; font-weight: 800; }
 
 .sell-all { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; margin-bottom: 10px; border-radius: 15px; background: #ffe6a8; border: 2px solid var(--orange); font-size: 15px; font-weight: 800; }
+.order-total .btn { flex: none; white-space: nowrap; }   /* nút "Đặt hàng" không xuống dòng ở 360px */
 
 .order { padding: 10px 12px; border-radius: 15px; background: var(--paper); border: 2px solid var(--line); box-shadow: 0 2px 0 var(--line); }
 .order.ready { background: #eaf7d8; border-color: #8cc65a; box-shadow: 0 2px 0 #8cc65a; }
@@ -638,3 +646,4 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 .wx-day.today b { font-size: 13px; }
 .wx-paper-wrap { display: flex; justify-content: center; }
 .wx-paper { image-rendering: pixelated; max-width: 100%; height: auto; }
+#vet-coats .row-ico .thumb { width: 44px; height: auto; }

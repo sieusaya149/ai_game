@@ -23,7 +23,7 @@ export const BUILDING_DEFS = {
   tank:     { name: 'Bồn chứa',      sprite: 'tank',      foot: { w: 2, h: 2 }, spr: { x: 0, y: -16 },  at: { x: 16, y: 40 } },
   tank2:    { name: 'Bồn phụ',       sprite: 'tank2',     foot: { w: 1, h: 1 }, spr: { x: 0, y: -12 },  at: null },
   booster:  { name: 'Trạm bơm phụ',  sprite: 'booster',   foot: { w: 1, h: 1 }, spr: { x: 0, y: -10 },  at: null },
-  doghouse: { name: 'Chuồng chó',    sprite: 'doghouse',  foot: { w: 1, h: 1 }, spr: { x: -6, y: -8 },  at: null, home: { x: 8, y: 26 } },
+  doghouse: { name: 'Chuồng chó',    sprite: 'doghouse',  foot: { w: 1, h: 1 }, spr: { x: -6, y: -8 },  at: { x: 8, y: 24 }, home: { x: 8, y: 26 }, bowl: { x: 18, y: 24 }, guest: 'Chuồng của chó nhà người ta, khách không đụng vào được' },
   cathouse: { name: 'Nhà mèo',       sprite: 'cathouse',  foot: { w: 1, h: 1 }, spr: { x: -5, y: -8 },  at: null, catHome: { x: 8, y: 24 } },
   // hố ủ phân (issue 61): hình đổi theo trạng thái (rỗng, đang bỏ đồ, đang ủ, đã xong), xem render.compostImg
   compost:  { name: 'Hố ủ phân',     sprite: 'compost',   foot: { w: 2, h: 1 }, spr: { x: 0, y: -8 },   at: { x: 16, y: 24 }, guest: 'Hố ủ phân của chủ vườn' },

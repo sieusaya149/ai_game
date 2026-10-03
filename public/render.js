@@ -12,8 +12,10 @@ import { TANK_ART, BAR_IN } from './arttank.js';
 import { SPR53_OLD } from './art53.js';   // trái khổng lồ (issue 53)
 import { GH, GH_AT } from './art60.js';   // nhà kính (issue 60)
 import { SPR61_OLD } from './art61.js';   // hố ủ phân (issue 61)
+import { recolor } from './coat.js';
+import { COURIER_ART } from './artcourier.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, plotSeasonMul, frostHold, glassStatus, tankInfo, waterNet, waterOn, autoInfo } from './state.js';
+import { canMove, ripeLeft, wilting, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, plotSeasonMul, frostHold, glassStatus, tankInfo, waterNet, waterOn, autoInfo } from './state.js';
 import { cropStar, compostInfo } from './state.js';
 import { AUTO_ART } from './art58.js';   // tự động hóa khối ruộng (issue 58)
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -276,16 +278,30 @@ const angelFallback = () => once('angel', () => {
   rect(x, '#f7d547', 3, 0, 4, 1); rect(x, '#ffffff', 0, 4, 3, 2); rect(x, '#ffffff', 7, 4, 3, 2); rect(x, '#fff3e0', 3, 2, 4, 8);
   return c;
 });
-export const dogImg = (dog, face, frame, sleep) => animalImg({ type: 'dog', stage: dog.stage, sex: 'm' }, face, frame, sleep);
+// Màu lông (coat.js): dựng từ chính sprite gốc ở cả bộ cũ lẫn bộ 2x; màu mặc định (thiếu / lạ) thì dùng ảnh gốc
+const coated = (img, sp, coat) => (img && coat ? derived(img, 'coat:' + coat, (im, k) => recolor(im, sp, coat, k)) : img);
+export const dogImg = (dog, face, frame, sleep) => coated(animalImg({ type: 'dog', stage: dog.stage, sex: 'm' }, face, frame, sleep), 'cho', dog.coat);
 // Dáng chó theo động tác lệnh (issue 45): mỗi giai đoạn một bộ art riêng; thiếu art thì về dáng đứng
 const DOG_POSE = { sit: 'dogSitBy', beg: 'dogBegBy', herd: 'dogHerdBy', bark: 'dogBarkBy' };
+// Cúi đầu ăn ở bát: phần đầu (phía mặt quay về, nửa trên) dịch xuống 1 điểm của bộ cũ, dựng từ chính khung đứng
+// của giai đoạn đó (cả bộ cũ lẫn 2x, đúng màu lông) nên không dùng chung hình giữa các giai đoạn
+const dipped = (img, face) => derived(img, 'dip' + face, (im, k) => {
+  const c = mkCanvas(im.width, im.height), x = c.getContext('2d'), w = im.width, cut = Math.round(w * 0.42), hh = Math.round(im.height * 0.62);
+  x.drawImage(im, 0, 0);
+  const sx = face === 'right' ? w - cut : 0;
+  x.clearRect(sx, 0, cut, hh);
+  x.drawImage(im, sx, 0, cut, hh - k, sx, k, cut, hh - k);
+  return c;
+});
 export function dogPoseImg(dog, pose, face, frame) {
+  if (pose === 'eat') { const im = dogImg(dog, face, 0); return frame % 2 ? dipped(im, face) : im; }
   const set = pose && SPR3?.[DOG_POSE[pose]]?.[dog.stage];
-  return set ? set[face][frame % set[face].length] : dogImg(dog, face, frame);
+  return set ? coated(set[face][frame % set[face].length], 'cho', dog.coat) : dogImg(dog, face, frame);
 }
 // Mèo (issue 44): mỗi dáng một bộ art riêng theo giai đoạn ở art3 (vồ, phơi nắng, ngậm chuột); thiếu art thì về dáng đứng.
 // rt = dữ liệu chạy của world.js (hướng, đang đi, đang vồ, đã tới chỗ khoe)
-export function catImg(c, rt = {}) {
+export const catImg = (c, rt) => coated(catBase(c, rt), 'meo', c.coat);
+function catBase(c, rt = {}) {
   const st = c.stage ?? 'truong', face = rt.face ?? 'left', base = { type: 'meo', stage: st, sex: c.sex };
   const fr = Math.floor((rt.anim ?? 0) * (rt.walking ? (rt.run ? 10 : 7) : 2)) % 2;
   const pose = key => { const set = SPR3?.[key]?.[st]; return set ? set[face][fr % set[face].length] : null; };
@@ -301,7 +317,7 @@ function guardImg(dog, face, rt, now) {
   const fr = Math.floor(now / 110);
   if (!rt.walking) return dogPoseImg(dog, 'bark', face, fr);
   const frames = SPR3?.dogRunBy?.[dog.stage ?? 'truong']?.[face];
-  if (frames?.length) return frames[fr % frames.length];
+  if (frames?.length) return coated(frames[fr % frames.length], 'cho', dog.coat);
   return dogImg(dog, face, Math.floor(rt.anim * 10) % 2);
 }
 // Sao quay quanh đầu lúc đứng hình; chưa có sprite thì vẽ tạm ba chấm vàng
@@ -331,6 +347,7 @@ export function crowImg(face, frame) {
 }
 // Thằng Tèo: nhân vật dựng bằng art.character (world.js vẽ cùng bảng khung hình với người chơi)
 export const TEO_LOOK = { skin: 1, hair: 0, hairColor: 4, shirt: 4, pants: 2, hat: 2, acc: 1 };
+const COURIER_LOOK = { skin: 0, hair: 0, hairColor: 1, shirt: 2, pants: 0, hat: 1, acc: 0 };   // chỉ dùng khi thiếu art người giao hàng
 // Tí Sún: đi / rón rén / bị bắt — mỗi tư thế một bộ sprite riêng (issue 46)
 export function tisunImg(pose, face = 'left', frame = 0, dir = 0) {
   if (pose === 'caught') return SPR3?.npcTiSunCaught ?? null;
@@ -652,6 +669,15 @@ function fieldUps(state) {
   }
   return out;
 }
+
+// Thanh nhỏ dưới ô: xanh = tiến độ lớn, cam = đếm ngược chín→héo, đỏ nhấp nháy = sắp héo (2 hàng điểm ảnh thế giới, nét nguyên theo tỉ lệ chẵn)
+function cropBar(ctx, c, px, py, now) {
+  if (c.dead || c.rotten) return;
+  const left = ripeLeft(c), f = left == null ? Math.min(1, c.progress) : left;
+  const col = left == null ? '#5fd35f' : wilting(c) ? (Math.floor(now / 300) % 2 ? '#ff4a3a' : '#c02a20') : '#f2a52b';
+  rect(ctx, '#2b1a0c', px + 2, py + 14, 12, 2);
+  rect(ctx, col, px + 2, py + 15, Math.max(1, Math.round(12 * f)), 2);
+}
 // Biểu tượng trong bong bóng của một ô (theo độ ưu tiên)
 export function plotProblem(p) {
   const c = p.crop;
@@ -907,6 +933,8 @@ export function render(ctx, f) {
   const cats = catsIn(state, here);
   for (const c of cats) if (c.x != null && vis(c.x, c.y)) shadow(c.x, c.y, Math.round(5 * (small[c.stage] ?? 1)));
   for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
+  const courier = farm && !state.visit ? state.courier : null;   // người giao hàng (mua online)
+  if (courier?.x != null && vis(courier.x, courier.y, 40)) shadow(courier.x, courier.y, 6);
   for (const p of preds) if (p.x != null && vis(p.x, p.y, 40) && p.kind !== 'hawk') shadow(p.x, p.y, p.kind === 'rat' ? 4 : 6);
 
   if (wd.build && farm) drawWater(ctx, state, wd.build);   // vùng phủ xanh, ống nước nằm dưới các vật (issue 57)
@@ -966,6 +994,8 @@ export function render(ctx, f) {
         else { ctx.fillStyle = '#767686'; for (let i = 0; i < 6; i++) ctx.fillRect(Math.round(b.x + 4 + i * 3), Math.round(b.y + img.height - 3 + (i % 2)), 2, 2); }
       });
     }
+    const bw = b.id === 'doghouse' && farm && m.dogBowl && SPR3?.dogBowl?.[state.dog?.bowl > 0 ? 'full' : 'empty'];
+    if (bw) add(m.dogBowl.y, () => blit(bw, m.dogBowl.x - bw.width / 2, m.dogBowl.y - bw.height));   // bát ăn cạnh chuồng chó
   }
   for (const p of m.penList) {   // nhà/mái chuồng theo cấp, rồi máng
     const hs = p.house, hi = hs.sprite === 'quarantine' ? SPR3?.quarantine : SPR3?.pen?.[hs.sprite]?.[p.lv - 1];
@@ -978,7 +1008,7 @@ export function render(ctx, f) {
     }
     const hm = farm && isDusk(state) ? penHome(state, p.id) : null, gt = hm?.total ? gateOf(state, p.id) : null;
     if (gt && vis(gt.x, gt.y, 24)) add(gt.y + 3, () => homeSign(gt, hm));   // biển số con đã về trên cửa chuồng
-    const tr = p.trough, n = state.troughs?.[p.type] ?? 0;
+    const tr = p.trough, n = state.troughs?.[p.id] ?? 0;
     if (!tr || !vis(tr.x, tr.y, 20)) continue;
     add(tr.y, () => {
       blit(SPR.trough, tr.x - 13, tr.y - 12);
@@ -1011,9 +1041,10 @@ export function render(ctx, f) {
     const prob = plotProblem(p);
     add(py + 12, () => {
       if (p.crop) {
-        const im = cropImg(p), gi = giantImg(p);
+        const gi = giantImg(p), warn = wilting(p.crop), im0 = cropImg(p), im = warn ? tinted(im0, '#8a5a1a', Math.floor(now / 350) % 2 ? 0.45 : 0.25) : im0;   // sắp héo: ngả nâu nhấp nháy
         if (gi) giant(gi, px, py, p.idx);   // trái khổng lồ: hình to tràn ra ngoài ô, lấp lánh (issue 53)
         else blit(im, px + (16 - im.width) / 2, py + 15 - im.height);
+        cropBar(ctx, p.crop, px, py, now);
         if (p.crop.sick && !p.crop.dead && !p.crop.rotten && !SPR.sick) { /* đã nhuộm vàng */ }
         if (!gi && cropStage(p.crop) >= 4 && !p.crop.dead && !p.crop.rotten) {
           for (let i = 0; i < sparkles; i++) {
@@ -1276,6 +1307,16 @@ export function render(ctx, f) {
       ctx.globalAlpha = 1;
     });
   }
+  // người giao hàng: ôm thùng hàng đi vào, giao xong để thùng trước cửa kho rồi đi tay không ra cổng
+  if (courier) {
+    const box = COURIER_ART?.box, c = courier;
+    if (c.state === 'leaving' && box) add(c.at.y - 1, () => blit(box, Math.round(c.at.x + 7 - box.width / 2), Math.round(c.at.y - box.height + 1)));
+    if (c.x != null && vis(c.x, c.y, 40)) {
+      const rt = wd.rt.get('courier') ?? {}, dir = rt.dir ?? 3, fr = rt.walking ? [1, 0, 2, 0][Math.floor((rt.anim ?? 0) * 8) % 4] : 0;
+      const set = COURIER_ART?.[c.state === 'leaving' ? 'empty' : 'carry'], im = set?.[dir]?.[fr] ?? charFrames(COURIER_LOOK)[dir][fr];
+      add(c.y, () => blit(im, Math.round(c.x - 8), Math.round(c.y - 23)));
+    }
+  }
   // kẻ săn mồi: chuột lon ton dưới đất, chồn men theo đất, diều hâu bay có bóng riêng in trên mặt đất
   for (const p of preds) {
     if (p.x == null || !vis(p.x, p.y, 48)) continue;
@@ -1297,7 +1338,11 @@ export function render(ctx, f) {
     const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
     const shake = wd.stun > 0 ? (Math.floor(now / 60) % 2 ? 1 : -1) : 0;
     if (!wd.sleeping) add(p.y, () => {
-      person(state.look, dir, k, p.x - 8 + shake, p.y - 23);
+      if (state.sit && !wd.moving) {   // ngồi ghế đá: hạ thân xuống, cắt phần chân (chưa có sprite ngồi riêng)
+        ctx.save(); ctx.beginPath(); ctx.rect(p.x - 12, p.y - 36, 24, 37); ctx.clip();
+        person(state.look, dir, 0, p.x - 8 + shake, p.y - 19);
+        ctx.restore();
+      } else person(state.look, dir, k, p.x - 8 + shake, p.y - 23);
       if (state.stamina <= 0) {   // hết thể lực: thở hồng hộc, mồ hôi bên đầu
         const sw = SPR2?.sweat?.[Math.floor(now / 350) % 2];
         if (sw) blit(sw, p.x + 4, p.y - 29);

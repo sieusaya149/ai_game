@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
+import { penIdOf } from './helpers/troughs.mjs';
 import { todoList } from '../public/todo.js';
 import { arrowTargets } from '../public/notify.js';
 
@@ -73,7 +74,7 @@ test('trứng dưới đất, phân chó, máng hết cám', () => {
   s.animals.push({ id: s.nextId++, type: 'ga', stage: 'truong', hunger: 100, happy: 60, sick: false, x: 1, y: 1 });
   const tr = get(s, 'trough');
   assert.equal(tr.count, 1); assert.equal(tr.level, 'normal');
-  s.troughs.chicken = 5;
+  s.troughs[penIdOf(G, s, 'chicken')] = 5;
   assert.equal(get(s, 'trough'), undefined);
 });
 

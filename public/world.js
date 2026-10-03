@@ -1,6 +1,6 @@
 // Thế giới: di chuyển, va chạm, tìm đường, AI con vật/chó/quạ/trộm, tìm target. Không vẽ gì.
 import { TS, GROUND } from './layout.js';
-import { ANIMALS, CROPS, DOG, GUARD, WALK_SPEED, DIR_NAME, BOND, FREE, PREDATOR } from './data.js';
+import { ANIMALS, CROPS, DOG, GUARD, WALK_SPEED, DIR_NAME, BOND, FREE, PREDATOR, DELIVERY } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
 import { troughOf } from './farm.js';
@@ -226,7 +226,7 @@ function updateAnimals(state, w, dt0, out) {
       if (rt.timer <= 0 && !near) {
         rt.nap = false;
         const inMud = a.type === 'heo' && inMudSpot(a);
-        const trough = pen.trough ? state.troughs?.[ANIMALS[a.type].pen] ?? 0 : 0;   // chuồng cách ly không có máng
+        const trough = pen.trough ? state.troughs?.[pen.id] ?? 0 : 0;   // chuồng cách ly không có máng
         const hen = henOf(state, a);
         if (hen && a.type === 'vit' && Math.random() < 0.9) {   // vịt con đi hàng theo vịt mẹ
           const r = duckRow(state, w, a, hen);
@@ -289,6 +289,14 @@ function updateDog(state, w, dt0, out) {
     return false;
   };
   if (guardStep(state, w, rt, dt, goTo, out)) return;   // canh khách lạ: sủa rồi đuổi
+  // đói và bát có thức ăn (luật đặt eatAt): đi tới bát, tới nơi thì cúi đầu ăn tới lúc luật cho ăn xong
+  const bw = atFarm() && d.eatAt && M.dogBowl;
+  if (bw) {
+    rt.pose = null; rt.nap = false; rt.mode = 'idle'; rt.timer = rnd(1, 2);
+    if (goTo(bw.x - 9, bw.y + 1, 46) || (rt.stuck > 0.6 && dist(d, bw) < 24)) { rt.face = 'right'; rt.pose = 'eat'; rt.anim += dt; }
+    else if (rt.stuck > 1.5) { d.x = bw.x - 9; d.y = bw.y + 1; }   // kẹt đường: tới thẳng bát
+    return;
+  }
   // đang có lệnh (issue 45): luật đã quyết kết quả, đây chỉ là diễn hoạt
   const cmd = d.cmd?.id;
   rt.pose = rt.barkT ? 'bark' : null;
@@ -462,6 +470,27 @@ function updateThreats(state, w, dt) {
   }
 }
 
+// ---------- Người giao hàng (mua online) ----------
+// Luật (state.js stepDeliveries) chốt lúc lên đường, lúc tới kho, lúc giao xong; ở đây chỉ diễn: đi từ cổng tới trước nhà kho,
+// đứng chờ ở cửa kho tới giờ giao, giao xong thì đi ra cổng. Tới nơi trễ hơn luật cũng không sao, hàng vẫn vào kho đúng giờ.
+function updateCourier(state, w, dt) {
+  const c = state.courier;
+  if (!c || !atFarm() || state.visit) return;
+  const rt = rtOf(w, 'courier');
+  rt.walking = false;
+  if (c.x == null) { c.x = c.from.x; c.y = c.from.y; rt.dir = 3; }
+  const want = c.state === 'leaving' ? 'out' : 'in';
+  if (rt.pathFor !== want || rt.forId !== c.id) {
+    rt.pathFor = want; rt.forId = c.id;
+    rt.path = want === 'in' ? findPath(c.x, c.y, c.at.x, c.at.y) : [...findPath(c.x, c.y, c.from.x, c.from.y), { x: c.from.x, y: M.view.y1 + 30 }];
+  }
+  const wp = rt.path?.[0];
+  if (!wp) { rt.dir = want === 'in' ? 3 : rt.dir; return; }   // tới cửa kho: quay mặt vào kho chờ giao
+  const dx = wp.x - c.x, dy = wp.y - c.y, d = Math.hypot(dx, dy), st = Math.min(d, DELIVERY.speed * dt);
+  if (d < 0.8) rt.path.shift();
+  else { c.x += dx / d * st; c.y += dy / d * st; rt.dir = dirOf(dx, dy); rt.walking = true; rt.anim += dt; }
+}
+
 // ---------- Kẻ săn mồi: chuột, diều hâu, chồn (issue 43) ----------
 // Luật (state.js) đã chọn ô của chuột và con mồi của diều hâu/chồn; ở đây chỉ diễn hoạt cho đẹp:
 // chuột lon ton tới ô luật chọn, diều hâu lượn vòng trên cao rồi sà xuống, chồn men theo đất tới con mồi.
@@ -539,6 +568,7 @@ export function targetPos(state, t) {
     case 'threat': return findBy(state.threats, t.id);
     case 'pred': return findBy(state.preds, t.id);
     case 'dog': return state.dog;
+    case 'bowl': return M.dogBowl;
     case 'cat': return findBy(state.cats, t.id);
     case 'trough': return troughAnchor(t);
     case 'gate': return ST.gateOf(state, t.id);
@@ -558,7 +588,7 @@ export function exists(state, t) {
   if (!atFarm() && !['building', 'door'].includes(t.kind) && !(t.kind === 'dog' && dogHere(state)) && t.kind !== 'cat') return false;
   if (t.kind === 'cat') return catsHere(state).some(c => c.id === t.id);
   if (t.kind === 'plot') return !!state.plots[t.idx]?.unlocked;
-  if (t.kind === 'lockedPlot') return t.idx === ST.nextLockedPlot(state);
+  if (t.kind === 'lockedPlot') { const lp = state.plots[t.idx]; return !!lp && !lp.unlocked && !lp.removed; }   // ô khóa chưa tới lượt: chạm vào được, báo ô cần mở trước
   if (t.kind === 'strip' && !atFarm()) return false;
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
@@ -570,7 +600,8 @@ const tappable = d => TAPPABLE_DECO.has(d.kind) || (d.kind === 'deco_scarecrow' 
 // nhà kính kính vỡ (issue 60): chạm cửa / bảng để sửa
 const glassField = id => M.fields.find(e => e.id === id && e.up?.glass) ?? null;
 const brokenGlass = () => M.fields.filter(e => e.up?.glass?.broken);
-const RANGE = { glass: 24, animal: 20, egg: 20, poop: 20, threat: 20, pred: 26, dog: 20, cat: 20, trough: 22, gate: 24, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
+
+const RANGE = { glass: 24, animal: 20, egg: 20, poop: 20, threat: 20, pred: 26, dog: 20, bowl: 20, cat: 20, trough: 22, gate: 24, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -584,7 +615,8 @@ export function rangeDist(state, t) {
   return d <= RANGE[t.kind] ? d : Infinity;
 }
 export const inRange = (state, t) => rangeDist(state, t) < Infinity;
-const BIAS = { threat: 10, pred: 12, poop: 3, egg: 3, animal: 2, dog: 2, cat: 2, lockedPlot: -2 };
+// bát ăn nằm ngay chỗ chó hay nằm: đứng cạnh chó thì chó được chọn trước, muốn đổ bát thì chạm vào bát
+const BIAS = { threat: 10, pred: 12, poop: 3, egg: 3, animal: 2, dog: 2, cat: 2, lockedPlot: -2, bowl: -10 };
 // Kẻ săn mồi chỉ được ưu tiên khi đang trong khoảng cảnh báo (sắp ra tay). Con chuột lang thang ngang qua
 // không được giành mất ô ruộng, quả trứng hay cái máng ngay dưới chân người chơi.
 function biasOf(state, t) {
@@ -625,6 +657,7 @@ export function findTarget(state, w) {
     for (const dir of ['N', 'S', 'E', 'W']) consider({ kind: 'strip', dir });
   }
   if (dogHere(state)) consider({ kind: 'dog' });
+  if (atFarm() && M.dogBowl) consider({ kind: 'bowl' });
   for (const c of catsHere(state)) consider({ kind: 'cat', id: c.id });
   for (const { pen, id } of M.troughs) consider({ kind: 'trough', pen, id });
   for (const p of M.penList) if (p.scale) consider({ kind: 'scale', pen: p.type, id: p.id });
@@ -643,20 +676,21 @@ export function nameOf(state, t) {
     case 'plot': {   // cây còn sống: kèm số sao vụ này đang giữ (issue 52), vd "Cải xanh ★★☆"
       const c = state.plots[t.idx]?.crop, n = c && !c.dead && !c.rotten ? ST.cropStar(c) : 0;
       const big = c?.giant && n && c.progress >= 1 ? ' · khổng lồ ✨' : '';   // trái khổng lồ (issue 53)
-      return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (n ? ` ${'★'.repeat(n)}${'☆'.repeat(3 - n)}` : '') + big : `Ô ruộng ${t.idx + 1}`;
+      return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (n ? ` ${'★'.repeat(n)}${'☆'.repeat(3 - n)}` : '') + (ST.wilting(c) ? ' – sắp héo!' : '') + big : `Ô ruộng ${t.idx + 1}`;
     }
     case 'lockedPlot': return 'Đất hoang';
-    case 'animal': { const a = findBy(state.animals, t.id); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}` : 'Vật nuôi'; }
+    case 'animal': { const a = findBy(state.animals, t.id), why = a && ST.breedNote(state, a); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}${why ? `\n💡 ${why}` : ''}` : 'Vật nuôi'; }
     case 'egg': { const e = findBy(state.eggs, t.id); return e?.candled ? (e.fertile ? 'Trứng có phôi ✨' : 'Trứng trống') : 'Quả trứng'; }
     case 'poop': return 'Phân chó';
     case 'threat': return THREAT_NAME[findBy(state.threats, t.id)?.kind] ?? 'Con quạ';
     case 'pred': { const p = findBy(state.preds, t.id); return p ? 'Con ' + ST.PRED_NAME[p.kind].toLowerCase() : ''; }
     case 'dog': return state.dog.name || DOG.name;
-    case 'cat': { const c = findBy(state.cats, t.id); return c ? `${ST.animalLabel(c)} ${'❤️'.repeat(c.bond || 1)}` : 'Mèo'; }
+    case 'bowl': { const n = state.dog.bowl || 0; return `Bát ăn của ${state.dog.name || DOG.name} · ${n ? `còn ${n}/${DOG.bowlMax} phần` : 'trống'}`; }
+    case 'cat': { const c = findBy(state.cats, t.id); return c ? `${ST.animalLabel(c)} ${'❤️'.repeat(c.bond || 1)}\n🐀 Đã bắt ${ST.catCatches(c)} con chuột` : 'Mèo'; }
     case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;
     case 'gate': { const h = ST.penHome(state, t.id); return `Cửa ${M.penById[t.id]?.name?.toLowerCase() ?? 'chuồng'} (${h.home}/${h.total} đã về)`; }
     case 'scale': return 'Cân heo';
-    case 'nest': return 'Ổ ấp trứng';
+    case 'nest': return 'Ổ ấp trứng\n🪺 Nở trứng có phôi (cần gà trống). Mái chuồng bên cạnh chỉ là nhà của đàn gà, lớn lên khi nâng cấp chuồng.';
     case 'building': {
       if (t.id === 'tank') { const k = ST.tankInfo(state); return `Bồn chứa · ${k.level}/${k.cap} lần nước`; }   // issue 57
       if (t.id === 'well' && (state.scene ?? 'farm') === 'farm') { const w = ST.wellInfo(state); return `${w.name} · cấp ${w.lv} · bình ${w.can} lần`; }   // giếng 4 cấp (issue 56)
@@ -669,7 +703,7 @@ export function nameOf(state, t) {
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
     case 'deco': { const d = M.decos.find(o => o.id === t.id); return d ? ST.entName(d.ent) : 'Đồ trang trí'; }
     case 'clutter': return M.clutter.find(o => o.id === t.id) ? ST.entName(M.clutter.find(o => o.id === t.id).ent) : '';
-    case 'strip': return `Đất phía ${DIR_NAME[t.dir]}`;
+    case 'strip': { const d = ST.nextStrip(state, t.dir); return d ? `Đất phía ${DIR_NAME[t.dir]}: dải ${d.w}×${d.h} ô, ${d.price} xu` : `Đất phía ${DIR_NAME[t.dir]}`; }
     case 'glass': return glassField(t.id)?.up.glass.broken ? 'Nhà kính (kính vỡ)' : 'Nhà kính';
   }
   return '';
@@ -689,6 +723,7 @@ export function anchorOf(state, t) {
     case 'threat': { const th = pos; return isBeast(th) ? { x: th.x, top: th.y - 16 } : { x: th.x, top: th.y - 26 }; }
     case 'pred': { const p = findBy(state.preds, t.id); return { x: pos.x, top: pos.y - (p?.kind === 'rat' ? 9 : p?.kind === 'weasel' ? 11 : 15) }; }
     case 'trough': return { x: pos.x, top: pos.y - 12 };
+    case 'bowl': return { x: pos.x, top: pos.y - 9 };
     case 'gate': return { x: pos.x, top: pos.y - 16 };
     case 'scale': return { x: pos.x, top: pos.y - 24 };
     case 'nest': return { x: pos.x, top: pos.y - 14 };
@@ -743,6 +778,8 @@ export function hitTest(state, wx, wy) {
     const dog = state.dog, di = dogImg(dog, 'left', 0);
     if (di && dog.x != null && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
   }
+  const bw = atFarm() && M.dogBowl;   // bát ăn nhỏ: chừa rộng một chút cho dễ chạm
+  if (bw && hitRect(bw.x - 6, bw.y - 8, 12, 8, wx, wy)) return { kind: 'bowl' };
   for (const d of M.decos) if (tappable(d)) { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
   // nhà kính kính vỡ: chạm bảng trạng thái hay cửa (mép dưới khối) là sửa kính
   if (atFarm()) for (const e of brokenGlass()) { const p = state.player, inGh = p.x >= e.c * TS && p.x < (e.c + 3) * TS && p.y >= e.r * TS && p.y < (e.r + 3) * TS; if (!inGh && hitRect(e.c * TS, e.r * TS + 15, 3 * TS, 10, wx, wy, 0)) return { kind: 'glass', id: e.id }; }
@@ -759,7 +796,7 @@ export function hitTest(state, wx, wy) {
   const idx = M.plotAt(Math.floor(wx / TS), Math.floor(wy / TS));
   if (idx >= 0) {
     if (state.plots[idx]?.unlocked) return { kind: 'plot', idx };
-    if (idx === ST.nextLockedPlot(state)) return { kind: 'lockedPlot', idx };
+    if (state.plots[idx] && !state.plots[idx].removed) return { kind: 'lockedPlot', idx };
   }
   return null;
 }
@@ -902,4 +939,5 @@ function updateFarm(state, w, dt, out) {
   updateAnimals(state, w, dt, out);
   updateThreats(state, w, dt);
   updatePreds(state, w, dt);
+  updateCourier(state, w, dt);
 }
