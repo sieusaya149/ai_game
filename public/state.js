@@ -13,7 +13,7 @@ import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng
 import { GIANT, giantKey, giantOf, itemSlots } from './data.js';   // trái khổng lồ (issue 53)
 import { COMPOST } from './data.js';   // hố ủ phân (issue 61)
 import { SHOWER } from './data.js';   // vòi sen chuồng cấp 3 (issue 59)
-import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
+import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash, penRemap } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
 import { now, villageCal, serverDay, VILLAGE_SEED } from './clock.js';
@@ -1109,7 +1109,8 @@ export function passGate(s, id) {
 export function gateOf(s, id) {
   const p = mapOf(s).penById[id];
   if (!p?.gates.length) return null;
-  return { x: p.gates.reduce((n, g) => n + g[0], 0) / p.gates.length * TS + 8, y: p.gates[0][1] * TS + 8 };
+  const n = p.gates.length;
+  return { x: p.gates.reduce((t, g) => t + g[0], 0) / n * TS + 8, y: p.gates.reduce((t, g) => t + g[1], 0) / n * TS + 8 };
 }
 // Số con thả rông của chuồng đã về: { type, home, total } (total = 0: chuồng không có loài thả rông)
 export function penHome(s, id) {
@@ -4403,7 +4404,7 @@ export function canPlace(s, what, c, r) {
     if (f.ents.filter(e => e.kind === what.kind).length >= max) return no('max', max > 1 ? `Đã đủ ${max} ${nm}` : `Vườn chỉ có một ${nm}`);
   }
   if (!old && what.kind === 'greenhouse') return glassCheck(s, c, r);
-  const e = { ...(old ?? what), c, r }, ft = footprint(e), o = f.owned;
+  const e = { ...(old ?? what), c, r, ...(what.rot != null ? { rot: what.rot } : {}) }, ft = footprint(e), o = f.owned;   // what.rot: thử xoay chuồng đang có
   if (ft.c < o.c || ft.r < o.r || ft.c + ft.w > o.c + o.w || ft.r + ft.h > o.r + o.h) return no('outside', 'Chỗ này ngoài đất của bạn');
   if (f.ents.some(x => CLUTTER[x.kind] && overlaps(ft, footprint(x)))) return no('uncleared', 'Còn bụi cây, đá chưa dọn');
   if (f.ents.some(x => x !== old && overlaps(ft, footprint(x)))) return no('overlap', 'Chồng lên công trình khác');
@@ -4675,6 +4676,24 @@ export function moveEntity(s, id, c, r) {
   bumpLayout(s);
   unstick(s);
   return R(true, `Đã dời ${entName(e).toLowerCase()}`);
+}
+
+// Xoay chuồng id theo vòng 0 → 1 (cửa trái) → 2 (cửa phải) → 0, giữ góc trên-trái. Qua canPlace nên cùng luật với dời (vừa chỗ, không chồng, còn đường).
+// Con vật và trứng trong chuồng đi theo cùng phép xoay với PEN_DEFS (penRemap), hoảng một lúc.
+export function rotateEntity(s, id) {
+  const e = s.farm.ents.find(x => x.id === id);
+  if (!e || e.kind !== 'pen') return R(false, 'Chỉ xoay được chuồng', { reason: 'missing' });
+  const from = e.rot ?? 0, rot = (from + 1) % 3, chk = canPlace(s, { id, rot }, e.c, e.r);
+  if (!chk.ok) return R(false, chk.msg, { reason: chk.reason });
+  settlePens(s);
+  const ft = footprint(e), inPen = o => o.x >= ft.c * TS && o.x < (ft.c + ft.w) * TS && o.y >= ft.r * TS && o.y < (ft.r + ft.h) * TS;
+  const mv = o => Object.assign(o, (({ x, y }) => ({ x: e.c * TS + x, y: e.r * TS + y }))(penRemap(e.pen, from, rot, { x: o.x - e.c * TS, y: o.y - e.r * TS })));
+  for (const a of s.animals) if (a.pen === e.id && a.x != null && !a.tile) { mv(a); a.scaredUntil = s.time + SCARED_MS; }
+  for (const o of s.eggs) if (o.x != null && inPen(o)) mv(o);
+  e.rot = rot;
+  bumpLayout(s);
+  unstick(s);
+  return R(true, 'Đã xoay chuồng');
 }
 
 // Chụp lại bố cục + vị trí lúc vào chế độ xây dựng; restoreLayout trả về đúng như cũ (nút Hủy).

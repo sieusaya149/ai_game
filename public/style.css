@@ -561,7 +561,7 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 #build-msg[data-ok="0"] { background: #ffd9d2; border-color: var(--red-d); }
 #ui #build-water { pointer-events: none; max-width: 420px; padding: 4px 12px; font-size: 13px; font-weight: 900; text-align: center; background: #dcefff; border-color: #3a6fa8; }
 .bt-card img.ico { object-fit: contain; image-rendering: pixelated; }
-#build-store, #build-upgrade, #build-fieldup { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
+#build-store, #build-upgrade, #build-fieldup, #build-rotate { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
 /* bảng nâng cấp khối ruộng (issue 58) */
 .fu-block { margin-top: 8px; padding: 2px 8px 8px; border-radius: 14px; border: 2px solid transparent; }
 .fu-block.on { border-color: #ffd23f; background: #fff8dc; }

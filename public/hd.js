@@ -72,6 +72,10 @@ if (iconArt?.ART62) { stats.files.push('art62.js'); link(iconArt.ART62, iconArt.
 const barrowArt = await import('./artbarrow.js').catch(() => null);
 if (barrowArt?.BARROW) { stats.files.push('artbarrow.js'); link(barrowArt.BARROW, barrowArt.BARROW_HD, 'BARROW'); }
 
+// Chuồng xoay (nhìn nghiêng, cửa bên trái): cùng cây khóa trong artrot.js (PENROT, PENROT_HD)
+const rotArt = await import('./artrot.js').catch(() => null);
+if (rotArt?.PENROT) { stats.files.push('artrot.js'); link(rotArt.PENROT, rotArt.PENROT_HD, 'PENROT'); }
+
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);
 // Ghi cặp ảnh dẫn xuất (lật, tô màu...) làm từ ảnh cũ và ảnh 2x bằng cùng một phép
