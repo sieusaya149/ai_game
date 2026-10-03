@@ -32,13 +32,14 @@ test('mọi công cụ bắt đầu ở cấp 1, bình tưới chứa 10', () =>
   assert.equal(s.smith, null);
 });
 
-test('vùng tác động: cấp 1 một ô, cấp 2 hàng 3 ô theo hướng nhìn, cấp 3 là 3×3 tâm ô mục tiêu', () => {
+test('vùng tác động: cấp 1 một ô, cấp 2 hàng 3 ô theo hướng từ chỗ đứng sang ô mục tiêu, cấp 3 là 3×3 tâm ô mục tiêu', () => {
   const s = newGame(), c = center(s), t = G.mapOf(s).plotTile(c);
   assert.deepEqual(G.toolArea(s, 'hoe', c), [c]);
   lv(s, 'hoe', 2);
   const dirs = [[0, 0, 1], [1, -1, 0], [2, 1, 0], [3, 0, -1]];   // dir → bước (c, r)
   for (const [dir, dc, dr] of dirs) {
-    s.player.dir = dir;
+    const from = G.mapOf(s).plotCenter(at(s, t.c - dc, t.r - dr));   // đứng phía sau ô mục tiêu, nhìn theo hướng dir
+    s.player.x = from.x; s.player.y = from.y; s.player.dir = (dir + 1) % 4;   // hướng nhìn cũ khác hẳn
     const row = G.toolArea(s, 'hoe', c).sort((a, b) => a - b);
     const want = [0, 1, 2].map(i => at(s, t.c + dc * i, t.r + dr * i)).filter(i => i >= 0).sort((a, b) => a - b);
     assert.deepEqual(row, want, `hướng ${dir}`);
@@ -219,4 +220,42 @@ test('chạm tiệm rèn trong làng mở bảng tiệm rèn', () => {
   const a = G.actionsFor(s, { kind: 'building', id: 'smithy' })[0];
   assert.equal(a.id, 'open');
   assert.equal(G.perform(s, { kind: 'building', id: 'smithy' }, 'open').open, 'smithy');
+});
+
+// ---- Hotfix: tưới nhiều ô lúc được lúc không ----
+const wetAll = (s, c) => { const t = G.mapOf(s).plotTile(c); for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) grow(s, at(s, t.c + k, t.r + j), 0.2); return t; };
+
+test('hàng 3 ô tưới theo phía người chơi đứng, không theo hướng nhìn cũ: xem trước đúng bằng lúc làm', () => {
+  const s = newGame(), c = center(s), m = G.mapOf(s); lv(s, 'can', 2); s.can = 20;
+  const t = wetAll(s, c);
+  const from = m.plotCenter(at(s, t.c - 1, t.r));   // đứng bên trái ô mục tiêu
+  s.player.x = from.x; s.player.y = from.y;
+  for (const stale of [0, 1, 2, 3]) {
+    s.player.dir = stale;   // hướng nhìn cũ từ lúc đi tới không được làm lệch hàng
+    const a = G.actionsFor(s, { kind: 'plot', idx: c })[0];
+    assert.deepEqual([...a.tiles].sort((x, y) => x - y), [0, 1, 2].map(i => at(s, t.c + i, t.r)).filter(i => i >= 0).sort((x, y) => x - y), `dir cũ ${stale}`);
+  }
+});
+
+test('ô mục tiêu đã đủ nước mà ô bên cạnh còn khô: vẫn tưới được các ô khô', () => {
+  const s = newGame(), c = center(s), m = G.mapOf(s); lv(s, 'can', 3); s.can = 40;
+  const t = wetAll(s, c);
+  s.plots[c].water = 100;
+  const a = G.actionsFor(s, { kind: 'plot', idx: c }).find(x => x.id === 'water');
+  assert.ok(!a.disabled, 'không khóa vì ô giữa đã ướt');
+  const r = quiet(() => G.perform(s, { kind: 'plot', idx: c }, 'water'));
+  assert.ok(r.ok);
+  assert.equal(s.can, 40 - 8);
+  assert.ok([-1, 0, 1].every(j => [-1, 0, 1].every(k => s.plots[at(s, t.c + k, t.r + j)].water === 100)));
+});
+
+test('bình không đủ nước cho cả vùng: báo rõ đã tưới mấy ô và vì sao chưa hết', () => {
+  const s = newGame(), c = center(s); lv(s, 'can', 3); s.can = 4;
+  wetAll(s, c);
+  const r = quiet(() => G.perform(s, { kind: 'plot', idx: c }, 'water'));
+  assert.ok(r.ok);
+  assert.equal(s.can, 0);
+  assert.match(r.msg, /4 ô/);
+  assert.match(r.msg, /hết nước/);
+  assert.match(r.msg, /5 ô/);   // còn 5 ô chưa tưới
 });

@@ -2128,12 +2128,20 @@ const FIT = {
   weed: p => p.weeds && !(p.crop && (p.crop.dead || p.crop.rotten || p.crop.progress >= 1)),
 };
 
-// Các ô bị tác động khi dùng công cụ `tool` lên ô ruộng `idx` (mục tiêu đứng đầu). Chỉ lấy ô mở, hợp lệ cho hành động `id`.
-// Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô.
-export function toolArea(s, tool, idx, id = TOOLS[tool]?.act[0]) {
+// Hướng hàng 3 ô: từ chỗ người chơi đứng nhìn sang ô mục tiêu (cùng cách tính hướng quay mặt của world.js), nên xem trước
+// và lúc làm luôn khớp, không lệch theo hướng nhìn cũ lúc đang đi. Đứng ngay trên ô thì dùng hướng đang nhìn.
+function rowDir(s, idx) {
+  const c = mapOf(s).plotCenter(idx), p = s.player;
+  if (!c || p.x == null || Math.hypot(c.x - p.x, c.y - p.y) <= 0.5) return p.dir ?? 0;
+  const dx = c.x - p.x, dy = c.y - p.y;
+  return Math.abs(dy) > Math.abs(dx) ? (dy > 0 ? 0 : 3) : (dx < 0 ? 1 : 2);
+}
+
+// Mọi ô trong vùng tác động của công cụ `tool` lên ô ruộng `idx` (mục tiêu đứng đầu), chỉ lấy ô mở, hợp lệ cho hành động `id`.
+function areaFit(s, tool, idx, id) {
   const m = mapOf(s), t = m.plotTile(idx), fit = FIT[id];
   if (!t || !fit) return [];
-  const kind = TOOLS[tool].area[toolLv(s, tool) - 1], [dx, dy] = DIRV[s.player.dir ?? 0];
+  const kind = TOOLS[tool].area[toolLv(s, tool) - 1], [dx, dy] = DIRV[rowDir(s, idx)];
   const cells = kind === 'row' ? [0, 1, 2].map(i => [t.c + dx * i, t.r + dy * i])
     : kind === 'block' ? [-1, 0, 1].flatMap(j => [-1, 0, 1].map(i => [t.c + i, t.r + j])) : [[t.c, t.r]];
   const out = [];
@@ -2141,7 +2149,11 @@ export function toolArea(s, tool, idx, id = TOOLS[tool]?.act[0]) {
     const i = m.plotAt(c, r), p = s.plots[i];
     if (p?.unlocked && fit(p) && !out.includes(i)) out.push(i);
   }
-  out.sort((a, b) => (b === idx) - (a === idx));
+  return out.sort((a, b) => (b === idx) - (a === idx));
+}
+// Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô.
+export function toolArea(s, tool, idx, id = TOOLS[tool]?.act[0]) {
+  const out = areaFit(s, tool, idx, id);
   return id === 'water' ? out.slice(0, s.can) : out;
 }
 
@@ -2158,6 +2170,10 @@ function withTools(s, t, A) {
     if (!k) continue;
     if (toolAway(s, k)) { a.disabled = awayMsg(k); continue; }
     a.tiles = toolArea(s, k, t.idx, a.id);
+    if (a.id === 'water') {
+      a.short = areaFit(s, k, t.idx, 'water').length - a.tiles.length;   // ô còn lại mà bình không đủ nước
+      if (a.disabled && s.can > 0 && a.tiles.length) delete a.disabled;   // ô giữa đã đủ nước nhưng ô bên cạnh còn khô: vẫn tưới được
+    }
     if (a.id === 'harvest') a.tiles = fitBasket(s, a.tiles);
     if (a.tiles.length > 1) a.label += ` (${a.tiles.length} ô)`;
   }
@@ -2479,8 +2495,9 @@ export function perform(s, t, id) {
   if (act.disabled) return bad(act.disabled, at);
   if (s.scene === 'visit') return guestDo(s, t, id, at);
   if (id !== 'sit') s.sit = false;
-  const n = t.kind === 'plot' && act.tiles?.length > 1 ? act.tiles.length : 1;   // dùng công cụ cấp cao: làm nhiều ô một lần
-  const r = n > 1 ? doArea(s, act.tiles, id) : DO[t.kind](s, t, id, at);
+  const area = t.kind === 'plot' && act.tiles?.length && !(act.tiles.length === 1 && act.tiles[0] === t.idx);   // dùng công cụ cấp cao: làm nhiều ô một lần
+  const n = area ? act.tiles.length : 1;
+  const r = area ? doArea(s, act.tiles, id, act.short) : DO[t.kind](s, t, id, at);
   if (t.kind === 'plot' && STAMINA.cost[id]) spend(s, Math.round(STAMINA.cost[id] * GROUP_COST[n]));
   checkAch(s);
   advanceTutorial(s);
@@ -2502,9 +2519,10 @@ function heartFx(s, a, at, reason) {
   return [say(at, a.bond > was ? `Thân hơn rồi ${'❤️'.repeat(a.bond)}` : '+❤️', '#ff7a9c')];
 }
 
-function doArea(s, tiles, id) {
+function doArea(s, tiles, id, short = 0) {
   const rs = tiles.map(idx => { const c = plotCenter(s, idx); return DO.plot(s, { kind: 'plot', idx }, id, { x: c.x, y: c.y }); });
-  return res(true, `Xong ${tiles.length} ô`, rs.flatMap(r => r.fx), rs[0].sound);
+  const why = short > 0 ? `, bình hết nước, còn ${short} ô chưa tưới` : '';
+  return res(true, `Xong ${tiles.length} ô${why}`, rs.flatMap(r => r.fx), rs[0].sound);
 }
 
 const DO = {
