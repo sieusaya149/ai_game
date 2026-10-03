@@ -333,7 +333,7 @@ function hostDid(m) {
 function dogBark() {
   const r = barkOp(state);
   if (!r) return;
-  sync?.send({ t: 'guest', op: r.guestOp });
+  if (r.guestOp) sync?.send({ t: 'guest', op: r.guestOp });   // đang nghỉ giữa hai lần báo chủ thì chỉ sủa cho khách nghe
   ui.handleEvents([{ type: 'sound', name: 'bark' }]);
   shakeUntil = performance.now() + SHAKE_MS;
   try { navigator.vibrate?.(120); } catch { /* máy không rung */ }

@@ -125,7 +125,7 @@ test('chó vừa sủa khách: tin của chủ chưa có lần sủa đó thì c
   const v = startVisit(createGame({ name: 'Bình' }), JSON.parse(JSON.stringify(host)), 'Lan');
   assert.ok(barkOp(v), 'chó sủa lần đầu');
   visitSync(v, wire(host));
-  assert.equal(barkOp(v), null);
+  assert.equal(barkOp(v).guestOp ?? null, null, 'không báo chủ lại ngay (chó vẫn sủa cho khách nghe)');
 });
 
 test('tin hỏng (không phải vườn) thì bỏ qua, bản đi dạo vẫn nguyên', () => {

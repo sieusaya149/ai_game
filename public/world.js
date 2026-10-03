@@ -672,7 +672,7 @@ export function nameOf(state, t) {
     case 'poop': return 'Phân chó';
     case 'threat': return THREAT_NAME[findBy(state.threats, t.id)?.kind] ?? 'Con quạ';
     case 'pred': { const p = findBy(state.preds, t.id); return p ? 'Con ' + ST.PRED_NAME[p.kind].toLowerCase() : ''; }
-    case 'dog': return state.dog.name || DOG.name;
+    case 'dog': { const g = ST.dogGuardStatus(state); return `${state.dog.name || DOG.name}\n🐕 ${g.label} · ${g.why}`; }
     case 'bowl': { const n = state.dog.bowl || 0; return `Bát ăn của ${state.dog.name || DOG.name} · ${n ? `còn ${n}/${DOG.bowlMax} phần` : 'trống'}`; }
     case 'cat': { const c = findBy(state.cats, t.id); return c ? `${ST.animalLabel(c)} ${'❤️'.repeat(c.bond || 1)}\n🐀 Đã bắt ${ST.catCatches(c)} con chuột` : 'Mèo'; }
     case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;

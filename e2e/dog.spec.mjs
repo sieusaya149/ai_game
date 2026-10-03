@@ -139,7 +139,7 @@ async function reachDog(page, touch) {
     await tapWorld(page, touch, d.x, d.y - 5);
     await page.waitForTimeout(500);
   }
-  await expect(page.locator('#target-name')).toHaveText('Mực');
+  await expect(page.locator('#target-name')).toContainText('Mực');
 }
 // Đi về phía chó cho tới khi nó phát hiện (hay hết lượt thử)
 async function approachDog(page, touch, tries = 14) {

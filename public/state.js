@@ -1275,7 +1275,8 @@ function stepBowl(s) {
   if (b) fxEv(b.x, b.y - 8, 'Măm măm 🦴', COL.good);
 }
 
-const guardOn = s => (s.dog.stage === 'truong' || s.dog.stage === 'gia') && s.dog.hunger > 40 && s.dog.happy > 50;
+// Chó canh được không (trộm NPC, kẻ săn mồi, chạy bù): cùng luật guardRadius với khách online. Chạy bù thì xét theo giờ đang mô phỏng.
+const guardOn = s => guardRadius(s, catchBase != null ? villageNow(s) : now()) > 0;
 
 // ---------- Vòng đời chó và dạy lệnh bằng minigame (issue 45) ----------
 // Minigame chỉ gửi vào luật một kết quả "đạt / không đạt"; luật quyết định tiến độ (ADR 0013).
@@ -1584,11 +1585,27 @@ export const dogQuiet = (s, t = now()) => t < (s?.dog?.quiet || 0);   // đang m
 export function guardRadius(s, t = now()) {
   const g = s?.dog;
   const base = DOG.guardRadius[g?.stage] ?? 0;
-  if (!base || g.hunger < GUARD.hungryStop || dogQuiet(s, t)) return 0;
+  if (!base || g.hunger < GUARD.hungryStop || dogQuiet(s, t) || dogAway(s)) return 0;
   const chain = g.chained ? GUARD.chainRadius : Infinity;
   if (dogAsleep(s)) return Math.min(GUARD.napRadius, chain);
   const r = (g.happy < GUARD.sadHappy ? base / 2 : base) * (dogPost(s) ? DOG.guardPostMul : 1);
   return Math.min(r, chain);
+}
+// Chó đang đi theo chủ sang làng / vào nhà: tọa độ của nó không phải của vườn nên vườn không có ai canh
+const dogAway = s => (s?.dog?.scene ?? 'farm') !== 'farm';
+// Vì sao chó đang canh hay không, cho người chơi đọc khi chạm vào chó: { on, label, why }.
+// on = có phát hiện được kẻ lạ ngay lúc này (kể cả tầm gần). Cùng luật với guardRadius.
+export function dogGuardStatus(s, t = now()) {
+  const g = s.dog, r = guardRadius(s, t), name = g.name || DOG.name;
+  if (dogAway(s)) return { on: false, label: `Đang đi theo bạn`, why: `${name} không ở vườn nên không canh trộm` };
+  if (!(DOG.guardRadius[g.stage] > 0)) return { on: false, label: 'Còn bé, chưa biết canh', why: `${name} lớn thành chó nhỡ mới bắt đầu canh nhà` };
+  if (g.hunger < GUARD.hungryStop) return { on: false, label: 'Đói nên lười canh', why: `${name} đói lả nằm bẹp, cho ăn hoặc đổ xương vào bát nhé` };
+  if (dogQuiet(s, t)) return { on: false, label: 'Đang mải ăn xúc xích', why: `${name} quên sủa chừng một phút` };
+  if (dogAsleep(s)) return { on: true, label: 'Đang ngủ gật', why: `chỉ thấy kẻ lạ sát bên, dậy sau ${Math.max(1, Math.ceil(((g.nap || 0) - (s.time || 0)) / 1000))} giây` };
+  const post = dogPost(s);
+  const why = [`thấy kẻ lạ trong ${r} ô`, g.happy < GUARD.sadHappy ? 'đang buồn nên nhìn gần hơn, vuốt ve cho vui' : '', g.stage === 'gia' ? 'già nên nhìn xa kém' : '', post ? 'đang gác một chỗ nên xa gấp đôi ở đó' : ''].filter(Boolean).join('; ');
+  if (g.chained) return { on: true, label: 'Đang bị xích', why: `chỉ canh trong ${GUARD.chainRadius} ô quanh chuồng; ${why}` };
+  return { on: true, label: 'Đang canh', why };
 }
 // Vùng chó chạy được khi bị xích: { x, y, r } theo điểm ảnh bản đồ. null = thả rông, chạy khắp vườn.
 export function guardArea(s) {
@@ -3321,7 +3338,9 @@ function sausageDo(s, at) {
 // Chó vừa phát hiện khách: báo cho chủ kèm chỗ thấy. Đang trong thời gian nghỉ giữa hai lần sủa thì trả null.
 export function barkOp(s) {
   if (s?.scene !== 'visit') return null;
-  return guestGuardOp(s, 'bark', { x: Math.round(s.player.x), y: Math.round(s.player.y) });
+  const r = guestGuardOp(s, 'bark', { x: Math.round(s.player.x), y: Math.round(s.player.y) });
+  // đang nghỉ giữa hai lần báo chủ (GUARD.barkEvery): chó vẫn sủa cho khách nghe và rung máy, chỉ không báo chủ thêm
+  return r ?? (guardRadius(s) > 0 ? { ok: true, msg: GUARD_MSG.bark(s.dog.name), guestOp: null } : null);
 }
 // Chó đuổi kịp và đớp được khách: rơi hết đồ vừa trộm, nộp phạt, đứng hình GUARD.biteStunMs
 export function biteOp(s) {
