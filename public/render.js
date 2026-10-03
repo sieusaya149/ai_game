@@ -1040,7 +1040,11 @@ export function render(ctx, f) {
     const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
     const shake = wd.stun > 0 ? (Math.floor(now / 60) % 2 ? 1 : -1) : 0;
     if (!wd.sleeping) add(p.y, () => {
-      person(state.look, dir, k, p.x - 8 + shake, p.y - 23);
+      if (state.sit && !wd.moving) {   // ngồi ghế đá: hạ thân xuống, cắt phần chân (chưa có sprite ngồi riêng)
+        ctx.save(); ctx.beginPath(); ctx.rect(p.x - 12, p.y - 36, 24, 37); ctx.clip();
+        person(state.look, dir, 0, p.x - 8 + shake, p.y - 19);
+        ctx.restore();
+      } else person(state.look, dir, k, p.x - 8 + shake, p.y - 23);
       if (state.stamina <= 0) {   // hết thể lực: thở hồng hộc, mồ hôi bên đầu
         const sw = SPR2?.sweat?.[Math.floor(now / 350) % 2];
         if (sw) blit(sw, p.x + 4, p.y - 29);
