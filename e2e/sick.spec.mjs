@@ -1,7 +1,7 @@
 // Bệnh 4 giai đoạn, trạm thú y Cô Út, chuồng cách ly, bác sĩ qua điện thoại, ngôi mộ (issue 38).
 import { test, expect } from '@playwright/test';
-import { makeSave, seedSave } from './helpers.mjs';
-import { mapOf, placeEntity, canPlace, buyAnimal, SAVE_KEY } from '../public/state.js';
+import { makeSave, seedSave, noCatchUp } from './helpers.mjs';
+import { mapOf, placeEntity, canPlace, buyAnimal } from '../public/state.js';
 import { SICK } from '../public/data.js';
 
 const HOUR = 3600_000;
@@ -252,8 +252,7 @@ test('con vừa mất: thiên thần bay lên, để lại ngôi mộ, đặt ho
     Object.assign(s.animals[0], { sick: 3, sickMs: SICK.deadAt - 3000 });
     s.inv.deco_flower = 1;
   }));
-  // đẩy savedAt về tương lai: trang tải chậm hơn 3 giây thì game chạy bù, bệnh bị kẹp ở Bệnh nặng và con vật không chết
-  await context.addInitScript(key => { try { const s = JSON.parse(localStorage.getItem(key)); s.savedAt = Date.now() + 60_000; localStorage.setItem(key, JSON.stringify(s)); } catch {} }, SAVE_KEY);
+  await noCatchUp(context);   // trang tải chậm hơn 3 giây thì game chạy bù, bệnh bị kẹp ở Bệnh nặng và con vật không chết
   await page.goto('/');
   await ready(page);
   // đồng hồ chạy tới lúc con vật ra đi: thiên thần hiện lên rồi còn lại ngôi mộ

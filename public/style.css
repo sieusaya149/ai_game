@@ -494,7 +494,7 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
   .guide-dot.on::before { background: var(--orange); border-color: var(--orange-d); }
   .guide-dots { gap: 0; }
 }
-@media (max-width: 400px) {
+@media (max-width: 440px) {
   .bb-lbl { font-size: 8.5px; letter-spacing: -0.3px; }   /* 8 nút trên thanh dưới */
   #bottombar { gap: 2px; padding-left: calc(4px + var(--sl)); padding-right: calc(4px + var(--sr)); }
   .bb-ico { height: 28px; }
@@ -502,7 +502,8 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 @media (max-width: 340px) {
   .bb-lbl { display: none; }   /* 7 nút trên 320px không đủ chỗ cho chữ */
   .bb-ico { height: 34px; }
-  #bottombar { gap: 3px; }
+  #bottombar { gap: 0; padding-left: var(--sl); padding-right: var(--sr); }   /* 8 nút trên 320px: vừa đủ 40px mỗi nút, ngăn cách bằng viền trong */
+  .bb-btn { box-shadow: 0 3px 0 var(--wood-d), inset 0 0 0 1.5px var(--wood-d), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
   #hud-clock { padding-left: 4px; padding-right: 4px; }   /* ngày làng 5 chữ số ("Ngày 19768 · 9:14 sáng") phải vừa một dòng */
   #hud-time { letter-spacing: -0.3px; }
 }

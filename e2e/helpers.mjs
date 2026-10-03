@@ -178,3 +178,10 @@ export function bigFarmSave() {
     mapOf(s);
   });
 }
+// Chống chạy bù khi trang tải chậm: loadGame chạy bù nếu bản lưu cũ hơn 3 giây (xóa kẻ săn mồi, kẹp bệnh ở Bệnh nặng).
+// Đẩy savedAt về tương lai lúc trang tải để tình huống ghi sẵn (kẻ săn mồi, bệnh sắp chết) còn nguyên.
+export async function noCatchUp(context) {
+  await context.addInitScript(key => {
+    try { const s = JSON.parse(localStorage.getItem(key)); s.savedAt = Date.now() + 60_000; localStorage.setItem(key, JSON.stringify(s)); } catch {}
+  }, SAVE_KEY);
+}
