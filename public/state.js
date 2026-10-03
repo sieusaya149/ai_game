@@ -259,7 +259,7 @@ export function createGame({ name = 'Nông dân', look = {}, dogCoat } = {}) {
     inv: { ...START.items }, basket: {},   // inv = kho, basket = giỏ
     shipbin: { items: {} },   // thùng giao hàng: lái buôn lấy hết lúc 6h sáng
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
-    animals: [], troughs: {}, manure: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], clutch: [], nest: { egg: false, hatchAt: 0, sp: null, mom: null, dad: null },
+    animals: [], carry: null, troughs: {}, manure: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], clutch: [], nest: { egg: false, hatchAt: 0, sp: null, mom: null, dad: null },
     // chained: xích chó · nap/napCheck: giấc ngủ gật ban đêm (giờ vườn) · quiet: đang mải ăn xúc xích (giờ ngoài đời)
     // · barkAt/barkX/barkY: lần sủa gần nhất và chỗ thấy khách lạ (issue 31)
     dog: {
@@ -371,6 +371,7 @@ export function loadGame(raw) {
   ensureGateBoxes(s); // vườn cũ chưa có hộp quà, sổ lưu bút: thêm cạnh cổng
   ensureTroughs(s);   // máng theo loại (bản cũ) thành máng theo chuồng
   settlePens(s);      // con vật chưa có chuồng (bản cũ): xếp vào chuồng cùng loại
+  s.carry = s.carry?.animalId != null ? { animalId: s.carry.animalId } : null; carriedAnimal(s);   // đang chở trên xe rùa (bản cũ không có): con không còn thì bỏ
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
   s.stamina = clamp(s.stamina, 0, STAMINA.max); s.sit = false;
@@ -2929,7 +2930,7 @@ function lockedActs(s, t) {
 
 function animalActs(s, t) {
   const a = s.animals.find(x => x.id === t.id);
-  if (!a) return [];
+  if (!a || s.carry?.animalId === a.id) return [];   // con đang nằm trên xe rùa thì không chạm được
   const def = ANIMALS[a.type], A = {}, n = have(s, def.feed);
   if (a.ready) A.collect = a.type === 'bo' ? mk('milk', '🥛', 'Vắt sữa', room(s) < 1 ? FULL : null) : mk('shear', '✂️', 'Xén lông', room(s) < 1 ? FULL : null);
   A.feed = mk('feed', '🌾', `Cho ăn tận tay (còn ${n})`, n <= 0 ? noItem(def.feed) : a.hunger >= 95 ? 'Bụng no căng rồi' : null);
@@ -2941,7 +2942,7 @@ function animalActs(s, t) {
   // cách ly: chỉ hiện khi con đang bệnh, hoặc đang nằm chuồng cách ly (để đưa về)
   const quar = penTypeOf(s, a) === 'quarantine';
   if (a.sick || quar) A.isolate = quar ? mk('unisolate', '🏠', 'Đưa về chuồng thường') : mk('isolate', '🏥', 'Chuyển vào chuồng cách ly');
-  if (have(s, 'barrow') > 0) A.barrow = mk('barrow', 'barrow', 'Chở sang chuồng khác', barrowTargets(s, a.id).length ? null : 'Chưa có chuồng nào khác cùng loại');
+  if (have(s, 'barrow') > 0 && !quar) A.barrow = mk('barrow', 'barrow', 'Chở bằng xe rùa', carriedAnimal(s) ? 'Xe rùa đang chở một con rồi' : null);
   if (animalCan(a, 'vitamin') && !a.sick) A.vitamin = mk('vitamin', '💉', `Cho uống vitamin (còn ${have(s, 'vitamin')})`, have(s, 'vitamin') <= 0 ? noItem('vitamin') : null);
   const first = (a.sick || a.hurt) ? 'medicine' : a.ready ? 'collect' : a.hunger < 40 ? 'feed' : isDirty(a) ? 'bath' : 'pet';
   const list = [A[first], ...Object.entries(A).filter(([k]) => k !== first).map(([, v]) => v)];
@@ -2957,7 +2958,8 @@ function troughActs(s, t) {
   const item = FEED_OF_PEN[t.pen], n = have(s, item);
   if (!item) return [];
   const tid = t.id ?? mapOf(s).pens[t.pen]?.id, lvl = s.troughs[tid] ?? 0;
-  const acts = [mk('fill', '🌾', `Đổ cám vào máng (${lvl}/${HUSBANDRY.troughMax})`,
+  const drop = dropAct(s, tid);   // đang đẩy xe rùa: việc chính ở máng là thả con vật
+  const acts = [...(drop ? [drop] : []), mk('fill', '🌾', `Đổ cám vào máng (${lvl}/${HUSBANDRY.troughMax})`,
     n <= 0 ? noItem(item) : lvl >= HUSBANDRY.troughMax ? 'Máng đầy ắp rồi' : null)];
   const muck = mk('muck', '💩', `Xúc phân chuồng (${Math.floor(s.manure[t.pen] ?? 0)}%)`, (s.manure[t.pen] ?? 0) < MANURE.perScoop ? 'Chuồng còn sạch, chưa cần xúc' : null);
   if (penDirty(s, t.pen)) acts.unshift(muck); else acts.push(muck);
@@ -2970,7 +2972,7 @@ function troughActs(s, t) {
     sh.why ?? `Mỗi sáng tự tắm cả chuồng bằng nước bồn, mỗi con 1 lần nước, +${SHOWER.happy} vui`));
   const up = upgradeInfo(s, penId);   // chạm vào chuồng (qua máng) cũng nâng cấp được
   if (up) acts.push(mk('upgrade', '⬆️', `Nâng chuồng lên cấp ${up.lv} (${fmtXu(up.price)} xu)`, up.error));
-  return acts;
+  return drop ? [drop, ...acts.filter(x => x !== drop)] : acts;
 }
 const fmtXu = n => n.toLocaleString('vi-VN');
 
@@ -3309,7 +3311,7 @@ const DO = {
         return res(true, r.msg, r.cured ? [say(at, 'Khỏe rồi! 💪'), ...heartFx(s, a, at, 'cure')] : [say(at, `Thuốc ${r.dose}/${SICK.doses[2]} 💊`)], 'spray');
       }
       case 'vaccinate': { const r = vaccinate(s, a.id); return r.ok ? res(true, r.msg, [say(at, 'Tiêm xong! 💉')], 'spray') : bad(r.msg, at); }
-      case 'barrow': { const r = carryAnimal(s, a.id, t.penId); return r.ok ? res(true, r.msg, [say(at, 'Đi nào! 🛒')], 'pop') : bad(r.msg, at); }
+      case 'barrow': { const r = startCarry(s, a.id); return r.ok ? res(true, r.msg, [say(at, 'Đi nào! 🛒')], 'pop') : bad(r.msg, at); }
       case 'isolate': case 'unisolate': { const r = id === 'isolate' ? isolate(s, a.id) : unisolate(s, a.id); return r.ok ? res(true, r.msg, [say(at, id === 'isolate' ? 'Cách ly 🏥' : 'Về chuồng 🏠')], 'pop') : bad(r.msg, at); }
       case 'vitamin':
         // lớn vọt thêm một nửa giai đoạn đang ở (không vượt quá đầu giai đoạn trưởng thành)
@@ -3356,6 +3358,10 @@ const DO = {
   },
 
   trough(s, t, id, at) {
+    if (id === 'drop') {
+      const r = dropCarry(s, t.id ?? mapOf(s).pens[t.pen]?.id);
+      return r.ok ? res(true, r.msg, [say(at, 'Xuống nào! 🐾')], 'pop') : bad(r.msg, at);
+    }
     if (id === 'upgrade') {
       const r = upgradePen(s, t.id ?? mapOf(s).pens[t.pen]?.id);
       return res(r.ok, r.msg, r.ok ? [say(at, `Cấp ${r.lv}! ⬆️`)] : [], r.ok ? 'coin' : 'error');
@@ -4575,26 +4581,49 @@ export function moveAnimal(s, animalId, penId) {
   return R(true, `Đã chuyển ${ANIMALS[a.type].name.toLowerCase()} sang ${PEN_DEFS[e.pen].name.toLowerCase()}`, { id: a.id });
 }
 
-// Xe rùa: chở con vật sang chuồng khác cùng loài (chuồng cách ly đi đường isolate/unisolate, không qua xe rùa).
-// → [{ id, name, use, cap, disabled? }] các chuồng đích có thể chọn, chuồng đầy thì có disabled là lý do.
-export function barrowTargets(s, animalId) {
-  const a = s.animals.find(x => x.id === animalId);
-  if (!a) return [];
-  settlePens(s);
-  const type = ANIMALS[a.type].pen, list = penEnts(s, type);
-  return list.filter(e => e.id !== a.pen).map(e => {
-    const use = penUse(s, e.id), cap = penCapOf(e);
-    return { id: e.id, name: `${PEN_DEFS[type].name} ${list.indexOf(e) + 1}`, use, cap, ...(use >= cap ? { disabled: 'Chuồng này chật rồi' } : {}) };
-  });
+// Xe rùa (tài sản mua một lần, dùng mãi): bế con vật lên xe (s.carry = { animalId }), tự đi tới chuồng đích rồi thả.
+// Con vật vẫn giữ a.pen là chuồng cũ (chiếm chỗ, không mất khi tải lại) cho tới khi thả; render ẩn nó khỏi chuồng và vẽ trên xe.
+// → con vật đang trên xe (tự bỏ trạng thái chở nếu con đó không còn), hoặc null.
+export function carriedAnimal(s) {
+  const a = s.carry && s.animals.find(x => x.id === s.carry.animalId);
+  if (!a && s.carry) s.carry = null;
+  return a ?? null;
 }
-export function carryAnimal(s, animalId, penId) {
+export function startCarry(s, animalId) {
   if (s.visit || s.scene === 'visit') return R(false, 'Về vườn nhà rồi hẵng chở nhé', { reason: 'visit' });
   if (have(s, 'barrow') <= 0) return R(false, 'Bạn chưa có xe rùa, mua ở chợ Bà Tư nhé', { reason: 'no_barrow' });
-  const e = s.farm.ents.find(x => x.id === penId && x.kind === 'pen'), a = s.animals.find(x => x.id === animalId);
-  if (!a || !e) return R(false, 'Không thấy con vật hoặc chuồng', { reason: 'missing' });
+  if (carriedAnimal(s)) return R(false, 'Xe rùa đang chở một con rồi, thả nó xuống trước nhé', { reason: 'busy' });
+  const a = s.animals.find(x => x.id === animalId);
+  if (!a) return R(false, 'Không thấy con vật', { reason: 'missing' });
+  if (penTypeOf(s, a) === 'quarantine') return R(false, 'Con đang cách ly, đưa về chuồng thường trước đã', { reason: 'quarantine' });
+  s.carry = { animalId: a.id };
+  return R(true, `Đã bế ${ANIMALS[a.type].name.toLowerCase()} lên xe rùa, đẩy tới chuồng khác nhé`, { id: a.id });
+}
+// Thả con đang trên xe vào chuồng penId: chuồng cũ (hủy chở) hoặc chuồng cùng loài còn chỗ.
+export function dropCarry(s, penId) {
+  const a = carriedAnimal(s);
+  if (!a) return R(false, 'Xe rùa đang trống', { reason: 'empty' });
+  const e = s.farm.ents.find(x => x.id === penId && x.kind === 'pen');
+  if (!e) return R(false, 'Không thấy chuồng', { reason: 'missing' });
+  if (e.id === a.pen) {
+    s.carry = null;
+    const p = penPoint(s, e.pen, e.id);
+    Object.assign(a, { x: p.x, y: p.y, tile: null });
+    return R(true, `Thả ${ANIMALS[a.type].name.toLowerCase()} về chuồng cũ`, { id: a.id });
+  }
   if (e.pen !== ANIMALS[a.type].pen) return R(false, `${PEN_DEFS[e.pen].name} không nhận ${ANIMALS[a.type].name.toLowerCase()}`, { reason: 'species' });
-  if (a.pen === e.id) return R(false, 'Nó đang ở chuồng này rồi', { reason: 'same' });
-  return moveAnimal(s, animalId, penId);
+  const r = moveAnimal(s, a.id, e.id);
+  if (r.ok) s.carry = null;
+  return r;
+}
+// Hành động "Thả vào chuồng này" ở máng của chuồng id (khi xe đang chở): { text, disabled? } hoặc null
+function dropAct(s, penId) {
+  const a = carriedAnimal(s), e = s.farm.ents.find(x => x.id === penId && x.kind === 'pen');
+  if (!a || !e) return null;
+  const nm = ANIMALS[a.type].name.toLowerCase();
+  if (e.id === a.pen) return mk('drop', 'barrow', `Thả ${nm} về chuồng cũ`);
+  const full = penUse(s, e.id) >= penCapOf(e);
+  return mk('drop', 'barrow', `Thả ${nm} vào chuồng này`, e.pen !== ANIMALS[a.type].pen ? `${PEN_DEFS[e.pen].name} không nhận ${nm}` : full ? 'Chuồng này chật rồi' : null);
 }
 
 // Nâng cấp chuồng (hoặc chuồng chó) id lên cấp kế: trừ xu, sức chứa tăng ngay, con vật giữ nguyên.

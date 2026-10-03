@@ -313,21 +313,6 @@ export function confirmBox(text, yes = 'Đồng ý', no = 'Thôi', danger = fals
   });
 }
 
-// Xe rùa: chọn chuồng đích. targets = S.barrowTargets(...); chuồng đầy thì khóa kèm lý do. Trả id chuồng hoặc null.
-export function pickPen(text, targets) {
-  return new Promise(resolve => {
-    const root = $('dialog-root');
-    const done = v => { root.hidden = true; root.replaceChildren(); dialogResolve = null; resolve(v); };
-    dialogResolve = () => done(null);
-    root.replaceChildren(h('div', { class: 'dialog' },
-      h('div', { class: 'dialog-text' }, text),
-      h('div', { class: 'dialog-btns pen-pick', style: 'flex-direction:column;align-items:stretch' },
-        ...targets.map(t => btn(`${t.name} ${t.use}/${t.cap}${t.disabled ? ` (${t.disabled})` : ''}`, () => done(t.id), 'plain', { 'data-pen': t.id, disabled: !!t.disabled, title: t.disabled || '' })),
-        btn('Thôi', () => done(null), 'plain'))));
-    root.hidden = false;
-  });
-}
-
 // ---------- Bắt được trộm: chọn kiểu phạt (issue 46) ----------
 // info = S.punishInfo(state). Đóng hộp mà không chọn thì mặc định bắt đền xu, khỏi mất công.
 export function askPunish(info) {
@@ -1215,8 +1200,9 @@ const GUIDE = [
       `Tuổi tính theo giờ vườn thật sự chạy (đóng băng thì không già đi). Gà lớn tới trưởng thành sau ${spanOf(D.stageStart('ga', 'truong'))}, vịt ${spanOf(D.stageStart('vit', 'truong'))}, heo ${spanOf(D.stageStart('heo', 'truong'))}, bò và cừu ${spanOf(D.stageStart('bo', 'truong'))}; rồi sống thêm nhiều ngày thật (gà, vịt chừng 5 ngày, bò cừu chừng 8 ngày). Chó mèo không bao giờ ra đi vì già.`,
       `Sắp vào giai đoạn già thì được báo trước khoảng ${D.AGING.warnMs / HOUR} giờ vườn để chuẩn bị hoặc bán đi. Con già đẻ thưa, cho ít sản phẩm hơn và hay ngủ.`] },
   { title: 'Xe rùa', lv: D.ITEMS.barrow.lv, art: () => [barrowArt?.BARROW?.barrowIcon],
-    text: [`Mua ${D.ITEMS.barrow.name.toLowerCase()} một lần ở chợ Bà Tư (${D.ITEMS.barrow.price} xu, mục Vật tư). Có xe rồi, chạm vào con vật chọn Chở sang chuồng khác, rồi chọn chuồng cùng loại còn chỗ (hiện số con/sức chứa; chuồng đầy thì khóa).`,
-      'Con vật giữ nguyên chỉ số. Chuồng cách ly vẫn dùng nút Chuyển vào chuồng cách ly / Đưa về chuồng thường; con nằm cách ly cũng chở về được chuồng thường bằng xe rùa. Đang thăm vườn người khác thì không dùng được.'] },
+    text: [`${D.ITEMS.barrow.name} là tài sản dùng mãi mãi: mua một lần ở chợ Bà Tư (${D.ITEMS.barrow.price.toLocaleString('vi-VN')} xu, mục Vật tư), không bao giờ hao. Xe nằm yên cho tới khi cần, không đi theo bạn.`,
+      'Chạm vào con vật chọn Chở bằng xe rùa: con vật nằm trên xe, bạn đẩy xe tới chuồng khác. Chạm máng ăn của chuồng cùng loại còn chỗ rồi chọn Thả vào chuồng này (chuồng khác loài hoặc chật thì khóa kèm lý do); chạm máng chuồng cũ để thả nó về chỗ cũ. Mỗi lần chở một con, tải lại game giữa chừng không mất con.',
+      'Con vật giữ nguyên chỉ số. Con nằm chuồng cách ly cần Đưa về chuồng thường trước. Đang thăm vườn người khác thì không dùng được.'] },
   { title: 'Tắm cho vật nuôi', lv: 2, art: () => [SPR3?.items?.soapBar, SPR3?.fx?.soap?.m?.[0], SPR3?.fx?.sparkleClean?.[0]],
     text: [`Con vật dơ dần theo giờ vườn, dơ hẳn sau khoảng ${D.DIRT.fullMs / HOUR} giờ; trời mưa hoặc chuồng bẩn thì nhanh gấp ${D.DIRT.fastMul} lần. Dơ từ ${D.DIRT.high} trở lên là mất vui, dễ bệnh hơn, sản phẩm kém.`,
       `Tắm tốn 1 ${D.ITEMS.soap.name.toLowerCase()} (mua ở chợ Bà Tư) và 1 nước trong bình tưới: sủi bọt, con vật lắc mình văng nước rồi sạch bong, +${D.DIRT.bathHappy} vui và thân hơn một chút.`,

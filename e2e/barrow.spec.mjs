@@ -12,7 +12,7 @@ const save = () => makeSave(s => {
   for (const a of s.animals) a.nextProduct = 1e15;
 });
 
-test('mua xe rùa rồi chở gà từ chuồng này sang chuồng kia', async ({ page, context }) => {
+test('xe rùa: bế gà lên xe rồi thả vào chuồng gà mới ở máng ăn', async ({ page, context }) => {
   await seedSave(context, save());
   await page.goto('/');
   await page.waitForFunction(() => globalThis.__farm?.state);
@@ -24,20 +24,26 @@ test('mua xe rùa rồi chở gà từ chuồng này sang chuồng kia', async (
     const hen = s.animals.find(a => a.type === 'ga' && a.pen === pens[0].id);
     return { hen: hen.id, to: pens[1].id, from: pens[0].id };
   });
-  const act = page.locator('#main-action, #chips .chip').filter({ hasText: 'Chở sang chuồng khác' });
   const penOf = () => page.evaluate(id => globalThis.__farm.state.animals.find(a => a.id === id).pen, info.hen);
-  // gà đi lạc thì mục tiêu đổi: đứng lại sát nó rồi làm lại cho tới khi sang chuồng mới
+  const carry = () => page.evaluate(() => globalThis.__farm.state.carry?.animalId ?? null);
+  // 1) gà đi lạc thì mục tiêu đổi: đứng lại sát nó rồi chạm tới khi bế được lên xe
+  const lift = page.locator('#main-action, #chips .chip').filter({ hasText: 'Chở bằng xe rùa' });
   await expect(async () => {
-    if (await page.locator('#dialog-root .dialog').isVisible()) await page.locator('#dialog-root .btn', { hasText: 'Thôi' }).click();
     await page.evaluate(id => { const s = globalThis.__farm.state, a = s.animals.find(x => x.id === id); s.player.x = a.x; s.player.y = a.y + 6; }, info.hen);
-    await expect(act.first()).toBeVisible({ timeout: 1000 });
-    await act.first().click();
-    const dlg = page.locator('#dialog-root .dialog');
-    await expect(dlg).toBeVisible({ timeout: 1000 });
-    await expect(dlg.locator(`[data-pen="${info.to}"]`)).toContainText(/[0-9]\/6/);
-    await dlg.locator(`[data-pen="${info.to}"]`).click();
-    await expect.poll(penOf, { timeout: 3000 }).toBe(info.to);
+    await expect(lift.first()).toBeVisible({ timeout: 1000 });
+    await lift.first().click();
+    await expect.poll(carry, { timeout: 2000 }).toBe(info.hen);
   }).toPass({ timeout: 40_000 });
+  expect(await penOf()).toBe(info.from);   // chưa thả thì vẫn thuộc chuồng cũ
+  // 2) đẩy xe tới máng chuồng mới, chạm nút Thả
+  await page.evaluate(async id => { const { mapOf } = await import('/state.js'); const s = globalThis.__farm.state, t = mapOf(s).penById[id].trough; s.player.x = t.x + 8; s.player.y = t.y - 3; }, info.to);
+  const drop = page.locator('#main-action, #chips .chip').filter({ hasText: 'vào chuồng này' });
+  await expect(async () => {
+    await expect(drop.first()).toBeVisible({ timeout: 1000 });
+    await drop.first().click();
+    await expect.poll(penOf, { timeout: 3000 }).toBe(info.to);
+  }).toPass({ timeout: 20_000 });
+  expect(await carry()).toBeNull();
   const inPen = await page.evaluate(id => { const a = globalThis.__farm.state.animals.find(x => x.id === id); return { x: a.x, y: a.y }; }, info.hen);
   expect(inPen.x).toBeGreaterThan(40 * 16);   // chuồng mới ở cột 44, xa chuồng cũ ở cột 27
 });

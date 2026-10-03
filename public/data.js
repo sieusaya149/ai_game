@@ -553,7 +553,7 @@ export const ITEMS = {
   vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 90, lv: 1, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 120, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
   straw:      { name: 'Rơm phủ luống',     kind: 'supply', price: 8,  lv: 1, desc: 'Phủ lên ô ruộng: đất giữ ẩm lâu gấp đôi (đỡ khổ lúc hạn hán), cây non không sợ sương muối. Thu hoạch hay dọn ô thì rơm mất.' },
-  barrow:     { name: 'Xe rùa',           kind: 'supply', price: 750, lv: 3, once: true, desc: 'Mua một lần. Chạm con vật chọn "Chở sang chuồng khác" để đưa nó sang chuồng cùng loại còn chỗ.' },
+  barrow:     { name: 'Xe rùa',           kind: 'supply', price: 2500, lv: 3, once: true, desc: 'Tài sản dùng mãi mãi, mua một lần. Chạm con vật chọn "Chở bằng xe rùa", đẩy tới chuồng cùng loại còn chỗ rồi chạm máng ăn để thả nó xuống.' },
   soap:       { name: 'Xà phòng',         kind: 'supply', price: 15, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
   manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
   phan_cho:   { name: 'Phân chó',          kind: 'material', price: 0, lv: 0, desc: 'Xúc bãi phân của chó. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
