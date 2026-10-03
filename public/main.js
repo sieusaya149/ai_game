@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, rotateEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, barrowTargets, commandDog,
+  startVisit, visitWorld, visitSync, visitEase, WORLD_MS, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, rotateEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, wake, isAsleep, speedOf, sellQuote, barrowTargets, commandDog,
 } from './state.js';
 import { refillMs } from './state.js';
 import * as ui from './ui.js';
@@ -99,7 +99,7 @@ const SHAKE_MS = 400;
 let shakeUntil = 0;
 
 // ---------- API cho ui.js ----------
-function changed() { dirty = true; worldDirty = true; }
+function changed() { dirty = true; }
 
 // Bán con vật: báo giá, con ❤️4+ phải xác nhận 2 lần. Nghỉ hưu: hỏi một lần (không quay lại được)
 async function askAnimal(target, id) {
@@ -312,15 +312,15 @@ function guestDid(op) {
 }
 // ---------- Khách thấy chủ làm gì ngay (sửa lỗi online: chủ thu hoạch mà cây vẫn nằm trên máy khách) ----------
 // Chủ: có khách đứng trong vườn mình (server báo `watch`) thì gửi phần vườn khách thấy được (state.js visitWorld) mỗi khi
-// vườn đổi, tối đa mỗi WORLD_MS, và đều đặn mỗi WORLD_IDLE_MS cho phần tự đổi (cây lớn, gà đẻ, con vật đói...).
+// mỗi WORLD_MS (1 giây) dù có đổi hay không: chủ chạy, chó chạy, cây lớn, gà đẻ... khách thấy mượt (visitEase). Luôn kèm `farm`
+// (chừng 1 KB) để máy khách bản cũ (bỏ qua tin thiếu `farm`) vẫn nhận được; khách bản mới thì tin thiếu `farm` vẫn giữ bố cục đang có.
 // Khách: áp lên bản đi dạo (visitSync), chỗ đứng của mình và việc vừa làm mà chủ chưa nhận vẫn giữ.
-const WORLD_MS = 1000, WORLD_IDLE_MS = 4000;
-let watchers = 0, worldAt = -Infinity, worldDirty = false;
+let watchers = 0, worldAt = -Infinity;
 function hostWorld(now) {
   const mine = home ?? state;
   if (!sync || !watchers || !mine || world.build) return;   // đang sửa bố cục: chưa lưu nên chưa gửi
-  if (now - worldAt < (worldDirty ? WORLD_MS : WORLD_IDLE_MS)) return;
-  if (sync.send({ t: 'world', w: visitWorld(mine) })) { worldAt = now; worldDirty = false; }
+  if (now - worldAt < WORLD_MS) return;
+  if (sync.send({ t: 'world', w: visitWorld(mine) })) worldAt = now;
 }
 function hostDid(m) {
   const owner = state?.visit?.owner;
@@ -335,7 +335,7 @@ function hostDid(m) {
 function dogBark() {
   const r = barkOp(state);
   if (!r) return;
-  sync?.send({ t: 'guest', op: r.guestOp });
+  if (r.guestOp) sync?.send({ t: 'guest', op: r.guestOp });   // đang nghỉ giữa hai lần báo chủ thì chỉ sủa cho khách nghe
   ui.handleEvents([{ type: 'sound', name: 'bark' }]);
   shakeUntil = performance.now() + SHAKE_MS;
   try { navigator.vibrate?.(120); } catch { /* máy không rung */ }
@@ -621,8 +621,9 @@ function goSleep() {
     el.classList.remove('on');
     if (!state) return;
     const r = sleep(state);
+    if (r.sleeping) world.busy = world.sleeping = true;   // khỏi nháy một khung hình trước khi vòng lặp dựng màn Zzz
     ui.toast(r.msg);
-    if (r.ok) ui.handleEvents([{ type: 'sound', name: 'levelup' }]);
+    if (r.ok && !r.sleeping) ui.handleEvents([{ type: 'sound', name: 'levelup' }]);   // online: nằm giường, màn Zzz do vòng lặp dựng
     world.fx = []; dirty = true;
     ui.renderHUD(state);
     save();
@@ -823,6 +824,8 @@ function syncTarget(now) {
 }
 syncTarget.key = '';
 
+// Đang ngủ (online): nhân vật nằm giường, màn Zzz, không điều khiển được; dậy thì trả lại
+let wasAsleep = false;
 function frame(now) {
   requestAnimationFrame(frame);
   if (prefs.battery && now - last < 1000 / P.BATTERY_FPS - 8) return;   // tiết kiệm pin: khóa 30 khung hình (bỏ qua một nhịp màn 60Hz)
@@ -837,6 +840,13 @@ function frame(now) {
 
   // 1-2) thời gian game
   const events = tick(home ?? state, dtMs * speedOf(state)) ?? [];   // đang thăm vườn người khác: vườn mình vẫn chạy
+  const asleep = isAsleep(state);
+  if (asleep !== wasAsleep) {
+    wasAsleep = asleep; world.sleeping = asleep; world.busy = asleep;
+    if (asleep) { V.cancelMove(world); plan = null; world.input.x = world.input.y = 0; }
+    ui.setSleeping(asleep, () => { const r = wake(state); if (r.ok) { dirty = true; save(); } });
+    if (!asleep) { ui.renderHUD(state); save(); }
+  }
 
   // 3) nhập liệu → di chuyển, AI
   if (ui.isBlocking()) { keys.clear(); world.input.x = world.input.y = 0; }
@@ -845,6 +855,7 @@ function frame(now) {
     world.input.x = kx || joy.x; world.input.y = ky || joy.y;
     if (plan && (world.input.x || world.input.y)) plan = null;   // tự đi bằng tay thì bỏ kế hoạch
   }
+  visitEase(state, dt);   // khách: con vật, chó của chủ đi dần tới chỗ tin world mới nhất
   const res = V.update(state, world, dt);
   for (const r of res.results) applyResult(r);
   if (res.bark) dogBark();     // chó trong vườn người khác vừa phát hiện mình (issue 31)

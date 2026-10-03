@@ -6,10 +6,11 @@
 // thì báo sau hello); trình duyệt chủ gửi phần vườn khách thấy được (`world { w }`), server chuyển cho khách trong vườn.
 import { notifyVisit } from './friends.mjs';
 import { LIVE, QUICK_CHAT, EMOTES, LOOK, DEFAULT_LOOK, levelInfo } from '../public/data.js';
-import { VISIT_KEYS } from '../public/state.js';
+import { VISIT_KEYS, WORLD_MS } from '../public/state.js';
 import { playOf } from './farms.mjs';
 
 const GAP = 1000 / LIVE.hz;
+const WORLD_GAP = WORLD_MS / 4;   // tin `world` của một chủ: tối đa 4 tin/giây (chủ thật gửi 1/giây)
 const MAPS = ['village', 'farm', 'house'];
 // Tài khoản smoke live (e2e/smoke-online.spec.mjs) có tên bắt đầu bằng tiền tố này: chơi ở làng thử riêng, người thật không thấy và ngược lại
 export const SMOKE_PREFIX = 'zzsmoke';
@@ -28,6 +29,7 @@ const pub = p => ({ id: p.id, name: p.name, level: p.level, look: p.look, x: p.x
 
 export function createPresence(ctx, send) {
   const { db } = ctx;
+  const lastWorld = new Map();   // accountId → giờ tin `world` gần nhất được chuyển
   const maps = new Map();   // mã bản đồ → Map(accountId → người)
   const others = p => [...(maps.get(p.map)?.values() ?? [])].filter(o => o !== p);
   const cast = (p, m) => { for (const o of others(p)) send(o.sock, m); };
@@ -100,6 +102,9 @@ export function createPresence(ctx, send) {
       if (!a || !sock.play || playOf(db, a.id) !== sock.play || !m.w || typeof m.w !== 'object' || Array.isArray(m.w)) return;
       const guests = guestsIn(a.id);
       if (!guests.length) return;
+      const t = Date.now();
+      if (t - (lastWorld.get(a.id) ?? 0) < WORLD_GAP) return;   // chống lạm dụng: tối đa 4 tin/giây/chủ, thừa thì bỏ
+      lastWorld.set(a.id, t);
       const w = {};
       for (const k of VISIT_KEYS) if (k in m.w) w[k] = m.w[k];
       const msg = { t: 'world', owner: a.name, w };
