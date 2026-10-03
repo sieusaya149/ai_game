@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, commandDog,
+  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, rotateEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, commandDog,
 } from './state.js';
 import { refillMs } from './state.js';
 import * as ui from './ui.js';
@@ -432,8 +432,21 @@ const api = {
     const r = upgradePen(state, b.sel);
     ui.buildMsg(r.msg, r.ok);
     ui.handleEvents([{ type: 'sound', name: r.ok ? 'coin' : 'error' }]);
-    ui.buildSel(null, upgradeInfo(state, b.sel));
+    ui.buildSel(null, upgradeInfo(state, b.sel), null, true);
     ui.buildTray(state, b);
+    changed();
+  },
+  // Xoay chuồng đang chọn (0 → cửa trái → cửa phải). Áp ngay lên bố cục, Xong giữ, Hủy trả về; không vừa chỗ thì hiện bóng đỏ kèm lý do.
+  buildRotate() {
+    const b = world.build, e = b?.sel && state.farm.ents.find(x => x.id === b.sel);
+    if (!e || e.kind !== 'pen') return;
+    const r = rotateEntity(state, e.id);
+    if (!r.ok) {
+      const nx = { ...e, rot: ((e.rot ?? 0) + 1) % 3 }, ft = footprint(nx);
+      b.ghost = { id: e.id, c: e.c, r: e.r, w: ft.w, h: ft.h, ok: false, reason: r.reason ?? null };
+    }
+    ui.buildMsg(r.msg, r.ok);
+    ui.handleEvents([{ type: 'sound', name: r.ok ? 'pop' : 'error' }]);
     changed();
   },
   // Đi tới chỗ gần nhất có việc loại kind (không tự làm). Ở bản đồ khác thì ra cửa/cổng trước, sang vườn rồi đi tiếp.
@@ -695,6 +708,7 @@ function buildDown(e) {
     placeGhost(b, p);
     return;
   }
+  b.ghost = null;   // bóng đỏ của lần xoay bị từ chối chỉ hiện tới lần chạm kế
   const ent = V.pickEntity(state, p.x, p.y);
   if (ent && canMove(ent)) {
     const ft = footprint(ent);
@@ -732,7 +746,7 @@ function buildUp(e) {
   if (d.tap && !g) {   // chạm không kéo: chọn món, hiện nút Cất nếu cất được
     const ent = state.farm.ents.find(x => x.id === d.id);
     if (ent && (ent.kind === 'deco' || ent.kind === 'field')) { b.sel = ent.id; ui.buildSel(entName(ent), null, ent.kind === 'field' ? ent.id : null); }   // khối ruộng: thêm nút Nâng cấp khối (issue 58)
-    else if (ent && upgradeInfo(state, ent.id)) { b.sel = ent.id; ui.buildSel(null, upgradeInfo(state, ent.id)); }   // chuồng, chuồng chó: nâng cấp
+    else if (ent && (ent.kind === 'pen' || upgradeInfo(state, ent.id))) { b.sel = ent.id; ui.buildSel(null, upgradeInfo(state, ent.id), null, ent.kind === 'pen'); }   // chuồng: nâng cấp, xoay; chuồng chó: nâng cấp
     ui.buildMsg(BUILD_HINT, null);
     return;
   }

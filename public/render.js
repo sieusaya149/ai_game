@@ -23,6 +23,8 @@ import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS, TANK, COMPOST } from '.
 import { SHOWER_ART } from './art59.js';   // vòi sen chuồng cấp 3 (issue 59)
 import { showerInfo } from './state.js';
 import { SHOWER } from './data.js';
+const PENROT = (await import('./artrot.js').catch(() => null))?.PENROT ?? null;   // chuồng xoay: ảnh nhìn nghiêng quay mặt sang trái (artrot.js), thiếu thì dùng ảnh nhìn thẳng
+const sideImg = (im, rot) => (im && rot === 2 ? derived(im, 'flip', flip) : im);   // cửa bên phải: lật ngang ảnh
 
 const FONT = "'Nunito', system-ui, sans-serif";
 
@@ -519,7 +521,8 @@ function outdoorChunk(m, ci, cw, R = 1) {
 
   // vũng bùn chuồng heo
   const mudHere = MUD && MUD.x < ox + CHUNK_PX && MUD.x + MUD.w > ox && MUD.y < oy + CHUNK_PX && MUD.y + MUD.h > oy;
-  if (mudHere && SPR.mud) put(x, SPR.mud, MUD.x, MUD.y);
+  const mudV = MUD?.rot && sideImg(PENROT?.mudV, MUD.rot);
+  if (mudHere && (mudV || (!MUD.rot && SPR.mud))) put(x, mudV || SPR.mud, MUD.x, MUD.y);
   else if (mudHere) {
     x.fillStyle = '#3f2a16'; x.beginPath(); x.ellipse(MUD.x + MUD.w / 2, MUD.y + MUD.h / 2, MUD.w / 2, MUD.h / 2, 0, 0, 7); x.fill();
     x.fillStyle = '#54381d'; x.beginPath(); x.ellipse(MUD.x + MUD.w / 2, MUD.y + MUD.h / 2, MUD.w / 2 - 2, MUD.h / 2 - 2, 0, 0, 7); x.fill();
@@ -998,7 +1001,7 @@ export function render(ctx, f) {
     if (bw) add(m.dogBowl.y, () => blit(bw, m.dogBowl.x - bw.width / 2, m.dogBowl.y - bw.height));   // bát ăn cạnh chuồng chó
   }
   for (const p of m.penList) {   // nhà/mái chuồng theo cấp, rồi máng
-    const hs = p.house, hi = hs.sprite === 'quarantine' ? SPR3?.quarantine : SPR3?.pen?.[hs.sprite]?.[p.lv - 1];
+    const hs = p.house, hi = (p.rot && sideImg(hs.sprite === 'quarantine' ? PENROT?.quarantine : PENROT?.pen?.[hs.sprite]?.[p.lv - 1], p.rot)) || (hs.sprite === 'quarantine' ? SPR3?.quarantine : SPR3?.pen?.[hs.sprite]?.[p.lv - 1]);
     if (hi && vis(hs.x, hs.y - hi.height / 2, hi.width)) add(hs.y, () => blit(hi, hs.x - hi.width / 2, hs.y - hi.height));
     const sa = p.shower && SHOWER_ART?.[p.type];   // vòi sen chuồng cấp 3 (issue 59): phun khi đang tắm, có nước thì chờ, không nước thì tắt
     if (sa && vis(p.shower.x + 8, p.shower.y - 18, 30)) {
@@ -1010,6 +1013,16 @@ export function render(ctx, f) {
     if (gt && vis(gt.x, gt.y, 24)) add(gt.y + 3, () => homeSign(gt, hm));   // biển số con đã về trên cửa chuồng
     const tr = p.trough, n = state.troughs?.[p.id] ?? 0;
     if (!tr || !vis(tr.x, tr.y, 20)) continue;
+    if (tr.v) {   // máng dọc của chuồng xoay: thanh đo cám nhỏ bên cạnh
+      add(tr.y, () => {
+        const im = sideImg(PENROT?.troughV, p.rot);
+        if (im) blit(im, tr.x - im.width / 2, tr.y - im.height);
+        else { rect(ctx, '#6b4020', tr.x - 7, tr.y - 28, 14, 28); rect(ctx, '#8a5a2b', tr.x - 5, tr.y - 26, 10, 24); }
+        rect(ctx, '#3b2412', tr.x - 2, tr.y - 24, 4, 20);
+        if (n > 0) { const hh = Math.max(1, Math.round(18 * Math.min(1, n / 20))); rect(ctx, '#5fd35f', tr.x - 1, tr.y - 5 - hh, 2, hh); }
+      });
+      continue;
+    }
     add(tr.y, () => {
       blit(SPR.trough, tr.x - 13, tr.y - 12);
       if (n <= 0) { rect(ctx, '#8a5a2b', tr.x - 12, tr.y - 9, 24, 3); rect(ctx, '#6b4020', tr.x - 12, tr.y - 9, 24, 1); }
@@ -1018,12 +1031,13 @@ export function render(ctx, f) {
   }
   for (const p of m.penList) {   // cân heo, mỗi chuồng heo một cái
     const sc = p.scale, im = SPR3?.scale;
-    if (sc && im && vis(sc.x, sc.y, 20)) add(sc.y, () => blit(im, sc.x - 8, sc.y - 14));
+    const si = (p.rot && sideImg(PENROT?.scale, p.rot)) || im, sd = si !== im;   // chuồng xoay: cân nhìn nghiêng 14x19
+    if (sc && si && vis(sc.x, sc.y, 20)) add(sc.y, () => blit(si, sd ? sc.x - si.width / 2 : sc.x - 8, sd ? sc.y - si.height + 2 : sc.y - 14));
   }
   // ổ ấp trứng cạnh chuồng gà nhỏ
   const coop = m.building('coop');
   if (coop && vis(coop.at.x, coop.at.y, 30)) add(coop.at.y - 2, () => {
-    const im = state.nest?.egg ? SPR.nestEgg : SPR.nestEmpty;
+    const im = (coop.rot && sideImg(state.nest?.egg ? PENROT?.nestEgg : PENROT?.nestEmpty, coop.rot)) || (state.nest?.egg ? SPR.nestEgg : SPR.nestEmpty);   // chuồng xoay: ổ nhìn nghiêng
     if (im) blit(im, coop.at.x - im.width / 2, coop.at.y - im.height);
     else {
       rect(ctx, '#3b2412', coop.at.x - 8, coop.at.y - 6, 16, 6); rect(ctx, '#e8c34a', coop.at.x - 7, coop.at.y - 5, 14, 4);

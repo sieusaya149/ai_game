@@ -1,6 +1,6 @@
 // Dựng bản đồ vườn từ state.farm (đất đã mua, đường đất, các thực thể đã đặt). Thuần JS, chạy được trong Node.
 // mapOf(state) có nhớ tạm theo state.farm.rev: đổi bố cục thì gọi bumpLayout(state).
-import { TS, GROUND, BUILDING_DEFS, PEN_DEFS, FIELD_SIZE, SCENES, tileHash } from './layout.js';
+import { TS, GROUND, BUILDING_DEFS, FIELD_SIZE, SCENES, tileHash, penGeo } from './layout.js';
 
 const cache = new WeakMap();
 export const bumpLayout = s => { s.farm.rev = (s.farm.rev || 0) + 1; };
@@ -29,7 +29,7 @@ function edge(owned, gap) {
 // Các ô một thực thể chiếm chỗ { c, r, w, h }: chuồng tính cả khung rào, ruộng là khối 3x3, đồ trang trí/cây 1 ô.
 export function footprint(e) {
   if (e.kind === 'field' || e.kind === 'greenhouse') return { c: e.c, r: e.r, w: FIELD_SIZE, h: FIELD_SIZE };   // nhà kính phủ đúng một khối ruộng
-  if (e.kind === 'pen') { const d = PEN_DEFS[e.pen]; return { c: e.c, r: e.r, w: d.w, h: d.h }; }
+  if (e.kind === 'pen') { const d = penGeo(e.pen, e.rot); return { c: e.c, r: e.r, w: d.w, h: d.h }; }
   const d = BUILDING_DEFS[e.kind];
   return { c: e.c, r: e.r, w: d?.foot.w ?? 1, h: d?.foot.h ?? 1 };
 }
@@ -65,17 +65,17 @@ function build(f) {
         plotPos.set(pi, t); plotByTile.set(idx(t.c, t.r), pi); plotField.set(pi, e);
       });
     } else if (e.kind === 'pen') {
-      const d = PEN_DEFS[e.pen], rect = { c: e.c, r: e.r, w: d.w, h: d.h };
+      const d = penGeo(e.pen, e.rot), rect = { c: e.c, r: e.r, w: d.w, h: d.h };
       if (d.ground) fill(e.c + d.ground.c, e.r + d.ground.r, d.ground.w, d.ground.h, GROUND[d.ground.kind]);
       const gates = d.gates.map(([dc, dr]) => [e.c + dc, e.r + dr]);
       const isGate = (x, y) => gates.some(([gx, gy]) => gx === x && gy === y);
       for (let x = rect.c; x < rect.c + rect.w; x++) for (const y of [rect.r, rect.r + rect.h - 1]) if (!isGate(x, y)) fences.push({ c: x, r: y, kind: 'h', lv: e.lv ?? 1 });
       for (let y = rect.r + 1; y < rect.r + rect.h - 1; y++) for (const x of [rect.c, rect.c + rect.w - 1]) if (!isGate(x, y)) fences.push({ c: x, r: y, kind: 'v', lv: e.lv ?? 1 });
-      const trough = d.trough ? { c: e.c + d.trough.c, r: e.r + d.trough.r, x: px + d.trough.x, y: py + d.trough.y } : null;
-      const pen = { id: e.id, type: e.pen, lv: e.lv ?? 1, name: d.name, rect, gates, trough, area: { x: px + d.area.x, y: py + d.area.y, w: d.area.w, h: d.area.h }, house: { x: px + d.house.x, y: py + d.house.y, sprite: d.house.sprite }, ent: e };
+      const trough = d.trough ? { c: e.c + d.trough.c, r: e.r + d.trough.r, x: px + d.trough.x, y: py + d.trough.y, v: !!d.trough.v } : null;
+      const pen = { id: e.id, type: e.pen, rot: d.rot ?? 0, lv: e.lv ?? 1, name: d.name, rect, gates, trough, area: { x: px + d.area.x, y: py + d.area.y, w: d.area.w, h: d.area.h }, house: { x: px + d.house.x, y: py + d.house.y, sprite: d.house.sprite }, ent: e };
       pens[e.pen] ??= pen;   // pens[loại] = chuồng đầu tiên của loại đó; penList/penById có đủ mọi chuồng
       penList.push(pen); penById[e.id] = pen;
-      if (trough) { troughs.push({ pen: e.pen, id: e.id, c: trough.c, r: trough.r, w: 2 }); block(trough.c, trough.r, 2, 1); }
+      if (trough) { troughs.push({ pen: e.pen, id: e.id, c: trough.c, r: trough.r, w: d.trough.w ?? 2, h: d.trough.h ?? 1 }); block(trough.c, trough.r, d.trough.w ?? 2, d.trough.h ?? 1); }
       if (d.shower && (e.lv ?? 1) >= 3) pen.shower = { x: px + d.shower.x, y: py + d.shower.y };   // vòi sen chuồng cấp 3 (issue 59), không chắn đường
       if (d.scale) {   // cân heo đặt cạnh máng của từng chuồng heo
         pen.scale = { c: e.c + d.scale.c, r: e.r + d.scale.r, x: px + d.scale.x, y: py + d.scale.y };
@@ -83,12 +83,12 @@ function build(f) {
       }
       if (d.nest && !buildings.some(b => b.id === 'coop')) {   // ổ ấp chỉ có ở chuồng gà đầu tiên
         const n = d.nest;
-        buildings.push({ id: 'coop', kind: 'coop', name: 'Ổ ấp trứng', label: 'Ổ ấp', sprite: 'coop', x: px + n.spr.x, y: py + n.spr.y,
+        buildings.push({ id: 'coop', kind: 'coop', name: 'Ổ ấp trứng', label: 'Ổ ấp', sprite: 'coop', x: px + n.spr.x, y: py + n.spr.y, rot: d.rot ?? 0,
           foot: { c: e.c + n.foot.c, r: e.r + n.foot.r, w: n.foot.w, h: n.foot.h }, at: { x: px + n.at.x, y: py + n.at.y }, ent: e });
         block(e.c + n.foot.c, e.r + n.foot.r, n.foot.w, n.foot.h);
       }
       if (d.mud && !mud) {
-        mud = { x: px + d.mud.x, y: py + d.mud.y, w: d.mud.w, h: d.mud.h };
+        mud = { x: px + d.mud.x, y: py + d.mud.y, w: d.mud.w, h: d.mud.h, rot: d.rot ?? 0 };
         const q = d.mudSpot;
         mudSpot = { x: px + q.x, y: py + q.y, rx: q.rx, ry: q.ry, x0: px + q.x0, x1: px + q.x1, y0: py + q.y0, y1: py + q.y1 };
       }

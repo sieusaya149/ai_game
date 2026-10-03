@@ -1,5 +1,5 @@
 // Thế giới: di chuyển, va chạm, tìm đường, AI con vật/chó/quạ/trộm, tìm target. Không vẽ gì.
-import { TS, GROUND } from './layout.js';
+import { TS, GROUND, troughBox } from './layout.js';
 import { ANIMALS, CROPS, DOG, GUARD, WALK_SPEED, DIR_NAME, BOND, FREE, PREDATOR, DELIVERY } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
@@ -236,7 +236,10 @@ function updateAnimals(state, w, dt0, out) {
         } else if (a.stage === 'gia' && Math.random() < 0.45) {   // con già hay ngủ gật
           rt.mode = 'nap'; rt.nap = true; rt.timer = rnd(4, 9);
         } else if (a.hunger < 60 && trough > 0 && Math.random() < 0.6) {
-          rt.tx = clamp(pen.trough.x + rnd(-14, 14), area.x, area.x + area.w); rt.ty = area.y + rnd(1, 8); rt.mode = 'walk';
+          const tg = pen.trough;   // máng ngang: đứng dưới máng ăn; máng dọc (chuồng xoay): đứng cạnh máng, phía trong chuồng
+          if (tg.v) { rt.tx = pen.rot === 2 ? area.x + area.w - rnd(1, 8) : area.x + rnd(1, 8); rt.ty = clamp(tg.y - 14 + rnd(-14, 14), area.y, area.y + area.h); }
+          else { rt.tx = clamp(tg.x + rnd(-14, 14), area.x, area.x + area.w); rt.ty = area.y + rnd(1, 8); }
+          rt.mode = 'walk';
         } else if (a.type === 'heo' && ms && !inMud && Math.random() < 0.45) {
           rt.tx = rnd(ms.x0, ms.x1); rt.ty = rnd(ms.y0, ms.y1); rt.mode = 'walk';
         } else if (POULTRY.includes(a.type) && Math.random() < (a.stage === 'nho' ? 0.7 : 0.4)) {   // gà nhỡ bới đất nhiều
@@ -537,7 +540,7 @@ function updatePreds(state, w, dt) {
 export const keyOf = t => t.kind + (t.id ?? t.idx ?? t.pen ?? t.to ?? t.dir ?? '');
 const doorOf = to => M.doors.find(d => d.to === to);
 const inDoor = (d, x, y) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h;
-const troughAnchor = tg => { const t = troughOf(M, tg); return t ? { x: t.x, y: t.r * TS + 8 } : null; };
+const troughAnchor = tg => { const t = troughOf(M, tg); return t ? { x: t.x, y: t.r * TS + (t.v ? TS : 8) } : null; };
 const scaleOf = t => (M.penById[t.id] ?? M.pens[t.pen])?.scale;   // cân của chuồng heo { pen, id }
 const coop = () => M.building('coop');
 // Điểm trên ranh đất nhà theo hướng dir, thẳng với người chơi (target mua đất: đứng sát mép là chạm được)
@@ -759,7 +762,7 @@ export function hitTest(state, wx, wy) {
     if (hitRect(p.x - hw, p.y - hh, hw * 2, hh + 4, wx, wy, 4)) return { kind: 'pred', id: p.id };
   }
   // máng ăn xét trước con vật: con vật hay đứng ăn ngay trên máng, chạm vào máng phải chọn được máng (chạm thân con vật phía trên vẫn trúng con vật)
-  for (const { pen, id } of M.troughs) { const tr = M.penById[id].trough; if (hitRect(tr.x - 13, tr.y - 12, 26, 12, wx, wy)) return { kind: 'trough', pen, id }; }
+  for (const { pen, id } of M.troughs) { const tb = troughBox(M.penById[id].trough); if (hitRect(tb.x, tb.y, tb.w, tb.h, wx, wy)) return { kind: 'trough', pen, id }; }
   if (atFarm()) {
     for (const a of [...state.animals].sort((u, v) => v.y - u.y)) {
       const im = animalImg(a, 'left', 0);

@@ -65,6 +65,49 @@ export const PEN_DEFS = {
   },
 };
 
+// Xoay chuồng (e.rot): 0 = cửa ở trên như PEN_DEFS; 1 = xoay 90°, cửa bên TRÁI; 2 = đối xứng của 1 qua trục dọc, cửa bên PHẢI.
+// MỘT phép biến đổi cho mọi toạ độ của chuồng (khung, cửa, máng, nhà, ổ ấp, cân, bùn, vòi sen, vùng đi lại), tính so với góc trên-trái khung.
+const penGeos = new Map();
+export function penGeo(pen, rot = 0) {
+  const d = PEN_DEFS[pen];
+  if (!rot) return d;
+  const key = pen + rot;
+  if (penGeos.has(key)) return penGeos.get(key);
+  const W = d.w, H = d.h, TW = W * TS, TH = H * TS, m = rot === 2;
+  const tr = (c, r, w = 1, h = 1) => ({ c: m ? H - r - h : r, r: W - c - w, w: h, h: w });   // ô (hình chữ nhật)
+  const pr = (x, y, w, h) => ({ x: m ? TH - y - h : y, y: TW - x - w, w: h, h: w });         // điểm ảnh (hình chữ nhật)
+  const pt = (x, y) => { const o = pr(x, y, 0, 0); return { x: o.x, y: o.y }; };            // điểm ảnh (điểm)
+  const g = { ...d, rot, w: H, h: W, gates: d.gates.map(([c, r]) => { const o = tr(c, r); return [o.c, o.r]; }), area: pr(d.area.x, d.area.y, d.area.w, d.area.h), house: { ...d.house, ...pt(d.house.x, d.house.y) } };
+  if (d.trough) {   // máng nằm dọc (1x2 ô), điểm vẽ = giữa đáy
+    const o = tr(d.trough.c, d.trough.r, 2, 1);
+    g.trough = { c: o.c, r: o.r, w: o.w, h: o.h, x: o.c * TS + TS / 2, y: (o.r + o.h) * TS - 2, v: true };
+  }
+  if (d.ground) g.ground = { kind: d.ground.kind, ...tr(d.ground.c, d.ground.r, d.ground.w, d.ground.h) };
+  if (d.nest) {
+    const o = tr(d.nest.foot.c, d.nest.foot.r, d.nest.foot.w, d.nest.foot.h);
+    g.nest = { foot: o, at: pt(d.nest.at.x, d.nest.at.y), spr: { x: o.c * TS - 7, y: o.r * TS - 4 } };
+  }
+  if (d.scale) { const o = tr(d.scale.c, d.scale.r), p = pt(d.scale.x, d.scale.y); g.scale = { c: o.c, r: o.r, x: p.x, y: p.y }; }
+  if (d.mud) {
+    g.mud = pr(d.mud.x, d.mud.y, d.mud.w, d.mud.h);
+    const q = d.mudSpot, c = pt(q.x, q.y), a = pr(q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0);
+    g.mudSpot = { x: c.x, y: c.y, rx: q.ry, ry: q.rx, x0: a.x, x1: a.x + a.w, y0: a.y, y1: a.y + a.h };
+  }
+  if (d.shower) g.shower = pt(d.shower.x, d.shower.y);
+  penGeos.set(key, g);
+  return g;
+}
+// Đổi một điểm ảnh (so với góc trên-trái khung) của chuồng từ góc xoay from sang góc xoay to: về dạng gốc rồi xoay lại
+export function penRemap(pen, from, to, p) {
+  const d = PEN_DEFS[pen], TW = d.w * TS, TH = d.h * TS;
+  let { x, y } = p;
+  if (from === 1) [x, y] = [TW - y, x]; else if (from === 2) [x, y] = [TW - y, TH - x];
+  if (to === 1) [x, y] = [y, TW - x]; else if (to === 2) [x, y] = [TH - y, TW - x];
+  return { x, y };
+}
+// Hộp vẽ/chạm của máng (x, y, w, h) theo điểm giữa đáy của nó
+export const troughBox = t => (t.v ? { x: t.x - 7, y: t.y - 28, w: 14, h: 28 } : { x: t.x - 13, y: t.y - 12, w: 26, h: 12 });
+
 // ---------- Vườn mới ----------
 // Đất ban đầu 24x20 ở giữa bản đồ. Toạ độ tính theo ô của bản đồ 64x48.
 export const START_FARM = {

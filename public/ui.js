@@ -226,8 +226,9 @@ function buildCard(s, kind, card) {
 const penIco = pen => (pen === 'quarantine' ? h('span', { class: 'ico emo' }, '🏥') : ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]));
 // Nút Cất cho món đang chạm (label = tên món, null = ẩn)
 // label: món cất được (nút Cất); up: S.upgradeInfo của chuồng đang chọn (nút Nâng cấp); field: id khối ruộng đang chọn (nút Nâng cấp khối)
-export function buildSel(label, up, field = null) {
+export function buildSel(label, up, field = null, rot = false) {
   const b = $('build-store'), u = $('build-upgrade');
+  $('build-rotate').hidden = !rot;   // rot: đang chọn một chuồng, hiện nút Xoay
   fieldSel = field;
   $('build-fieldup').hidden = field == null;
   b.hidden = !label;
@@ -2337,6 +2338,7 @@ export function initUI(a) {
   $('build-cancel').addEventListener('click', () => api.buildCancel());
   $('build-store').addEventListener('click', () => api.buildStore());
 $('build-upgrade').addEventListener('click', () => api.buildUpgrade());
+  $('build-rotate').addEventListener('click', () => api.buildRotate());
 $('build-fieldup').addEventListener('click', () => openPanel('fieldup'));
 
   addEventListener('keydown', e => {
