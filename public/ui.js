@@ -1535,6 +1535,13 @@ const achIcon = (a, done, cls = 'ico') => {
   const b = a?.badge && SPR2?.badges?.[a.badge];
   return b ? canvasIco(done ? b.on : b.off, cls + ' ach-badge') : h('span', { class: cls + ' emo' }, done ? '🏅' : '🔘');
 };
+// Màn hẹp: Thành tựu và Nhật ký gom vào nút "Thêm" để nút nào trên thanh dưới cũng đủ to
+PANELS.more = {
+  title: '⋯ Thêm',
+  render(body) {
+    body.append(h('div', { class: 'list' }, [['🏆 Thành tựu', 'achievements'], ['📜 Nhật ký', 'log']].map(([t, id]) => btn(t, () => openPanel(id), 'plain nosound', { 'data-more': id }))));
+  },
+};
 PANELS.achievements = {
   title: '🏆 Thành tựu',
   render(body, s) {

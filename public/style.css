@@ -187,6 +187,8 @@ kbd {
   border: 0; border-radius: 12px; cursor: pointer; color: var(--cream); padding: 0;
   background: linear-gradient(#c9924f, #a8743a); box-shadow: 0 3px 0 var(--wood-d), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
+#bb-more { display: none; }
+@media (max-width: 440px) { .bb-wide { display: none; } #bb-more { display: flex; } }
 .bb-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--wood-d); }
 .bb-ico { display: flex; height: 30px; align-items: center; font-size: 22px; line-height: 1; }
 .bb-ico .ico { width: 28px; height: 28px; }
