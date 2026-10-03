@@ -32,7 +32,7 @@ Yêu cầu: không tràn ngang, nút đủ to để bấm (≥ 40px), tránh vù
 
 - [ ] E2E ở cỡ 360px mở từng bảng/màn mới trên và kiểm tra không có cuộn ngang; nút nằm trong màn hình và ≥ 40px; các lớp nổi không đè nhau.
 - [ ] E2E giả lập tai thỏ: đè biến safe-area, mọi nút mới nằm trong vùng an toàn. Thử máy thật khi có, nếu chưa thì ghi rõ "chỉ giả lập".
-- [ ] `SPEC.md` khớp với code sau khi issue 50–62 xong; một agent mới chỉ đọc `SPEC.md` là biết file nào được sửa, gọi API nào, test ở đâu cho các hệ thống Phase 3.
+- [x] `SPEC.md` khớp với code sau khi issue 50–62 xong; một agent mới chỉ đọc `SPEC.md` là biết file nào được sửa, gọi API nào, test ở đâu cho các hệ thống Phase 3.
 - [ ] Unit và e2e pass hết trên máy local trước khi deploy; ghi lại số test pass.
 - [ ] Deploy xong, container `ai-game` ở trạng thái chạy. Smoke live pass.
 - [ ] Bản lưu v3 thật chuyển sang v4 không mất gì (cây đang trồng, đồ trong túi thành ★1, giếng cấp 1). Nếu chưa mở được bằng trình duyệt có save thật thì ghi "chờ chủ game" như Phase 0 và đã kiểm bằng fixture v3.
@@ -41,3 +41,8 @@ Yêu cầu: không tràn ngang, nút đủ to để bấm (≥ 40px), tránh vù
 ## Blocked by
 
 - Tất cả issue 50–62
+
+## Ghi chú phát hành
+
+- Ghi chú cho người chơi: [`docs/release/phase-3.md`](../release/phase-3.md). Số liệu thời gian và giá lấy từ mục "Đã chốt (03/10)" của đề xuất cân bằng; nếu `p3-balance` đổi thêm số thì rà lại mục "Nhịp thời gian mới".
+- `SPEC.md` đã rà (bỏ dòng lặp ở bảng file và bản lưu, sửa tiêu đề và quy trình phát hành); phần số liệu cân bằng sẽ do nhánh `p3-balance` cập nhật khi gộp.
