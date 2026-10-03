@@ -52,6 +52,15 @@ export const CROPS = {
 };
 // Nhóm thời gian lớn (ngưỡng thành thạo theo nhóm ở issue 51): ngắn ≤ 3 phút · trung bình 5–10 phút · dài ≥ 12 phút
 export const CROP_GROUPS = { short: 'Ngắn ngày', mid: 'Trung bình', long: 'Dài ngày' };
+// Thành thạo (issue 51): số lần thu hoạch để lên cấp 2 và 3 theo nhóm; thưởng theo cấp (chỉ số 0 = cấp 1)
+// yield: +sản lượng · giant: tỉ lệ trái khổng lồ (dùng ở issue 53) · bugMul: nhân xác suất sâu tới · seedBack: tỉ lệ được lại 1 hạt · exp: EXP khi lên tới cấp đó
+export const MASTERY = {
+  thresholds: { short: [20, 60], mid: [12, 35], long: [8, 25] },
+  perk: ['', '+1 sản lượng mỗi vụ, 10% ra trái khổng lồ', '+2 sản lượng mỗi vụ, 20% trái khổng lồ, ít sâu hơn, 30% được lại 1 hạt'],
+  yield: [0, 1, 2], giant: [0, 0.1, 0.2], bugMul: [1, 1, 0.5], seedBack: [0, 0, 0.3], exp: [0, 40, 100],
+};
+// Cấp thành thạo (1..3) của một nhóm cây sau n lần thu hoạch
+export const masteryLevel = (group, n) => 1 + MASTERY.thresholds[group].filter(t => n >= t).length;
 // Chất lượng nông sản ★1–3 (Phase 3): khóa vật phẩm ★1 là id cây như bản lưu cũ ('cai'), ★2/★3 thêm hậu tố ('cai@2').
 // Chỉ nông sản cây trồng có sao; sản phẩm vật nuôi có món "sao" riêng (sua_ngon, len_xoan).
 export const STARS = { max: 3, mul: [1, 1.5, 2] };
@@ -597,6 +606,7 @@ export const EVENT_LEVEL = {
   tisun:     { level: 'important', cat: 'loss', group: () => 'loss:tisun', label: 'Tí Sún trộm trứng', text: (n, e) => `Tí Sún lấy trộm mất ${e.n ?? n} quả trứng 😢` },
   civet:     { level: 'important', cat: 'loss', group: () => 'loss:civet', label: 'Chồn hương bắt con vật', text: (n, e) => `Chồn hương tha mất ${n} con ${animalN(e.animal)} 😿` },
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
+  mastery:   { level: 'important', cat: 'levelup', group: e => 'mastery:' + e.crop, label: 'Thành thạo cây', text: (n, e) => `Thành thạo ${cropN(e.crop)} lên cấp ${e.lv}! 🟡` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   helped:    { level: 'important', cat: 'help', group: e => `helped:${e.by}:${e.act}`, label: 'Khách giúp vườn', text: (n, e) => `${e.by} đã ${helpN(e.act)} ${n} ${HELP_JOBS[e.act]?.unit ?? 'việc'} giúp bạn 🙏` },
   stolen:    { level: 'urgent', group: e => `stolen:${e.by}:${e.item}`, label: 'Có người sang trộm', text: (n, e) => `${e.by} đã trộm ${e.qty * n} ${itemName(e.item).toLowerCase()} lúc ${hourText(e.at)} 😤` },

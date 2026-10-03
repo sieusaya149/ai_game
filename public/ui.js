@@ -1118,9 +1118,10 @@ PANELS.seeds = {
       const list = h('div', { class: 'grid' });
       for (const k of keys) {
         const c = D.CROPS[D.ITEMS[k].crop];
-        const on = s.selectedSeed === D.ITEMS[k].crop;
+        const on = s.selectedSeed === D.ITEMS[k].crop, m = S.masteryOf(s, D.ITEMS[k].crop);
         list.append(h('button', { class: 'cell pick nosound' + (on ? ' on' : ''), type: 'button', on: { click: () => { S.selectSeed(st(), D.ITEMS[k].crop); sound.play('pop'); commit(); closePanel(); } } },
-          ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + s.inv[k]), h('div', { class: 'cell-name' }, c.name), h('div', { class: 'cell-sub' }, `${c.grow / MIN} phút`)));
+          ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + s.inv[k]), h('div', { class: 'cell-name' }, c.name), h('div', { class: 'cell-sub' }, `${c.grow / MIN} phút`),
+          h('div', { class: 'cell-sub mastery', 'data-crop': D.ITEMS[k].crop }, `🟡 Cấp ${m.lv}` + (m.next ? ` · ${m.n}/${m.next} lần` : ' · tối đa'))));
       }
       body.append(list);
     }
@@ -1766,6 +1767,17 @@ function nextCelebration() {
   const lv = celebQueue.shift();
   if (lv == null) { celebOpen = false; root.hidden = true; root.replaceChildren(); return; }
   celebOpen = true;
+  if (typeof lv === 'object') {   // lên cấp thành thạo (issue 51)
+    const c = D.CROPS[lv.crop];
+    root.replaceChildren(h('div', { class: 'celeb-card', 'data-celeb': 'mastery' },
+      h('div', { class: 'celeb-star' }, ico(lv.crop, 'big')),
+      h('h2', {}, `Thành thạo ${c.name} cấp ${lv.lv}!`),
+      h('p', {}, D.MASTERY.perk[lv.lv - 1]),
+      btn('Tuyệt vời!', nextCelebration, 'orange big')));
+    root.hidden = false;
+    sound.play('levelup');
+    return;
+  }
   const unlocked = [
     ...Object.entries(D.ITEMS).filter(([, it]) => it.lv === lv).map(([k, it]) => ({ key: k, name: it.name })),
     ...Object.entries(D.ANIMALS).filter(([, a]) => a.lv === lv).map(([k, a]) => ({ key: k, name: a.baby })),
@@ -1861,6 +1873,7 @@ export function handleEvents(events) {
       case 'log': if (!hasToast && logged++ < 2) pushToast(e.text); break;
       case 'sound': sound.play(e.name); break;
       case 'levelup': celebQueue.push(e.level); if (!celebOpen) nextCelebration(); break;
+      case 'mastery': celebQueue.push({ crop: e.crop, lv: e.lv }); if (!celebOpen) nextCelebration(); break;
       case 'achievement': showBadge(e); break;
       case 'stolen': alertNow(D.EVENT_LEVEL.stolen.text(1, e)); break;   // có người trộm vườn mình (issue 30)
       case 'barked': alertNow(D.EVENT_LEVEL.barked.text(1, e)); break;    // chó sủa báo có khách lạ (issue 31)
