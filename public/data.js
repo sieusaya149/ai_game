@@ -845,6 +845,24 @@ export const LIVE = { hz: 6, crowd: 12, delayMs: 300, chatMs: 4000, emoteMs: 250
 // Câu chat nhanh có sẵn: server chỉ nhận đúng các câu này
 export const QUICK_CHAT = ['Chào cả làng!', 'Cảm ơn nhé!', 'Hẹn gặp lại!', 'Ghé vườn mình chơi nha!', 'Đi chợ không?', 'Tạm biệt!'];
 export const EMOTES = ['👋', '❤️', '😂', '😡'];
+// Chat tự gõ: tối đa maxWords từ (tách theo khoảng trắng) và maxChars ký tự · gap = giãn cách tối thiểu giữa hai tin (ms) ·
+// perMin = số tin tối đa mỗi phút mỗi người · msPerWord = bong bóng hiện thêm chừng này cho mỗi từ từ thứ 6 trở đi (tin dài đọc lâu hơn)
+export const CHAT = { maxWords: 20, maxChars: 120, gap: 2000, perMin: 10, msPerWord: 250 };
+// Từ tục cơ bản (không dấu, chữ thường); khớp nguyên từ, không phân biệt hoa thường và dấu, bị thay bằng ***
+export const BAD_WORDS = ['dm', 'dmm', 'dcm', 'dcmm', 'vcl', 'vkl', 'cc', 'dit', 'dit me', 'du ma', 'dume', 'cai lon', 'dau buoi', 'con cho', 'oc cho', 'khon nan'];
+const fold = c => (c === 'đ' || c === 'Đ' ? 'd' : (c.normalize('NFD')[0] ?? c).toLowerCase());
+const BAD_RE = new RegExp(`(?<![a-z0-9])(?:${[...BAD_WORDS].sort((a, b) => b.length - a.length).map(w => w.replace(/ /g, ' +')).join('|')})(?![a-z0-9])`, 'g');
+// Chuẩn hóa tin tự gõ: không phải chuỗi / rỗng / quá dài / quá nhiều từ → null; còn lại bỏ ký tự điều khiển, gộp khoảng trắng, che từ tục
+export function cleanChat(text) {
+  if (typeof text !== 'string' || text.length > CHAT.maxChars * 4) return null;
+  const t = text.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').replace(/\s+/g, ' ').trim();
+  if (!t || t.length > CHAT.maxChars || t.split(' ').length > CHAT.maxWords) return null;
+  const f = t.split('').map(fold).join('');   // cùng độ dài với t (mỗi đơn vị UTF-16 → một ký tự)
+  let out = '', at = 0;
+  for (const m of f.matchAll(BAD_RE)) { out += t.slice(at, m.index) + '***'; at = m.index + m[0].length; }
+  return out + t.slice(at);
+}
+export const chatMs = text => LIVE.chatMs + CHAT.msPerWord * Math.max(0, String(text).split(' ').length - 5);
 // Quà và sổ lưu bút ở cổng (issue 29): perGift = số món tối đa mỗi lần tặng · boxMax = số quà đang chờ tối đa ở một cổng
 // (mỗi lần tặng là một quà) · noteMax = số ký tự tối đa một dòng lưu bút
 export const GIFT = { perGift: 10, boxMax: 12, noteMax: 80 };

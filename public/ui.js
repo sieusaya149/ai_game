@@ -2374,6 +2374,24 @@ export function initUI(a) {
   const says = $('live-says');
   $('live-emotes').append(...D.EMOTES.map(e => btn(e, () => { says.hidden = true; api.emote(e); }, 'live-btn nosound', { title: 'Biểu cảm ' + e, 'aria-label': e })));
   says.append(...D.QUICK_CHAT.map(t => btn(t, () => { says.hidden = true; api.say(t); }, 'small')));
+  // chat tự gõ (tối đa D.CHAT.maxWords từ): Enter hoặc nút Gửi; phím di chuyển / phím tắt không chạy khi đang gõ
+  const chatIn = h('input', { id: 'live-chat-in', type: 'text', maxlength: D.CHAT.maxChars * 2, placeholder: 'Gõ tin nhắn…', autocomplete: 'off', enterkeyhint: 'send', 'aria-label': 'Tin nhắn' });
+  const chatCount = h('span', { id: 'live-chat-n' }, '0/' + D.CHAT.maxWords + ' từ');
+  let chatLast = 0;
+  const chatWords = () => chatIn.value.trim().split(/\s+/).filter(Boolean).length;
+  const chatSend = () => {
+    const v = D.cleanChat(chatIn.value);
+    if (!v) { chatCount.textContent = chatIn.value.trim() ? 'Tối đa ' + D.CHAT.maxWords + ' từ, ' + D.CHAT.maxChars + ' ký tự' : 'Gõ gì đó đã nhé'; chatCount.classList.add('bad'); return; }
+    if (Date.now() - chatLast < D.CHAT.gap) { chatCount.textContent = 'Chậm một chút nhé'; chatCount.classList.add('bad'); return; }
+    chatLast = Date.now(); chatIn.value = ''; chatIn.blur(); says.hidden = true; api.say(v);
+  };
+  chatIn.addEventListener('input', () => { const n = chatWords(); chatCount.textContent = n + '/' + D.CHAT.maxWords + ' từ'; chatCount.classList.toggle('bad', n > D.CHAT.maxWords || chatIn.value.trim().length > D.CHAT.maxChars); });
+  chatIn.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); chatSend(); }
+    else if (e.key === 'Escape') { chatIn.blur(); says.hidden = true; }
+  });
+  says.append(h('div', { class: 'live-type' }, chatIn, btn('Gửi', chatSend, 'green nosound', { id: 'live-chat-send' })), chatCount);
   $('live-chat').addEventListener('click', () => { says.hidden = !says.hidden; });
   $('live-people').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('online'); });
   $('live-friends').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('friends'); });
@@ -2397,7 +2415,7 @@ $('build-demolish').addEventListener('click', () => api.buildDemolish());
       else if (panel) closePanel();
       return;
     }
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isBlocking()) return;
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isBlocking() || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
     if (e.code === 'Space' || e.key === 'e' || e.key === 'E') {
       if (cur.actions[0]) { e.preventDefault(); runAction(cur.actions[0]); }
     } else if (/^[1-6]$/.test(e.key)) {

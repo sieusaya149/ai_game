@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
 import { createGame } from '../public/state.js';
-import { LIVE, QUICK_CHAT, EMOTES } from '../public/data.js';
+import { LIVE, CHAT, QUICK_CHAT, EMOTES } from '../public/data.js';
 
 async function setup(t) {
   const srv = await bootServer();
@@ -90,6 +90,59 @@ test('làng: vị trí phát không quá 6 lần mỗi giây cho mỗi người 
   assert.equal(got.at(-1).x, 200);   // tin dồn cuối cùng không bị nuốt
 });
 
+test('làng: chat tự gõ được chuẩn hóa, che từ tục, giới hạn 20 từ / 120 ký tự và tốc độ', async t => {
+  const { player } = await setup(t);
+  const a = await (await player('Lan')).ws(), b = await (await player('Minh')).ws();
+  await join(a, 'village');
+  const me = (await join(b, 'village')).me;
+  await until(a, 'enter');
+  const wait = () => new Promise(ok => setTimeout(ok, CHAT.gap + 100));
+
+  b.send({ t: 'chat', text: '  Xin   chào\n các\u0000 bạn\u0007 ' });
+  let m = await until(a, 'chat');
+  assert.deepEqual([m.id, m.text], [me, 'Xin chào các bạn']);
+  // quá nhanh: từ chối, không ai nhận
+  b.send({ t: 'chat', text: 'lại nữa nè' });
+  assert.equal((await until(b, 'error')).code, 'chat_rate');
+  await none(a, 'chat', 150);
+  await wait();
+  // từ tục bị che (hoa/thường, có/không dấu)
+  b.send({ t: 'chat', text: 'Đm mày, VCL thật, dit me' });
+  assert.equal((await until(a, 'chat')).text, '*** mày, *** thật, ***');
+  // 20 từ / 120 ký tự vừa đủ thì qua, quá một chút thì bị từ chối (tin bị từ chối không tính vào giới hạn tốc độ)
+  const words = n => Array.from({ length: n }, () => 'a').join(' ');
+  b.send({ t: 'chat', text: words(21) });
+  assert.equal((await until(b, 'error')).code, 'chat_invalid');
+  b.send({ t: 'chat', text: 'a'.repeat(CHAT.maxChars + 1) });
+  assert.equal((await until(b, 'error')).code, 'chat_invalid');
+  b.send({ t: 'chat', text: '   \n  ' });
+  assert.equal((await until(b, 'error')).code, 'chat_invalid');
+  b.send({ t: 'chat', text: 42 });
+  assert.equal((await until(b, 'error')).code, 'chat_invalid');
+  await none(a, 'chat', 150);
+  await wait();
+  b.send({ t: 'chat', text: words(20) });
+  assert.equal((await until(a, 'chat')).text, words(20));
+  await wait();
+  b.send({ t: 'chat', text: 'b'.repeat(CHAT.maxChars) });
+  assert.equal((await until(a, 'chat')).text.length, CHAT.maxChars);
+});
+
+test('làng: một người tối đa 10 tin tự gõ mỗi phút, đổi bản đồ không xóa giới hạn', async t => {
+  const { player } = await setup(t);
+  const a = await (await player('Lan')).ws(), b = await (await player('Minh')).ws();
+  await join(a, 'village'); await join(b, 'village'); await until(a, 'enter');
+  const wait = () => new Promise(ok => setTimeout(ok, CHAT.gap + 30));
+  for (let i = 0; i < CHAT.perMin; i++) {
+    b.send({ t: 'chat', text: 'tin ' + i });
+    assert.equal((await until(a, 'chat')).text, 'tin ' + i);
+    await wait();
+  }
+  await join(b, 'village');   // vào lại bản đồ không xóa giới hạn
+  b.send({ t: 'chat', text: 'tin thừa' });
+  assert.equal((await until(b, 'error')).code, 'chat_rate');
+});
+
 test('làng: chat nhanh và biểu cảm chỉ tới người cùng bản đồ; câu lạ bị từ chối', async t => {
   const { player } = await setup(t);
   const a = await (await player('Lan')).ws(), b = await (await player('Minh')).ws(), c = await (await player('Tư')).ws();
@@ -106,8 +159,8 @@ test('làng: chat nhanh và biểu cảm chỉ tới người cùng bản đồ;
   await none(c, 'chat', 150);
   await none(c, 'emote', 50);
 
-  // câu tự gõ / biểu cảm lạ: báo lỗi cho người gửi, không ai nhận
-  b.send({ t: 'chat', text: 'mua acc giá rẻ' });
+  // chat không phải chuỗi / biểu cảm lạ: báo lỗi cho người gửi, không ai nhận
+  b.send({ t: 'chat', text: { toString: 1 } });
   assert.equal((await until(b, 'error')).code, 'chat_invalid');
   b.send({ t: 'emote', e: '💩' });
   assert.equal((await until(b, 'error')).code, 'chat_invalid');

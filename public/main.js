@@ -6,7 +6,7 @@ import {
 import { refillMs } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
-import { DIR_NAME, LIVE, itemName, ANIMALS, WATER_BUILD } from './data.js';
+import { DIR_NAME, LIVE, chatMs, cleanChat, itemName, ANIMALS, WATER_BUILD } from './data.js';
 import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
@@ -362,7 +362,7 @@ function liveFrame(now) {
   if (sync.send({ t: 'pos', x, y, dir })) { livePos = key; livePosAt = now; }
 }
 // câu chat nhanh / biểu cảm: hiện trên đầu mình ngay, gửi cho người cùng bản đồ
-function say(text) { me.chat = text; me.chatUntil = performance.now() + LIVE.chatMs; sync?.send({ t: 'chat', text }); }
+function say(raw) { const text = cleanChat(raw); if (!text) return; me.chat = text; me.chatUntil = performance.now() + chatMs(text); sync?.send({ t: 'chat', text }); }
 function emote(e) { me.emote = e; me.emoteT0 = performance.now(); sync?.send({ t: 'emote', e }); }
 const myTalk = now => ({ chat: now < me.chatUntil ? me.chat : null, emote: me.emote && now - me.emoteT0 < LIVE.emoteMs ? { e: me.emote, age: (now - me.emoteT0) / LIVE.emoteMs } : null });
 

@@ -5,7 +5,7 @@
 // Khách thấy chủ làm gì ngay: server báo chủ số khách đang đứng trong vườn (`watch { n }`, đổi là báo, kết nối lại
 // thì báo sau hello); trình duyệt chủ gửi phần vườn khách thấy được (`world { w }`), server chuyển cho khách trong vườn.
 import { notifyVisit } from './friends.mjs';
-import { LIVE, QUICK_CHAT, EMOTES, LOOK, DEFAULT_LOOK, levelInfo } from '../public/data.js';
+import { LIVE, CHAT, cleanChat, QUICK_CHAT, EMOTES, LOOK, DEFAULT_LOOK, levelInfo } from '../public/data.js';
 import { VISIT_KEYS, WORLD_MS } from '../public/state.js';
 import { playOf } from './farms.mjs';
 
@@ -55,6 +55,7 @@ export function createPresence(ctx, send) {
     p.timer = 0; p.sent = Date.now();
     cast(p, { t: 'pos', id: p.id, x: p.x, y: p.y, dir: p.dir });
   }
+  const chatLogs = new Map();   // tài khoản → giờ các tin tự gõ gần đây (đổi bản đồ / kết nối lại không xóa giới hạn)
   const say = (sock, ok, m) => {
     if (!sock.pres) return send(sock, { t: 'error', code: 'not_joined' });
     if (!ok) return send(sock, { t: 'error', code: 'chat_invalid' });
@@ -110,7 +111,17 @@ export function createPresence(ctx, send) {
       const msg = { t: 'world', owner: a.name, w };
       for (const o of guests) send(o.sock, msg);
     },
-    chat: (sock, m) => say(sock, QUICK_CHAT.includes(m.text), { t: 'chat', text: m.text }),
+    // chat nhanh (câu có sẵn) hoặc tự gõ: server chuẩn hóa lại, tối đa CHAT.perMin tin/phút và cách nhau CHAT.gap ms mỗi người
+    chat(sock, m) {
+      if (QUICK_CHAT.includes(m.text)) return say(sock, true, { t: 'chat', text: m.text });
+      const text = cleanChat(m.text), p = sock.pres, t = Date.now();
+      if (p && text) {
+        const who = sock.account?.id ?? sock, log = (chatLogs.get(who) ?? []).filter(x => t - x < 60000);
+        if (log.length >= CHAT.perMin || (log.length && t - log.at(-1) < CHAT.gap)) return send(sock, { t: 'error', code: 'chat_rate' });
+        log.push(t); chatLogs.set(who, log);
+      }
+      say(sock, !!text, { t: 'chat', text });
+    },
     emote: (sock, m) => say(sock, EMOTES.includes(m.e), { t: 'emote', e: m.e }),
   };
   return {

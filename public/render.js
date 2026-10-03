@@ -786,7 +786,24 @@ function talk(ctx, who, x, y, dpr, now) {
   if (who.chat) {
     const size = Math.round(11 * dpr), pad = 5 * dpr;
     ctx.font = `800 ${size}px ${FONT}`;
-    const w = Math.ceil(ctx.measureText(who.chat).width + pad * 2), h = size + pad * 1.6;
+    // tin dài xuống dòng theo từ, mỗi dòng tối đa ~150px (không tràn màn hình điện thoại hẹp)
+    const maxW = Math.min(150 * dpr, ctx.canvas.width * 0.8), lines = [];
+    const words = [];   // từ dài hơn một dòng thì bẻ theo ký tự
+    for (let word of who.chat.split(' ')) {
+      while (ctx.measureText(word).width > maxW && word.length > 1) {
+        let n = word.length - 1;
+        while (n > 1 && ctx.measureText(word.slice(0, n)).width > maxW) n--;
+        words.push(word.slice(0, n)); word = word.slice(n);
+      }
+      words.push(word);
+    }
+    for (const word of words) {
+      let cur = lines.length ? lines[lines.length - 1] : null;
+      if (cur !== null && ctx.measureText(cur + ' ' + word).width <= maxW) lines[lines.length - 1] = cur + ' ' + word;
+      else lines.push(word);
+    }
+    const lh = Math.round(size * 1.25), tw = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const w = Math.ceil(Math.min(tw, maxW * 1.6) + pad * 2), h = Math.round(size + pad * 1.6 + (lines.length - 1) * lh);
     const bx = Math.round(x - w / 2), by = Math.round(y - h - 5 * dpr);
     const nine = SPR2?.chatBubble, tail = SPR2?.chatTail;
     if (nine) {
@@ -809,7 +826,8 @@ function talk(ctx, who, x, y, dpr, now) {
       ctx.beginPath(); ctx.moveTo(x - 3 * dpr, by + h - 1); ctx.lineTo(x + 3 * dpr, by + h - 1); ctx.lineTo(x, by + h + 3 * dpr); ctx.fill();
     }
     ctx.fillStyle = '#3b2412'; ctx.textAlign = 'center';
-    ctx.fillText(who.chat, x, by + h / 2 + size * 0.36);
+    const top = by + h / 2 - (lines.length - 1) * lh / 2 + size * 0.36;
+    lines.forEach((l, i) => ctx.fillText(l, x, top + i * lh));
     y = by - 2 * dpr;
   }
   if (who.emote) {

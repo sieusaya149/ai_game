@@ -607,9 +607,15 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 .live-btn.wide { border-radius: 20px; font-size: 14px; gap: 0; grid-auto-flow: row; }
 .live-btn.wide b { font-size: 11px; line-height: 1; margin-top: -2px; }
 .live-btn img { width: 22px; height: 22px; image-rendering: pixelated; }
-#live-says { position: absolute; left: 48px; bottom: 0; width: max-content; max-width: min(230px, calc(100vw - 72px)); padding: 6px; display: flex; flex-direction: column; gap: 5px; z-index: 7; }
+#live-says { position: absolute; left: 48px; bottom: 0; width: max-content; max-width: min(240px, calc(100vw - 72px)); min-width: min(220px, calc(100vw - 72px)); padding: 6px; display: flex; flex-direction: column; gap: 5px; z-index: 7; }
 #live-says[hidden] { display: none; }
 #live-says .btn { min-height: 40px; padding: 4px 12px; font-size: 13px; justify-content: flex-start; text-align: left; white-space: normal; }
+
+#live-says .live-type { display: flex; gap: 5px; align-items: center; }
+#live-chat-in { flex: 1; min-width: 0; height: 40px; padding: 0 8px; font: 16px inherit; font-family: inherit; border: 2px solid var(--wood); border-radius: 8px; background: #fffaf0; color: var(--ink, #3b2412); }
+#live-says .live-type .btn { min-height: 40px; flex: none; padding: 4px 10px; }
+#live-chat-n { font-size: 11px; color: var(--wood-d); text-align: right; padding-right: 2px; }
+#live-chat-n.bad { color: #c0392b; font-weight: 700; }
 
 /* bạn bè và cổng vườn (issue 26) */
 .fr-add { display: flex; gap: 8px; align-items: center; }

@@ -1,7 +1,7 @@
 // Người khác cùng bản đồ (issue 25), phía trình duyệt. Thuần JS, không DOM: chạy được trong Node (seam 1).
 // Server phát vị trí tối đa LIVE.hz lần/giây; ở đây giữ vài mốc vị trí gần nhất của mỗi người và vẽ trễ LIVE.delayMs
 // để nội suy giữa hai mốc, nên nhân vật đi mượt kể cả khi mạng chậm hay mất vài gói.
-import { LIVE } from './data.js';
+import { LIVE, chatMs } from './data.js';
 
 // Ai hiện đầy đủ nhân vật: bản đồ có quá `max` người (tính cả người xem) thì chỉ (max - 1) người gần người xem nhất
 // hiện đầy đủ, người ở xa hơn chỉ hiện tên mờ. Trả Set id người hiện đầy đủ.
@@ -50,7 +50,7 @@ export function createPeers() {
           p.track.push({ t: now, x: m.x, y: m.y }); p.dir = m.dir;
           if (p.track.length > 8) p.track.splice(0, p.track.length - 8);
           return false;
-        case 'chat': if (p) p.chat = { text: m.text, until: now + LIVE.chatMs }; return false;
+        case 'chat': if (p) p.chat = { text: m.text, until: now + chatMs(m.text) }; return false;
         case 'emote': if (p) p.emote = { e: m.e, t0: now, until: now + LIVE.emoteMs }; return false;
       }
       return false;

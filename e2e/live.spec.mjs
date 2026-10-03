@@ -78,6 +78,30 @@ test('hai người trong làng: thấy tên và nhân vật nhau, đi mượt, t
   await A.context.close(); await B.context.close();
 });
 
+test('chat tự gõ: gõ WASD/phím tắt không làm nhân vật đi, Enter gửi, người kia thấy tin (từ tục bị che), quá 20 từ không gửi được', async ({ browser, baseURL }, testInfo) => {
+  test.setTimeout(60_000);
+  const A = await player(browser, opts(testInfo, baseURL), at(200, 180));
+  const B = await player(browser, opts(testInfo, baseURL), at(250, 184));
+  await expect.poll(() => peers(A.page).then(l => l.length)).toBe(1);
+  await B.page.locator('#live-chat').click();
+  const input = B.page.locator('#live-chat-in');
+  const x0 = (await peers(A.page))[0].x;
+  await input.click();
+  await input.pressSequentially('wasd e 1 dm xin chao');
+  await B.page.waitForTimeout(400);
+  expect((await peers(A.page))[0].x).toBe(x0);   // phím di chuyển không chạy khi đang gõ
+  await expect(B.page.locator('#live-chat-n')).toHaveText('6/20 từ');
+  await input.fill(Array.from({ length: 21 }, () => 'a').join(' '));
+  await B.page.locator('#live-chat-send').click();
+  await expect(B.page.locator('#live-chat-n')).toHaveClass(/bad/);
+  await expect(B.page.locator('#live-says')).toBeVisible();
+  await input.fill('wasd e 1 dm xin chao');
+  await input.press('Enter');
+  await expect.poll(() => peers(A.page).then(l => l[0].chat)).toBe('wasd e 1 *** xin chao');
+  await expect(B.page.locator('#live-says')).toBeHidden();
+  await A.context.close(); await B.context.close();
+});
+
 test('một người ở làng, một người trong nhà: không thấy nhau, không thấy chat của nhau', async ({ browser, baseURL }, testInfo) => {
   test.setTimeout(60_000);
   const A = await player(browser, opts(testInfo, baseURL), at(200, 180));
