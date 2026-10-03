@@ -34,6 +34,9 @@ const opts = (testInfo, baseURL) => ({ baseURL, ...testInfo.project.use });
 const peers = page => page.evaluate(() => globalThis.__farm.peers.map(p => ({ name: p.name, x: p.x, y: p.y, full: p.full, chat: p.chat, emote: p.emote?.e ?? null, look: p.look })));
 const at = (x, y) => s => Object.assign(s.player, { x, y, dir: 0 });
 
+// Điện thoại: cột biểu cảm gọn thành một nút 😊, bấm mới bung ra (màn rộng thì không có nút này)
+const openEmotes = async page => { const t = page.locator('#live-emote-toggle'); if (await t.isVisible()) await t.click(); };
+
 test('hai người trong làng: thấy tên và nhân vật nhau, đi mượt, thấy bong bóng chat và biểu cảm 😂', async ({ browser, baseURL }, testInfo) => {
   test.setTimeout(60_000);
   const errors = [];
@@ -65,6 +68,7 @@ test('hai người trong làng: thấy tên và nhân vật nhau, đi mượt, t
   await B.page.getByRole('button', { name: QUICK_CHAT[0] }).click();
   await expect.poll(() => peers(A.page).then(l => l[0].chat)).toBe(QUICK_CHAT[0]);
   // A bấm 😂: B thấy biểu cảm
+  await openEmotes(A.page);
   await A.page.getByRole('button', { name: '😂' }).click();
   await expect.poll(() => peers(B.page).then(l => l[0].emote)).toBe('😂');
   await A.page.screenshot({ path: `test-results/live-village-${testInfo.project.name}.png` });
@@ -118,6 +122,7 @@ test('một người ở làng, một người trong nhà: không thấy nhau, k
   await B.page.getByRole('button', { name: QUICK_CHAT[1] }).click();
   await A.page.locator('#live-chat').click();
   await A.page.getByRole('button', { name: QUICK_CHAT[2] }).click();
+  await openEmotes(A.page);
   await A.page.getByRole('button', { name: '👋' }).click();
   await A.page.waitForTimeout(800);
   expect(await peers(A.page)).toEqual([]);
@@ -143,14 +148,25 @@ test('online: mua hạt giống ở chợ Bà Tư vẫn như cũ; cột chat/bi�
   await expect(page.locator('#main-action')).toBeVisible();
   await page.locator('#live-chat').click();
   await page.screenshot({ path: `test-results/live-layout-${testInfo.project.name}.png` });
-  const boxes = await page.evaluate(() => {
+  const measure = () => page.evaluate(() => {
     const r = sel => [...document.querySelectorAll(sel)].filter(e => e.offsetParent || getComputedStyle(e).position === 'fixed').map(e => { const b = e.getBoundingClientRect(); return { sel, l: b.left, t: b.top, r: b.right, b: b.bottom }; }).filter(b => b.r > b.l);
     return { live: r('#live .live-btn'), others: [...r('#joy-base'), ...r('#main-action'), ...r('#chips .chip'), ...r('#target-name'), ...r('#mini-wrap'), ...r('#hud-speed'), ...r('#todo-btn')] };
   });
-  expect(boxes.live.length).toBe(7);   // 4 biểu cảm + chat + bạn bè + người đang ở đây
-  if (touch) expect(boxes.others.some(o => o.sel === '#joy-base')).toBe(true);
-  for (const a of boxes.live) for (const o of boxes.others)
-    expect(a.r <= o.l || o.r <= a.l || a.b <= o.t || o.b <= a.t, `${JSON.stringify(a)} đè ${JSON.stringify(o)}`).toBe(true);
+  const phone = page.viewportSize().width <= 600;
+  const check = boxes => {
+    if (touch) expect(boxes.others.some(o => o.sel === '#joy-base')).toBe(true);
+    for (const a of boxes.live) for (const o of boxes.others)
+      expect(a.r <= o.l || o.r <= a.l || a.b <= o.t || o.b <= a.t, `${JSON.stringify(a)} đè ${JSON.stringify(o)}`).toBe(true);
+  };
+  const boxes = await measure();
+  expect(boxes.live.length).toBe(phone ? 4 : 7);   // điện thoại: 😊 + chat + bạn bè + người đang ở đây; màn rộng: 4 biểu cảm + 3 nút kia
+  check(boxes);
+  if (phone) {   // bung biểu cảm ra: 4 biểu cảm thêm vào, vẫn không đè gì
+    await page.locator('#live-emote-toggle').click();
+    const open = await measure();
+    expect(open.live.length).toBe(8);
+    check(open);
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await A.context.close();
 });

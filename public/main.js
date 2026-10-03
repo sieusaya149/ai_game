@@ -702,6 +702,7 @@ function onTap(cx, cy) {
     return;
   }
   const hit = V.hitTest(state, wx, wy);
+  if (hit) ui.openSheet(); else ui.closeSheet();   // điện thoại: chạm ra ngoài thì đóng bảng hành động, chạm vật thể thì mở lại
   if (!hit) { V.walkTo(state, world, wx, wy); return; }
   // đã trong tầm thì quay mặt về thứ vừa chạm; thanh hành động theo đúng thứ đó (V.pickTarget), không theo hướng đang nhìn
   if (V.inRange(state, hit)) { const q = V.targetPos(state, hit); if (q) V.faceTo(state, q.x, q.y); V.pickTarget(world, hit); autoAct(hit); }

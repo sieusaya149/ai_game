@@ -189,7 +189,7 @@ test('hai trình duyệt: đăng nhập ở B thì A thoát về màn đầu, v�
   await ctxB.close();
 });
 
-// Giờ trong HUD ('Ngày 12 · 7:30 sáng') → số phút game kể từ đầu ngày 1
+// Giờ trong HUD ('Ngày 5/7 · 7:30 sáng', ngày trong mùa) → số phút game kể từ đầu mùa; so hai máy cùng thời điểm nên không cần số ngày cộng dồn
 const gameMin = async page => {
   const t = await page.locator('#hud-time').textContent();
   const [, d, h, m, part] = t.match(/Ngày (\d+).*?(\d+):(\d+) (\S+)/);

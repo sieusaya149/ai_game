@@ -4,6 +4,8 @@ import http from 'node:http';
 import { readFileSync } from 'node:fs';
 import { bootServer } from './helpers/server.mjs';
 
+// index.html được gắn ?v=<mtime> vào style.css / main.js (phá cache CDN); bỏ đi thì phải trùng file gốc
+const unbust = s => s.replace(/[?]v=[0-9a-z]+"/g, '"');
 const pub = f => readFileSync(new URL(`../public/${f}`, import.meta.url));
 // Gửi đường dẫn thô (fetch tự chuẩn hóa `..`, trình duyệt cũng vậy, kẻ xấu thì không)
 const raw = (url, path) => new Promise((ok, no) => {
@@ -21,7 +23,8 @@ test('file tĩnh: trả đúng nội dung và kiểu MIME', async t => {
     const res = await srv.get('/' + f);
     assert.equal(res.status, 200, f);
     assert.match(res.headers.get('content-type'), new RegExp('^' + type), f);
-    assert.deepEqual(Buffer.from(await res.arrayBuffer()), pub(f), f);
+    const got = Buffer.from(await res.arrayBuffer());
+    assert.deepEqual(f === 'index.html' ? Buffer.from(unbust(got.toString())) : got, pub(f), f);
   }
 });
 
@@ -30,7 +33,10 @@ test('file tĩnh: `/` là index.html và không bị cache, file khác hỏi l�
   t.after(srv.close);
   const home = await srv.get('/');
   assert.equal(home.status, 200);
-  assert.equal(await home.text(), pub('index.html').toString());
+  const html = await home.text();
+  assert.equal(unbust(html), pub('index.html').toString());
+  assert.match(html, /href="style[.]css[?]v=[0-9a-z]+"/);
+  assert.match(html, /src="main[.]js[?]v=[0-9a-z]+"/);
   assert.match(home.headers.get('cache-control'), /no-store/);
 
   const js = await srv.get('/main.js');

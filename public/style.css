@@ -120,7 +120,7 @@ kbd {
 .btn-pill { cursor: pointer; }
 .btn-pill:active { transform: translateY(2px); }
 #hud-basket.full { background: #ffd2c8; }
-#hud-water.empty { background: #ffd2c8; animation: blink 0.9s infinite; }
+#hud-water.dry { background: #ffd2c8; animation: blink 0.9s infinite; }
 @keyframes bump { 40% { transform: scale(1.18); } }
 @keyframes blink { 50% { opacity: 0.6; } }
 
@@ -682,3 +682,36 @@ body.chat-typing #live-says > .btn { display: none; }
 .mode.on { background: var(--orange); border-color: var(--orange-d); color: #fff; box-shadow: 0 2px 0 var(--orange-d); }
 .tabs.shops { position: static; margin-bottom: 0; padding-bottom: 6px; border-bottom: 0; }
 .tabs.shops .tab { flex: 1 1 0; }
+
+/* ---------- Điện thoại: bảng hành động trượt từ đáy + cột biểu cảm gọn (hotfix giao diện mobile) ---------- */
+#act-sheet { display: contents; }
+#sheet-x { display: none; }
+#live-emote-toggle { display: none; }
+/* Thẻ hướng dẫn / nhiệm vụ luôn nổi trên nút nổi (cột biểu cảm z 9, mũi tên z 15 nằm dưới) */
+#tutorial, #coutquest, #seasonquest { z-index: 12; }
+#alert-arrows { z-index: 8; }
+@media (max-width: 600px) {
+  #live-emote-toggle { display: grid; }
+  #live-emotes { display: none; }
+  #live.emotes-open #live-emotes { display: flex; flex-direction: row; position: absolute; left: 46px; top: 0; padding: 3px 6px; gap: 4px; border-radius: 24px;
+    background: rgba(255, 248, 225, 0.96); border: 3px solid var(--wood); box-shadow: 0 2px 0 var(--wood-d), 0 3px 8px rgba(0, 0, 0, 0.3); z-index: 8; }
+  #live.emotes-open #live-emotes .live-btn { width: 38px; height: 38px; border-width: 2px; box-shadow: none; }
+  body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px + var(--sheet-h, 0px)); }
+  body.has-sheet #joy-base { bottom: calc(var(--ui-bottom, 64px) + var(--sheet-h, 0px) + 20px) !important; }
+  #actions { bottom: calc(var(--ui-bottom) + var(--sheet-h, 0px) + 10px); }
+
+  #act-sheet.on { display: block; position: fixed; left: 0; right: 0; bottom: var(--ui-bottom); z-index: 14; pointer-events: auto;
+    padding: 8px calc(10px + var(--sr)) 10px calc(10px + var(--sl)); border-radius: 18px 18px 0 0; background: var(--cream); border-top: 4px solid var(--wood);
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.35); animation: sheet-up 0.2s ease-out; }
+  #act-sheet.on #target-name { max-width: none; padding: 0 40px 6px 2px; margin: 0; background: none; box-shadow: none; color: var(--ink); text-align: left; font-size: 13px; white-space: pre-line; }
+  #act-sheet.on #sheet-x { display: block; position: absolute; top: 2px; right: 6px; width: 40px; height: 40px; border: 0; background: transparent; color: #a07a45; font-size: 16px; cursor: pointer; }
+  #act-sheet.on #chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: none !important; overflow: visible; padding: 0; margin: 0; align-items: stretch; }
+  #act-sheet.on .chip { position: relative; flex-direction: column; justify-content: center; gap: 2px; min-height: 62px; padding: 4px 2px; border-radius: 12px; border-width: 2px; box-shadow: 0 2px 0 var(--wood-d); }
+  #act-sheet.on .chip .ico { width: 28px; height: 28px; }
+  #act-sheet.on .chip .ico.emo { font-size: 24px; line-height: 28px; }
+  #act-sheet.on .chip-lbl { font-size: 11px; line-height: 1.1; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #act-sheet.on .chip kbd { display: none; }
+}
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+/* người chơi vừa mở danh sách chat / biểu cảm thì danh sách nổi trên thẻ hướng dẫn */
+#live:has(#live-says:not([hidden])), #live.emotes-open { z-index: 13; }
