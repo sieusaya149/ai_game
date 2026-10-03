@@ -59,7 +59,7 @@ function ownerGarden(s) {
   spots.sort((a, b) => a.d - b.d);
   expect(spots.some(q => q.d > TS && moveEntity(s, field.id, q.c, q.r).ok), 'dời khối ruộng ra gần cổng').toBe(true);
   const p = s.plots[0];
-  p.soil = 'tilled'; p.water = 0; p.weeds = false;
+  p.soil = 'tilled'; p.water = 0; p.weeds = true;   // cỏ: trời mưa (thời tiết làng, Phase 3) tưới hộ thì khách vẫn có việc giúp là nhổ cỏ
   p.crop = { id: 'carot', progress: 0.4, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
   s.scene = 'village'; Object.assign(s.player, { ...MARKET_AT, dir: 0 });
 }
@@ -209,19 +209,19 @@ test('smoke live online: hai người chơi làng, kết bạn, giúp vườn, m
       expect(fr.friends.map(f => f.name)).toContain(B.name);
     });
 
-    await test.step('6. B thăm vườn A, tưới giúp ô 0; A đang online thấy ô được tưới', async () => {
+    await test.step('6. B thăm vườn A, giúp ô 0 (nhổ cỏ / tưới); A đang online thấy ngay', async () => {
       const coins = await st(B.page, () => globalThis.__farm.state.coins);
       await openGate(B.page);
       await B.page.locator(`.gate-row[data-name="${A.name}"] .gate-go`).click();
       await expect.poll(() => st(B.page, () => globalThis.__farm.state?.scene), NET).toBe('visit');
       await expect(B.page.locator('#visit-help')).toHaveText(new RegExp(`Còn ${GUEST.helpMax} lượt giúp`), NET);
-      // chạm tới khi ô được tưới (ô vừa mọc cỏ hay có sâu thì lần chạm đầu là nhổ cỏ / bắt sâu giúp)
-      await tapPlot(B.page, 0, false, () => st(B.page, () => globalThis.__farm.state.plots[0].water > 50));
+      // chạm tới khi B đã giúp một việc (ô có cỏ: nhổ cỏ; trời làng đang mưa thì ô đã ướt, không tưới được nữa)
+      await tapPlot(B.page, 0, false, () => st(B.page, n => globalThis.__farm.state.guests?.some(g => g.by === n), B.name));
       await expect.poll(() => st(B.page, () => globalThis.__farm.state.coins), NET).toBeGreaterThanOrEqual(coins + GUEST.helpCoins);
-      await expect.poll(() => st(A.page, () => globalThis.__farm.state.plots[0].water), NET).toBeGreaterThan(50);
-      await expect(A.page.locator('#toasts')).toContainText(`${B.name} đã tưới 1 ô giúp bạn`, NET);
+      await expect.poll(() => st(A.page, n => globalThis.__farm.state.guests?.some(g => g.by === n), B.name), NET).toBe(true);
+      await expect(A.page.locator('#toasts')).toContainText(`${B.name} đã`, NET);
       // B thấy vườn A theo A ngay (tin `world` A gửi qua server): nhật ký khách trong bản đi dạo là của A, việc tưới đã được A xem
-      await expect.poll(() => st(B.page, n => globalThis.__farm.state.guests?.some(g => g.by === n && g.act === 'water' && g.seen), B.name), NET).toBe(true);
+      await expect.poll(() => st(B.page, n => globalThis.__farm.state.guests?.some(g => g.by === n && g.seen), B.name), NET).toBe(true);
     });
 
     await test.step('7. B về làng, mua một gà con ở chợ Bà Tư', async () => {
@@ -244,14 +244,13 @@ test('smoke live online: hai người chơi làng, kết bạn, giúp vườn, m
       expect(a.after.account).toBe(A.name);
       expect(a.after.coins).toBe(a.before.coins);
       expect(a.after.animals).toEqual(a.before.animals);
-      expect(a.after.water).toBeGreaterThan(0);
-      expect(a.after.guests).toContainEqual([B.name, 'water']);
+      expect(a.after.guests.some(([by]) => by === B.name)).toBe(true);
       const b = await relog(B);
       expect(b.after.account).toBe(B.name);
       expect(b.after.animals).toEqual(b.before.animals);
       expect(b.after.coins).toBe(b.before.coins);
       // và trên server cũng vậy
-      expect((await serverFarm(A.page)).guests.some(g => g.by === B.name && g.act === 'water')).toBe(true);
+      expect((await serverFarm(A.page)).guests.some(g => g.by === B.name)).toBe(true);
       expect((await serverFarm(B.page)).animals.length).toBe(b.before.animals.length);
     });
 
