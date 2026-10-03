@@ -867,10 +867,10 @@ function stepPlot(s, p, d, rich = false) {
     if (s.time - c.bugSince >= FARMING.bugToSick) { c.bugs = false; c.sick = true; c.sickSince = s.time; fxEv(at.x, at.y, 'Cây bệnh rồi 🤒', COL.bad); log(s, `${def.name} bị bệnh vì sâu`); }
     return;
   }
-  if (p.water > 0 && !frostHold(s, p)) {   // sương muối: cây hạt, mầm đứng yên hôm nay (không chết)
+  if (!frostHold(s, p)) {   // sương muối: cây hạt, mầm đứng yên hôm nay (không chết). Đất khô hẳn thì lớn chậm một nửa chứ không dừng, không bao giờ chết vì khô
     const sm = plotSeasonMul(s, p);   // trong nhà kính đang chạy thì không chậm (issue 60)
     if (sm < 1) c.offSeason = true;   // đã lớn lúc trái mùa: không ra ★3 (issue 54)
-    c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm;
+    c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm * (p.water > 0 ? 1 : FARMING.dryGrowMul);
   }
   if (c.progress >= 1) { ripen(s, c); emit({ type: 'ripe', crop: c.id }); fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
   else if (chance(FARMING.bugChancePerMin * MASTERY.bugMul[mastery(s, c.id).lv - 1], d)) { c.bugs = true; c.bugSince = s.time; fxEv(at.x, at.y, 'Có sâu! 🐛', COL.bad); }

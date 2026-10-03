@@ -7,7 +7,7 @@ import * as G from '../public/state.js';
 import { penIdOf } from './helpers/troughs.mjs';
 import {
   CROPS, ANIMALS, HUSBANDRY, FARMING, ORDERS, TOOLS, WELL, FIELD_PRICES, PEN_PRICES, PEN_TABLE, GLASS, AUTO, WATER_BUILD,
-  PRODUCTS, ITEMS, WEIGHT, SEASON, expNeed, animalPrice, weightAt, stageStart, sellPrice,
+  PRODUCTS, ITEMS, WEIGHT, SEASON, DOG, CAT, expNeed, animalPrice, weightAt, stageStart, sellPrice,
 } from '../public/data.js';
 
 const MIN = 60_000, HOUR = 60 * MIN;
@@ -64,6 +64,37 @@ test('đất tụt 1% nước mỗi phút: tưới một lần cho cây 2 phút 
   assert.ok(s.plots[0].crop.progress >= 1, 'rau muống 2 phút chín chỉ với một lần tưới');
   assert.equal(quiet(() => G.perform(s, at, 'harvest')).ok, true);
   assert.equal(G.haveItem(s, 'raumuong'), CROPS.raumuong.yield);
+});
+
+test('đất khô hẳn: cây vẫn lớn nhưng chậm một nửa; có nước thì đủ tốc độ; ★★ vẫn đòi đất không khô hẳn', () => {
+  assert.equal(FARMING.dryGrowMul, 0.5);
+  const grow = water => {
+    const s = G.createGame({ name: 'Khô' }); s.tutorial = 99; s.orders = []; s.nextOrderAt = 1e12; s.weather = 'cloud'; s.exp = 1e5;
+    Object.assign(s.plots[0], { soil: 'tilled', water, crop: { id: 'carot', progress: 0, planted: s.time, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: false } } });
+    quiet(() => G.tick(s, 6 * MIN));
+    return s.plots[0].crop;
+  };
+  const wet = grow(100), dry = grow(0);
+  assert.ok(dry.progress > 0, 'đất khô vẫn lớn');
+  assert.ok(Math.abs(dry.progress / wet.progress - 0.5) < 0.05, `khô ${dry.progress} so với ướt ${wet.progress}`);
+  // sao: đất từng khô hẳn thì vụ chỉ còn ★1 (đã ghi ở q.dry khi nước vừa về 0)
+  const s = G.createGame({ name: 'Sao' }); s.tutorial = 99; s.orders = []; s.nextOrderAt = 1e12; s.weather = 'cloud'; s.exp = 1e5;
+  Object.assign(s.plots[0], { soil: 'tilled', water: 0.5, crop: { id: 'carot', progress: 0.1, planted: s.time, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: true, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: true } } });
+  quiet(() => G.tick(s, 2 * MIN));
+  assert.equal(G.cropStar(s.plots[0].crop), 1, 'đất khô hẳn một lần thì mất sao');
+});
+
+test('chạy bù offline 8 giờ đất khô: cây không chết, không héo, vẫn lớn chậm', () => {
+  const s = G.createGame({ name: 'Khô bù' }); s.tutorial = 99; s.orders = []; s.nextOrderAt = 1e12;
+  const c = { id: 'lua', progress: 0.1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: false } };
+  Object.assign(s.plots[0], { soil: 'tilled', water: 0, crop: c });
+  s.savedAt = Date.now() - 8 * HOUR;
+  store[G.SAVE_KEY] = JSON.stringify(s);
+  const l = quiet(() => G.loadGame());
+  const lc = l.plots[0].crop;
+  assert.equal(lc.dead, false); assert.equal(lc.rotten, false);
+  assert.ok(lc.progress > 0.1, 'vẫn lớn trong lúc vắng');
+  assert.ok(lc.progress <= 0.1 + 8 * HOUR / CROPS.lua.grow + 0.01, 'không nhanh hơn tốc độ đủ nước');
 });
 
 test('thuốc tăng trưởng: mỗi lần cộng tối đa 90 phút (cây ngắn vẫn +50%), không rút ngắn cả vụ dài ngày chỉ bằng một lọ', () => {
@@ -295,4 +326,15 @@ test('checkSaveJump: hái cả ruộng lúa 8 giờ ★3 một nhịp là hợp 
   assert.equal(G.checkSaveJump(bare, day, 12 * HOUR).ok, true);
   const rich = structuredClone(bare); rich.simMs += 12 * HOUR; rich.coins += 9 * 12 * 60 * 60;
   assert.equal(G.checkSaveJump(bare, rich, 12 * HOUR).reason, 'coins');
+});
+
+test('chó, mèo đói theo nhịp vật nuôi: một lần no kéo dài ~2 giờ (chó), ~3 giờ (mèo), không còn 8 / 12 phút', () => {
+  assert.equal(DOG.hungerMs, 2 * HOUR);
+  assert.equal(CAT.hungerMs, 3 * HOUR);
+  const s = G.createGame({ name: 'Thú cưng' }); s.tutorial = 99; s.orders = []; s.nextOrderAt = 1e12; s.animals = [];
+  s.dog.hunger = 100; s.dog.stage = 'truong'; s.dog.age = stageStart('cho', 'truong');
+  quiet(() => G.tick(s, 60 * MIN));
+  assert.ok(Math.abs(s.dog.hunger - 50) < 1, `chó sau 1 giờ còn ${s.dog.hunger}`);
+  quiet(() => G.tick(s, 60 * MIN));
+  assert.ok(s.dog.hunger < 1, 'chó đói hẳn sau 2 giờ');
 });

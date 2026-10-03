@@ -59,10 +59,10 @@ test('khách thăm vườn thấy chó và mèo đúng màu lông chủ đã ch�
 
 test('chủ vắng: server chạy bù, chó tự ra bát ăn đúng như chạy bù ở trình duyệt', async t => {
   const { user, owner } = await setup(t);
-  const { s } = await owner('Lan', 15 * MIN, petFarm);
+  const { s } = await owner('Lan', 200 * MIN, petFarm);
   const f = (await (await user('Bình')).visit('Lan')).body.farm;
   assert.equal(f.dog.bowl, 0, 'chó đã ăn hết bát');
-  const here = structuredClone(s); here.savedAt = T - 15 * MIN;
+  const here = structuredClone(s); here.savedAt = T - 200 * MIN;
   const l = loadGame(here);
   assert.equal(f.dog.bowl, l.dog.bowl);
   assert.equal(f.dog.hunger, l.dog.hunger);

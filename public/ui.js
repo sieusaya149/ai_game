@@ -578,7 +578,7 @@ const TUT_TEXT = {
     if (live.some(p => p.crop.progress >= 1)) return 'Cây chín rồi! Bấm Thu hoạch.';
     if (!live.length) return 'Chưa có cây nào đang lớn. Cuốc đất rồi gieo hạt lại nhé.';
     if (live.some(p => p.crop.bugs || p.crop.sick)) return 'Cây có sâu! Bấm Bắt sâu hoặc xịt thuốc trừ sâu cho cây.';
-    if (live.every(p => p.water <= 0)) return 'Cây khô nước rồi, tưới thêm cho cây lớn nhé.';
+    if (live.every(p => p.water <= 0)) return 'Đất khô rồi, cây chỉ lớn chậm một nửa. Tưới thêm cho cây lớn nhanh nhé.';
     return 'Đợi cây lớn. Sốt ruột thì bật x5 trong ⚙️ Cài đặt.';
   },
   ship: () => 'Bỏ nông sản vào thùng giao hàng cạnh nhà kho. 6h sáng mai lái buôn trả xu.',
@@ -1254,7 +1254,8 @@ const GUIDE = [
   { title: 'Nước: giếng, bồn, tầm nước', lv: 5, art: () => [WELLS?.[0], WELLS?.[3], TANK_ART?.tank?.[4], TANK_ART?.tank?.[0], TANK_ART?.tank2?.[4], a62('tankLow')],
     text: [`Giếng có 4 cấp: ${D.WELL.map(w => w.name).join(' → ')}. Nâng giếng thì bình tưới chứa nhiều hơn và múc lại nhanh hơn. Giếng cấp cuối có máy bơm tự bơm nước vào bồn chứa.`,
       `Bồn chứa (${fmt(D.WATER_BUILD.tank.price)} xu) phải đặt trong ${D.TANK.range} ô quanh giếng, chứa ${D.TANK.cap} lần nước; mỗi bồn phụ (tối đa ${D.WATER_BUILD.tank2.max} cái) thêm ${D.TANK.extra} lần. Máy bơm bơm khoảng ${D.TANK.perHour} lần nước mỗi giờ vườn chạy, hạn hán thì chậm một nửa.`,
-      `Tầm nước là ${D.TANK.range} ô quanh bồn: công trình dùng nước phải nằm trong tầm (vùng xanh khi đặt). Trạm bơm phụ nối tiếp tầm nước đi xa hơn. Bồn dưới ${D.TANK.low} lần nước thì có thông báo và việc "bồn cạn"; bồn cạn thì máy ngừng, không ai bị phạt.`] },
+      `Tầm nước là ${D.TANK.range} ô quanh bồn: công trình dùng nước phải nằm trong tầm (vùng xanh khi đặt). Trạm bơm phụ nối tiếp tầm nước đi xa hơn. Bồn dưới ${D.TANK.low} lần nước thì có thông báo và việc "bồn cạn"; bồn cạn thì máy ngừng, không ai bị phạt.`,
+      `Đất khô dần ${D.FARMING.waterDrainPerMin}% mỗi phút (nắng, hạn hán thì nhanh hơn). Một lần tưới đủ chừng hai giờ. Đất khô hẳn thì cây vẫn lớn nhưng chậm một nửa, không bao giờ chết vì khô, kể cả lúc bạn đi vắng; tưới, mưa, bồn hay máy nhỏ giọt thì lớn đủ tốc độ. Muốn lên ★★ thì đừng để đất khô hẳn.`] },
   { title: 'Tự động hóa khối ruộng', lv: 8, art: () => [AUTO_ART?.drip?.on?.[0], AUTO_ART?.sprayer?.on?.[0], AUTO_ART?.rich, a62('powerOut')],
     text: ['Mua nâng cấp cho cả khối ruộng 3×3 trong 🔨 Xây dựng: ' + Object.values(D.AUTO.ups).map(u => u.name.toLowerCase() + ' ' + fmt(u.price) + ' xu').join(', ') + '. Dời khối thì nâng cấp đi theo.',
       'Tưới nhỏ giọt lấy 1 lần nước bồn cho mỗi ô, khối phải trong tầm nước. Phun thuốc tự động trừ thuốc trừ sâu trong kho. Đất màu mỡ giảm cỏ và thêm sản lượng.',

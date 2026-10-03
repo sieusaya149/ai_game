@@ -182,6 +182,7 @@ export const GLASS = { lv: 14, max: 2, price: 30000, heat: 150, fix: 2000, break
 
 export const FARMING = {
   waterDrainPerMin: 1,    // đất mất bao nhiêu % nước mỗi phút: một lần tưới đủ ~100 phút, cây 2 phút khỏi tưới lại (trời nắng ×1.5, hạn ×2, mưa luôn đầy)
+  dryGrowMul: 0.5,    // đất khô hẳn (nước 0): cây lớn chậm bằng chừng này, không dừng và không bao giờ chết vì khô (kể cả lúc chạy bù offline). Có nước, mưa, bồn, nhỏ giọt thì lớn đủ tốc độ
   canMax: 10,             // bình tưới cấp 1 chứa 10 lần tưới, ra giếng múc lại (cấp cao hơn: TOOLS.can.canMax)
   weedChancePerMin: 0.004, // xác suất mọc cỏ mỗi phút trên ô đã cuốc (chừng 1 đợt cỏ mỗi 4 giờ)
   weedSlow: 0.5,          // có cỏ thì cây lớn chậm một nửa
@@ -348,7 +349,7 @@ export const pigKgPrice = day => TRADE.pigKg[((day | 0) % 7 + 7) % 7];
 // ---------- Chó ----------
 export const DOG = {
   name: 'Mực',
-  hungerMs: 8 * MIN,
+  hungerMs: 2 * HOUR,         // từ no (100) xuống đói hẳn (0): một lần no kéo dài ~2 giờ chơi, cùng nhịp với vật nuôi (xem HUSBANDRY.hungerMs)
   poopEvery: [2 * MIN, 4 * MIN], // chó ỉa bậy ngẫu nhiên trong khoảng này
   maxPoops: 8,
   poopPupMul: 0.55,           // chó con nghịch và ỉa nhiều hơn hẳn
@@ -379,7 +380,7 @@ export const COAT = { price: 20, def: { cho: 'den', meo: 'vang' } };
 // Săn chuột là luật trừu tượng theo ô và xác suất (ADR 0013): mỗi huntEvery một lượt rình, nhắm con chuột gần nhất
 // theo ô, trúng với xác suất catchChance[giai đoạn] × hệ số theo mức đói. Chạy bù offline ra đúng kết quả đó.
 export const CAT = {
-  hungerMs: 12 * MIN,         // từ no (100) xuống đói hẳn (0)
+  hungerMs: 3 * HOUR,         // từ no (100) xuống đói hẳn (0): một lần no kéo dài ~3 giờ chơi
   happyDecayPerMin: 3,
   sickMul: 0.25,              // thú cưng khỏe hơn vật nuôi: nguy cơ mắc bệnh chỉ bằng chừng này
   petHappy: 25,
