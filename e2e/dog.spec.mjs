@@ -218,7 +218,7 @@ test('B chạy kịp ra cổng thì thoát và giữ đồ đã trộm', async (
   // bước về phía chó cho nó phát hiện, rồi quay đầu chạy ngay: cổng ở sát ô ruộng nên thoát kịp
   const d = await dogPos(B.page);
   await tapWorld(B.page, touch, d.x, d.y + 20);
-  for (let i = 0; i < 60 && !(await world(B.page, () => !!globalThis.__farm.world.guard?.chasing)); i++) await B.page.waitForTimeout(150);
+  for (let i = 0; i < 60 && !(await world(B.page, () => !!globalThis.__farm.world.guard?.chasing)); i++) { await B.page.waitForTimeout(150); if (i % 10 === 9) await tapWorld(B.page, touch, d.x, d.y + 20); }   // chạm lại: Phase 3 có thể làm bước đầu dừng sớm
   expect(await world(B.page, () => !!globalThis.__farm.world.guard?.chasing)).toBe(true);
   await B.page.locator('#visit-leave').click();
   await expect.poll(() => st(B.page, () => globalThis.__farm.state?.scene), { timeout: 40_000 }).toBe('village');
