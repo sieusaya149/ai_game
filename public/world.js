@@ -1,6 +1,6 @@
 // Thế giới: di chuyển, va chạm, tìm đường, AI con vật/chó/quạ/trộm, tìm target. Không vẽ gì.
 import { TS, GROUND } from './layout.js';
-import { ANIMALS, CROPS, DOG, GUARD, WALK_SPEED, DIR_NAME, BOND, FREE, PREDATOR } from './data.js';
+import { ANIMALS, CROPS, DOG, GUARD, WALK_SPEED, DIR_NAME, BOND, FREE, PREDATOR, DELIVERY } from './data.js';
 import { character } from './art.js';
 import * as ST from './state.js';
 import { troughOf } from './farm.js';
@@ -470,6 +470,27 @@ function updateThreats(state, w, dt) {
   }
 }
 
+// ---------- Người giao hàng (mua online) ----------
+// Luật (state.js stepDeliveries) chốt lúc lên đường, lúc tới kho, lúc giao xong; ở đây chỉ diễn: đi từ cổng tới trước nhà kho,
+// đứng chờ ở cửa kho tới giờ giao, giao xong thì đi ra cổng. Tới nơi trễ hơn luật cũng không sao, hàng vẫn vào kho đúng giờ.
+function updateCourier(state, w, dt) {
+  const c = state.courier;
+  if (!c || !atFarm() || state.visit) return;
+  const rt = rtOf(w, 'courier');
+  rt.walking = false;
+  if (c.x == null) { c.x = c.from.x; c.y = c.from.y; rt.dir = 3; }
+  const want = c.state === 'leaving' ? 'out' : 'in';
+  if (rt.pathFor !== want || rt.forId !== c.id) {
+    rt.pathFor = want; rt.forId = c.id;
+    rt.path = want === 'in' ? findPath(c.x, c.y, c.at.x, c.at.y) : [...findPath(c.x, c.y, c.from.x, c.from.y), { x: c.from.x, y: M.view.y1 + 30 }];
+  }
+  const wp = rt.path?.[0];
+  if (!wp) { rt.dir = want === 'in' ? 3 : rt.dir; return; }   // tới cửa kho: quay mặt vào kho chờ giao
+  const dx = wp.x - c.x, dy = wp.y - c.y, d = Math.hypot(dx, dy), st = Math.min(d, DELIVERY.speed * dt);
+  if (d < 0.8) rt.path.shift();
+  else { c.x += dx / d * st; c.y += dy / d * st; rt.dir = dirOf(dx, dy); rt.walking = true; rt.anim += dt; }
+}
+
 // ---------- Kẻ săn mồi: chuột, diều hâu, chồn (issue 43) ----------
 // Luật (state.js) đã chọn ô của chuột và con mồi của diều hâu/chồn; ở đây chỉ diễn hoạt cho đẹp:
 // chuột lon ton tới ô luật chọn, diều hâu lượn vòng trên cao rồi sà xuống, chồn men theo đất tới con mồi.
@@ -893,4 +914,5 @@ function updateFarm(state, w, dt, out) {
   updateAnimals(state, w, dt, out);
   updateThreats(state, w, dt);
   updatePreds(state, w, dt);
+  updateCourier(state, w, dt);
 }
