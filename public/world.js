@@ -635,17 +635,17 @@ export function nameOf(state, t) {
   switch (t.kind) {
     case 'plot': { const c = state.plots[t.idx]?.crop; return c ? (CROPS[c.id]?.name ?? 'Cây trồng') : `Ô ruộng ${t.idx + 1}`; }
     case 'lockedPlot': return 'Đất hoang';
-    case 'animal': { const a = findBy(state.animals, t.id); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}` : 'Vật nuôi'; }
+    case 'animal': { const a = findBy(state.animals, t.id), why = a && ST.breedNote(state, a); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}${why ? `\n💡 ${why}` : ''}` : 'Vật nuôi'; }
     case 'egg': { const e = findBy(state.eggs, t.id); return e?.candled ? (e.fertile ? 'Trứng có phôi ✨' : 'Trứng trống') : 'Quả trứng'; }
     case 'poop': return 'Phân chó';
     case 'threat': return THREAT_NAME[findBy(state.threats, t.id)?.kind] ?? 'Con quạ';
     case 'pred': { const p = findBy(state.preds, t.id); return p ? 'Con ' + ST.PRED_NAME[p.kind].toLowerCase() : ''; }
     case 'dog': return state.dog.name || DOG.name;
-    case 'cat': { const c = findBy(state.cats, t.id); return c ? `${ST.animalLabel(c)} ${'❤️'.repeat(c.bond || 1)}` : 'Mèo'; }
+    case 'cat': { const c = findBy(state.cats, t.id); return c ? `${ST.animalLabel(c)} ${'❤️'.repeat(c.bond || 1)}\n🐀 Đã bắt ${ST.catCatches(c)} con chuột` : 'Mèo'; }
     case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;
     case 'gate': { const h = ST.penHome(state, t.id); return `Cửa ${M.penById[t.id]?.name?.toLowerCase() ?? 'chuồng'} (${h.home}/${h.total} đã về)`; }
     case 'scale': return 'Cân heo';
-    case 'nest': return 'Ổ ấp trứng';
+    case 'nest': return 'Ổ ấp trứng\n🪺 Nở trứng có phôi (cần gà trống). Mái chuồng bên cạnh chỉ là nhà của đàn gà, lớn lên khi nâng cấp chuồng.';
     case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
     case 'deco': { const d = M.decos.find(o => o.id === t.id); return d ? ST.entName(d.ent) : 'Đồ trang trí'; }

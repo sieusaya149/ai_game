@@ -82,7 +82,7 @@ function build(f) {
       }
       if (d.nest && !buildings.some(b => b.id === 'coop')) {   // ổ ấp chỉ có ở chuồng gà đầu tiên
         const n = d.nest;
-        buildings.push({ id: 'coop', kind: 'coop', name: 'Ổ ấp trứng', sprite: 'coop', x: px + n.spr.x, y: py + n.spr.y,
+        buildings.push({ id: 'coop', kind: 'coop', name: 'Ổ ấp trứng', label: 'Ổ ấp', sprite: 'coop', x: px + n.spr.x, y: py + n.spr.y,
           foot: { c: e.c + n.foot.c, r: e.r + n.foot.r, w: n.foot.w, h: n.foot.h }, at: { x: px + n.at.x, y: py + n.at.y }, ent: e });
         block(e.c + n.foot.c, e.r + n.foot.r, n.foot.w, n.foot.h);
       }

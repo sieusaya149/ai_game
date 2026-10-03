@@ -208,6 +208,35 @@ test('con nguy kịch: gọi bác sĩ thú y ở điện thoại trong nhà thì
   expect(errors).toEqual([]);
 });
 
+test('hotfix: con gà mới Mệt cũng hiện ở điện thoại và gọi bác sĩ được', async ({ page, context }, testInfo) => {
+  test.setTimeout(90_000);
+  const touch = !!testInfo.project.use.hasTouch;
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  const save = base(s => {
+    buyAnimal(s, 'ga');
+    Object.assign(s.animals[0], { sick: 1, sickMs: 0 });
+    s.coins = SICK.vetPrice + 10;
+  });
+  save.scene = 'house';
+  Object.assign(save.player, { x: 96, y: 126, dir: 3 });
+  await seedSave(context, save);
+  await page.goto('/');
+  await ready(page);
+  await expect.poll(async () => (await look(page)).scene).toBe('house');
+  const phone = await where(page, 'phone');
+  await expect(async () => {
+    await tap(page, touch, phone.x, phone.y);
+    const main = page.locator('#main-action');
+    if (await main.isVisible() && /bác sĩ/i.test(await main.textContent())) await main.click();
+    await expect(page.locator('.sheet-head h2')).toHaveText(/Điện thoại/, { timeout: 2500 });
+  }).toPass({ timeout: 40_000 });
+  await expect(page.locator('#panel-root')).toContainText('Mệt');
+  await page.locator('#panel-root').getByRole('button', { name: 'Gọi bác sĩ' }).click();
+  await expect.poll(async () => (await look(page)).animals[0].sick, { timeout: 5000 }).toBe(0);
+  expect(errors).toEqual([]);
+});
+
 test('con vừa mất: thiên thần bay lên, để lại ngôi mộ, đặt hoa lên mộ', async ({ page, context }, testInfo) => {
   test.setTimeout(90_000);
   const touch = !!testInfo.project.use.hasTouch;

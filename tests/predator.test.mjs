@@ -346,3 +346,42 @@ test('danh sách việc cần làm và mũi tên có kẻ săn mồi sắp ra ta
   assert.ok(spots.some(x => x.key === 'pred:' + hawk.id && /Diều hâu/.test(x.text)));
   assert.ok(spots.some(x => x.key === 'hurt:' + chick.id));
 });
+
+test('hotfix: chó canh nhà đuổi chồn, diều hâu đi thì hiện chữ và nhật ký, và lần nào cũng như nhau', () => {
+  const play = () => {
+    const keep = [P.hawk.chancePerMin, P.weasel.chancePerMin];
+    P.hawk.chancePerMin = 0.05; P.weasel.chancePerMin = 0.05;   // dồn nhiều lần định tới trong thời gian ngắn
+    try { return play0(); } finally { [P.hawk.chancePerMin, P.weasel.chancePerMin] = keep; }
+  };
+  const play0 = () => {
+    const sd = newGame();
+    sd.dog.age = G.stageStart('cho', 'truong'); sd.dog.stage = 'truong'; sd.dog.hunger = 100; sd.dog.happy = 100;
+    bird(sd, 'non', { tile: { c: sd.farm.owned.c + 8, r: sd.farm.owned.r + 8 } });
+    bird(sd, 'truong', { tile: { c: sd.farm.owned.c + 9, r: sd.farm.owned.r + 8 }, stray: true });
+    const ev = [];   // chó luôn no vui, con non luôn non và ở ngoài chuồng, gà lạc luôn lạc
+    seeded(30, () => { for (let i = 0; i < 40 * 120; i++) {
+      sd.dog.hunger = 100; sd.dog.happy = 100;
+      for (const a of sd.animals) { a.hunger = 100; a.sick = 0; a.age = a.stage === 'non' ? 0 : G.stageStart('ga', 'truong'); a.stage = a.stage === 'non' ? 'non' : 'truong'; a.nextProduct = 1e15; }
+      ev.push(...G.tick(sd, 30_000)); } });
+    return { sd, ev };
+  };
+  const { sd, ev } = play();
+  assert.equal(sd.preds.some(p => p.kind !== 'rat'), false, 'vẫn không có diều hâu, chồn');
+  const fx = ev.filter(e => e.type === 'fx' && /đuổi .* đi rồi 🐕/.test(e.text));
+  assert.ok(fx.length > 0, 'có hiện chữ bay');
+  assert.ok(sd.log.some(l => /Mực đuổi (chồn|diều hâu) đi rồi 🐕/.test(l.text ?? l)), 'có dòng nhật ký');
+  assert.deepEqual(play().sd.log.map(l => l.text ?? l), sd.log.map(l => l.text ?? l), 'cùng hạt giống ra cùng kết quả');
+  // không chó canh thì không có chữ này
+  const s0 = newGame(); bird(s0, 'truong', { tile: { c: s0.farm.owned.c + 9, r: s0.farm.owned.r + 8 }, stray: true });
+  seeded(30, () => runFed(s0, 5 * HOUR, 30_000));
+  assert.equal(s0.log.some(l => /đi rồi 🐕/.test(l.text ?? l)), false);
+});
+
+test('hotfix: chạy bù offline không có chữ chó đuổi kẻ săn mồi', () => {
+  const sd = newGame();
+  sd.dog.stage = 'truong'; sd.dog.hunger = 100; sd.dog.happy = 100;
+  bird(sd, 'truong', { tile: { c: sd.farm.owned.c + 9, r: sd.farm.owned.r + 8 }, stray: true });
+  sd.time = MIDNIGHT; sd.savedAt = Date.now() - 8 * HOUR; store[G.SAVE_KEY] = JSON.stringify(sd);
+  const l = seeded(31, () => G.loadGame());
+  assert.equal(l.log.some(x => /đi rồi 🐕/.test(x.text ?? x)), false);
+});

@@ -160,11 +160,28 @@ function bornPen(s, mom, type) {
 }
 const penTypeOf = (s, a) => s.farm.ents.find(e => e.id === a.pen)?.pen;
 const fitToBreed = a => animalCan(a, 'product') && !a.sick && a.hunger > HUSBANDRY.growNeedsHunger && a.happy > 40;
-// Lý do con vật chưa sinh sản được dù đủ cặp: 'Chuồng đầy' | null
+// Lý do con heo/bò/cừu này chưa sinh sản được (chữ cho người chơi), null = không có gì cản hay đang mang thai
 export function breedNote(s, a) {
-  if (!['heo', 'bo', 'cuu'].includes(a.type) || a.sex !== 'f' || penTypeOf(s, a) === 'quarantine' || !fitToBreed(a)) return null;
-  const mate = s.animals.some(m => m.type === a.type && m.sex === 'm' && m.pen === a.pen && fitToBreed(m));
-  return mate && typeFree(s, ANIMALS[a.type].pen) <= 0 ? 'Chuồng đầy' : null;
+  if (!['heo', 'bo', 'cuu'].includes(a.type) || a.pregnant) return null;
+  const def = ANIMALS[a.type], nm = def.name.toLowerCase();
+  if (penTypeOf(s, a) === 'quarantine') return 'Chuồng cách ly không sinh sản được';
+  if (!animalCan(a, 'product')) return a.retired ? 'Đã nghỉ hưu' : `Còn nhỏ, chờ lớn thành ${nm} trưởng thành`;
+  if (a.sick) return 'Đang bệnh, chữa khỏi mới sinh sản được';
+  if (a.hunger <= HUSBANDRY.growNeedsHunger) return 'Còn đói, cho ăn no mới sinh sản được';
+  if (a.happy <= 40) return 'Chưa vui, vuốt ve hoặc cho ăn để vui lên';
+  const mates = s.animals.filter(m => m.type === a.type && m.sex !== a.sex && m.pen === a.pen && animalCan(m, 'product'));
+  if (!mates.length) return `Cần 1 ${nm} ${a.sex === 'm' ? 'cái' : 'đực'} trưởng thành ở cùng chuồng`;
+  if (!mates.some(fitToBreed)) return `${nm[0].toUpperCase() + nm.slice(1)} ${a.sex === 'm' ? 'cái' : 'đực'} cùng chuồng còn đói, chưa vui hoặc đang bệnh`;
+  return typeFree(s, def.pen) <= 0 ? `Chuồng đầy, nâng cấp chuồng để có chỗ cho ${def.baby.toLowerCase()}` : null;
+}
+// Nhắc mua cho đủ đực và cái: heo, bò, cừu cần cả hai giới mới sinh sản. null = đủ cặp (hay loài này không cần cặp)
+export function breedAdvice(s, type) {
+  if (!['heo', 'bo', 'cuu'].includes(type)) return null;
+  const nm = ANIMALS[type].name.toLowerCase();
+  const m = s.animals.some(a => a.type === type && a.sex === 'm'), f = s.animals.some(a => a.type === type && a.sex === 'f');
+  if (m && f) return null;
+  if (!m && !f) return `Nhớ mua cả ${nm} đực và cái thì ${nm} mới sinh sản`;
+  return `Mới chỉ có ${nm} ${m ? 'đực' : 'cái'}, mua thêm 1 ${nm} ${m ? 'cái' : 'đực'} để ${nm} sinh sản`;
 }
 // Con vật hay thú cưng theo id: mèo nằm ở s.cats chứ không ở s.animals (issue 44)
 const beast = (s, id) => s.animals.find(x => x.id === id) ?? (s.cats ?? []).find(x => x.id === id) ?? null;
@@ -226,6 +243,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     mode: 'offline', account: null,
     today: { day: '', helps: 0, steals: 0, stolen: 0, robs: 0 },
     guests: [],
+    nestHint: false,   // đã nhắc cách dùng ổ ấp lần đầu có trứng có phôi
     coUtQuest: null,   // nhiệm vụ làm quen của Cô Út (issue 48): { step } sau khi mua con heo đầu tiên
   };
   const m = mapOf(s);
@@ -892,7 +910,7 @@ function stepAnimals(s, d) {
     if (a.hunger <= 0) { if (!a.starvingSince) { a.starvingSince = s.time; emit({ type: 'hungry', animal: def.name }); } } else a.starvingSince = 0;
     // nguyên nhân tự mắc: đói lả lâu, dơ, chuồng bẩn, tuổi già (con ❤️4+ ít bệnh hơn); vắc-xin chặn hết
     if (!a.sick && !vaccinated(s, a) && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving)
-      || chance(HUSBANDRY.sickChancePerMin * sickFactor(a) * (isDirty(a) ? DIRT.sickMul : 1) * (penDirty(s, def.pen) ? SICK.dirtyPenMul : 1) * (a.stage === 'gia' ? SICK.oldChanceMul : 1), d))) fall(s, a, def);
+      || (neglected(s, a, def) && chance(HUSBANDRY.sickChancePerMin * sickFactor(a) * (isDirty(a) ? DIRT.sickMul : 1) * (penDirty(s, def.pen) ? SICK.dirtyPenMul : 1) * (a.stage === 'gia' ? SICK.oldChanceMul : 1), d)))) fall(s, a, def);
     if (a.hurt && !stepHurt(s, a, d, def)) continue;   // mất vì vết chuột cắn
     if (a.sick && !stepSick(s, a, d, def)) continue;   // mất vì bệnh
     if (grieving(s)) a.happy = Math.min(a.happy, SICK.griefCap);
@@ -912,6 +930,11 @@ function stepAnimals(s, d) {
         const roos = roosters(s, a.type), fert = roos.length > 0 && Math.random() < BREED.fertile;   // có trống: 40% trứng có phôi
         const e = { id: s.nextId++, sp: a.type, x: a.x, y: a.y, laidAt: s.time, fertile: fert, mom: ref(a), dad: fert ? ref(pick(roos)) : null, ...(a.tile ? bushSpot(s, a) : null) };
         s.eggs.push(e); emit({ type: 'egg' }); spawnEv('egg', e.x, e.y);
+        if (fert && !s.nestHint && !catchUp) {   // lần đầu có trứng có phôi: chỉ cách dùng ổ ấp (một lần, chỉ khi đang chơi)
+          s.nestHint = true;
+          toast('Có trứng có phôi rồi! Nhặt trứng, mang tới Ổ ấp trứng cạnh máng gà để nở ra gà con 🐣');
+          log(s, 'Trứng có phôi (nhờ có gà trống) ấp được: nhặt rồi đặt vào Ổ ấp trứng trong chuồng gà');
+        }
       }
       a.nextProduct = s.time + productEvery(a);
     } else if (!a.ready) { a.ready = true; fxEv(a.x, a.y, a.type === 'bo' ? 'Có sữa! 🥛' : 'Có lông! ✂️'); }
@@ -926,6 +949,8 @@ const SICK_FLOOR = [0, 0, SICK.toSevere, SICK.toCritical];   // tiến triển t
 export const SICK_NAME = ['Khỏe', 'Mệt', 'Bệnh nặng', 'Nguy kịch'];
 // Thời gian (giờ vườn, đã tính hệ số) còn lại tới khi mất; chỉ có nghĩa ở Nguy kịch (đồng hồ đếm ngược trên đầu)
 export const sickLeft = a => (a.sick >= 3 ? Math.max(0, SICK.deadAt - a.sickMs) : null);
+// Bị bỏ bê: đói, dơ, chuồng bẩn hoặc già. Chỉ lúc đó mới có nguy cơ tự bệnh (ngoài đói lả lâu, luôn bệnh)
+const neglected = (s, a, def) => a.hunger < HUSBANDRY.hungryBelow || isDirty(a) || penDirty(s, def.pen) || a.stage === 'gia';
 // Bắt đầu bệnh (Mệt)
 function fall(s, a, def) {
   a.sick = 1; a.sickSince = s.time; a.sickMs = 0; a.dose = 0; a.spreadAcc = 0;
@@ -1562,6 +1587,7 @@ function stepThreats(s, d) {
 // { id, kind: 'rat'|'hawk'|'weasel', state: 'hunt'|'leaving', since, x, y, tile?, tileAt?, target?, strikeAt, warned }
 // strikeAt = lúc ra tay; luật báo 🔴 trước đúng PREDATOR.warnMs (10 giây), đuổi kịp trong khoảng đó thì không ai bị hại.
 export const PRED_NAME = { rat: 'Chuột', hawk: 'Diều hâu', weasel: 'Chồn' };
+const PRED_LC = { rat: 'chuột', hawk: 'diều hâu', weasel: 'chồn' };
 export const preds = s => s.preds ?? [];
 // Những con đang trong khoảng cảnh báo (sắp ra tay): dùng cho báo 🔴 và mũi tên chỉ hướng
 export const predWarning = s => preds(s).filter(p => p.state === 'hunt' && p.strikeAt - s.time <= PREDATOR.warnMs);
@@ -1619,17 +1645,19 @@ function stepPreds(s, d) {
   s.preds ??= [];
   // Bảo hộ người mới: dưới cấp PREDATOR.minLevel chưa có kẻ săn mồi nào
   if (level(s) >= PREDATOR.minLevel) {
-    if (s.preds.filter(p => p.kind === 'rat').length < PREDATOR.rat.max && chance(PREDATOR.rat.spawnPerMin, d)) spawnRat(s);
+    if (s.preds.filter(p => p.kind === 'rat').length < PREDATOR.rat.max && chance(PREDATOR.rat.spawnPerMin * (catGuards(s) ? CAT.ratSpawnMul : 1), d)) spawnRat(s);
     // Diều hâu, chồn chỉ tới khi chủ đang chơi: chạy bù offline không bao giờ làm con vật chết (ADR 0004)
-    if (!catchUp && !guardOn(s)) {
+    if (!catchUp) {
+      // Có chó canh: kẻ săn mồi vẫn "định" tới (cùng xác suất) nhưng bị chó đuổi đi, người chơi thấy chữ bay và nhật ký
+      const guard = guardOn(s), scare = kind => { fxEv(s.dog.x, s.dog.y - 10, `${s.dog.name} đuổi ${PRED_LC[kind]} đi rồi 🐕`, COL.good); log(s, `${s.dog.name} đuổi ${PRED_LC[kind]} đi rồi 🐕`); };
       if (!isNight(s) && !s.preds.some(p => p.kind === 'hawk') && chance(PREDATOR.hawk.chancePerMin, d)) {
         const prey = hawkPrey(s);
-        if (prey.length) spawnPounce(s, 'hawk', pick(prey));
+        if (prey.length) { if (guard) scare('hawk'); else spawnPounce(s, 'hawk', pick(prey)); }
       }
       const lamps = Math.min(3, mapOf(s).decos.filter(o => o.kind === 'deco_lamp').length);
       if (weaselHour(s) && !s.preds.some(p => p.kind === 'weasel') && chance(PREDATOR.weasel.chancePerMin * Math.pow(PREDATOR.weasel.lampMul, lamps), d)) {
         const prey = strays(s);
-        if (prey.length) spawnPounce(s, 'weasel', pick(prey));
+        if (prey.length) { if (guard) scare('weasel'); else spawnPounce(s, 'weasel', pick(prey)); }
       }
     }
   }
@@ -1783,6 +1811,10 @@ export function buyCat(s, sex = 'm') {
   log(s, `Mang một ${def.baby.toLowerCase()} ở chợ Bà Tư về nuôi`);
   return R(true, `Đã mua ${def.baby.toLowerCase()} ${sex === 'm' ? 'đực' : 'cái'}`, { price });
 }
+// Có mèo trưởng thành khỏe mạnh (không bệnh, không đói lả) ở trong trại thì chuột sinh ra thưa đi (CAT.ratSpawnMul), dù mèo đang ngủ hay no
+const catGuards = s => cats(s).some(c => !c.sick && (c.stage === 'truong' || c.stage === 'gia') && c.hunger >= CAT.guardMinHunger);
+// Số chuột con mèo này đã bắt từ trước tới giờ
+export const catCatches = c => c?.caught ?? 0;
 // Hệ số săn của con mèo này lúc này: 0 = không săn (mèo con, đang bệnh, no quá nên lười, mèo già chưa đói)
 function catHuntMul(c) {
   if (c.sick || c.stage === 'non') return 0;
@@ -1805,6 +1837,7 @@ function catStrike(s, c) {
   if (Math.random() >= CAT.catchChance[c.stage] * mul) return;
   s.preds.splice(s.preds.indexOf(p), 1);
   s.stats.rats = (s.stats.rats || 0) + 1;
+  c.caught = (c.caught ?? 0) + 1;
   addExp(s, CAT.catchExp);
   emit({ type: 'catRat', id: c.id, cat: c.name });
   if (catchUp) return;   // chạy bù: vẫn bớt chuột, nhưng không có màn khoe
@@ -1844,7 +1877,7 @@ function stepCats(s, d) {
     if (c.happy > 50) c.happy = Math.max(50, c.happy - CAT.happyDecayPerMin * d / MIN);
     if (c.hunger <= BOND.hungerBelow) bondShift(c, -BOND.lossPerMin * d / MIN);
     // bệnh: mèo cũng mắc bệnh như vật nuôi, nhưng là thú cưng nên không bao giờ nguy kịch, không chết (stepSick)
-    if (!c.sick && !vaccinated(s, c) && chance(HUSBANDRY.sickChancePerMin * CAT.sickMul * sickFactor(c) * (c.stage === 'gia' ? SICK.oldChanceMul : 1), d)) fall(s, c, def);
+    if (!c.sick && !vaccinated(s, c) && (c.hunger < HUSBANDRY.hungryBelow || c.stage === 'gia') && chance(HUSBANDRY.sickChancePerMin * CAT.sickMul * sickFactor(c) * (c.stage === 'gia' ? SICK.oldChanceMul : 1), d)) fall(s, c, def);
     if (c.sick) stepSick(s, c, d, def);
     if (c.trophy && s.time >= c.trophy.until) c.trophy = null;
     // tối đi về cửa mèo trên nhà, chui qua (sau CAT.doorMs) rồi ngủ trong nhà; sáng chui ra lại vườn
@@ -2286,6 +2319,7 @@ function buildingActs(s, t) {
   if (open) return [mk('open', open[0], open[1])];
   if (b.id === 'market') return [mk('open', '🛒', 'Mua bán ở chợ', marketOpen(s) ? null : CLOSED)];
   if (TALK[b.id]) return [mk('talk', TALK[b.id].icon, TALK[b.id].label)];
+  if (b.id === 'doghouse') return dogActs(s).filter(a => ['chain', 'feed', 'pet'].includes(a.id)).sort((x, y) => (x.id === 'chain' ? 0 : 1) - (y.id === 'chain' ? 0 : 1));   // chuồng chó: xích/thả trước, rồi cho ăn, vuốt ve
   if (b.id === 'house') return [mk('enter', '🏠', 'Vào nhà')];
   if (b.id === 'gate') return [mk('enter', '🚪', 'Ra làng')];
   if (b.id === 'giftbox') return [mk('open', '🎁', s.visit ? 'Tặng quà cho chủ vườn' : 'Mở hộp quà')];
@@ -2585,6 +2619,7 @@ const DO = {
   },
 
   building(s, t, id, at) {
+    if (t.id === 'doghouse') return DO.dog(s, t, id, at);   // chuồng chó: cùng việc với chạm vào chó
     if (id === 'refill') { s.can = canMax(s); return res(true, 'Đã múc đầy bình', [say(at, 'Đầy bình! 💧', '#7ad7ff')], 'water'); }
     if (id === 'enter') return res(true, '', [], 'click', { go: BUILDING_DEFS[t.id].door.to });
     if (id === 'talk') return res(true, TALK[t.id].msg, [], 'click');
@@ -3142,7 +3177,8 @@ export function buyAnimal(s, type, sex = 'm') {
   const p = penPoint(s, def.pen, pen.id);
   mkAnimal(s, type, 'non', p.x, p.y, { pen: pen.id, sex });
   if (firstPig) { s.coUtQuest = { step: 0 }; log(s, 'Cô Út: Heo đầu tiên à? Để tôi chỉ bạn tắm, chữa bệnh và tiêm vắc-xin cho heo nhé!'); }
-  return R(true, `Đã mua ${def.baby.toLowerCase()} ${sex === 'm' ? 'đực' : 'cái'}`, { price });
+  const tip = breedAdvice(s, type);
+  return R(true, `Đã mua ${def.baby.toLowerCase()} ${sex === 'm' ? 'đực' : 'cái'}${tip ? `. ${tip}` : ''}`, { price });
 }
 
 // ---------- Nhiệm vụ làm quen của Cô Út: tắm → chữa bệnh → vắc-xin (issue 48) ----------
@@ -3331,7 +3367,7 @@ function access(m) {
   const from = m.gateIn ?? m.spawn, out = [];
   const add = (key, name, p) => out.push({ key, name, ok: reachable(m, from, p) });
   const mid = (c, r) => ({ x: c * TS + 8, y: r * TS + 8 });
-  for (const b of m.buildings) if (b.at && b.id !== 'gate') add(b.id === 'house' ? 'house' : `b${b.ent.id}${b.id}`, b.name, b.at);
+  for (const b of m.buildings) if (b.at && b.id !== 'gate' && b.id !== 'doghouse') add(b.id === 'house' ? 'house' : `b${b.ent.id}${b.id}`, b.name, b.at);
   for (const p of m.penList) add(`p${p.ent.id}`, p.name, mid(...p.gates[0]));
   for (const e of m.fields) add(`f${e.id}`, 'Khối ruộng', mid(e.c + 1, e.r + 1));
   return out;

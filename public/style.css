@@ -131,7 +131,7 @@ kbd {
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100% - 144px - var(--sl) - var(--sr));
 }
 #target-name {
-  max-width: 100%; padding: 4px 12px; border-radius: 14px; font-size: 13px; font-weight: 800; text-align: right;
+  max-width: 100%; padding: 4px 12px; border-radius: 14px; font-size: 13px; font-weight: 800; text-align: right; white-space: pre-line;
   background: rgba(60, 35, 10, 0.85); color: var(--cream); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 /* Nhiều nút trên màn thấp (con vật có tới 6 chip): danh sách cuộn dọc, không leo lên bản đồ nhỏ / HUD.

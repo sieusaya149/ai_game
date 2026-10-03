@@ -348,3 +348,18 @@ test('bản lưu v2 cũ có Mực đã lớn: lên v3 là chó trưởng thành,
   const b = guestOpApply(s, who('Bình'), op('bite', 'bite', { loot: {} }));
   assert.equal(b.ok, true, b.msg);
 });
+test('hotfix: chạm vào chuồng chó thì xích / thả chó được, như chạm vào chó', () => {
+  const s = createGame({ name: 'Hùng' });
+  const t = { kind: 'building', id: 'doghouse' };
+  const acts = actionsFor(s, t);
+  assert.ok(acts.some(a => a.id === 'chain' && /Xích/.test(a.label)), 'có nút xích');
+  assert.equal(s.dog.chained, false);
+  const r = perform(s, t, 'chain');
+  assert.equal(r.ok, true);
+  assert.equal(s.dog.chained, true);
+  assert.ok(actionsFor(s, t).some(a => a.id === 'chain' && /Thả/.test(a.label)), 'đang xích thì nút thành thả');
+  perform(s, t, 'chain');
+  assert.equal(s.dog.chained, false);
+  assert.ok(actionsFor(s, t).some(a => a.id === 'feed'), 'cho chó ăn ngay ở chuồng');
+  assert.ok(mapOf(s).building('doghouse').at, 'chuồng chó có chỗ đứng để chạm tới');
+});

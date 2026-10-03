@@ -68,7 +68,7 @@ export const ANIMALS = {
   bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
   cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
   // Mèo là thú cưng (issue 44): ở nhà mèo chứ không ở chuồng có rào, không cho sản phẩm, không bán được, không dơ
-  meo: { name: 'Mèo', baby: 'Mèo con', lv: 4, price: 180, feed: 'catfood', pen: 'cathouse', product: null,    every: 0,         sell: 0,   exp: 6, pet: true },
+  meo: { name: 'Mèo', baby: 'Mèo con', lv: 5, price: 180, feed: 'catfood', pen: 'cathouse', product: null,    every: 0,         sell: 0,   exp: 6, pet: true },
 };
 // Dơ và tắm (lát 37). Độ dơ 0..100 theo giờ vườn; từ sạch tới dơ hẳn mất fullMs, mưa hoặc chuồng bẩn thì nhanh gấp đôi.
 export const DIRT = {
@@ -93,7 +93,8 @@ export const HUSBANDRY = {
   happyDecayPerMin: 4,
   petHappy: 25,
   sickAfterStarving: 3 * MIN, // đói lả (0) quá 3 phút thì bệnh
-  sickChancePerMin: 0.004,
+  sickChancePerMin: 0.004,    // chỉ áp dụng khi bị bỏ bê: đói (dưới hungryBelow), dơ, chuồng bẩn hoặc già. No, sạch thì không tự bệnh
+  hungryBelow: 40,            // đói hơn mức này là "đang đói" (cùng mốc hiện nút Cho ăn)
   eggHatchChance: 0.2,        // trứng bỏ quên quá 10 phút có 20% tự nở thành gà con
   eggForgetMs: 10 * MIN,
   nestHatchMs: 3 * MIN,       // đặt trứng vào ổ ấp: 3 phút nở gà con
@@ -225,6 +226,8 @@ export const CAT = {
   huntEvery: 2 * MIN,         // mỗi lượt rình cách nhau chừng này giờ vườn
   catchChance: { non: 0, nho: 0.1, truong: 0.2, gia: 0.2 },   // trưởng thành: 0.2 mỗi 2 phút ≈ 1 con chuột mỗi 10 phút
   catchExp: 3,
+  ratSpawnMul: 0.5,           // có mèo trưởng thành khỏe (không bệnh, còn no) thì chuột sinh ra thưa đi chừng này
+  guardMinHunger: 20,         // đói dưới mức này mèo không còn "canh" chuột nữa
   trophyMs: 60_000,           // mang chuột tới khoe người chơi trong chừng này
   praiseHappy: 15, praiseExp: 2,
   herdHappy: 60,              // vui từ mức này mèo mới chịu lùa (mỏng hơn chó: chỉ 1 con gần nhất)
@@ -376,8 +379,8 @@ export const ITEMS = {
   pesticide:  { name: 'Thuốc trừ sâu',     kind: 'supply', price: 15, lv: 1, desc: 'Diệt sâu và chữa cây bệnh ngay lập tức.' },
   growth:     { name: 'Thuốc tăng trưởng', kind: 'supply', price: 30, lv: 2, desc: 'Cây lớn vọt thêm 50% thời gian. Tối đa 2 lần mỗi cây.' },
   fertilizer: { name: 'Phân bón',          kind: 'supply', price: 12, lv: 1, desc: 'Bón trước khi chín: +50% sản lượng, lớn nhanh hơn.' },
-  medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 3, desc: 'Mệt: 1 liều là khỏi. Bệnh nặng: 2 liều. Nguy kịch: phải gọi bác sĩ thú y.' },
-  vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 60, lv: 3, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
+  medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 1, desc: 'Mệt: 1 liều là khỏi. Bệnh nặng: 2 liều. Nguy kịch: phải gọi bác sĩ thú y.' },
+  vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 60, lv: 1, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
   soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
   manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Hố ủ phân sẽ dùng sau.' },
@@ -389,7 +392,7 @@ export const ITEMS = {
   dogfood:    { name: 'Xương cho chó',     kind: 'feed',   price: 8,  lv: 1, desc: 'Cho chó Mực ăn để nó lớn và chịu giữ nhà.' },
   sausage:    { name: 'Xúc xích',          kind: 'feed',   price: 30, lv: 5, desc: 'Ném cho chó nhà người ta: nó mải ăn thì quên sủa 60 giây.' },
   treat:      { name: 'Bánh thưởng',       kind: 'feed',   price: 15, lv: 1, desc: 'Bánh quy hình xương để dạy lệnh cho chó. Mỗi buổi dạy tốn 1 cái.' },
-  catfood:    { name: 'Cá khô cho mèo',    kind: 'feed',   price: 9,  lv: 4, desc: 'Cho mèo ăn. Đừng cho no quá: mèo no là nằm phơi nắng, không thèm săn chuột đâu.' },
+  catfood:    { name: 'Cá khô cho mèo',    kind: 'feed',   price: 9,  lv: 5, desc: 'Cho mèo ăn. Đừng cho no quá: mèo no là nằm phơi nắng, không thèm săn chuột đâu.' },
   deco_scarecrow: { name: 'Bù nhìn',       kind: 'deco',   price: 150, lv: 2, desc: 'Cắm gần ruộng, quạ không dám tới.' },
   deco_flower:    { name: 'Chậu hoa',      kind: 'deco',   price: 30,  lv: 1, desc: 'Cho nông trại thêm xinh.' },
   deco_lamp:      { name: 'Đèn lồng',      kind: 'deco',   price: 90,  lv: 3, desc: 'Sáng lung linh ban đêm, trộm ngại vào hơn.' },
@@ -483,7 +486,7 @@ export const PEN_TABLE = {
   pasture:    { cap: [3, 6, 9],   lv: 5, limit: [[5, 1], [8, 2], [12, 3]], up: [2000, 4500], upLv: [6, 8], extra3: ['autoGrass'] },
   quarantine: { cap: [1, 2, 3],   lv: 3, limit: [[3, 1], [7, 2]],         up: [500, 1200],  upLv: [5, 7], extra3: [] },
   doghouse:   { cap: [1, 1, 1],   lv: 1, limit: [[1, 1]],                 up: [150, 400],   upLv: [2, 4], extra3: ['bed', 'toy'] },
-  cathouse:   { cap: [1, 2, 3],   lv: 4, limit: [[4, 1], [9, 2]],         up: [250, 600],   upLv: [5, 7], extra3: ['bed', 'toy'] },
+  cathouse:   { cap: [1, 2, 3],   lv: 5, limit: [[5, 1], [9, 2]],         up: [250, 600],   upLv: [5, 7], extra3: ['bed', 'toy'] },
 };
 // Công trình đặt được ở chế độ xây dựng mà không phải chuồng có rào (nhà mèo): giá xây
 export const BUILD_PRICES = { cathouse: 350 };
