@@ -22,7 +22,7 @@ const HANDLERS = {
 export const send = (sock, m) => { if (sock.readyState === sock.OPEN) sock.send(JSON.stringify(m)); };
 
 export function attachLive(server, ctx) {
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });   // tin `world` của chủ là phần lớn nhất (cỡ bản lưu)
   const pres = createPresence(ctx, send);   // làng real-time (issue 25): join, pos, chat, emote
   const guests = createGuests(ctx, send, pres);   // hàng đợi thao tác của khách (issue 28): guest
   server.on('upgrade', (req, socket, head) => {
@@ -35,6 +35,7 @@ export function attachLive(server, ctx) {
       let m;
       try { m = JSON.parse(data); } catch { return; }   // tin hỏng thì bỏ qua, không ngắt
       (HANDLERS[m?.t] ?? pres.handlers[m?.t] ?? guests.handlers[m?.t])?.(sock, m, ctx);
+      if (m?.t === 'hello' && sock.play) pres.hello(sock);   // chủ kết nối lại khi đang có khách trong vườn
     });
     sock.on('close', () => pres.leave(sock));
   });

@@ -2,8 +2,12 @@
 // Làng là bản đồ chung; vườn và nhà là bản đồ riêng của từng người. Khách thăm vườn (issue 27) vào `farm` kèm `owner` (tên chủ):
 // cùng bản đồ vườn của chủ nên chủ, khách và các khách khác thấy nhau; khách là bạn của chủ thì chủ được báo (friends.notifyVisit).
 // Vị trí của mỗi người gửi được phát tối đa LIVE.hz lần mỗi giây: gửi dồn thì giữ bản mới nhất, phát khi tới nhịp.
+// Khách thấy chủ làm gì ngay: server báo chủ số khách đang đứng trong vườn (`watch { n }`, đổi là báo, kết nối lại
+// thì báo sau hello); trình duyệt chủ gửi phần vườn khách thấy được (`world { w }`), server chuyển cho khách trong vườn.
 import { notifyVisit } from './friends.mjs';
 import { LIVE, QUICK_CHAT, EMOTES, LOOK, DEFAULT_LOOK, levelInfo } from '../public/data.js';
+import { VISIT_KEYS } from '../public/state.js';
+import { playOf } from './farms.mjs';
 
 const GAP = 1000 / LIVE.hz;
 const MAPS = ['village', 'farm', 'house'];
@@ -24,6 +28,10 @@ export function createPresence(ctx, send) {
   const maps = new Map();   // mã bản đồ → Map(accountId → người)
   const others = p => [...(maps.get(p.map)?.values() ?? [])].filter(o => o !== p);
   const cast = (p, m) => { for (const o of others(p)) send(o.sock, m); };
+  // số khách đang đứng trong vườn của `host` (không tính chính chủ) và báo cho chủ
+  const guestsIn = host => [...(maps.get(`farm:${host}`)?.values() ?? [])].filter(o => o.id !== host);
+  const watch = host => ctx.live?.sendTo(host, { t: 'watch', n: guestsIn(host).length });
+  const hostOf = p => { const [kind, id] = p.map.split(':'); return kind === 'farm' && Number(id) !== p.id ? Number(id) : null; };
 
   // rời bản đồ đang đứng (đổi bản đồ, đóng kết nối, tài khoản vào lại bằng kết nối khác)
   function leave(sock) {
@@ -36,6 +44,7 @@ export function createPresence(ctx, send) {
     room.delete(p.id);
     if (!room.size) maps.delete(p.map);
     cast(p, { t: 'leave', id: p.id });
+    if (hostOf(p)) watch(hostOf(p));
   }
   function flush(p) {
     p.timer = 0; p.sent = Date.now();
@@ -69,6 +78,7 @@ export function createPresence(ctx, send) {
       send(sock, { t: 'joined', map: m.map, me: p.id, people: others(p).map(pub) });
       cast(p, { t: 'enter', p: pub(p) });
       room.set(p.id, p);
+      if (host !== a.id) watch(host);
       if (host !== a.id && !old && ctx.live) notifyVisit(ctx, a, host);   // chủ vườn: "X vừa ghé thăm vườn của bạn" (nếu X là bạn của chủ)
     },
     pos(sock, m) {
@@ -81,11 +91,24 @@ export function createPresence(ctx, send) {
       const wait = p.sent + GAP - Date.now();
       if (wait <= 0) flush(p); else p.timer = setTimeout(flush, wait, p);
     },
+    // phần vườn của chủ (state.js visitWorld): chỉ nhận từ máy đang giữ phiên chơi của chủ, chỉ giữ các trường của vườn
+    world(sock, m) {
+      const a = sock.account;
+      if (!a || !sock.play || playOf(db, a.id) !== sock.play || !m.w || typeof m.w !== 'object' || Array.isArray(m.w)) return;
+      const guests = guestsIn(a.id);
+      if (!guests.length) return;
+      const w = {};
+      for (const k of VISIT_KEYS) if (k in m.w) w[k] = m.w[k];
+      const msg = { t: 'world', owner: a.name, w };
+      for (const o of guests) send(o.sock, msg);
+    },
     chat: (sock, m) => say(sock, QUICK_CHAT.includes(m.text), { t: 'chat', text: m.text }),
     emote: (sock, m) => say(sock, EMOTES.includes(m.e), { t: 'emote', e: m.e }),
   };
   return {
     handlers, leave,
+    // máy chủ vừa kết nối (lại) xong: đang có khách trong vườn thì báo ngay
+    hello(sock) { const n = guestsIn(sock.account.id).length; if (n) send(sock, { t: 'watch', n }); },
     // Kết nối này đang đứng trong vườn của ai (issue 28: thao tác của khách chỉ nhận khi khách đang ở trong vườn đó)
     gardenOf(sock) { const [kind, id] = String(sock.pres?.map ?? '').split(':'); return kind === 'farm' ? Number(id) : null; },
     stop() { for (const room of maps.values()) for (const p of room.values()) clearTimeout(p.timer); },
