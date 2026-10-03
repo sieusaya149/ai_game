@@ -100,7 +100,7 @@ state = {
   plots: [ { idx, unlocked, removed?, soil: 'untilled'|'tilled', water: 0..100, weeds: false,
              crop: null | { id, progress, planted, bugs, bugSince, sick, sickSince, fert, boosts, dead, rotten, ripeAt } } ],
   animals: [ Animal ],                        // xem "Con vật (v3)" ngay dưới
-  troughs: { chicken, pig, pasture },
+  troughs: { [id chuồng]: số phần cám },   // theo từng chuồng; bản lưu cũ khóa theo loại được chép cho từng chuồng khi nạp
   manure: { chicken, pig, pasture },          // phân chuồng tích dần 0..100 (đầy = chuồng bẩn), xúc ở máng (hành động `muck`)
   eggs: [ { id, sp?, x, y, laidAt, fertile?, candled?, mom?, dad? } ],   // sp = loài đẻ ('ga' | 'vit'; thiếu = 'ga'); fertile: có phôi (ẩn tới khi soi); mom/dad = { id, name }
   clutch: [ { sp?, mom, dad } ],               // gốc gác của các trứng có phôi đã nhặt (khớp theo thứ tự với món trung_phoi / trung_vit_phoi)
@@ -751,7 +751,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'animal', id }
 { kind: 'egg', id }
 { kind: 'poop', id }
-{ kind: 'trough', pen, id? }   // pen: 'chicken'|'pig'|'pasture'; id = thực thể chuồng (có nhiều chuồng cùng loại). Máng ăn gom theo loại: state.troughs[loại]
+{ kind: 'trough', pen, id? }   // pen: 'chicken'|'pig'|'pasture'; id = thực thể chuồng (có nhiều chuồng cùng loại). Máng ăn theo từng chuồng: state.troughs[id chuồng] (không có id thì chuồng đầu của loại)
 { kind: 'scale', pen: 'pig' }  // cái cân cạnh máng chuồng heo (PEN_DEFS.pig.scale): cân heo (issue 40)
 { kind: 'gate', id }           // cửa chuồng (id thực thể chuồng); chỉ là target từ chạng vạng (isDusk), cho rải thóc và xem số con đã về
 { kind: 'nest' }

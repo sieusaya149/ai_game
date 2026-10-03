@@ -221,7 +221,7 @@ export function createGame({ name = 'Nông dân', look = {}, dogCoat } = {}) {
     inv: { ...START.items }, basket: {},   // inv = kho, basket = giỏ
     shipbin: { items: {} },   // thùng giao hàng: lái buôn lấy hết lúc 6h sáng
     plots: Array.from({ length: nf.plotCount }, (_, i) => newPlot(i, true)),
-    animals: [], troughs: { chicken: 0, pig: 0, pasture: 0 }, manure: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], clutch: [], nest: { egg: false, hatchAt: 0, sp: null, mom: null, dad: null },
+    animals: [], troughs: {}, manure: { chicken: 0, pig: 0, pasture: 0 }, eggs: [], clutch: [], nest: { egg: false, hatchAt: 0, sp: null, mom: null, dad: null },
     // chained: xích chó · nap/napCheck: giấc ngủ gật ban đêm (giờ vườn) · quiet: đang mải ăn xúc xích (giờ ngoài đời)
     // · barkAt/barkX/barkY: lần sủa gần nhất và chỗ thấy khách lạ (issue 31)
     dog: {
@@ -255,8 +255,22 @@ export function createGame({ name = 'Nông dân', look = {}, dogCoat } = {}) {
   s.dog.nextPoop = nextPoopAt(s);
   for (const a of START.animals) { const p = penPoint(s, ANIMALS[a.type].pen); mkAnimal(s, a.type, a.stage, p.x, p.y, { sex: a.sex }); }
   settlePens(s);
+  ensureTroughs(s);
   evq = [];
   return s;
+}
+
+// Máng ăn theo từng chuồng: s.troughs[id chuồng]. Bản lưu cũ giữ máng theo loại (chicken/pig/pasture):
+// chép giá trị đó cho từng chuồng cùng loại rồi bỏ khóa loại. Chuồng nào chưa có máng thì khởi tạo 0.
+function ensureTroughs(s) {
+  const t = s.troughs ??= {};
+  for (const e of s.farm.ents) if (e.kind === 'pen') t[e.id] = t[e.pen] ?? t[e.id] ?? 0;   // khóa loại (nếu còn) thắng
+  for (const k of ['chicken', 'pig', 'pasture']) delete t[k];
+}
+// Khóa máng con vật ăn: chuồng nó ở; chuồng không máng (cách ly) thì ăn máng chuồng đầu cùng loại.
+function troughKey(s, a) {
+  const m = mapOf(s), p = m.penById[a.pen];
+  return p?.trough ? p.id : m.pens[ANIMALS[a.type].pen]?.id;
 }
 
 // Lưu vườn chơi đơn vào localStorage. Vườn online (mode 'online') chỉ cập nhật savedAt, không bao giờ ghi đè
@@ -308,13 +322,14 @@ export function loadGame(raw) {
   // Bổ sung trường thiếu
   const base = createGame({ name: s.name });
   s.stats = { ...base.stats, ...s.stats };
-  s.troughs = { ...base.troughs, ...s.troughs };
+  s.troughs = { ...s.troughs };
   s.manure = { ...base.manure, ...s.manure };
   for (const k of ['owned', 'achievements', 'inv', 'basket', 'nest', 'dog', 'player']) s[k] = { ...base[k], ...s[k] };
   for (const k of ['animals', 'eggs', 'clutch', 'poops', 'threats', 'preds', 'cats', 'orders', 'log']) s[k] ||= [];
   s.shipbin = { items: Object.fromEntries(Object.entries(s.shipbin?.items ?? {}).filter(([k, n]) => (CROPS[k] || PRODUCTS[k]) && n > 0)) };
   ensureShipbin(s);   // vườn cũ chưa có thùng: thêm một thùng cạnh nhà kho
   ensureGateBoxes(s); // vườn cũ chưa có hộp quà, sổ lưu bút: thêm cạnh cổng
+  ensureTroughs(s);   // máng theo loại (bản cũ) thành máng theo chuồng
   settlePens(s);      // con vật chưa có chuồng (bản cũ): xếp vào chuồng cùng loại
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
@@ -923,7 +938,8 @@ function stepAnimals(s, d) {
     const pigNho = a.type === 'heo' && a.stage === 'nho';   // heo nhỡ ăn khỏe, tăng cân nhanh
     a.hunger = Math.max(0, a.hunger - 100 * d / HUSBANDRY.hungerMs * (pigNho ? AGING.pigHungry : 1));
     // tự ra máng ăn
-    if (a.hunger < HUSBANDRY.autoEatBelow && s.troughs[def.pen] > 0) { s.troughs[def.pen]--; a.hunger = 100; }
+    const tk = troughKey(s, a);
+    if (a.hunger < HUSBANDRY.autoEatBelow && s.troughs[tk] > 0) { s.troughs[tk]--; a.hunger = 100; }
     stepDirt(s, a, d);
     // vui: trôi dần về 50, mùi hôi kéo xuống
     if (a.happy > 50) a.happy = Math.max(50, a.happy - HUSBANDRY.happyDecayPerMin * d / MIN);
@@ -2246,8 +2262,9 @@ function animalActs(s, t) {
 function troughActs(s, t) {
   const item = FEED_OF_PEN[t.pen], n = have(s, item);
   if (!item) return [];
-  const acts = [mk('fill', '🌾', `Đổ cám vào máng (${s.troughs[t.pen]}/${HUSBANDRY.troughMax})`,
-    n <= 0 ? noItem(item) : s.troughs[t.pen] >= HUSBANDRY.troughMax ? 'Máng đầy ắp rồi' : null)];
+  const tid = t.id ?? mapOf(s).pens[t.pen]?.id, lvl = s.troughs[tid] ?? 0;
+  const acts = [mk('fill', '🌾', `Đổ cám vào máng (${lvl}/${HUSBANDRY.troughMax})`,
+    n <= 0 ? noItem(item) : lvl >= HUSBANDRY.troughMax ? 'Máng đầy ắp rồi' : null)];
   const muck = mk('muck', '💩', `Xúc phân chuồng (${Math.floor(s.manure[t.pen] ?? 0)}%)`, (s.manure[t.pen] ?? 0) < MANURE.perScoop ? 'Chuồng còn sạch, chưa cần xúc' : null);
   if (penDirty(s, t.pen)) acts.unshift(muck); else acts.push(muck);
   const penId = t.id ?? mapOf(s).pens[t.pen]?.id;
@@ -2612,7 +2629,8 @@ const DO = {
       return res(true, `Chuồng sạch bong, được ${n} phân chuồng`, [say(at, `+${n} Phân chuồng`), say({ x: at.x, y: at.y - 10 }, '✨ Sạch rồi')], 'dig');
     }
     take(s, FEED_OF_PEN[t.pen]);
-    s.troughs[t.pen] = Math.min(HUSBANDRY.troughMax, s.troughs[t.pen] + HUSBANDRY.unitsPerBag);
+    const tid = t.id ?? mapOf(s).pens[t.pen]?.id;
+    s.troughs[tid] = Math.min(HUSBANDRY.troughMax, (s.troughs[tid] ?? 0) + HUSBANDRY.unitsPerBag);
     return res(true, 'Đã đổ cám vào máng', [say(at, `+${HUSBANDRY.unitsPerBag} phần ăn`)], 'eat');
   },
 
@@ -3738,7 +3756,7 @@ export function placeEntity(s, what, c, r) {
   const e = { id: s.nextId++, kind: what.kind, c, r };
   if (what.kind === 'deco') { take(s, what.item); e.item = what.item; }
   else s.coins -= placeCost(s, what);
-  if (what.kind === 'pen') e.pen = what.pen;
+  if (what.kind === 'pen') { e.pen = what.pen; (s.troughs ??= {})[e.id] = 0; }
   if (what.kind === 'field') {
     e.plots = [];
     for (let i = 0; i < FIELD_SIZE * FIELD_SIZE; i++) { e.plots.push(s.plots.length); s.plots.push(newPlot(s.plots.length, true)); }

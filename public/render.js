@@ -768,7 +768,7 @@ export function render(ctx, f) {
     if (hi && vis(hs.x, hs.y - hi.height / 2, hi.width)) add(hs.y, () => blit(hi, hs.x - hi.width / 2, hs.y - hi.height));
     const hm = farm && isDusk(state) ? penHome(state, p.id) : null, gt = hm?.total ? gateOf(state, p.id) : null;
     if (gt && vis(gt.x, gt.y, 24)) add(gt.y + 3, () => homeSign(gt, hm));   // biển số con đã về trên cửa chuồng
-    const tr = p.trough, n = state.troughs?.[p.type] ?? 0;
+    const tr = p.trough, n = state.troughs?.[p.id] ?? 0;
     if (!tr || !vis(tr.x, tr.y, 20)) continue;
     add(tr.y, () => {
       blit(SPR.trough, tr.x - 13, tr.y - 12);

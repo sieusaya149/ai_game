@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
+import { penIdOf } from './helpers/troughs.mjs';
 import { ANIMALS, TRADE, WEIGHT, pigKgPrice } from '../public/data.js';
 
 const MIN = 60_000;
@@ -41,7 +42,7 @@ test('heo bán theo số ký × giá chợ hôm đó', () => {
 
 test('heo ăn no, ít vận động tăng cân nhanh hơn heo hay vận động', () => {
   const s = newGame(), lazy = put(s, 'heo', 'nho', { weight: 20, hunger: 100 }), busy = put(s, 'heo', 'nho', { weight: 20, hunger: 100 });
-  s.troughs.pig = 20;
+  s.troughs[penIdOf(G, s, 'pig')] = 20;
   for (let i = 0; i < 20; i++) {
     busy.walk = TRADE.walkPx * 1; lazy.walk = 0;   // 1 giây một bước, đi liên tục vs đứng yên
     lazy.hunger = busy.hunger = 100;

@@ -205,7 +205,7 @@ test('server chạy bù 8 giờ (issue 43): có chuột, diều hâu, chồn th�
   assert.deepEqual(f.animals.map(a => a.id).sort(), [...ids].sort(), 'không con nào chết hay bị bắt đi');
   assert.equal(f.animals.filter(a => a.hurt).length, 0, 'không con nào bị cắn');
   assert.equal(f.preds.some(p => p.kind !== 'rat'), false, 'diều hâu, chồn bỏ đi tay không');
-  assert.ok(f.troughs.chicken < 20, 'cám trong máng có hao');
+  assert.ok(Object.values(f.troughs).some(n => n < 20), 'cám trong máng có hao');
   assert.ok(f.preds.filter(p => p.kind === 'rat').length <= PREDATOR.rat.max, 'chuột không sinh quá trần');
 });
 
