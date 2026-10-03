@@ -782,8 +782,12 @@ export function render(ctx, f) {
           }
         }
         if (p.crop.fert) rect(ctx, '#f7d547', px + 1, py + 14, 2, 1);
-        // trái mùa: lớn chậm (issue 54). Chờ art Opus, tạm emoji ốc sên
-        if (p.crop.progress < 1 && !p.crop.dead && !p.crop.rotten && seasonGrowMul(state, p.crop.id) < 1) { ctx.font = '6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🐌', px + 13, py + 6); }
+        // trái mùa: lớn chậm (issue 54): ốc sên bò ở góc dưới-phải ô (nửa thò ra mép, không che cây); thiếu sprite thì emoji
+        if (p.crop.progress < 1 && !p.crop.dead && !p.crop.rotten && seasonGrowMul(state, p.crop.id) < 1) {
+          const sn = SPR2?.slowSnail?.[Math.floor(now / 700 + p.idx) % 2];
+          if (sn) blit(sn, px + 11, py + 9);
+          else { ctx.font = '6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🐌', px + 13, py + 6); }
+        }
       }
       if (p.weeds) blit(SPR.problem.weed, px + 3, py + 9);
       if (p.crop?.bugs) blit(SPR.problem.bug, px + 4 + Math.round(Math.sin(now / 260 + p.idx) * 2), py + 3 + (Math.floor(now / 300 + p.idx) % 2));

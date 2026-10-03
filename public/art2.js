@@ -1317,6 +1317,34 @@ function snowIcon() {
   });
   return outline(c, '#24508a');
 }
+// Nhãn "Đúng mùa" (issue 54): mầm hai lá 10x10
+const SPROUT = [
+  '..........',
+  '......LA..',
+  '.....LLMm.',
+  '.AL..LMm..',
+  '.LMm.Sm...',
+  '..mmSS....',
+  '....S.....',
+  '....S.....',
+  '...sSs....',
+  '..........',
+];
+function seasonTagIcon() {
+  return outline(spr(SPROUT, { A: '#c4ec8a', L: '#8fd65a', M: '#5fb33e', m: '#3d8c2a', S: '#4f9a30', s: '#2f6b1f' }), '#1e3d10');
+}
+// Dấu "lớn chậm" trên ô cây trái mùa (issue 54): ốc sên 10x7 bò sang phải, 2 khung (khung 1 đuôi co, râu ngả)
+const SNAIL = [
+  ['..........', '..yYy.....', '.yYssy....', '.ysYsy.Hh.', '.yssyy.hh.', '.bBBBBBBh.', '..........'],
+  ['..........', '..yYy.....', '.yYssy....', '.ysYsy.Hh.', '.yssyy.hh.', '..bBBBBBh.', '..........'],
+];
+const SNAIL_EYES = [[[8, 1], [9, 0], [7, 1], [7, 0]], [[8, 1], [8, 0], [7, 1], [6, 0]]];
+function slowSnail(f) {
+  const c = outline(spr(SNAIL[f], { Y: '#ffd06a', y: '#e89a3a', s: '#a85a1e', H: '#f0ead0', h: '#c9bf98', B: '#d8d0a8', b: '#b0a47c' }));
+  const x = c.getContext('2d');   // râu mắt: 2 nét tối mọc từ đầu
+  for (const [px, py] of SNAIL_EYES[f]) R(x, OUT, px, py);
+  return c;
+}
 
 function woodIcon() {
   const c = draw(12, 12, x => {
@@ -1776,6 +1804,8 @@ export const SPR2 = {
   staminaTired: boltIcon(true),
   sweat: [sweatFrame(0), sweatFrame(1)],
   season: { xuan: hoaMai(), ha: sunIcon(), thu: mapleIcon(), dong: snowIcon() },
+  seasonTag: seasonTagIcon(),
+  slowSnail: [slowSnail(0), slowSnail(1)],
   wood: woodIcon(),
   stone: stoneIcon(),
   guidebook: guidebookIcon(),
