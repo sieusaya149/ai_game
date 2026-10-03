@@ -5,6 +5,7 @@ import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
+import { WELLS } from './artwell.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -353,7 +354,7 @@ const spr3 = key => String(key).split('.').reduce((o, k) => o?.[k], SPR3);   // 
 const PEN_SHORT = { chicken: 'Gà', pig: 'Heo', pasture: 'Bò cừu', quarantine: 'Cách ly' };
 export function buildingImg(b) {
   if (b.interior) return spr2(b.sprite) ?? spr3(b.sprite) ?? furnFallback(b.sprite);
-  if (b.sprite === 'well') return wellImg();
+  if (b.sprite === 'well') return WELLS[(b.ent?.lv ?? 1) - 1] ?? wellImg();   // giếng 4 cấp (issue 56)
   if (b.sprite === 'board') return boardImg();
   if (b.sprite === 'doghouse' && SPR3?.doghouse) return SPR3.doghouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.doghouse[0];   // chuồng chó 3 cấp
   if (b.sprite === 'cathouse' && SPR3?.cathouse) return SPR3.cathouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.cathouse[0];   // nhà mèo 3 cấp

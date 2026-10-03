@@ -7,6 +7,7 @@ import {
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
   TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON, MASTERY, masteryLevel,
 } from './data.js';
+import { WELL } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
@@ -207,8 +208,8 @@ export function pedigree(s, id) {
   return { id, name: a.name, sex: a.sex, mom: a.mom, dad: a.dad, kids: s.animals.filter(o => o.mom?.id === id || o.dad?.id === id).map(o => ({ id: o.id, name: o.name, sex: o.sex })) };
 }
 const newPlot = (idx, unlocked) => ({ idx, unlocked, soil: 'untilled', water: 0, weeds: false, crop: null, mulch: false });
-// Giếng có cấp (Phase 3, issue 56): cấp của giếng đầu tiên trong vườn, vườn cũ là cấp 1
-export const wellLv = s => s.farm?.ents.find(e => e.kind === 'well')?.lv ?? 1;
+// Giếng có cấp (Phase 3, issue 56): cấp của giếng đầu tiên trong vườn, vườn cũ là cấp 1 (bản lưu sửa tay thì kẹp về 1..4)
+export const wellLv = s => clamp(Math.floor(s.farm?.ents.find(e => e.kind === 'well')?.lv) || 1, 1, WELL.length);
 
 // ---------- Tạo / lưu / tải ----------
 export function createGame({ name = 'Nông dân', look = {} } = {}) {
@@ -2045,7 +2046,9 @@ export const stageOf = c => CROP_STAGES.reduce((st, th, i) => (c.progress >= th 
 
 // ---------- Công cụ & tiệm rèn Ông Sáu ----------
 export const toolLv = (s, k) => s.tools?.[k]?.lv ?? 1;
-export const canMax = s => TOOLS.can.canMax[toolLv(s, 'can') - 1];
+// Sức chứa bình tưới: bình cấp tool chứa TOOLS.can.canMax, giếng cấp wl cộng thêm phần hơn giếng đất (10/15/25/40 với bình sắt)
+export const canCap = (tool, wl) => TOOLS.can.canMax[tool - 1] + WELL[wl - 1].can - WELL[0].can;
+export const canMax = s => canCap(toolLv(s, 'can'), wellLv(s));
 export const toolName = (s, k) => `${TOOLS[k].name} ${TOOL_LEVEL[toolLv(s, k) - 1]}`;
 export const toolAway = (s, k) => s.smith?.tool === k;   // đang nằm lò rèn: chưa dùng được
 const awayMsg = k => `${TOOLS[k].name} đang nằm lò rèn của Ông Sáu, chờ rèn xong nhé`;
@@ -2111,6 +2114,28 @@ export function startUpgrade(s, k) {
   s.smith = { tool: k, doneAt: s.time + DAY_MS };
   log(s, `Gửi ${d.name.toLowerCase()} cho Ông Sáu rèn lên cấp ${lv + 1} (${cost} xu)`);
   return R(true, `Ông Sáu nhận rèn ${d.name.toLowerCase()} lên cấp ${lv + 1}, một ngày nữa xong nhé`);
+}
+// ---------- Giếng 4 cấp (issue 56) ----------
+// Một lần múc nước mất bấy nhiêu ms (main.js giữ người chơi đứng múc chừng đó); giếng xây trở lên múc nhanh hơn
+export const refillMs = s => WELL[wellLv(s) - 1].refillMs;
+// → { lv, name, can (bình chứa được ở cấp này), next: { lv, name, can, price, error? } | null (đã cấp 4) }
+export function wellInfo(s) {
+  const lv = wellLv(s), tl = toolLv(s, 'can'), d = WELL[lv - 1], n = WELL[lv];
+  const next = n ? { lv: lv + 1, name: n.name, can: canCap(tl, lv + 1), price: n.price, ...(s.coins < n.price ? { error: 'Chưa đủ xu, cố lên nhé' } : {}) } : null;
+  return { lv, name: d.name, can: canCap(tl, lv), next };
+}
+// Nâng giếng lên cấp kế ngay tại chỗ (giữ chỗ và hướng), trừ xu. Nước đang có trong bình giữ nguyên.
+export function upgradeWell(s) {
+  if (s.scene && s.scene !== 'farm') return R(false, 'Ra vườn rồi hãy nâng giếng nhé', { reason: 'scene' });
+  const e = s.farm?.ents.find(x => x.kind === 'well');
+  if (!e) return R(false, 'Vườn chưa có giếng', { reason: 'missing' });
+  const { next } = wellInfo(s);
+  if (!next) return R(false, `${WELL[WELL.length - 1].name} đã là cấp cao nhất rồi`, { reason: 'max' });
+  if (next.error) return R(false, next.error, { reason: 'coins' });
+  s.coins -= next.price; e.lv = next.lv;
+  bumpLayout(s);
+  log(s, `Nâng giếng lên ${next.name.toLowerCase()} (${fmtXu(next.price)} xu)`);
+  return R(true, `Đã nâng giếng lên ${next.name.toLowerCase()}, bình chứa ${next.can} lần nước`, { lv: next.lv, sound: 'coin' });
 }
 function finishUpgrade(s) {
   const k = s.smith.tool;
@@ -2333,7 +2358,11 @@ function buildingActs(s, t) {
   if (b.id === 'guestbook') return [mk('open', '📖', s.visit ? 'Ký sổ lưu bút' : 'Đọc sổ lưu bút')];
   if (b.id === 'bed') return [mk('sleep', '🛏️', 'Ngủ', canSleep(s) ? null : SLEEP_EARLY)];
   if (b.id.startsWith('bench')) return benchActs(s);
-  if (b.id === 'well') return [mk('refill', '🪣', `Múc nước (bình ${s.can}/${canMax(s)})`, toolAway(s, 'can') ? awayMsg('can') : s.can >= canMax(s) ? 'Bình đầy rồi' : null)];
+  if (b.id === 'well') {   // múc nước luôn là hành động chính; chưa cấp 4 thì thêm nút nâng giếng có giá (issue 56)
+    const w = wellInfo(s), A = [mk('refill', '🪣', `Múc nước (bình ${s.can}/${canMax(s)})`, toolAway(s, 'can') ? awayMsg('can') : s.can >= canMax(s) ? 'Bình đầy rồi' : null)];
+    if (w.next) A.push(mk('upgradeWell', '⬆️', `Nâng lên ${w.next.name}: bình ${w.next.can} lần (${fmtXu(w.next.price)} xu)`, w.next.error));
+    return A;
+  }
   return [];
 }
 
@@ -2634,6 +2663,10 @@ const DO = {
 
   building(s, t, id, at) {
     if (id === 'refill') { s.can = canMax(s); return res(true, 'Đã múc đầy bình', [say(at, 'Đầy bình! 💧', '#7ad7ff')], 'water'); }
+    if (id === 'upgradeWell') {
+      const r = upgradeWell(s);
+      return res(r.ok, r.msg, r.ok ? [say(at, `${WELL[r.lv - 1].name}! ⬆️`)] : [], r.ok ? 'coin' : 'error');
+    }
     if (id === 'enter') return res(true, '', [], 'click', { go: BUILDING_DEFS[t.id].door.to });
     if (id === 'talk') return res(true, TALK[t.id].msg, [], 'click');
     if (id === 'sit') return sitDown(s, at);

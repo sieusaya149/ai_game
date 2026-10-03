@@ -24,10 +24,10 @@ Giếng thành thực thể có cấp, nâng dần để bình tưới chứa nh
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): bình tưới chứa đúng 10 / 15 / 25 / 40 lần theo cấp giếng; nâng cấp trừ đúng xu, không đủ xu thì bị từ chối; không nâng quá cấp 4.
-- [ ] Unit test: múc nước ở giếng xây nhanh hơn giếng đất; nâng cấp không làm mất nước trong bình.
-- [ ] Unit test: giếng giữ nguyên cấp qua lưu và nạp.
-- [ ] E2E (desktop + 360px): dựng bản lưu đủ xu → nâng giếng từ cấp 1 lên 4, mỗi cấp hình đổi và bình tưới múc được đúng số lần.
+- [x] Unit test (seam 1): bình tưới chứa đúng 10 / 15 / 25 / 40 lần theo cấp giếng; nâng cấp trừ đúng xu, không đủ xu thì bị từ chối; không nâng quá cấp 4.
+- [x] Unit test: múc nước ở giếng xây nhanh hơn giếng đất; nâng cấp không làm mất nước trong bình.
+- [x] Unit test: giếng giữ nguyên cấp qua lưu và nạp.
+- [x] E2E (desktop + 360px): dựng bản lưu đủ xu → nâng giếng từ cấp 1 lên 4, mỗi cấp hình đổi và bình tưới múc được đúng số lần.
 
 ## Blocked by
 

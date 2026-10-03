@@ -48,6 +48,10 @@ for (const [i, m] of mods) {
   }
 }
 
+// Giếng 4 cấp (issue 56): bộ thường WELLS và bộ 2x WELLS_HD cùng nằm trong artwell.js
+const wellArt = await import('./artwell.js').catch(() => null);
+if (wellArt) { stats.files.push('artwell.js'); wellArt.WELLS.forEach((o, i) => link(o, wellArt.WELLS_HD[i], `WELLS.${i}`)); }
+
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);
 // Ghi cặp ảnh dẫn xuất (lật, tô màu...) làm từ ảnh cũ và ảnh 2x bằng cùng một phép
