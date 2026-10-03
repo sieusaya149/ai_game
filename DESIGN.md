@@ -77,7 +77,7 @@ Những gì đã có sẵn trong game được mô tả ở `SPEC.md`. File này
 | Thú cưng | Sống ở | Vai trò |
 |---|---|---|
 | 🐕 Chó Mực | Chuồng chó ngoài sân | Canh trộm, lùa gà vịt |
-| 🐈 Mèo | Ra vào tự do qua cửa mèo, tối ngủ trong nhà | Bắt chuột, đuổi sóc |
+| 🐈 Mèo | Ra vào tự do qua cửa mèo, tối ngủ trong nhà | Bắt chuột (rình rồi vồ, có hoạt cảnh và thông báo), đuổi sóc ở cây ăn trái, canh kho (kho có mèo thì chuột không ăn đồ), thỉnh thoảng tha "quà" về cửa (lông chim, hạt giống lạ). Khung thông tin hiện số chuột đã bắt |
 | 🐶🐰 Thú cưng cảnh: chó Phốc, thỏ, sau này có vẹt | Chỉ ở trong nhà | Tăng điểm Nhà đẹp, thêm thể lực khi ngủ dậy, đi dạo với bạn bè |
 
 **Thú cưng cảnh:**
@@ -234,13 +234,13 @@ Mỗi giai đoạn có sprite và hành vi riêng.
 | 🐇 Thỏ angora | Chuồng thỏ | 3 | Lông thỏ | Đẻ 2–4 con một lứa. Dễ bị chuột và chồn bắt. |
 | 🪿 Ngỗng | Thả rông | 6 | Trứng ngỗng | **Canh nhà:** thấy người lạ thì kêu inh ỏi và đuổi mổ. |
 | 🐐 Dê | Đồng cỏ | 6 | Sữa dê → phô mai dê | Hay nhảy rào trốn đi gặm rau ngoài ruộng. Cần rào cao. |
-| 🐃 Trâu | Đồng cỏ | 9 | Kéo cày khối 3×3, kéo xe chở hàng ra chợ | Thích đầm bùn. |
+| 🐃 Trâu | Đồng cỏ | 9 | Kéo cày khối 3×3, kéo xe: có trâu trưởng thành khỏe thì thùng giao hàng trả 85% (thay vì 80%) và chứa gấp đôi | Thích đầm bùn. Bò kéo cày thì xới cả hàng. |
 | 🐸 Ếch | Hồ | 8 | Ăn sâu ở ruộng gần hồ, bán được | Kêu ban đêm. Bắt bằng vợt. |
 | 🐟 Cá | Hồ | 8+ | Rô, trê, chép, tôm càng, lươn, Koi (cảnh) | Mỗi loài thích một tầng nước, nhiều loài chung một hồ. |
 | 🐝 Ong | Thùng ong cạnh vườn trái | 10 | Mật ong, sáp ong | Thụ phấn. Không có đồ bảo hộ thì bị đốt, mất thể lực. |
 | 🐛 Tằm | Nhà tằm, ăn lá dâu tằm | 12 | Kén → tơ lụa | Phải trồng cây dâu tằm. |
 | 🕊️ Bồ câu | Chuồng chim trên mái | 7 | Đưa thư và quà cho bạn bè online | Cho ăn đầy đủ thì thư tới nhanh hơn. |
-| 🦚 Công | Thả rông | 18 | Tăng điểm đẹp của vườn | Để khoe, rất đắt. |
+| 🦚 Công | Thả rông | 18 | Mỗi sáng xòe đuôi, cả trại vui hơn (như Koi); khách thăm vườn thấy công xòe. Điểm đẹp của vườn ở Phase 5 | Để khoe, rất đắt. |
 | 🐎 Ngựa | Chuồng ngựa | 15 | Cưỡi để đi nhanh ×2 | Phải chải lông, cho ăn cà rốt. |
 
 ### 2.1b Đực/cái và sinh sản (đã chốt)
@@ -405,8 +405,8 @@ Mỗi giai đoạn có sprite và hành vi riêng.
 - **Phí vận hành:** máy bơm và máy phun tốn tiền điện mỗi ngày, trừ lúc 6h sáng.
 
 ### 3.3b Kho và đồ hư (đã chốt)
-- **Kho có 3 cấp:** chứa 100 → 250 → 600 món. Kho đầy thì đồ thu hoạch chỉ để trong giỏ.
-- **Đồ tươi hư dần** (tính bằng giờ vườn chạy):
+- **Kho có 3 cấp:** chứa 100 → 250 → 600 món, **chỉ tính hàng bán được** (hạt, vật tư, cám, gỗ, đá, đồ trang trí không chiếm chỗ). Kho đầy thì đồ thu hoạch chỉ để trong giỏ. Ai đang vượt sức chứa khi chuyển bản lưu thì giữ nguyên. Hàng giao online, quà và hàng sạp trả về **luôn vào kho** dù đầy.
+- **Đồ tươi hư dần** (tính bằng giờ vườn chạy, **chỉ lúc chủ vườn đang chơi; chạy bù offline không hư**, ADR 0018):
 
 | Loại | Kho thường | Kho lạnh |
 |---|---|---|
@@ -436,8 +436,12 @@ Mỗi giai đoạn có sprite và hành vi riêng.
 | 🥜 Máy ép dầu | 9 | Đậu phộng → Dầu phộng | 20 phút |
 | 🧼 Nồi nấu xà phòng | 6 | Dầu phộng + Sáp ong → Xà phòng | 15 phút |
 | 🧥 Máy may | 11 | Vải → Áo len, quần áo · Lụa → Áo dài | 40 phút |
+| 🌽 Máy trộn cám | 6 | Lúa/bắp → cám gà vịt · bắp + khoai lang → cám heo · rơm + bắp → cỏ khô bò cừu · bắp + trứng → thức ăn chó mèo | 10–15 phút |
 | 🍳 Bếp (trong nhà) | Có sẵn | Công thức nấu ăn: hồi thể lực, giao đơn đặc biệt | 2–10 phút |
 
+- **Máy trộn cám** rẻ hơn mua ở Bà Tư khoảng 30–50% (tính theo giá bán của nông sản đầu vào), đổi lại tốn thời gian. Bà Tư vẫn bán như cũ.
+- **Máy ấp 3 cấp:** ổ ấp đứng riêng thành "Máy ấp", nâng ở tiệm rèn. Cấp 1: 1 trứng, thời gian như cũ. Cấp 2: 3 trứng, ×0,75 thời gian, tốn điện. Cấp 3: 6 trứng, ×0,5 thời gian, tốn điện, nhận cả trứng ngỗng. Ổ ấp tự động ở chuồng gia cầm cấp 3 giữ nguyên.
+- **Máy gắn cố định** (không thay thợ, gắn như tưới nhỏ giọt): **máng trứng lăn** gắn vào chuồng gia cầm, trứng đẻ trong chuồng tự vào kho (trứng đẻ ngoài vườn khi thả rông vẫn phải nhặt tay); **máy gặt** gắn vào khối ruộng 3×3, tự hái khi chín và cất vào kho, không gieo lại, tối đa ★2. Cả hai tốn điện và có hao mòn.
 - **Công thức bếp** mở dần qua sổ công thức: hàng xóm cho, đơn hàng thưởng, mua ở chợ. Ví dụ: Trứng chiên, Canh rau muống, Cơm gà, Bánh bí ngô, Chè đậu, Sinh tố dâu.
 
 ### 3.3d Hao mòn & sửa chữa (đã chốt)
@@ -632,6 +636,7 @@ Cây lâu năm, trồng một lần, thu hoạch nhiều lần.
   - Thưởng: giảm giá ở cửa hàng của người đó, công thức mới, đơn hàng giá cao, sự kiện riêng.
 - **Cư dân đứng ở chỗ cố định**, chỉ đi loanh quanh gần đó, không có lịch sinh hoạt.
 - **Đơn hàng:** tối đa 3 đơn trên bảng, người đặt là cư dân thật. Giao đơn thì tăng độ thân.
+- **Đơn việc** (nằm chung bảng, không xin sản phẩm): Chú Ba cần 1 heo ≥ 90 kg (giao con vật, giá cao hơn bán thường); Cô Út nhờ chó biết lệnh "Bắt tay" ra biểu diễn; nhà Bà Tư có chuột nên mượn mèo một buổi (mèo đi vắng, về mang theo quà). Thưởng xu và EXP, ❤️ nối ở đợt 4C.
 
 ## 7. Chơi online
 
@@ -767,16 +772,17 @@ Mọi mốc giờ trong mục này tính theo **giờ ngoài đời (giờ Việ
 **Giá bán giữa người chơi** (chợ phiên, livestream): người bán tự đặt trong khoảng **50%–200% giá gốc**; hàng không có ở chợ thì game tự tính giá gốc. Giới hạn này để không chuyển xu cho nhau qua giá ảo (giữ luật chống gian lận).
 
 #### Chợ online
-- App **"Chợ Làng Online"** (nút 📱 trên thanh dưới), mở từ **cấp 3** (tin nhắn "Bà Tư mở bán online rồi nè 📱"). Chơi đơn và online đều dùng được.
-- Bán gần hết hàng Bà Tư **cùng giá + phí giao**. Chỉ có ở chợ: hàng giảm giá hôm nay, hạt theo mùa vừa về, con vật.
-- **Hai gói giao:**
+- App **"Chợ Làng Online"**, hiện chạy dưới tên **Đặt hàng online** (nút 🛒 "Mua hàng" trên thanh dưới và trong điện thoại), mở từ **cấp 3**. Chơi đơn và online đều dùng được.
+- Bán hạt giống, vật tư, thức ăn, trang trí của **Bà Tư** và đồ thú y của **Cô Út** (cùng giá + phí giao). Chỉ có ở chợ: hàng giảm giá hôm nay, hạt theo mùa vừa về, con vật.
+- **Ba kiểu giao** (người chơi chọn trên phiếu, mặc định 2 phút), phí tính theo tiền hàng:
 
-| Gói | Tới đâu | Khi nào | Phí |
-|---|---|---|---|
-| Giao thường | Hộp quà ở cổng vườn | 6h sáng hôm sau (giờ game, tối đa ~20 phút ngoài đời) | ~10% giá đơn, tối thiểu 5 xu; đơn trên 500 xu miễn phí |
-| Giao tận kho | Thẳng vào kho | ~1 giờ game | ~25% giá đơn, tối thiểu 15 xu |
+| Kiểu | Hàng tới kho sau | Phí |
+|---|---|---|
+| Giao ngay | tức thì | 30% |
+| Sau 1 phút | 1 phút | 20% |
+| Sau 2 phút | 2 phút | 10% |
 
-- Phí không đổi theo giờ (ban đêm không phụ phí). Mưa bão (Phase 3) chỉ làm hàng tới trễ, có thông báo "Shipper kẹt mưa 🌧️".
+- **Người giao hàng đi bộ thật** từ cổng tới kho (giờ chợ 6h–18h), hàng vào kho (luôn vào dù kho đầy, ADR 0018). Phí không đổi theo giờ. Mưa bão (Phase 3) chỉ làm hàng tới trễ, có thông báo "Shipper kẹt mưa 🌧️". Mã giảm giá (đợt 4C) áp vào đúng chỗ này.
 
 #### Chợ phiên
 - **Có giờ hẹn:** mỗi ngày hai phiên **12h–13h** và **20h–21h**, ở quảng trường làng.
@@ -804,7 +810,7 @@ Mọi mốc giờ trong mục này tính theo **giờ ngoài đời (giờ Việ
 - Chỉ tiêu tính theo **số người chơi tuần trước** (có mức tối thiểu), NPC góp thêm ~20%. Chơi đơn có chỉ tiêu nhỏ riêng.
 
 #### Mã giảm giá
-- 3 loại: **giảm 10%**, **giảm 20%**, **miễn phí giao** (cả giao tận kho). Chỉ dùng cho **chợ online**, 1 mã mỗi đơn, hết hạn sau **3 ngày ngoài đời**, tặng bạn được qua hộp quà.
+- 3 loại: **giảm 10%**, **giảm 20%**, **miễn phí giao** (cả giao tận kho). Chỉ dùng cho **Đặt hàng online** (giảm trên tiền hàng, miễn phí giao thì bỏ phí của kiểu giao đã chọn), 1 mã mỗi đơn, hết hạn sau **3 ngày ngoài đời**, tặng bạn được qua hộp quà.
 - Nguồn: xem live đủ 3 phút · thưởng hợp tác xã · một số thành tựu · đăng nhập 7 ngày liền · sự kiện làng.
 
 #### Xe bán hàng rong
@@ -920,9 +926,9 @@ Làm **nền móng trước, online sau**. Đặt công trình tự do và nhi�
 | 1. Online | Server Node + `ws` + SQLite trong Docker · tài khoản, 1 thiết bị · đồng bộ + server chạy bù · làng (chợ, thấy nhau, chat) · thăm vườn, giúp, trộm + giới hạn · chó phát hiện người chơi |
 | 2. Vật nuôi | Vòng đời, đực/cái, dơ/tắm, bệnh/chết, độ thân, bán theo cân · chuồng 3 cấp + cách ly · thả rông, về chuồng, lùa · kẻ săn mồi, mèo · dạy lệnh |
 | 3. Cây & nước | 16 loại cây với hình riêng · thành thạo, trái khổng lồ, ★ · mùa, thời tiết xấu · nhà kính · giếng, bồn, ống nước, tự động hóa |
-| 4. Kinh tế & làng | Sức mua, sự kiện giá · hóa đơn, hao mòn · kho, đồ hư, kho lạnh · máy chế biến, bếp · cư dân ❤️ · nhân công · hội chợ + loto + thi nông sản · Tiếng tăm ⭐ · chợ online + giao hàng · chợ phiên · mùa dịch + livestream bán hàng · hợp tác xã · mã giảm giá · xe hàng rong · sự kiện diệt chuột/rắn/sâu (mục 8.6) |
+| 4. Kinh tế, làng & loài mới (gộp Phase 6 cũ, 3 đợt 4A/4B/4C, ADR 0017) | **4A:** bản lưu v5 · kho 3 cấp, đồ hư, kho lạnh · sức mua, được mùa/mất mùa · hộp thư, hóa đơn tháng · máy chế biến (gồm máy trộn cám) · hao mòn, sửa chữa · bếp. **4B:** hồ cá, câu cá, ếch · cây ăn trái, dâu tằm · mèo có tác dụng · ong, tằm · 7 loài mới, kéo cày, xe trâu · máy ấp 3 cấp, máng trứng lăn, máy gặt · đơn việc. **4C:** cư dân ❤️ · Tiếng tăm ⭐ · nhân công · hội chợ + loto + thi nông sản · chợ phiên + uy tín shop · livestream · mùa dịch · hợp tác xã · mã giảm giá · xe hàng rong · sự kiện diệt chuột/rắn/sâu (mục 8.6) |
 | 5. Nhà | Nội thất, đặt đồ, Nhà đẹp · thú cưng cảnh · quần áo có tác dụng |
-| 6. Loài & khu mới | Hồ cá, cây ăn trái, ong, tằm · thỏ, ngỗng, dê, trâu, ếch, bồ câu, công, ngựa |
+| 6. Loài & khu mới | Gộp vào Phase 4 (đợt 4B) |
 | 7. Mục tiêu dài hạn | Nhiệm vụ hằng ngày · lễ hội · sổ sưu tầm · ~60 thành tựu · nhiệm vụ làm quen |
 
 ### Quy trình mỗi phase (đã chốt)
@@ -972,6 +978,7 @@ Làm **nền móng trước, online sau**. Đặt công trình tự do và nhi�
 | N | Tiến trình & mục tiêu | Đường cong cấp ✅ · mở khóa ✅ · nhiệm vụ ✅ · thành tựu ✅ · lễ hội ✅ · sổ sưu tầm ✅ | ✅ |
 | O | UI/UX & hiệu năng | Thông báo 3 mức ✅ · bảng Việc cần làm ✅ · bản đồ nhỏ ✅ · hiệu năng ✅ · hướng dẫn người mới ✅ | ✅ |
 | Q | Chợ & sự kiện làng (mục 8.6) | Bán gì cho nhau ✅ · chợ online + 2 gói giao ✅ · chợ phiên (giờ, giá, sạp, NPC, chơi đơn) ✅ · mùa dịch ✅ · livestream (lúc nào, độ hot, giỏ live, người xem, giới hạn) ✅ · uy tín shop 🏪 ✅ · 🏪 tách riêng Tiếng tăm ⭐, 🏪 cao thưởng ⭐ ✅ · hợp tác xã ✅ · mã giảm giá ✅ · xe hàng rong ✅ · thi nông sản ✅ · sự kiện diệt chuột/rắn/sâu ✅ | ✅ |
+| R | Phase 4 gộp | gộp 4+6 ✅ · 3 đợt ✅ · v5 một lần ✅ · đồ hư khi online ✅ · bảng số duyệt trước ✅ · máy vs thợ ✅ · máy ấp ✅ · máy trộn cám ✅ · đơn việc ✅ · mèo ✅ · công ✅ · kéo cày ✅ · kho ✅ · chợ online ✅ · art ✅ · online ADR 0019/0020 ✅ | ✅ |
 | P | Kỹ thuật & triển khai | Thứ tự phase ✅ · quy trình mỗi phase ✅ · chia agent/file + model ✅ · chuyển save cũ ✅ (mục 7) · test local + live từ máy local ✅ | ✅ |
 
 ## 10. Câu hỏi còn mở

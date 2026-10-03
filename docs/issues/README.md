@@ -102,3 +102,79 @@ Nguồn: [PRD 0004](../prd/0004-phase-3-cay-va-nuoc.md).
 | 63 | [Phát hành Phase 3](63-phat-hanh-phase-3.md) | 50–62 | ⬜ |
 
 **Làm song song được:** sau 50 thì 51, 52, 54, 56; sau 57 thì 58, 59.
+
+## Phase 4A, kinh tế và sản xuất
+
+Nguồn: [PRD 0005](../prd/0005-phase-4-kinh-te-lang-loai-moi.md), [ADR 0017](../adr/0017-phase-4-gop-chia-ba-dot.md) (Phase 4 gộp Phase 6 cũ, chia ba đợt, mỗi đợt tự phát hành). Bảng số liệu (64) chủ game duyệt trước khi chép số vào code.
+
+| # | Issue | Bị chặn bởi | Trạng thái |
+|---|---|---|---|
+| 64 | [Bảng số liệu đợt 4A (chủ game duyệt)](64-bang-so-lieu-dot-4a.md) | 63 | ⬜ |
+| 65 | [Bản lưu v5, kho theo lô và đồ hư](65-ban-luu-v5-kho-theo-lo.md) | 64 | ⬜ |
+| 66 | [Kho 3 cấp và kho lạnh](66-kho-3-cap-va-kho-lanh.md) | 65 | ⬜ |
+| 67 | [Sức mua của chợ](67-suc-mua-cua-cho.md) | 65 | ⬜ |
+| 68 | [Lịch sự kiện làng và được mùa/mất mùa](68-lich-su-kien-lang-duoc-mua-mat-mua.md) | 67 | ⬜ |
+| 69 | [Hộp thư và hóa đơn tháng](69-hop-thu-va-hoa-don-thang.md) | 65 | ⬜ |
+| 70 | [Khung máy chế biến: cối xay và hũ muối dưa](70-khung-may-che-bien-coi-xay-hu-muoi-dua.md) | 65, 69 | ⬜ |
+| 71 | [Máy phô mai, khung dệt, máy ép dầu, nồi xà phòng, máy may](71-may-pho-mai-khung-det-may-ep-dau-noi-xa-phong-may-may.md) | 70 | ⬜ |
+| 72 | [Máy trộn cám](72-may-tron-cam.md) | 70 | ⬜ |
+| 73 | [Hao mòn và sửa chữa](73-hao-mon-va-sua-chua.md) | 70 | ⬜ |
+| 74 | [Bếp và sổ công thức](74-bep-va-so-cong-thuc.md) | 65 | ⬜ |
+| 75 | [ART đợt 4A](75-art-dot-4a.md) | 64 | ⬜ |
+| 76 | [Thông báo, việc cần làm và sổ tay đợt 4A](76-thong-bao-viec-can-lam-so-tay-dot-4a.md) | 66–74 | ⬜ |
+| 77 | [Rà 360px, cập nhật SPEC.md và phát hành đợt 4A](77-phat-hanh-dot-4a.md) | 64–76 | ⬜ |
+
+**Làm song song được:** 64 và 75 (ART) chạy đầu tiên; sau 65 thì 66, 67, 69, 74; sau 70 thì 71, 72, 73.
+
+## Phase 4B, loài và khu mới
+
+Nguồn: [PRD 0005](../prd/0005-phase-4-kinh-te-lang-loai-moi.md), [ADR 0017](../adr/0017-phase-4-gop-chia-ba-dot.md).
+
+| # | Issue | Bị chặn bởi | Trạng thái |
+|---|---|---|---|
+| 78 | [Bảng số liệu đợt 4B (chủ game duyệt)](78-bang-so-lieu-dot-4b.md) | 77 | ⬜ |
+| 79 | [Hồ cá](79-ho-ca.md) | 78 | ⬜ |
+| 80 | [Câu cá, sông làng và ếch](80-cau-ca-song-lang-va-ech.md) | 79 | ⬜ |
+| 81 | [Cây ăn trái và dâu tằm](81-cay-an-trai-va-dau-tam.md) | 78 | ⬜ |
+| 82 | [Sóc và mèo có tác dụng rõ](82-soc-va-meo-co-tac-dung-ro.md) | 81 | ⬜ |
+| 83 | [Ong, thùng ong và máy quay mật](83-ong-thung-ong-may-quay-mat.md) | 81 | ⬜ |
+| 84 | [Tằm và nhà tằm](84-tam-va-nha-tam.md) | 81 | ⬜ |
+| 85 | [Thỏ angora và ngỗng](85-tho-angora-va-ngong.md) | 78 | ⬜ |
+| 86 | [Dê, trâu, kéo cày và xe trâu](86-de-trau-keo-cay-va-xe-trau.md) | 78 | ⬜ |
+| 87 | [Bồ câu, công và ngựa](87-bo-cau-cong-va-ngua.md) | 78 | ⬜ |
+| 88 | [Máy ấp 3 cấp](88-may-ap-3-cap.md) | 78 | ⬜ |
+| 89 | [Máng trứng lăn và máy gặt](89-mang-trung-lan-va-may-gat.md) | 78 | ⬜ |
+| 90 | [Đơn việc cho heo, chó, mèo](90-don-viec-cho-heo-cho-meo.md) | 78 | ⬜ |
+| 91 | [ART đợt 4B: hồ, cá, ếch, cây trái, sóc, ong, tằm](91-art-dot-4b-ho-ca-ech-cay-trai-soc-ong-tam.md) | 78 | ⬜ |
+| 92 | [ART đợt 4B: 7 loài mới, chuồng mới, máy ấp, máy gắn cố định](92-art-dot-4b-7-loai-moi-chuong-may-ap-may-gan.md) | 78 | ⬜ |
+| 93 | [Thông báo, việc cần làm và sổ tay đợt 4B](93-thong-bao-viec-can-lam-so-tay-dot-4b.md) | 79–90 | ⬜ |
+| 94 | [Rà 360px, cập nhật SPEC.md và phát hành đợt 4B](94-phat-hanh-dot-4b.md) | 78–93 | ⬜ |
+
+**Làm song song được:** 78, 91 và 92 (ART) chạy đầu tiên; sau 78 thì 79, 81, 85, 86, 87, 88, 89, 90; sau 81 thì 82, 83, 84.
+
+## Phase 4C, làng
+
+Nguồn: [PRD 0005](../prd/0005-phase-4-kinh-te-lang-loai-moi.md), [ADR 0019](../adr/0019-su-kien-lang-ham-thuan-cong-don-tren-server.md), [ADR 0020](../adr/0020-mua-ban-giua-nguoi-choi-la-thao-tac-khach.md). Đợt nặng online nhất: issue 99 giao agent Opus.
+
+| # | Issue | Bị chặn bởi | Trạng thái |
+|---|---|---|---|
+| 95 | [Bảng số liệu đợt 4C (chủ game duyệt)](95-bang-so-lieu-dot-4c.md) | 94 | ⬜ |
+| 96 | [Độ thân với cư dân](96-do-than-voi-cu-dan.md) | 95 | ⬜ |
+| 97 | [Tiếng tăm ⭐ và Tiệm Danh Giá](97-tieng-tam-va-tiem-danh-gia.md) | 96 | ⬜ |
+| 98 | [Nhân công](98-nhan-cong.md) | 95 | ⬜ |
+| 99 | [Trạng thái chung của làng trên server](99-trang-thai-chung-cua-lang-tren-server.md) | 95 | ⬜ |
+| 100 | [Hội chợ: loto và trò chơi](100-hoi-cho-loto-va-tro-choi.md) | 99 | ⬜ |
+| 101 | [Thi nông sản](101-thi-nong-san.md) | 99 | ⬜ |
+| 102 | [Chợ phiên và uy tín shop](102-cho-phien-va-uy-tin-shop.md) | 99 | ⬜ |
+| 103 | [Livestream bán hàng](103-livestream-ban-hang.md) | 102 | ⬜ |
+| 104 | [Mùa dịch và tiêm phòng](104-mua-dich-va-tiem-phong.md) | 95 | ⬜ |
+| 105 | [Hợp tác xã](105-hop-tac-xa.md) | 99 | ⬜ |
+| 106 | [Mã giảm giá](106-ma-giam-gia.md) | 95 | ⬜ |
+| 107 | [Xe bán hàng rong](107-xe-ban-hang-rong.md) | 102 | ⬜ |
+| 108 | [Sự kiện diệt chuột, bắt rắn, phun sâu](108-su-kien-diet-chuot-bat-ran-phun-sau.md) | 99 | ⬜ |
+| 109 | [ART đợt 4C: cư dân và thợ](109-art-dot-4c-cu-dan-va-tho.md) | 95 | ⬜ |
+| 110 | [ART đợt 4C: sạp, xe hàng rong, hội chợ, hợp tác xã, cúp, livestream, rắn](110-art-dot-4c-sap-xe-hoi-cho-hop-tac-xa-cup-livestream-ran.md) | 95 | ⬜ |
+| 111 | [Thông báo, việc cần làm và sổ tay đợt 4C](111-thong-bao-viec-can-lam-so-tay-dot-4c.md) | 96–108 | ⬜ |
+| 112 | [Rà 360px, cập nhật SPEC.md và phát hành Phase 4](112-phat-hanh-phase-4.md) | 95–111 | ⬜ |
+
+**Làm song song được:** 95, 109 và 110 (ART) chạy đầu tiên; sau 95 thì 96, 98, 99, 104, 106; sau 99 thì 100, 101, 102, 105, 108; sau 102 thì 103, 107.
