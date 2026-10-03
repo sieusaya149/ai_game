@@ -174,7 +174,9 @@ Trồng và thu hoạch một loại cây đủ số lần thì loại cây đó
 - **Mùa chỉ làm chậm, không cấm trồng:**
   - Trái mùa: lớn chậm ×0.6, không ra được ★3.
   - Đúng mùa: 10% được thêm sản lượng.
-- **Đổi mùa giữa vụ:** cây không chết, chỉ lớn chậm lại.
+- **Đổi mùa giữa vụ:** cây không chết. Mùa **chốt lúc gieo**: gieo đúng mùa thì lớn đủ tốc độ cả vụ, gieo trái mùa thì chậm cả vụ.
+
+**Cân bằng thời gian và kinh tế (chốt 03/10).** Thời gian lớn thật: rau muống 2 phút, cải 3, hành lá 5, dưa leo 10, su hào 15, cà rốt 20, bắp 30, cà chua 45, dưa hấu 60, ớt 1,5 giờ, đậu phộng 2, khoai lang 3, bắp cải 4, bí ngô 5, dâu 6, lúa 8. Xu/giờ/ô khoảng 36–60 tăng nhẹ theo cấp, EXP ~15% lãi. Lúa mở ở cấp 8. Gà đẻ mỗi 10 phút, vịt 15, bò sữa mỗi giờ, cừu len mỗi 3 giờ, heo mang thai 2 giờ. Đói không bệnh ngay (an toàn ~90 phút, rồi nguy cơ tăng dần). Giá nâng cấp ×2,5–4, thưởng đơn hàng ×1,25, đơn mới mỗi 15 phút. Bảng đầy đủ: `docs/proposals/balance-time-economy.md`, mục "Đã chốt (03/10)".
 
 ### 1.5 Nhà kính (đã chốt)
 - **Phủ lên một khối 3×3 ô** trong ruộng. Mở ở cấp người chơi 14, rất đắt, mỗi vườn tối đa 2 cái.
@@ -207,9 +209,10 @@ Mỗi giai đoạn có sprite và hành vi riêng.
 
 | Con | Non → Nhỡ | Nhỡ → Trưởng thành | Trưởng thành | Già (báo trước) | Tổng, tương đương ngoài đời |
 |---|---|---|---|---|---|
-| Gà, vịt | 5 phút | 10 phút | ~20 giờ | ~4 giờ | ~1,5 ngày |
-| Heo | 10 phút | 20 phút | ~30 giờ | ~6 giờ | ~2,5 ngày |
-| Bò, cừu | 15 phút | 30 phút | ~45 giờ | ~8 giờ | ~3,5 ngày |
+| Gà | 20 phút | 40 phút | ~96 giờ | ~24 giờ | ~6 ngày |
+| Vịt | 25 phút | 50 phút | ~96 giờ | ~24 giờ | ~6 ngày |
+| Heo | 90 phút | 150 phút | ~120 giờ | ~24 giờ | ~7 ngày |
+| Bò, cừu | 2 giờ | 3 giờ | ~168 giờ | ~36 giờ | ~10 ngày |
 | Chó, mèo, thú cưng cảnh | 30 phút | 1 giờ | Mãi mãi | Chậm chạp, ngủ nhiều | Không chết vì già |
 
 - Hết giai đoạn già thì con vật có thể ra đi bất kỳ lúc nào. **Thú cưng không bao giờ chết vì già**, chỉ có thể chết vì bệnh.
