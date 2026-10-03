@@ -137,8 +137,8 @@ state = {
   // trường cho online (issue 22), thêm từ v2 không đổi phiên bản; bản thiếu thì loadGame bù mặc định. v2→v3 giữ nguyên các trường này
   //   (`v2to3` chép cả bản lưu, chỉ đổi con vật và chó); server nhận/chạy bù bản v2 cũ qua `migrate`/`loadGame` nên tự lên v3
   mode: 'offline' | 'online', account,        // vườn chơi đơn hay vườn trên làng; account = tên tài khoản (null khi offline)
-  today: { day: 'YYYY-MM-DD', helps, steals, stolen, robs },   // thống kê hôm nay theo ngày ngoài đời (`serverDay`).
-                                              //   helps = số việc khách đã giúp vườn này (issue 28) · steals = số vụ vườn này bị trộm ·
+  today: { day: 'YYYY-MM-DD', helps, helpBy, steals, stolen, robs },   // thống kê hôm nay theo ngày ngoài đời (`serverDay`).
+                                              //   helps = số việc mọi khách đã giúp vườn này (issue 28) · helpBy = { tên khách: số việc người đó đã giúp vườn này } · steals = số vụ vườn này bị trộm ·
                                               //   stolen = tổng giá trị (xu) vườn này đã mất vì trộm · robs = số vụ chính mình đi trộm (issue 30)
   guests: [{ id, kind, act, by, lv, at, seen, item, qty, fine, ate }],  // nhật ký việc khách làm trong vườn, mới nhất ở đầu, tối đa GUEST.logMax (60).
                                               //   `id` = mã thao tác đã áp dụng (áp dụng lại cùng mã thì không làm gì), `seen` = chủ đã được báo,
@@ -573,7 +573,7 @@ Thao tác của khách là **hàm thuần** trên bản lưu chủ: server kiể
 // who = { name, level, room } của khách
 guestOps(state, target)           // → các thao tác khách làm được lên target ngay lúc này (chưa có mã): [{ kind, act, idx|crow|egg|animal }]
 guestOpCheck(host, who, op)       // thuần, không đổi gì → { ok: true, target } (trộm thì thêm { item, qty }) | { ok: false, reason, msg }
-                                  //   reason: 'op_invalid' (thao tác lạ) · 'done' (mã này đã áp dụng rồi) · 'help_full' ("Vườn này hôm
+                                  //   reason: 'op_invalid' (thao tác lạ) · 'done' (mã này đã áp dụng rồi) · 'help_full' (khách này đã giúp đủ GUEST.helpMax việc hôm nay) · 'help_host_full' (cả vườn đã nhận đủ GUEST.helpHostMax việc) · (cũ: "Vườn này hôm
                                   //   nay đã được giúp đủ") · 'nothing' ("Ở đây không còn gì để làm/để trộm", vd chủ vừa tưới ô đó)
                                   //   trộm: 'cant_steal' (con vật, trái khổng lồ, đồ trong kho/nhà, cá) · 'host_new' ("Vườn này còn quá
                                   //   nhỏ để trộm") · 'guest_new' (khách chưa tới cấp 5) · 'robbed' (người này trộm ở đây rồi) ·
@@ -588,15 +588,16 @@ guestReward(me, reward)           // cộng xu + EXP, bỏ đồ trộm được
 takeGuestLog(state)               // các dòng guests chưa seen → [{ type: 'helped', by, act, at }] / [{ type: 'stolen', by, item, qty, at }]
                                   //   rồi đánh dấu đã xem (báo một lần)
 helpsToday(state, t?)             // số việc giúp vườn này đã nhận hôm nay (ngày ngoài đời theo serverDay)
-helpLeft(state, t?)               // số lượt giúp còn lại hôm nay (GUEST.helpMax - helpsToday)
+helpLeft(state, t?)               // trong bản đi dạo: lượt khách còn giúp được vườn này = min(helpMax - helpsBy(tên mình), helpHostMax - helpsToday); ngoài đó: lượt vườn còn nhận
+helpsBy(state, name, t?) · helpHostLeft(state, t?) · helpLeftFor(state, name, t?) · helpBlock(state, name, t?)   // giới hạn theo khách / theo vườn, lý do từ chối
 stealsToday(state, t?)            // số vụ vườn này bị trộm hôm nay · stolenToday(state, t?) = tổng giá trị đã mất
 robsToday(state, t?)              // số vụ chính mình đi trộm hôm nay (bản lưu khách)
 ripeValue(state)                  // tổng giá trị đồ đang chín chờ lấy trong vườn (cây chín, trứng dưới đất, sữa và lông đang chờ)
 stealLeft(state, t?)              // giá trị vườn này còn chịu mất hôm nay (GUEST.dayPct của ripeValue + phần đã mất)
-HELP_FULL                         // câu "Vườn này hôm nay đã được giúp đủ" · STEAL_SMALL = "Vườn này còn quá nhỏ để trộm"
+HELP_FULL / HELP_HOST_FULL        // câu "Bạn đã giúp vườn này đủ 10 việc hôm nay, mai (sau 0h giờ Việt Nam) giúp tiếp nhé" / "Vườn này hôm nay đã nhận đủ 30 việc giúp từ mọi khách, mai ... quay lại nhé" · STEAL_SMALL = "Vườn này còn quá nhỏ để trộm"
 ```
 - **Việc giúp** (`GUEST`, `HELP_JOBS` trong data.js): tưới (`water`), nhổ cỏ (`weed`), bắt sâu (`catch`), đuổi quạ (`shoo`). Điều kiện đúng như của chủ (`FIT`): ô khô mới tưới được, có cỏ mới nhổ, có sâu mới bắt, con quạ còn đó mới đuổi. Giúp không tốn nước bình, thể lực hay đồ của khách.
-- **Thưởng khách:** `GUEST.helpCoins` = 3 xu + `GUEST.helpExp` = 2 EXP mỗi việc. **Giới hạn:** mỗi vườn mỗi **ngày ngoài đời** nhận tối đa `GUEST.helpMax` = 10 việc giúp.
+- **Thưởng khách:** `GUEST.helpCoins` = 3 xu + `GUEST.helpExp` = 2 EXP mỗi việc. **Giới hạn:** mỗi **khách** giúp một vườn tối đa `GUEST.helpMax` = 10 việc mỗi **ngày ngoài đời** (giờ Việt Nam, đếm trong `today.helpBy`), và cả vườn nhận tối đa `GUEST.helpHostMax` = 30 việc từ mọi khách. Mỗi thao tác (một ô) tính một việc. Khách này dùng hết lượt không ảnh hưởng khách khác.
 - **Giao diện:** ở cảnh `visit`, chạm ô ruộng (hay con quạ) hiện các nút 💧 Tưới giúp / 🌿 Nhổ cỏ giúp / 🤏 Bắt sâu giúp / 🪶 Đuổi quạ giúp đúng theo trạng thái (id hành động `help_<act>`); hết lượt thì nút vẫn hiện nhưng **mờ** kèm lý do. Thanh `#visit-bar` có thêm dòng "Còn x lượt giúp hôm nay" (`ui.setVisit(owner, left)`).
 - **Luồng:** `perform` trả thêm `guestOp` (thao tác vừa làm, đã áp dụng lên bản đi dạo để khách thấy liền) → `main.js` gửi `{ t: 'guest', op }` lên server → server kiểm tra trên bản lưu mới nhất của chủ rồi trả `{ t: 'guest', ok, reward }` (khách lúc đó mới được cộng xu/EXP hay nhận đồ trộm được) hoặc lý do từ chối (toast). Chủ đang online nhận `{ t: 'guestop', op }` → `guestOpApply` trên vườn mình → `takeGuestLog` → toast 🟡 gộp "Lan đã tưới 3 ô giúp bạn 🙏" hay băng rôn 🔴 "Bình đã trộm 1 cà chua lúc 3h chiều 😤". Chủ vắng thì server áp dụng thẳng vào bản lưu; lần sau chủ vào làng, `takeGuestLog` báo sau khi đóng màn "Trong lúc bạn vắng nhà" (`ui.afterAway(fn)`).
 
@@ -1011,7 +1012,7 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
     - `{ id, kind: 'bark', act: 'bark', x, y }` (chỗ chó thấy khách, số nguyên trong ±10000) — không có `reward`;
     - `{ id, kind: 'bite', act: 'bite', loot: { <món>: n } }` (tối đa 20 món, `n` nguyên 1..10000, món phải có trong `ITEMS`/`CROPS`/`PRODUCTS`) → `reward` = `{ lose, fine, bite }`;
     - `{ id, kind: 'sausage', act: 'sausage' }` → `reward` = `{ lose: { sausage: 1 } }`.
-    Server chỉ nhận đúng các trường trên; `by`, `level`, `room` (chỗ trống trong giỏ theo vườn đã lưu của khách), `sausage` (số xúc xích khách đang có) và `at` do server điền, không tin trình duyệt. `reason`: `no_session` · `not_joined` (chưa vào vườn ai) · `self` (vườn của chính mình) · `no_farm` · `op_invalid` · và các lý do của luật (`done`, `help_full`, `nothing`, `cant_steal`, `host_new`, `guest_new`, `robbed`, `full`, `day_full`, `no_guard`, `no_item`, `barking`).
+    Server chỉ nhận đúng các trường trên; `by`, `level`, `room` (chỗ trống trong giỏ theo vườn đã lưu của khách), `sausage` (số xúc xích khách đang có) và `at` do server điền, không tin trình duyệt. `reason`: `no_session` · `not_joined` (chưa vào vườn ai) · `self` (vườn của chính mình) · `no_farm` · `op_invalid` · và các lý do của luật (`done`, `help_full`, `help_host_full`, `nothing`, `cant_steal`, `host_new`, `guest_new`, `robbed`, `full`, `day_full`, `no_guard`, `no_item`, `barking`).
   - Server lấy bản lưu mới nhất của chủ, áp dụng các thao tác còn chờ trong hàng đợi rồi kiểm tra thao tác mới bằng `guestOpApply` của `state.js`. Bị từ chối thì **không** ghi vào hàng đợi. Nhận thì ghi `guest_ops` và:
     - chủ **đang online** (có WebSocket giữ phiên chơi): `applied = NULL`, đẩy `{ t: 'guestop', op }` tới mọi kết nối của chủ; trình duyệt chủ áp dụng rồi gửi bản lưu lên như thường.
     - chủ **offline**: server chạy bù vườn (issue 24) rồi áp dụng ngay trên bản lưu đó, lưu lại (`saved_at` không đổi) và đánh dấu `applied`.
