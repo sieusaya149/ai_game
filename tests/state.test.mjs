@@ -285,6 +285,9 @@ test('vật nuôi: tự ăn ở máng, đói -> bệnh -> thuốc thú y', () =>
   assert.equal(s.troughs[penIdOf(G, s, 'chicken')], 0);
   // đói lả
   noBugs(() => run(s, 10 * MIN));
+  assert.equal(hen.sick, 0, 'quên cho ăn một lúc chưa bệnh');
+  hen.starvingSince = s.time - 120 * MIN;   // bỏ đói lả rất lâu
+  withRandom(0.000001, () => run(s, MIN));
   assert.equal(hen.sick, 1);   // mức Mệt
   s.inv.medicine = 1;
   assert.equal(G.actionsFor(s, { kind: 'animal', id: hen.id })[0].id, 'medicine');

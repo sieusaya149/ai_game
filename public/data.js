@@ -4,15 +4,16 @@ const MIN = 60_000;
 export const DAY_MS = 20 * MIN;           // 1 ngày trong game = 20 phút ở tốc độ x1
 export const NIGHT_FROM = 0.75;           // từ 3/4 ngày trở đi là ban đêm (tới hết ngày)
 export const MARKET = { open: 6, close: 18 }; // chợ Bà Tư mở từ 6h tới 18h (giờ trong game; ngày bắt đầu lúc 6h)
-// Mua online: đặt lúc nào cũng được, hàng đi sau waitMs nếu chợ đang mở (chợ đóng thì sáng hôm sau 6h), người giao hàng
-// đi bộ từ cổng tới nhà kho. Phí giao feePct tiền hàng (ít nhất feeMin xu) · tối đa maxPending đơn chờ · maxQty mỗi món một đơn
+// Mua online: đặt lúc nào cũng được, hàng tới kho theo kiểu giao đã chọn (chợ đóng thì sáng hôm sau 6h), người giao hàng
+// đi bộ từ cổng tới nhà kho. Phí giao theo kiểu giao (ít nhất feeMin xu) · tối đa maxPending đơn chờ · maxQty mỗi món một đơn
 // · leaveMs: giao xong còn đi ra cổng chừng này lâu · speed: px/s lúc đi (world.js) · walkMul: thời gian đi = quãng thẳng / tốc độ đi × hệ số (đường vòng)
-export const DELIVERY = { waitMs: 2 * MIN, feePct: 0.1, feeMin: 5, maxPending: 5, maxQty: 99, leaveMs: 15_000, speed: 44, walkMul: 1.8, walkMin: 6000 };
+// Ba kiểu giao (modes): ms = tổng thời gian tới khi hàng vào kho (đã gồm quãng người giao hàng đi bộ), fee = phí theo tiền hàng; ms 0 = vào kho ngay
+export const DELIVERY = { modes: [{ id: 'now', ms: 0, fee: 0.3 }, { id: 'm1', ms: MIN, fee: 0.2 }, { id: 'm2', ms: 2 * MIN, fee: 0.1 }], feeMin: 5, maxPending: 5, maxQty: 99, leaveMs: 15_000, speed: 44, walkMul: 1.8, walkMin: 6000 };
 // Thể lực: cost = điểm trừ mỗi lần làm (dọn bụi, đập đá chưa có hành động, để sẵn); hết thể lực thì đi và làm chậm ×slow.
 // morningRegen: tự hồi mỗi sáng 6h · benchPerMin: ngồi ghế đá hồi mỗi phút · sleepHour: từ giờ này mới ngủ được
 export const STAMINA = {
   max: 100, slow: 2, morningRegen: 30, benchPerMin: 15, sleepHour: 18,
-  cost: { till: 1, water: 1, plant: 1, harvest: 1, clearBush: 2, breakRock: 3, steal: 2 },
+  cost: { till: 1, water: 1, plant: 1, harvest: 1, clearBush: 2, breakRock: 3, chopTree: 4, steal: 2 },
 };
 // Công cụ 3 cấp (sắt/đồng/vàng). area: vùng tác động theo cấp (one = 1 ô · row = hàng 3 ô theo hướng nhìn · block = 3×3 tâm ô mục tiêu)
 // price: xu nâng lên cấp 2, cấp 3 (mất DAY_MS ở tiệm rèn) · act: hành động ruộng dùng công cụ này · canMax: sức chứa bình tưới theo cấp
@@ -225,9 +226,15 @@ export const HUSBANDRY = {
   growNeedsHunger: 30,        // phải no trên 30 mới lớn và mới đẻ
   happyDecayPerMin: 4,
   petHappy: 25,
-  sickAfterStarving: 3 * MIN, // đói lả (0) quá 3 phút thì bệnh
-  sickChancePerMin: 0.004,    // chỉ áp dụng khi bị bỏ bê: đói (dưới hungryBelow), dơ, chuồng bẩn hoặc già. No, sạch thì không tự bệnh
-  hungryBelow: 40,            // đói hơn mức này là "đang đói" (cùng mốc hiện nút Cho ăn)
+  // Quên cho ăn một lượt KHÔNG gây bệnh. Từ no: 3 phút tới "đang đói" (<40, báo + việc cần làm), 5 phút tới đói lả (0);
+  // con đói thì ngừng sinh sản/lớn (growNeedsHunger) nhưng chưa bệnh. Chỉ bỏ đói lả RẤT LÂU mới có nguy cơ bệnh:
+  // từ lúc hunger = 0 phải qua sickRiskAfterStarving (30 phút, ~6 chu kỳ ăn) mới bắt đầu có xác suất, rồi xác suất
+  // tăng dần tuyến tính từ 0 tới sickStarveMaxPerMin sau sickStarveRampMs. Không có mốc "chắc chắn bệnh". Chỉnh lại cân bằng thì sửa 3 số này.
+  sickRiskAfterStarving: 30 * MIN,
+  sickStarveRampMs: 60 * MIN,
+  sickStarveMaxPerMin: 0.08,  // xác suất/phút khi đã đói lả hết thời gian tăng dần
+  sickChancePerMin: 0.004,    // xác suất/phút: áp dụng khi bị bỏ bê (đói lả lâu, dơ, chuồng bẩn hoặc già). No, sạch thì không tự bệnh
+  hungryBelow: 40,            // đói hơn mức này là "đang đói": báo đói, vào việc cần làm, hiện nút Cho ăn (CHƯA có nguy cơ bệnh)
   eggHatchChance: 0.2,        // trứng bỏ quên quá 10 phút có 20% tự nở thành gà con
   eggForgetMs: 10 * MIN,
   nestHatchMs: 3 * MIN,       // đặt trứng vào ổ ấp: 3 phút nở gà con
@@ -530,6 +537,7 @@ export const ITEMS = {
   vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 60, lv: 1, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
   straw:      { name: 'Rơm phủ luống',     kind: 'supply', price: 5,  lv: 1, desc: 'Phủ lên ô ruộng: đất giữ ẩm lâu gấp đôi (đỡ khổ lúc hạn hán), cây non không sợ sương muối. Thu hoạch hay dọn ô thì rơm mất.' },
+  barrow:     { name: 'Xe rùa',           kind: 'supply', price: 250, lv: 3, once: true, desc: 'Mua một lần. Chạm con vật chọn "Chở sang chuồng khác" để đưa nó sang chuồng cùng loại còn chỗ.' },
   soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
   manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
   phan_cho:   { name: 'Phân chó',          kind: 'material', price: 0, lv: 0, desc: 'Xúc bãi phân của chó. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
@@ -561,6 +569,8 @@ export const LAND_STRIPS = [500, 800, 1200, 1700, 2400, 3300, 4500, 6000, 8000, 
 export const DIR_NAME = { N: 'Bắc', S: 'Nam', E: 'Đông', W: 'Tây' };
 // Bụi, đá rải trên dải mới: xác suất mỗi ô (theo băm toạ độ, không ngẫu nhiên). Dọn tay: tốn thể lực STAMINA.cost[cost], được qty món item.
 export const CLUTTER_RATE = { bush: 0.16, rock: 0.09 };
+// Cây trong vườn (cây nền hoặc cây chắn đường): chặt tay, tốn thể lực, cây biến mất ngay (không để gốc)
+export const CHOP = { name: 'Cây', act: 'Chặt cây', icon: '🪓', item: 'wood', qty: 3, cost: 'chopTree' };
 export const CLUTTER = {
   bush: { name: 'Bụi cây', act: 'Dọn bụi', icon: '🌿', item: 'wood',  qty: 2, cost: 'clearBush' },
   rock: { name: 'Tảng đá', act: 'Đập đá', icon: '⛏️', item: 'stone', qty: 2, cost: 'breakRock' },
@@ -651,6 +661,7 @@ export const COMPOST = {
   ms: 2 * DAY_MS,                                       // 2 ngày game (40 phút ở x1)
   inputs: ['cay_heo', 'cay_chet', 'manure', 'phan_cho'],   // thứ tự lấy khi "bỏ hết"
 };
+export const PEN_REFUND = 0.5;   // phá bỏ chuồng trống: hoàn tỉ lệ này của giá xây + giá các lần nâng cấp
 export const PEN_LEVELS = 3;
 export const expNeed = level => Math.floor(25 * level ** 1.5);
 export function levelInfo(exp) {
@@ -690,13 +701,13 @@ export const ACHIEVEMENTS = [
 ];
 
 // ---------- Khách giúp vườn và trộm vườn (issue 28, 30, ADR 0012) ----------
-// helpMax: mỗi vườn mỗi ngày ngoài đời nhận tối đa bấy nhiêu việc giúp · helpCoins/helpExp: thưởng cho khách mỗi việc
+// helpMax: mỗi KHÁCH giúp một vườn tối đa bấy nhiêu việc mỗi ngày ngoài đời · helpHostMax: cả vườn nhận tối đa bấy nhiêu việc giúp từ mọi khách · helpCoins/helpExp: thưởng cho khách mỗi việc
 // logMax: nhật ký khách trong bản lưu chủ giữ bấy nhiêu việc gần nhất (cũng là nơi nhớ mã thao tác đã áp dụng)
 // stealLv: cấp tối thiểu để đi trộm, cũng là cấp tối thiểu để vườn bị trộm (bảo vệ người mới)
 // stealPct: mỗi vụ trộm lấy tối đa bấy nhiêu sản lượng còn lại của ô hay con đó (mỗi người một lần mỗi ô hay mỗi con)
 // dayPct: mỗi vườn mỗi ngày ngoài đời mất tối đa bấy nhiêu tổng giá trị đồ chín · thể lực mỗi vụ: STAMINA.cost.steal
 // robShowMs: chỗ vừa bị trộm là chỗ gấp 🔴 (mũi tên chỉ hướng) trong chừng này, giờ ngoài đời (issue 32)
-export const GUEST = { helpMax: 10, helpCoins: 3, helpExp: 2, logMax: 60, stealLv: 5, stealPct: 0.25, dayPct: 0.3, robShowMs: 15_000 };
+export const GUEST = { helpMax: 10, helpHostMax: 30, helpCoins: 3, helpExp: 2, logMax: 60, stealLv: 5, stealPct: 0.25, dayPct: 0.3, robShowMs: 15_000 };
 // Bốn việc giúp: động từ và đơn vị để ghép câu cảm ơn ("Lan đã tưới 3 ô giúp bạn")
 export const HELP_JOBS = {
   water: { verb: 'tưới', unit: 'ô', icon: '💧', label: 'Tưới giúp' },
@@ -738,7 +749,7 @@ export const EVENT_LEVEL = {
   ripe:      { level: 'important', cat: 'ripe', group: e => 'ripe:' + e.crop, label: 'Cây chín', text: (n, e) => `${n} ô ${cropN(e.crop)} đã chín 🌾` },
   rotten:    { level: 'important', cat: 'spoil', group: e => 'rotten:' + e.crop, label: 'Cây héo', text: (n, e) => `${n} ô ${cropN(e.crop)} đã héo 🥀` },
   dead:      { level: 'important', cat: 'spoil', group: e => 'dead:' + e.crop, label: 'Cây chết', text: (n, e) => `${n} ô ${cropN(e.crop)} đã chết 💀` },
-  hungry:    { level: 'important', cat: 'hungry', group: e => 'hungry:' + e.animal, label: 'Con vật đói', text: (n, e) => `${n} con ${animalN(e.animal)} đói lả` },
+  hungry:    { level: 'important', cat: 'hungry', group: e => 'hungry:' + e.animal, label: 'Con vật đói', text: (n, e) => `${n} con ${animalN(e.animal)} đang đói` },
   crow:      { level: 'important', cat: 'loss', group: () => 'loss:crow', label: 'Quạ ăn mất cây', text: (n, e) => n > 1 ? `Quạ đã ăn mất ${n} cây 😢` : `Quạ đã ăn mất ${(e.name ?? 'cây').toLowerCase()} 😢` },
   thief:     { level: 'important', cat: 'loss', group: () => 'loss:thief', label: 'Trộm hái mất cây', text: (n, e) => n > 1 ? `Thằng Tèo đã hái trộm ${n} cây 😢` : `Thằng Tèo đã hái trộm ${(e.name ?? 'cây').toLowerCase()} 😢` },
   tisun:     { level: 'important', cat: 'loss', group: () => 'loss:tisun', label: 'Tí Sún trộm trứng', text: (n, e) => `Tí Sún lấy trộm mất ${e.n ?? n} quả trứng 😢` },

@@ -79,7 +79,7 @@ test('awaySummary gộp: "5 ô cà chua đã chín", lái buôn, trứng, bệnh
     { type: 'toast', text: 'bỏ qua' },
   ];
   const lines = G.awaySummary(ev, 4 * HOUR);
-  for (const want of ['5 ô cà chua đã chín', '1 ô cải xanh đã chín', '2 ô cải xanh đã héo', '3 quả trứng mới', '2 con gà bị bệnh', '1 con heo đói lả', 'Lái buôn trả 120 xu', 'Vườn đã đóng băng 4 giờ']) {
+  for (const want of ['5 ô cà chua đã chín', '1 ô cải xanh đã chín', '2 ô cải xanh đã héo', '3 quả trứng mới', '2 con gà bị bệnh', '1 con heo đang đói', 'Lái buôn trả 120 xu', 'Vườn đã đóng băng 4 giờ']) {
     assert.ok(lines.includes(want), `thiếu "${want}" trong ${JSON.stringify(lines)}`);
   }
   assert.ok(lines.some(x => /quạ/i.test(x)) && lines.some(x => /đuổi/.test(x)));

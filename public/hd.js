@@ -68,6 +68,9 @@ if (courierArt?.COURIER_ART) { stats.files.push('artcourier.js'); link(courierAr
 // Biểu tượng thông báo, Việc cần làm, Sổ tay cho cây và nước (issue 62): cùng cây khóa trong art62.js
 const iconArt = await import('./art62.js').catch(() => null);
 if (iconArt?.ART62) { stats.files.push('art62.js'); link(iconArt.ART62, iconArt.ART62_HD, 'ART62'); }
+// Xe rùa (artbarrow.js): BARROW (1x) và BARROW_HD (2x) cùng khóa barrowIcon, barrow, barrowLoaded
+const barrowArt = await import('./artbarrow.js').catch(() => null);
+if (barrowArt?.BARROW) { stats.files.push('artbarrow.js'); link(barrowArt.BARROW, barrowArt.BARROW_HD, 'BARROW'); }
 
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);

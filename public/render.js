@@ -14,8 +14,9 @@ import { GH, GH_AT } from './art60.js';   // nhà kính (issue 60)
 import { SPR61_OLD } from './art61.js';   // hố ủ phân (issue 61)
 import { recolor } from './coat.js';
 import { COURIER_ART } from './artcourier.js';
+const BARROW = (await import('./artbarrow.js').catch(() => null))?.BARROW ?? null;   // art xe rùa vẽ sau: chưa có thì không vẽ xe cạnh người
 import { sceneMap, footprint } from './farm.js';
-import { canMove, ripeLeft, wilting, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, plotSeasonMul, frostHold, glassStatus, tankInfo, waterNet, waterOn, autoInfo } from './state.js';
+import { canMove, ripeLeft, wilting, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, haveItem, seasonGrowMul, plotSeasonMul, frostHold, glassStatus, tankInfo, waterNet, waterOn, autoInfo } from './state.js';
 import { cropStar, compostInfo } from './state.js';
 import { AUTO_ART } from './art58.js';   // tự động hóa khối ruộng (issue 58)
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -956,7 +957,7 @@ export function render(ctx, f) {
   }
   for (const b of m.bushes) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
   // bụi, đá chưa dọn trên đất mới mua
-  for (const o of m.clutter ?? []) if (vis(o.x, o.y, 20)) add(o.y + TS, () => {
+  for (const o of m.clutter ?? []) if (o.kind !== 'tree' && vis(o.x, o.y, 20)) add(o.y + TS, () => {
     const im = (o.kind === 'bush' ? SPR2?.bushes : SPR2?.rocks)?.[o.v];
     if (im) blit(im, o.x, o.y);
     else if (o.kind === 'bush') blit(SPR.bush, o.x, o.y + 2);
@@ -1337,6 +1338,8 @@ export function render(ctx, f) {
     const fr = wd.moving ? [1, 0, 2, 0][Math.floor(wd.walkT * 8) % 4] : 0;
     const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
     const shake = wd.stun > 0 ? (Math.floor(now / 60) % 2 ? 1 : -1) : 0;
+    const bw = farm && !state.visit && haveItem(state, 'barrow') > 0 ? BARROW?.barrow?.[dir === 1 ? 'left' : 'right']?.[wd.moving ? Math.floor(now / 160) % 2 : 0] : null;
+    if (bw && !wd.sleeping) add(p.y - 0.1, () => blit(bw, p.x + (dir === 1 ? -bw.width - 3 : 3), p.y - bw.height + 2));   // xe rùa dắt bên người
     if (!wd.sleeping) add(p.y, () => {
       if (state.sit && !wd.moving) {   // ngồi ghế đá: hạ thân xuống, cắt phần chân (chưa có sprite ngồi riêng)
         ctx.save(); ctx.beginPath(); ctx.rect(p.x - 12, p.y - 36, 24, 37); ctx.clip();

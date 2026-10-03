@@ -21,7 +21,7 @@ const KINDS = [
   { kind: 'civet', kp: 'threat', level: 'urgent', icon: '🦝', label: () => 'Chồn hương đang rình gà', spots: s => threats(s, 'civet') },
   { kind: 'sick', level: 'urgent', icon: '🤒', label: n => `${n} con vật bệnh nặng`, spots: s => animals(s, a => a.sick >= 2) },
   { kind: 'tired', level: 'normal', icon: '🥱', label: n => `${n} con vật mệt`, spots: s => animals(s, a => a.sick && a.sick < 2) },
-  { kind: 'hungry', level: 'normal', icon: '🍽️', label: n => `${n} con vật đói`, spots: s => animals(s, a => !a.sick && a.hunger < HUSBANDRY.growNeedsHunger) },
+  { kind: 'hungry', level: 'normal', icon: '🍽️', label: n => `${n} con vật đói`, spots: s => animals(s, a => !a.sick && a.hunger < HUSBANDRY.hungryBelow) },
   { kind: 'dirty', level: 'normal', icon: '🧼', label: n => `${n} con vật dơ`, spots: s => animals(s, a => dirtyAnimals(s).includes(a)) },
   { kind: 'stray', level: 'normal', icon: '💤', label: n => `${n} con lạc ngủ ngoài`, spots: s => animals(s, a => strays(s).includes(a)) },
   { kind: 'muck', level: 'normal', icon: '💩', label: n => `${n} chuồng bẩn`, spots: s => muckPens(s) },

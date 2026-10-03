@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, commandDog,
+  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, barrowTargets, commandDog,
 } from './state.js';
 import { refillMs } from './state.js';
 import * as ui from './ui.js';
@@ -119,6 +119,12 @@ async function askAnimal(target, id) {
 async function doAction(target, id) {
   if (!state || busy || fading || world.stun > 0) return;
   if (target.kind === 'animal' && (id === 'sell' || id === 'retire') && !(target = await askAnimal(target, id))) return;
+  if (target.kind === 'animal' && id === 'barrow') {
+    const t = barrowTargets(state, target.id);
+    const pen = await ui.pickPen('Chở sang chuồng nào?', t);
+    if (pen == null) return;
+    target = { ...target, penId: pen };
+  }
   if (busy || !V.exists(state, target)) return;
   const pos = V.targetPos(state, target);
   if (pos) V.faceTo(state, pos.x, pos.y);
@@ -432,7 +438,23 @@ const api = {
     const r = upgradePen(state, b.sel);
     ui.buildMsg(r.msg, r.ok);
     ui.handleEvents([{ type: 'sound', name: r.ok ? 'coin' : 'error' }]);
-    ui.buildSel(null, upgradeInfo(state, b.sel));
+    const e = state.farm.ents.find(x => x.id === b.sel);
+    ui.buildSel(null, upgradeInfo(state, b.sel), null, e?.kind === 'pen' ? { refund: demolishRefund(e) } : null);
+    ui.buildTray(state, b);
+    changed();
+  },
+  // Phá bỏ chuồng trống đang chọn (có hỏi lại); Hủy cả chế độ xây dựng thì chuồng trở lại
+  async buildDemolish() {
+    const b = world.build, e = b?.sel != null && state.farm.ents.find(x => x.id === b.sel);
+    if (!e || e.kind !== 'pen') return;
+    const chk = demolishPen(structuredClone(state), e.id);   // thử trên bản sao để báo lý do trước khi hỏi
+    if (!chk.ok) { ui.buildMsg(chk.msg, false); ui.handleEvents([{ type: 'sound', name: 'error' }]); return; }
+    if (!await ui.confirmBox(`Phá ${entName(e).toLowerCase()}? Hoàn 🪙 ${demolishRefund(e)}, máng ăn và phân trong chuồng mất.`, 'Phá bỏ', 'Thôi', true)) return;
+    if (world.build !== b || b.sel !== e.id) return;
+    const r = demolishPen(state, e.id);
+    b.sel = null; ui.buildSel(null);
+    ui.buildMsg(r.msg, r.ok);
+    ui.handleEvents([{ type: 'sound', name: r.ok ? 'coin' : 'error' }]);
     ui.buildTray(state, b);
     changed();
   },
@@ -732,7 +754,7 @@ function buildUp(e) {
   if (d.tap && !g) {   // chạm không kéo: chọn món, hiện nút Cất nếu cất được
     const ent = state.farm.ents.find(x => x.id === d.id);
     if (ent && (ent.kind === 'deco' || ent.kind === 'field')) { b.sel = ent.id; ui.buildSel(entName(ent), null, ent.kind === 'field' ? ent.id : null); }   // khối ruộng: thêm nút Nâng cấp khối (issue 58)
-    else if (ent && upgradeInfo(state, ent.id)) { b.sel = ent.id; ui.buildSel(null, upgradeInfo(state, ent.id)); }   // chuồng, chuồng chó: nâng cấp
+    else if (ent && (upgradeInfo(state, ent.id) || ent.kind === 'pen')) { b.sel = ent.id; ui.buildSel(null, upgradeInfo(state, ent.id), null, ent.kind === 'pen' ? { refund: demolishRefund(ent) } : null); }   // chuồng, chuồng chó: nâng cấp
     ui.buildMsg(BUILD_HINT, null);
     return;
   }
