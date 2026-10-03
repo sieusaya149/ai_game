@@ -28,7 +28,7 @@ function edge(owned, gap) {
 
 // Các ô một thực thể chiếm chỗ { c, r, w, h }: chuồng tính cả khung rào, ruộng là khối 3x3, đồ trang trí/cây 1 ô.
 export function footprint(e) {
-  if (e.kind === 'field') return { c: e.c, r: e.r, w: FIELD_SIZE, h: FIELD_SIZE };
+  if (e.kind === 'field' || e.kind === 'greenhouse') return { c: e.c, r: e.r, w: FIELD_SIZE, h: FIELD_SIZE };   // nhà kính phủ đúng một khối ruộng
   if (e.kind === 'pen') { const d = PEN_DEFS[e.pen]; return { c: e.c, r: e.r, w: d.w, h: d.h }; }
   const d = BUILDING_DEFS[e.kind];
   return { c: e.c, r: e.r, w: d?.foot.w ?? 1, h: d?.foot.h ?? 1 };
@@ -44,7 +44,7 @@ function build(f) {
   const idx = (c, r) => r * mw + c;
   const ground = new Uint8Array(mw * mh), solid = new Uint8Array(mw * mh);
   const fences = [], buildings = [], pens = {}, penList = [], penById = {}, troughs = [], trees = [], decos = [], fields = [], clutter = [];
-  const plotPos = new Map(), plotByTile = new Map();
+  const plotPos = new Map(), plotByTile = new Map(), plotField = new Map();
   const inside = (c, r) => c >= 0 && r >= 0 && c < mw && r < mh;
   const fill = (c, r, w, h, g) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (inside(x, y)) ground[idx(x, y)] = g; };
   const block = (c, r, w = 1, h = 1) => { for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (inside(x, y)) solid[idx(x, y)] = 1; };
@@ -62,7 +62,7 @@ function build(f) {
       fields.push(e);
       (e.plots ?? []).forEach((pi, k) => {
         const t = { c: e.c + k % FIELD_SIZE, r: e.r + Math.floor(k / FIELD_SIZE) };
-        plotPos.set(pi, t); plotByTile.set(idx(t.c, t.r), pi);
+        plotPos.set(pi, t); plotByTile.set(idx(t.c, t.r), pi); plotField.set(pi, e);
       });
     } else if (e.kind === 'pen') {
       const d = PEN_DEFS[e.pen], rect = { c: e.c, r: e.r, w: d.w, h: d.h };
@@ -143,6 +143,7 @@ function build(f) {
     plotTile,
     plotCenter: i => { const t = plotPos.get(i); return t ? { x: t.c * TS + 8, y: t.r * TS + 8 } : null; },
     plotAt: (c, r) => plotByTile.get(idx(c, r)) ?? -1,
+    fieldOf: i => plotField.get(i) ?? null,   // khối ruộng chứa ô i (nâng cấp theo khối, nhà kính)
   };
 }
 
@@ -218,7 +219,7 @@ function buildFixed(id, d) {
     props: d.props, doors, arrive: d.arrive, spawn: Object.values(d.arrive)[0], dogHome: null, catHome: null, catDoor: null, gateIn: null,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)), isOwned: (c, r) => inside(c, r),
     building: bid => buildings.find(b => b.id === bid) ?? null,
-    plotTile: () => null, plotCenter: () => null, plotAt: () => -1,
+    plotTile: () => null, plotCenter: () => null, plotAt: () => -1, fieldOf: () => null,
   };
 }
 

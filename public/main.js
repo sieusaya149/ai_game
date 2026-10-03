@@ -720,7 +720,7 @@ function buildUp(e) {
   ui.handleEvents([{ type: 'sound', name: r.ok ? 'pop' : 'error' }]);
   if (d.place) {
     const w = d.place;   // đặt xong mà không đặt thêm được (hết đồ, đủ khối, đã có chuồng): bỏ chọn
-    if (r.ok && (w.kind === 'pen' || WATER_BUILD[w.kind] || (w.kind === 'deco' && !canAfford(state, w).ok) || (w.kind === 'field' && fieldCount(state) >= fieldLimit(state)))) b.place = null;
+    if (r.ok && (w.kind === 'pen' || w.kind === 'greenhouse' || WATER_BUILD[w.kind] || (w.kind === 'deco' && !canAfford(state, w).ok) || (w.kind === 'field' && fieldCount(state) >= fieldLimit(state)))) b.place = null;
     ui.buildTray(state, b);
     ui.buildWater(state);
   }
@@ -729,7 +729,11 @@ function buildUp(e) {
 // Bóng của món mới theo con trỏ: tâm khối nằm dưới ngón tay
 function placeGhost(b, p) {
   const what = b.place, ft = footprint(what);
-  const c = Math.floor(p.x / TS) - Math.floor(ft.w / 2), r = Math.floor(p.y / TS) - Math.floor(ft.h / 2);
+  let c = Math.floor(p.x / TS) - Math.floor(ft.w / 2), r = Math.floor(p.y / TS) - Math.floor(ft.h / 2);
+  if (what.kind === 'greenhouse') {   // nhà kính bám vào khối ruộng dưới ngón tay (issue 60)
+    const m = mapOf(state), fe = m.fieldOf(m.plotAt(Math.floor(p.x / TS), Math.floor(p.y / TS)));
+    if (fe) { c = fe.c; r = fe.r; }
+  }
   if (b.ghost?.c === c && b.ghost?.r === r) return;
   const chk = canPlace(state, what, c, r), aff = chk.ok ? canAfford(state, what) : chk, ok = chk.ok && aff.ok;
   b.ghost = { id: null, what, c, r, w: ft.w, h: ft.h, ok, reason: aff.reason ?? null };

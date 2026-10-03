@@ -8,15 +8,16 @@ import {
   TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON, WEATHER, MASTERY, masteryLevel,
 } from './data.js';
 import { WELL, TANK, WATER_BUILD } from './data.js';
+import { GLASS } from './data.js';   // nhà kính (issue 60)
 import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng ★ (issue 52)
 import { GIANT, giantKey, giantOf, itemSlots } from './data.js';   // trái khổng lồ (issue 53)
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
 import { now, villageCal, serverDay, VILLAGE_SEED } from './clock.js';
-import { weatherOn, outageOn, droughtOf, isWet } from './weather.js';
+import { weatherOn, outageOn, droughtOf, isWet, glassBreakOn } from './weather.js';
 
-export { animalPrice, levelInfo, mapOf, reachable, footprint, sceneMap, stageStart, stageAt, lifeEnd, weatherOn, outageOn, droughtOf, isWet };
+export { animalPrice, levelInfo, mapOf, reachable, footprint, sceneMap, stageStart, stageAt, lifeEnd, weatherOn, outageOn, droughtOf, isWet, glassBreakOn };
 export const SAVE_KEY = 'nongtrai-save-v4';
 // Bản cũ: đọc được để chuyển, không bao giờ ghi đè hay xóa. Mỗi bản có cờ riêng "đã chuyển (hoặc đã chơi lại từ đầu)"
 // để không đọc lại nữa; đọc lần lượt v4 → v3 → v2 → v1.
@@ -523,8 +524,8 @@ export function weatherOf(s, ahead = 0) {
 export const forecast = s => weatherOf(s, 1);
 // Mất điện (issue 57–58 đọc): ngày bão có cờ mất điện thì nửa ngày đầu (6h–18h) máy bơm, máy phun ngừng
 export const powerOut = s => s.weather === 'storm' && outageOn(weatherSeed(s), s.wday ?? dayOf(s)) && dayFrac(s) < 0.5;
-// Sương muối giữ cây hạt và mầm đứng yên cả ngày; ô phủ rơm thì không (issue 60: ô trong nhà kính cũng không)
-export const frostHold = (s, p) => s.weather === 'frost' && !p.mulch && !!p.crop && !p.crop.dead && !p.crop.rotten && stageOf(p.crop) <= 1;
+// Sương muối giữ cây hạt và mầm đứng yên cả ngày; ô phủ rơm thì không, ô trong nhà kính đang chạy cũng không (issue 60)
+export const frostHold = (s, p) => s.weather === 'frost' && !p.mulch && !!p.crop && !p.crop.dead && !p.crop.rotten && stageOf(p.crop) <= 1 && !glassOn(s, p);
 // Hệ số đất khô của một ô: nắng ×1.5, hạn hán gấp đôi ngày nắng, phủ rơm ×0.5 (mưa, bão thì đất luôn đủ nước)
 export const dryMul = (s, p) => (s.weather === 'sun' ? WEATHER.sunDry : s.weather === 'drought' ? WEATHER.sunDry * WEATHER.droughtDry : 1) * (p.mulch ? WEATHER.mulchDry : 1);
 // 6h sáng ngày game mới (theo dayOf): chốt trời hôm nay, bão quật đổ bù nhìn, cầu vồng làm con vật vui, báo trước ngày mai xấu
@@ -538,11 +539,65 @@ function newWeatherDay(s, wd) {
     const down = s.farm.ents.filter(e => e.item === 'deco_scarecrow' && !e.down);
     for (const e of down) e.down = true;
     if (down.length) { log(s, `Bão quật đổ ${down.length} bù nhìn, dựng lại thì quạ mới sợ`); emit({ type: 'scarecrow', n: down.length }); }
+    // bão có tỉ lệ thấp làm vỡ kính nhà kính (thuần theo hạt giống, ngày, khối: server chạy bù ra y như trình duyệt)
+    const glass = greenhouses(s).filter(e => !e.up.glass.broken && glassBreakOn(weatherSeed(s), wd, e.id));
+    for (const e of glass) Object.assign(e.up.glass, { broken: true, unpaid: false });
+    if (glass.length) { log(s, `Bão làm vỡ kính ${glass.length} nhà kính, sửa bằng xu mới dùng lại được`); emit({ type: 'glassBroken', n: glass.length }); }
   }
+  heatGlass(s, true);
   if (s.weather === 'rainbow') for (const a of s.animals) a.happy = Math.min(100, a.happy + WEATHER.rainbowHappy);
   toast(WEATHER.kinds[s.weather].toast);
   const f = forecast(s);
   if (!catchUp && WEATHER.bad.includes(f)) emit({ type: 'forecast', kind: f, day: wd + 1 });
+}
+
+// ---------- Nhà kính (issue 60) ----------
+// Nhà kính là thuộc tính của khối ruộng: field.up.glass = false | { broken, unpaid } (dời khối thì đi theo).
+// broken: bão làm vỡ kính, sửa bằng xu (fixglass). unpaid: mùa Đông chưa trả được tiền sưởi hôm nay.
+export const greenhouses = s => s.farm.ents.filter(e => e.kind === 'field' && e.up?.glass);
+const glassOf = (s, p) => mapOf(s).fieldOf(p.idx)?.up?.glass || null;
+// Kính còn lành: quạ không vào, bão không đổ gì bên trong
+const glassIntact = (s, p) => { const g = glassOf(s, p); return !!g && !g.broken; };
+// Nhà kính đang có tác dụng với ô p (kính lành, đang sưởi): bỏ qua mùa, không bị sương muối
+export const glassOn = (s, p) => { const g = glassOf(s, p); return !!g && !g.broken && !g.unpaid; };
+// Hệ số tốc độ lớn theo mùa của cây trên ô p: trong nhà kính đang chạy thì luôn 1
+export const plotSeasonMul = (s, p) => (p.crop && !glassOn(s, p) ? seasonGrowMul(s, p.crop.id) : 1);
+// Tiền điện sưởi mùa Đông (6h sáng, morning = true): mỗi nhà kính kính lành GLASS.heat xu, ghi nhật ký. Không đủ xu thì nhà đó
+// ngừng sưởi (unpaid), bước tick nào đủ xu thì tự trả rồi sưởi lại. Không bao giờ nợ. Chỉ chạy khi vườn chạy (đóng băng không tính).
+function heatGlass(s, morning) {
+  const list = greenhouses(s);
+  if (!list.length) return;
+  const winter = morning && seasonOf(s).key === 'dong';
+  let paid = 0;
+  for (const e of list) {
+    const g = e.up.glass;
+    if (morning) g.unpaid = winter && !g.broken;
+    if (g.unpaid && s.coins >= GLASS.heat) { s.coins -= GLASS.heat; g.unpaid = false; paid++; }
+  }
+  if (paid) log(s, `Tiền điện sưởi nhà kính: -${paid * GLASS.heat} xu`);
+  if (morning && list.some(e => e.up.glass.unpaid)) { log(s, 'Không đủ xu trả tiền sưởi, nhà kính ngừng sưởi tới khi đủ xu'); toast('Không đủ xu trả tiền sưởi nhà kính 🥶'); }
+}
+// Bảng trạng thái ở cửa nhà kính: số ô khô (cây đang lớn mà đất cạn), sâu (có sâu hay bệnh vì sâu), chín, héo (héo hay chết).
+// urgent: có sâu, bệnh thì bong bóng trên mái nhấp nháy. null nếu không có khối ruộng id.
+export function glassStatus(s, id) {
+  const f = s.farm.ents.find(e => e.id === id && e.kind === 'field');
+  if (!f) return null;
+  const o = { dry: 0, bugs: 0, ripe: 0, rotten: 0 };
+  for (const i of f.plots ?? []) {
+    const p = s.plots[i], c = p?.crop;
+    if (!c) continue;
+    if (c.dead || c.rotten) o.rotten++;
+    else if (c.progress >= 1) o.ripe++;
+    else { if (c.bugs || c.sick) o.bugs++; if (p.water <= 0) o.dry++; }
+  }
+  return { ...o, urgent: o.bugs > 0 };
+}
+// Chỗ đứng trước cửa nhà kính (giữa mép dưới khối ruộng)
+export const glassDoor = e => ({ x: (e.c + 1) * TS + 8, y: (e.r + FIELD_SIZE) * TS + 6 });
+function glassActs(s, t) {
+  const g = s.farm.ents.find(e => e.id === t.id && e.kind === 'field')?.up?.glass;
+  if (!g?.broken) return [];
+  return [mk('fixglass', '🔧', `Sửa kính nhà kính (${GLASS.fix} xu)`, s.coins < GLASS.fix ? 'Chưa đủ xu' : null)];
 }
 
 // ---------- Thời gian ----------
@@ -683,6 +738,7 @@ function step(s, d) {
     if (s.stamina >= STAMINA.max) { s.sit = false; toast('Khỏe re rồi, làm tiếp thôi 💪'); }
   }
   if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
+  heatGlass(s, false);   // nhà kính đang ngừng sưởi vì thiếu xu: đủ xu thì tự trả
   for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d);
   stepWater(s, d);   // bơm vào bồn rồi trừ nước theo thứ tự cố định (issue 57)
   stepFree(s, d);
@@ -726,7 +782,7 @@ function stepPlot(s, p, d) {
     return;
   }
   if (p.water > 0 && !frostHold(s, p)) {   // sương muối: cây hạt, mầm đứng yên hôm nay (không chết)
-    const sm = seasonGrowMul(s, c.id);
+    const sm = plotSeasonMul(s, p);   // trong nhà kính đang chạy thì không chậm (issue 60)
     if (sm < 1) c.offSeason = true;   // đã lớn lúc trái mùa: không ra ★3 (issue 54)
     c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm;
   }
@@ -1692,7 +1748,7 @@ function stepThreats(s, d) {
   const m = mapOf(s), v = m.view;
   const scare = m.decos.filter(o => o.kind === 'deco_scarecrow' && !o.ent?.down);   // bù nhìn bị bão quật đổ thì quạ không sợ
   // quạ
-  const open = ripe.filter(p => { const c = plotCenter(s, p.idx); return !scare.some(o => Math.hypot(o.x - c.x, o.y - c.y) <= 5 * TS); });
+  const open = ripe.filter(p => { const c = plotCenter(s, p.idx); return !glassIntact(s, p) && !scare.some(o => Math.hypot(o.x - c.x, o.y - c.y) <= 5 * TS); });   // quạ không vào nhà kính
   if (open.length && s.threats.filter(t => t.kind === 'crow').length < 2 && chance(THREATS.crowChancePerMin, d)) {
     const p = pick(open), c = plotCenter(s, p.idx), side = rint(0, 2);
     const x = side === 0 ? v.x0 + 2 : side === 1 ? v.x1 - 2 : rnd(v.x0 + 20, v.x1 - 20), y = side === 2 ? v.y0 + 2 : rnd(v.y0 + 20, (v.y0 + v.y1) / 2);
@@ -2374,7 +2430,7 @@ export function actionsFor(s, t) {
   if (!t) return [];
   if (s.scene === 'visit') return guestActs(s, t);
   const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: eggActs,
-    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, gate: gateActs, scale: () => [mk('weigh', '⚖️', 'Cân heo xem số ký')], nest: nestActs, dog: dogActs, cat: catActs, threat: threatActs, pred: predActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
+    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, gate: gateActs, scale: () => [mk('weigh', '⚖️', 'Cân heo xem số ký')], nest: nestActs, dog: dogActs, cat: catActs, threat: threatActs, pred: predActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs, glass: glassActs }[t.kind];
   return f ? f(s, t) : [];
 }
 
@@ -2644,6 +2700,7 @@ function posOf(s, t) {
   if (t.kind === 'door') return doorOf(s, t.to)?.at ?? s.player;
   if (t.kind === 'deco') return m.decos.find(d => d.id === t.id) ?? s.player;
   if (t.kind === 'clutter') { const e = s.farm.ents.find(x => x.id === t.id); return e ? { x: e.c * TS + 8, y: e.r * TS + 8 } : s.player; }
+  if (t.kind === 'glass') { const e = s.farm.ents.find(x => x.id === t.id); return e ? glassDoor(e) : s.player; }
   if (t.kind === 'dog') return s.dog;
   const list = { animal: s.animals, egg: s.eggs, poop: s.poops, threat: s.threats, pred: s.preds, cat: s.cats }[t.kind];
   return list?.find(x => x.id === t.id) ?? s.player;
@@ -2691,6 +2748,12 @@ function doArea(s, tiles, id) {
 }
 
 const DO = {
+  glass(s, t, id, at) {   // sửa kính nhà kính bị bão làm vỡ
+    const g = s.farm.ents.find(x => x.id === t.id).up.glass;
+    s.coins -= GLASS.fix; g.broken = false;
+    log(s, `Sửa kính nhà kính (${GLASS.fix} xu)`);
+    return res(true, 'Kính lành rồi, nhà kính chạy lại', [say(at, `-${GLASS.fix} xu`, COL.coin)], 'coin');
+  },
   gate(s, t, id, at) { return scatter(s, t, at); },
   plot(s, t, id, at) {
     const p = s.plots[t.idx], c = p.crop;
@@ -3670,6 +3733,7 @@ const overlaps = (a, b) => a.c < b.c + b.w && b.c < a.c + a.w && a.r < b.r + b.h
 export const canMove = e => !!e && e.kind !== 'tree' && !CLUTTER[e.kind] && !BUILDING_DEFS[e.kind]?.fixed;
 export function entName(e) {
   if (e.kind === 'field') return 'Khối ruộng';
+  if (e.kind === 'greenhouse') return 'Nhà kính';
   if (e.kind === 'pen') return PEN_DEFS[e.pen].name;
   if (e.kind === 'deco') return ITEMS[e.item]?.name ?? 'Đồ trang trí';
   if (e.kind === 'tree') return 'Cây';
@@ -3689,6 +3753,16 @@ function access(m) {
   return out;
 }
 
+// Nhà kính (issue 60): chỉ đặt trùng đúng một khối ruộng có sẵn (góc trên-trái trùng nhau), từ cấp GLASS.lv, tối đa GLASS.max cái
+const fieldAt = (s, c, r) => s.farm.ents.find(e => e.kind === 'field' && e.c === c && e.r === r) ?? null;
+function glassCheck(s, c, r) {
+  if (level(s) < GLASS.lv) return no('level', `Cần cấp ${GLASS.lv} mới xây nhà kính được`);
+  const f = fieldAt(s, c, r);
+  if (!f) return no('no_field', 'Nhà kính phải phủ đúng lên một khối ruộng');
+  if (f.up?.glass) return no('has_glass', 'Khối ruộng này có nhà kính rồi');
+  if (greenhouses(s).length >= GLASS.max) return no('max_glass', `Mỗi vườn tối đa ${GLASS.max} nhà kính`);
+  return { ok: true };
+}
 export function canPlace(s, what, c, r) {
   const f = s.farm, old = what.id != null ? f.ents.find(e => e.id === what.id) : null;
   if (what.id != null && !old) return no('missing', 'Không thấy công trình này');
@@ -3716,6 +3790,7 @@ export function canPlace(s, what, c, r) {
     if (what.kind !== 'tank' && !f.ents.some(e => e.kind === 'tank')) return no('no_tank', `Cần xây bồn chứa trước rồi mới xây ${nm}`);
     if (f.ents.filter(e => e.kind === what.kind).length >= max) return no('max', max > 1 ? `Đã đủ ${max} ${nm}` : `Vườn chỉ có một ${nm}`);
   }
+  if (!old && what.kind === 'greenhouse') return glassCheck(s, c, r);
   const e = { ...(old ?? what), c, r }, ft = footprint(e), o = f.owned;
   if (ft.c < o.c || ft.r < o.r || ft.c + ft.w > o.c + o.w || ft.r + ft.h > o.r + o.h) return no('outside', 'Chỗ này ngoài đất của bạn');
   if (f.ents.some(x => CLUTTER[x.kind] && overlaps(ft, footprint(x)))) return no('uncleared', 'Còn bụi cây, đá chưa dọn');
@@ -3834,6 +3909,7 @@ export function upgradePen(s, id) {
 // Giá và điều kiện (ngoài chỗ đặt) của món định đặt: xu, cấp, đồ trong túi
 export function placeCost(s, what) {
   if (what.kind === 'field') return fieldCost(s);
+  if (what.kind === 'greenhouse') return GLASS.price;
   if (what.kind === 'pen') return PEN_PRICES[what.pen] ?? 0;
   return BUILD_PRICES[what.kind] ?? WATER_BUILD[what.kind]?.price ?? 0;
 }
@@ -3845,6 +3921,8 @@ export function canAfford(s, what) {
   } else if (BUILD_PRICES[what.kind]) {
     const t = PEN_TABLE[what.kind];
     if (level(s) < t.lv) return no('level', `Cần cấp ${t.lv} mới xây ${BUILDING_DEFS[what.kind].name.toLowerCase()} được`);
+  } else if (what.kind === 'greenhouse') {
+    if (level(s) < GLASS.lv) return no('level', `Cần cấp ${GLASS.lv} mới xây nhà kính được`);
   } else if (what.kind !== 'field' && !WATER_BUILD[what.kind]) return no('missing', 'Không đặt được món này');
   return s.coins >= placeCost(s, what) ? { ok: true } : no('coins', 'Chưa đủ xu, cố lên nhé');
 }
@@ -3857,6 +3935,14 @@ export function placeEntity(s, what, c, r) {
   if (!chk.ok) return R(false, chk.msg, { reason: chk.reason });
   const aff = canAfford(s, what);
   if (!aff.ok) return R(false, aff.msg, { reason: aff.reason });
+  if (what.kind === 'greenhouse') {   // nhà kính: nâng cấp của khối ruộng nằm dưới, không thêm thực thể mới
+    const f = fieldAt(s, c, r);
+    s.coins -= GLASS.price;
+    f.up = { ...fieldUpgrades(), ...f.up, glass: { broken: false, unpaid: false } };
+    bumpLayout(s);
+    log(s, `Xây nhà kính (${GLASS.price} xu)`);
+    return R(true, 'Đã xây nhà kính', { id: f.id, sound: 'coin' });
+  }
   const e = { id: s.nextId++, kind: what.kind, c, r };
   if (what.kind === 'deco') { take(s, what.item); e.item = what.item; }
   else s.coins -= placeCost(s, what);
@@ -3882,6 +3968,7 @@ export function storeEntity(s, id) {
   } else if (e.kind === 'field') {
     if (e.plots.some(i => s.plots[i]?.crop)) return R(false, 'Ruộng còn cây, thu hoạch xong mới cất được', { reason: 'has_crop' });
     if (fieldCount(s) <= 1) return R(false, 'Phải giữ lại ít nhất một khối ruộng', { reason: 'last_field' });
+    if (e.up?.glass) return R(false, 'Khối ruộng có nhà kính, không cất được', { reason: 'has_glass' });
     for (const i of e.plots) s.plots[i] = { idx: i, unlocked: false, removed: true, soil: 'untilled', water: 0, weeds: false, crop: null };
     s.threats = (s.threats ?? []).filter(t => !e.plots.includes(t.plot));
   } else return R(false, `${entName(e)} không cất được`, { reason: 'fixed' });
