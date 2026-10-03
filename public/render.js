@@ -6,7 +6,7 @@ import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses } from './state.js';
+import { canMove, ripeLeft, wilting, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
@@ -539,6 +539,14 @@ export function cropImg(p) {
   if (c.sick) img = st >= 1 && SPR.sick ? SPR.sick : tinted(img, '#d4c23a', 0.6);
   return img;
 }
+// Thanh nhỏ dưới ô: xanh = tiến độ lớn, cam = đếm ngược chín→héo, đỏ nhấp nháy = sắp héo (2 hàng điểm ảnh thế giới, nét nguyên theo tỉ lệ chẵn)
+function cropBar(ctx, c, px, py, now) {
+  if (c.dead || c.rotten) return;
+  const left = ripeLeft(c), f = left == null ? Math.min(1, c.progress) : left;
+  const col = left == null ? '#5fd35f' : wilting(c) ? (Math.floor(now / 300) % 2 ? '#ff4a3a' : '#c02a20') : '#f2a52b';
+  rect(ctx, '#2b1a0c', px + 2, py + 14, 12, 2);
+  rect(ctx, col, px + 2, py + 15, Math.max(1, Math.round(12 * f)), 2);
+}
 // Biểu tượng trong bong bóng của một ô (theo độ ưu tiên)
 export function plotProblem(p) {
   const c = p.crop;
@@ -772,8 +780,9 @@ export function render(ctx, f) {
     const prob = plotProblem(p);
     add(py + 12, () => {
       if (p.crop) {
-        const im = cropImg(p);
+        const warn = wilting(p.crop), im0 = cropImg(p), im = warn ? tinted(im0, '#8a5a1a', Math.floor(now / 350) % 2 ? 0.45 : 0.25) : im0;   // sắp héo: ngả nâu nhấp nháy
         blit(im, px + (16 - im.width) / 2, py + 15 - im.height);
+        cropBar(ctx, p.crop, px, py, now);
         if (p.crop.sick && !p.crop.dead && !p.crop.rotten && !SPR.sick) { /* đã nhuộm vàng */ }
         if (cropStage(p.crop) >= 4 && !p.crop.dead && !p.crop.rotten) {
           for (let i = 0; i < sparkles; i++) {

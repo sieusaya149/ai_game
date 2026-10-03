@@ -532,9 +532,10 @@ export function setTarget(target, actions, name) {
     if (!nm.hidden) nm.textContent = name;
     return;
   }
+  const a = cur.actions[0];
+  if (a.disabled && (target.kind === 'strip' || target.kind === 'lockedPlot')) name = `${name ? name + '. ' : ''}${a.disabled}`;   // đất chưa mua được: nói luôn vì sao
   nm.hidden = !name;
   nm.textContent = name || '';
-  const a = cur.actions[0];
   main.hidden = false;
   main.classList.toggle('disabled', !!a.disabled);
   main.querySelector('.ma-icon').replaceChildren(actIcon(a.icon));
@@ -1596,6 +1597,7 @@ PANELS.settings = {
         h('li', {}, h('kbd', {}, 'Space'), ' / ', h('kbd', {}, 'E'), ': hành động chính.'),
         h('li', {}, h('kbd', {}, '1'), '–', h('kbd', {}, '6'), ': các hành động phụ.'),
         h('li', {}, h('kbd', {}, 'Esc'), ': đóng bảng.'),
+        h('li', {}, '🗺️ Mua đất: từ cấp 5, đứng sát mép vườn rồi bấm Mua đất. Đất mua từng dải, vườn luôn là một hình chữ nhật.'),
         h('li', {}, '📱 Điện thoại: chạm mặt đất để đi, chạm vật để làm việc, hoặc dùng cần điều khiển.')),
       section('Làng'),
       ...(s.mode === 'online'

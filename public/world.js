@@ -557,7 +557,7 @@ export function exists(state, t) {
   if (!atFarm() && !['building', 'door'].includes(t.kind) && !(t.kind === 'dog' && dogHere(state)) && t.kind !== 'cat') return false;
   if (t.kind === 'cat') return catsHere(state).some(c => c.id === t.id);
   if (t.kind === 'plot') return !!state.plots[t.idx]?.unlocked;
-  if (t.kind === 'lockedPlot') return t.idx === ST.nextLockedPlot(state);
+  if (t.kind === 'lockedPlot') { const lp = state.plots[t.idx]; return !!lp && !lp.unlocked && !lp.removed; }   // ô khóa chưa tới lượt: chạm vào được, báo ô cần mở trước
   if (t.kind === 'strip' && !atFarm()) return false;
   const pos = targetPos(state, t);
   return !!pos && pos.x != null;
@@ -633,7 +633,7 @@ export function findTarget(state, w) {
 export function nameOf(state, t) {
   use(state);
   switch (t.kind) {
-    case 'plot': { const c = state.plots[t.idx]?.crop; return c ? (CROPS[c.id]?.name ?? 'Cây trồng') : `Ô ruộng ${t.idx + 1}`; }
+    case 'plot': { const c = state.plots[t.idx]?.crop; return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (ST.wilting(c) ? ' – sắp héo!' : '') : `Ô ruộng ${t.idx + 1}`; }
     case 'lockedPlot': return 'Đất hoang';
     case 'animal': { const a = findBy(state.animals, t.id), why = a && ST.breedNote(state, a); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}${why ? `\n💡 ${why}` : ''}` : 'Vật nuôi'; }
     case 'egg': { const e = findBy(state.eggs, t.id); return e?.candled ? (e.fertile ? 'Trứng có phôi ✨' : 'Trứng trống') : 'Quả trứng'; }
@@ -650,7 +650,7 @@ export function nameOf(state, t) {
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
     case 'deco': { const d = M.decos.find(o => o.id === t.id); return d ? ST.entName(d.ent) : 'Đồ trang trí'; }
     case 'clutter': return M.clutter.find(o => o.id === t.id) ? ST.entName(M.clutter.find(o => o.id === t.id).ent) : '';
-    case 'strip': return `Đất phía ${DIR_NAME[t.dir]}`;
+    case 'strip': { const d = ST.nextStrip(state, t.dir); return d ? `Đất phía ${DIR_NAME[t.dir]}: dải ${d.w}×${d.h} ô, ${d.price} xu` : `Đất phía ${DIR_NAME[t.dir]}`; }
   }
   return '';
 }
@@ -736,7 +736,7 @@ export function hitTest(state, wx, wy) {
   const idx = M.plotAt(Math.floor(wx / TS), Math.floor(wy / TS));
   if (idx >= 0) {
     if (state.plots[idx]?.unlocked) return { kind: 'plot', idx };
-    if (idx === ST.nextLockedPlot(state)) return { kind: 'lockedPlot', idx };
+    if (state.plots[idx] && !state.plots[idx].removed) return { kind: 'lockedPlot', idx };
   }
   return null;
 }

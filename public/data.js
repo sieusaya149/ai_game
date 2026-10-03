@@ -42,7 +42,9 @@ export const CROPS = {
 };
 // Các giai đoạn theo % thời gian lớn: 0 hạt · 1 mầm · 2 cây non · 3 ra hoa/trái non · 4 chín.
 export const CROP_STAGES = [0, 0.1, 0.35, 0.7, 1];
-export const OVERRIPE = 1.5;              // chín quá (grow × 1.5) mà chưa hái thì héo, mất trắng
+export const OVERRIPE = 1.5;              // chín quá (grow × 1.5) mà chưa hái thì héo, mất trắng (cây ngắn ngày: xem RIPE_FLOOR)
+export const RIPE_FLOOR = 10 * MIN;       // cửa sổ chín→héo ít nhất 10 phút game, kể cả cây lớn nhanh
+export const WILT_WARN = 0.8;             // đã qua 80% cửa sổ thì báo "sắp héo"
 
 export const FARMING = {
   waterDrainPerMin: 25,   // đất mất bao nhiêu % nước mỗi phút (trời nắng ×1.5, trời mưa luôn đầy)
