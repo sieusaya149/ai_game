@@ -650,11 +650,12 @@ export const START = {
   animals: [{ type: 'ga', stage: 'truong', sex: 'f' }, { type: 'ga', stage: 'non', sex: 'm' }],
   dogStage: 'non',
 };
-export const expandCost = n => Math.round(120 * 1.25 ** (n - START_PLOTS) / 10) * 10;
-export const expandLevel = n => 1 + Math.floor((n - START_PLOTS) / 3);
 // Khối ruộng 3x3 (chế độ xây dựng): [cấp, số khối tối đa]; giá khối thứ (n+1) khi đã có n khối (khối đầu có sẵn, miễn phí)
+// Đặt khung khối miễn phí, mở từng ô: giá ô thứ i (0..8) = giá khối × w_i / Σw, làm tròn 10 xu, ô sau đắt hơn ô trước, tổng ≈ giá khối
 export const FIELD_LIMITS = [[1, 1], [4, 2], [8, 3], [12, 4], [16, 5], [20, 6], [25, 7], [30, 8]];
 export const FIELD_PRICES = [1000, 2500, 5000, 9000, 15000, 24000, 36000];
+const PLOT_W = Array.from({ length: 9 }, (_, i) => 0.88 + 0.06 * i);
+export const plotPrice = (block, i) => Math.round(block * PLOT_W[i] / PLOT_W.reduce((a, b) => a + b, 0) / 10) * 10;
 // Giá xây chuồng (mở theo cấp mua được con vật tương ứng trong ANIMALS)
 export const PEN_PRICES = { chicken: 400, pig: 1500, pasture: 4500, quarantine: 1000 };
 // Bảng chuồng theo (loại, cấp). cap: sức chứa 3 cấp; lv: cấp người chơi để xây; limit: [cấp, số chuồng tối đa] (như FIELD_LIMITS);

@@ -168,9 +168,9 @@ export function buildTray(s, b) {
   }, icon, h('b', {}, name), h('small', {}, sub));
   let empty = '';
   if (trayTab === 'field') {
-    const n = S.fieldCount(s), max = S.fieldLimit(s), nx = S.fieldNextLevel(s), full = n >= max;
+    const n = S.fieldCount(s), max = S.fieldLimit(s), nx = S.fieldNextLevel(s), full = n >= max, half = S.nextLockedPlot(s) >= 0;
     cards.push(card({ kind: 'field' }, h('span', { class: 'ico emo' }, '🟫'), `Khối ruộng ${n}/${max}`,
-      full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : S.fieldCost(s) ? `🪙 ${fmt(S.fieldCost(s))}` : 'Miễn phí', full));
+      full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : half ? 'Mở hết ô có cờ trước' : `Đặt miễn phí, mở ô 🪙 ${fmt(S.fieldCost(s))}`, full || half));
     // nhà kính (issue 60): kéo thả lên một khối ruộng có sẵn
     const g = S.greenhouses(s).length, glow = level(s) < D.GLASS.lv, gfull = !glow && g >= D.GLASS.max;
     cards.push(card({ kind: 'greenhouse' }, h('img', { class: 'ico', src: hd(GH.card).toDataURL(), alt: '', draggable: false }), glow ? 'Nhà kính' : `Nhà kính ${g}/${D.GLASS.max}`,
@@ -1162,7 +1162,8 @@ const GUIDE = [
   { title: 'Chế độ xây dựng', art: () => [spr().shippingBin, spr().lampPost, spr().bench],
     text: ['Bấm 🔨 Xây dựng ở thanh dưới để dời nhà, kho, chuồng, ruộng, đồ trang trí.',
       'Chạm và kéo công trình tới chỗ mới (chỗ đỏ là không đặt được). Cất để cho vào kho, Xong để giữ, Hủy để trả lại như cũ.',
-      'Khay phía dưới có khối ruộng, chuồng và đồ trang trí đã mua.'] },
+      'Khay phía dưới có khối ruộng, chuồng và đồ trang trí đã mua.',
+      'Khối ruộng mới đặt miễn phí nhưng 9 ô còn khóa: chạm ô có cờ để mở (tốn xu), mở lần lượt từng ô. Mở hết khối này mới đặt được khối kế.'] },
   { title: 'Mở đất', art: () => [spr().bushes?.[0], spr().rocks?.[0], spr().stump],
     text: ['Dải đất mới mua ở mép vườn có bụi cây và đá. Đứng gần rồi bấm dọn là được gỗ, đá.',
       `Dọn bụi tốn ${D.STAMINA.cost.clearBush} thể lực, đập đá tốn ${D.STAMINA.cost.breakRock}, chặt cây chắn đường tốn ${D.STAMINA.cost.chopTree} (được gỗ). Dọn xong đặt ruộng, chuồng ở 🔨 Xây dựng.`] },

@@ -912,7 +912,7 @@ export function render(ctx, f) {
   };
 
   // 1) đất ruộng
-  const nextLocked = wd.nextLocked(state);
+  const nextLocked = state.scene === 'visit' ? -1 : wd.nextLocked(state);   // khách không thấy cờ (không mở được ô của chủ)
   const ups = farm ? fieldUps(state) : null;   // ô → khối có nâng cấp (issue 58)
   for (const p of state.plots) {
     const pt = m.plotTile(p.idx);
@@ -922,10 +922,9 @@ export function render(ctx, f) {
     if (!p.unlocked) {
       blit(SPR.wild, px, py);
       if (p.idx === nextLocked) {
-        ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(px, py, 16, 16);
-        rect(ctx, '#3b2412', px + 5, py + 7, 7, 6); rect(ctx, '#f7d547', px + 6, py + 8, 5, 4); rect(ctx, '#d19a1c', px + 8, py + 9, 1, 2);
-        rect(ctx, '#3b2412', px + 6, py + 4, 5, 4); rect(ctx, '#b8b8b8', px + 7, py + 5, 3, 3);
-        rect(ctx, '#f7d547', px + 6, py + 8, 5, 4); rect(ctx, '#3b2412', px + 8, py + 9, 1, 2);
+        // cờ nhỏ báo ô kế tiếp cần mở: cọc gỗ, cờ đuôi nheo đỏ, đống đất dưới chân
+        rect(ctx, '#7a5a34', px + 4, py + 13, 5, 1); rect(ctx, '#5a3a1a', px + 6, py + 3, 1, 11);
+        rect(ctx, '#d9402b', px + 7, py + 3, 6, 1); rect(ctx, '#d9402b', px + 7, py + 4, 5, 1); rect(ctx, '#b02a1a', px + 7, py + 5, 4, 1); rect(ctx, '#b02a1a', px + 7, py + 6, 2, 1);
       }
     } else {
       blit(soilImg(p), px, py);

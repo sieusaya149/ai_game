@@ -175,7 +175,7 @@ export function bigFarmSave() {
     s.inv.deco_scarecrow = s.inv.deco_flower = s.inv.deco_lamp = s.inv.deco_bench = 999;
     const decos = ['deco_flower', 'deco_lamp', 'deco_bench', 'deco_scarecrow'];
     // khối ruộng và chuồng ở những chỗ trống tìm được, rồi rải đồ trang trí cách 3 ô khắp vườn
-    const spot = what => { for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) if (canPlace(s, what, c, r).ok) return placeEntity(s, what, c, r).ok; return false; };
+    const spot = what => { for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) if (canPlace(s, what, c, r).ok) { const ok = placeEntity(s, what, c, r).ok; if (what.kind === 'field') for (const i of s.farm.ents.at(-1).plots) s.plots[i].unlocked = true; return ok; } return false; };
     for (let i = 0; i < 8; i++) spot({ kind: 'field' });
     spot({ kind: 'pen', pen: 'pig' }); spot({ kind: 'pen', pen: 'pasture' });
     let k = 0;

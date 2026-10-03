@@ -181,6 +181,7 @@ test('đất màu mỡ: cỏ mọc chậm hơn khối thường', () => {
   const p = spot(s, { kind: 'field' });
   assert.ok(G.placeEntity(s, { kind: 'field' }, p.c, p.r).ok);
   const g = s.farm.ents.filter(e => e.kind === 'field').at(-1);
+  for (const i of g.plots) s.plots[i].unlocked = true;   // khung mới còn khóa: mở hết cho gọn
   for (const x of [f, g]) for (const i of x.plots) Object.assign(s.plots[i], { unlocked: true, soil: 'tilled', weeds: false, crop: null });
   // xác suất mỗi giây của khối thường lớn hơn số ngẫu nhiên, của khối màu mỡ thì nhỏ hơn
   const perSec = 1 - Math.pow(1 - FARMING.weedChancePerMin, 1 / 60);
@@ -196,6 +197,7 @@ test('đất màu mỡ: thêm sản lượng so với khối không nâng, tính
   const p = spot(s, { kind: 'field' });
   assert.ok(G.placeEntity(s, { kind: 'field' }, p.c, p.r).ok);
   const g = s.farm.ents.filter(e => e.kind === 'field').at(-1);
+  for (const i of g.plots) s.plots[i].unlocked = true;   // khung mới còn khóa: mở hết cho gọn
   buy(s, f, 'rich');
   const a = f.plots[0], b = g.plots[0];
   for (const i of [a, b]) {

@@ -297,6 +297,7 @@ test('thứ tự trừ nước cố định: chạy lại cùng bản lưu ra c�
   const p = spot(s, { kind: 'field' }, (c, r) => gap({ c, r, w: 3, h: 3 }, t) <= TANK.range);
   assert.ok(G.placeEntity(s, { kind: 'field' }, p.c, p.r).ok);
   const f2 = s.farm.ents.filter(e => e.kind === 'field').at(-1);
+  for (const i of f2.plots) s.plots[i].unlocked = true;
   f2.up.drip = true;
   for (const i of f2.plots) Object.assign(s.plots[i], { soil: 'tilled', water: 0, crop: structuredClone(s.plots[f1.plots[0]].crop) });
   for (const i of f1.plots) s.plots[i].water = 0;
