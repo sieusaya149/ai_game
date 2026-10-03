@@ -21,7 +21,6 @@ test('createGame: đúng dữ liệu khởi đầu', () => {
   const s = newGame();
   assert.equal(s.plots.length, 9);   // vườn mới: 1 khối ruộng 3x3
   assert.equal(s.plots.filter(p => p.unlocked).length, 9);
-  assert.deepEqual(G.UNLOCK_ORDER.slice(0, 9).sort((a, b) => a - b), [0, 1, 2, 6, 7, 8, 12, 13, 14]);
   assert.equal(s.coins, 250);
   assert.equal(s.animals.length, 2);
   assert.equal(s.inv.seed_cai, 6);
@@ -179,16 +178,16 @@ test('bón phân tăng sản lượng, thuốc tăng trưởng đẩy nhanh', ()
   assert.equal(s.basket['cai@3'], Math.round(CROPS.cai.yield * 1.5));   // tưới tay, bón phân, không khô, không sâu: ★3 (issue 52)
 });
 
-test('mở rộng đất theo thứ tự (vườn chuyển từ v1 còn ô khóa)', () => {
+test('mở ô theo thứ tự trong khối (vườn chuyển từ v1 còn ô khóa)', () => {
   const v1 = JSON.parse(readFileSync(new URL('./fixtures/v1-fresh.json', import.meta.url), 'utf8'));
   v1.savedAt = Date.now();
   for (const k of Object.keys(store)) delete store[k];
   store['nongtrai-save-v1'] = JSON.stringify(v1);
   const s = G.loadGame();
   const next = G.nextLockedPlot(s);
-  assert.equal(next, G.UNLOCK_ORDER[9]);
-  const far = G.actionsFor(s, { kind: 'lockedPlot', idx: 35 })[0];   // ô khóa không phải kế tiếp: báo ô cần mở trước
-  assert.ok(far.disabled && far.disabled.includes(`ô ${next + 1}`), far.disabled);
+  assert.ok(next >= 0 && !s.plots[next].unlocked);
+  const far = G.actionsFor(s, { kind: 'lockedPlot', idx: s.plots.findLastIndex(p => !p.unlocked) })[0];   // ô khóa không phải kế tiếp: báo ô cần mở trước
+  assert.ok(far.disabled && far.disabled.includes('ô có cờ'), far.disabled);
   const a = G.actionsFor(s, { kind: 'lockedPlot', idx: next })[0];
   assert.equal(a.id, 'expand');
   s.coins = 500;

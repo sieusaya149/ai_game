@@ -26,7 +26,7 @@ async function dragTo(page, touch, from, to, check) {
   await d.end();
 }
 
-test('mua và đặt khối ruộng mới → cuốc được ô trong khối đó', async ({ page, context }, testInfo) => {
+test('đặt khung khối ruộng mới miễn phí → mở ô có cờ → cuốc được ô đó', async ({ page, context }, testInfo) => {
   const touch = !!testInfo.project.use.hasTouch;
   await enterBuild(page, context);
   await expect(page.locator('#build-tray')).toContainText('Khối ruộng 1/2');
@@ -37,12 +37,15 @@ test('mua và đặt khối ruộng mới → cuốc được ô trong khối đ
   await expect.poll(async () => (await fields(page)).length).toBe(2);
   await expect(page.locator('#build-tray')).toContainText('Cấp 8 để có thêm');
   await expect(page.locator('.bt-card').first()).toBeDisabled();   // đủ 2/2: không chọn thêm được
-  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(1700);
+  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(2000);   // đặt khung miễn phí
   await page.locator('#build-done').click();
   await expect(page.locator('#buildbar')).toBeHidden();
 
   await page.waitForTimeout(800);   // camera về theo nhân vật
-  const idx = (await fields(page))[1].plots[4];
+  const idx = (await fields(page))[1].plots[0];
+  expect(await page.evaluate(i => globalThis.__farm.state.plots[i].unlocked, idx)).toBe(false);
+  await tapPlot(page, idx, touch, () => page.evaluate(i => globalThis.__farm.state.plots[i].unlocked, idx));   // chạm ô có cờ → mở ô (trả xu)
+  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBeLessThan(2000);
   await tapPlot(page, idx, touch);
   await expect.poll(() => page.evaluate(i => globalThis.__farm.state.plots[i].soil, idx), { timeout: 15000 }).toBe('tilled');
   await page.reload();

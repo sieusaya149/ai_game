@@ -279,7 +279,7 @@ function bigFarm(s) {
   s.farm.ents = s.farm.ents.filter(e => !CLUTTER[e.kind]);   // đất đã dọn hết bụi, đá
   const o = s.farm.owned;
   s.inv.deco_scarecrow = s.inv.deco_flower = s.inv.deco_lamp = s.inv.deco_bench = 999;
-  const spot = what => { for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) if (canPlace(s, what, c, r).ok) return placeEntity(s, what, c, r).ok; return false; };
+  const spot = what => { for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) if (canPlace(s, what, c, r).ok) { const ok = placeEntity(s, what, c, r).ok; if (what.kind === 'field') for (const i of s.farm.ents.at(-1).plots) s.plots[i].unlocked = true; return ok; } return false; };
   for (let i = 0; i < 3; i++) for (const pen of ['pig', 'pasture', 'chicken']) spot({ kind: 'pen', pen });
   for (let i = 0; i < 8; i++) spot({ kind: 'field' });
   const decos = ['deco_flower', 'deco_lamp', 'deco_bench', 'deco_scarecrow'];

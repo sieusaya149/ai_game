@@ -31,7 +31,7 @@ const fields = s => s.farm.ents.filter(e => e.kind === 'field');
 // Thêm một khối ruộng ở chỗ trống đầu tiên đặt được
 function addField(s) {
   const o = s.farm.owned;
-  for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) if (G.canPlace(s, { kind: 'field' }, c, r).ok) { assert.ok(G.placeEntity(s, { kind: 'field' }, c, r).ok); return fields(s).at(-1); }
+  for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) if (G.canPlace(s, { kind: 'field' }, c, r).ok) { assert.ok(G.placeEntity(s, { kind: 'field' }, c, r).ok); for (const i of fields(s).at(-1).plots) s.plots[i].unlocked = true; return fields(s).at(-1); }
   throw new Error('hết chỗ đặt khối ruộng');
 }
 const GH = { kind: 'greenhouse' };

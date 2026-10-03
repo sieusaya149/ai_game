@@ -1031,13 +1031,13 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 **Mức và khóa gộp của event** (`EVENT_LEVEL` trong `data.js`): mỗi event có `level`, `group(e)` (khóa gộp), `label`; mức `important` có thêm `cat` (loại tắt được) và `text(n, e)` (chữ đã gộp, ví dụ "5 ô cà chua đã chín"). Mức: `urgent` 🔴 (băng rôn đỏ, âm thanh, rung, mũi tên; không tắt được) · `important` 🟡 (toast nhỏ, tự gộp) · `info` ⚪ (chỉ ghi nhật ký) · `direct` (hiện ngay không gộp) · `none` (hiệu ứng/âm thanh, không thông báo). **Thêm event mới thì khai báo trong `EVENT_LEVEL`**, thiếu thì `eventMeta` trả `null`.
 
 ### Hằng và tiện ích khác
-`UNLOCK_ORDER`, `nextLockedPlot`, `stageOf(crop)`, `levelInfo`, `mapOf`, `reachable`, `footprint`, `sceneMap`, `mmss`, `TUTORIAL`. `UNLOCK_ORDER`/`lockedPlot` chỉ còn cho ô chưa mở trong khối ruộng chuyển từ v1 (mở theo thứ tự cũ); vườn mới không có ô khóa. Chạm ô khóa chưa tới lượt thì hành động `expand` bị vô hiệu kèm lý do "Mở ô N trước (mở đất theo thứ tự)".
+`nextLockedPlot(state)` (ô khóa kế tiếp, -1 nếu hết), `plotCost(state, idx)`, `stageOf(crop)`, `levelInfo`, `mapOf`, `reachable`, `footprint`, `sceneMap`, `mmss`, `TUTORIAL`. Ô khóa nằm trong khối ruộng mới đặt (và khối chuyển từ v1 còn ô khóa), mở theo thứ tự trong khối. Chạm ô khóa chưa tới lượt thì hành động `expand` bị vô hiệu kèm lý do "Mở ô có cờ trước".
 
 ### Danh sách target (`{ kind, ... }`)
 
 ```js
 { kind: 'plot', idx }          // ô ruộng đã mở
-{ kind: 'lockedPlot', idx }    // ô chưa mở kế tiếp trong khối chuyển từ v1
+{ kind: 'lockedPlot', idx }    // ô khóa trong khối ruộng (kế tiếp có cờ)
 { kind: 'animal', id }
 { kind: 'egg', id }
 { kind: 'poop', id }
@@ -1140,7 +1140,7 @@ Tên âm thanh (`sound.js`, `play(name)`, `setMuted(bool)`): `click coin harvest
 Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra vị trí (theo thực thể đã đặt thay vì lưới cố định).
 
 **Ruộng**
-- Ruộng là các **khối 3x3** đặt tự do; vườn mới có 1 khối (9 ô), thêm khối ở chế độ xây dựng theo `FIELD_LIMITS` (cấp → số khối tối đa) và `FIELD_PRICES`.
+- Ruộng là các **khối 3x3** đặt tự do; vườn mới có 1 khối (9 ô), thêm khối ở chế độ xây dựng theo `FIELD_LIMITS` (cấp → số khối tối đa). **Đặt khung khối mới miễn phí, 9 ô còn khóa; mở từng ô** (trái → phải, trên → xuống; ô kế tiếp có cờ, chạm để mở). Giá ô i (0..8) = `plotPrice(FIELD_PRICES[số khối đã có − 1], i)` = giá khối × (0,88 + 0,06·i) / Σ, làm tròn 10 xu (ô sau đắt hơn, tổng ≈ giá khối, `fieldCost` = giá khối). Phải mở hết khối đang dở mới đặt được khối mới (`canAfford` trả `reason: 'unfinished'`). Dời khối giữ ô khóa; nâng cấp khối chỉ tác dụng lên ô đã mở. Khách thăm không thấy cờ, không mở được.
 - Chu trình: ô mới là `untilled` → **Cuốc đất** → `tilled` → **Gieo hạt** (tốn 1 `seed_<id>`, theo `selectedSeed`).
 - Cây lớn qua 5 giai đoạn (`CROP_STAGES`). Lớn đủ tốc độ khi `water > 0`; đất khô hẳn thì lớn chậm `FARMING.dryGrowMul` = 0.5 (không dừng, không bao giờ chết vì khô, kể cả chạy bù offline). Có cỏ thì lớn chậm lại (×`weedSlow`), có sâu hoặc bệnh thì dừng lớn.
 - **Tưới** tốn 1 `can`, đặt `water` về 100; hết nước thì ra giếng múc (`refill`, múc đầy `canMax`; giếng cấp cao bình chứa nhiều hơn và múc nhanh hơn, mục "Giếng 4 cấp"). **Nhổ cỏ** tay. **Sâu:** phun thuốc (chắc chắn, tốn 1 `pesticide`) hoặc bắt tay (50%). Sâu để lâu → **bệnh** → **chết**; thuốc trừ sâu chữa bệnh. **Bón phân** (+50% sản lượng) và **thuốc tăng trưởng** là hành động phụ.

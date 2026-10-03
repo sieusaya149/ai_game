@@ -50,7 +50,7 @@ function cropsFarm() {
     const o = s.farm.owned;
     for (let r = o.r; r < o.r + o.h; r++) for (let c = o.c; c < o.c + o.w; c++) {
       if (s.farm.ents.filter(e => e.kind === 'field').length >= 6) break;
-      if (canPlace(s, { kind: 'field' }, c, r).ok) placeEntity(s, { kind: 'field' }, c, r);
+      if (canPlace(s, { kind: 'field' }, c, r).ok && placeEntity(s, { kind: 'field' }, c, r).ok) for (const i of s.farm.ents.at(-1).plots) s.plots[i].unlocked = true;
     }
     s.animals = []; s.dog.chained = true; s.weather = 'sun'; s.coins = 1000;
     for (const p of s.plots) Object.assign(p, { soil: 'untilled', water: 0, weeds: false, crop: null });

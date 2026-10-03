@@ -2,7 +2,7 @@
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, RIPE_FLOOR, WILT_WARN, FARMING,
   ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, GUARD, WALK_SPEED, THREATS, RAID, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
-  expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, PEN_REFUND, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
+  FIELD_LIMITS, FIELD_PRICES, plotPrice, PEN_PRICES, PEN_REFUND, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CHOP, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
   TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON, WEATHER, MASTERY, masteryLevel, COATS, COAT, DELIVERY,
@@ -27,12 +27,6 @@ const OLD_KEYS = [['nongtrai-save-v3', 'nongtrai-migrated-v4'], ['nongtrai-save-
 const MARKS = OLD_KEYS.map(([, m]) => m);
 const MIN = 60_000;
 const plotCenter = (s, i) => mapOf(s).plotCenter(i);
-
-// Thứ tự mở ruộng: lan dần từ góc (max(r,c), min(r,c), r).
-export const UNLOCK_ORDER = Array.from({ length: GRID * GRID }, (_, i) => i).sort((a, b) => {
-  const [ra, ca, rb, cb] = [Math.floor(a / GRID), a % GRID, Math.floor(b / GRID), b % GRID];
-  return Math.max(ra, ca) - Math.max(rb, cb) || Math.min(ra, ca) - Math.min(rb, cb) || ra - rb;
-});
 
 // ---------- Tiện ích ----------
 let evq = [];            // hàng đợi event; tick() trả ra và xóa
@@ -2430,8 +2424,16 @@ function makeOrder(s) {
 }
 
 // ---------- Ruộng: tiện ích ----------
-export const nextLockedPlot = s => UNLOCK_ORDER.find(i => s.plots[i] && !s.plots[i].unlocked && !s.plots[i].removed) ?? -1;
-const unlockedCount = s => s.plots.filter(p => p.unlocked).length;
+// Ô kế tiếp cần mở (có cờ): theo thứ tự khối trong vườn, trong khối trái → phải, trên → xuống (thứ tự e.plots); -1 = không còn ô khóa
+export const nextLockedPlot = s => {
+  for (const e of s.farm?.ents ?? []) if (e.kind === 'field') for (const i of e.plots) if (s.plots[i] && !s.plots[i].unlocked && !s.plots[i].removed) return i;
+  return -1;
+};
+// Giá mở ô idx: giá khối × trọng số theo vị trí ô trong khối (ô sau đắt hơn); null nếu ô không thuộc khối nào
+export function plotCost(s, idx) {
+  const fs = s.farm.ents.filter(e => e.kind === 'field'), k = fs.findIndex(e => e.plots.includes(idx));
+  return k < 0 ? null : plotPrice(FIELD_PRICES[Math.min(Math.max(k, 1), FIELD_PRICES.length) - 1], fs[k].plots.indexOf(idx));
+}
 export const stageOf = c => CROP_STAGES.reduce((st, th, i) => (c.progress >= th ? i : st), 0);
 
 // ---------- Công cụ & tiệm rèn Ông Sáu ----------
@@ -2924,10 +2926,11 @@ function plotActs(s, t) {
 const mulchAct = s => mk('mulch', '🌾', `Phủ rơm (còn ${have(s, 'straw')})`, have(s, 'straw') <= 0 ? noItem('straw') : null);
 
 function lockedActs(s, t) {
-  const nx = nextLockedPlot(s);
-  if (t.idx !== nx) return s.plots[t.idx] && !s.plots[t.idx].unlocked && nx >= 0 ? [mk('expand', '🔓', 'Mở rộng đất', `Mở ô ${nx + 1} trước (mở đất theo thứ tự)`)] : [];
-  const n = unlockedCount(s), cost = expandCost(n), lv = expandLevel(n);
-  return [mk('expand', '🔓', `Mở rộng đất (${cost} xu)`, level(s) < lv ? `Cần cấp ${lv} mới mở rộng được` : s.coins < cost ? 'Chưa đủ xu' : null)];
+  const p = s.plots[t.idx], nx = nextLockedPlot(s);
+  if (!p || p.unlocked || p.removed || nx < 0) return [];
+  if (t.idx !== nx) return [mk('expand', '🔓', 'Mở ô đất', 'Mở ô có cờ trước')];
+  const cost = plotCost(s, t.idx);
+  return [mk('expand', '🔓', `Mở ô đất (${cost} xu)`, s.coins < cost ? 'Chưa đủ xu' : null)];
 }
 
 function animalActs(s, t) {
@@ -3288,11 +3291,11 @@ const DO = {
   },
 
   lockedPlot(s, t, id, at) {
-    const cost = expandCost(unlockedCount(s));
+    const cost = plotCost(s, t.idx);
     s.coins -= cost;
     Object.assign(s.plots[t.idx], newPlot(t.idx, true));
-    log(s, `Mở rộng thêm một ô đất (${cost} xu)`);
-    return res(true, 'Đã mở rộng đất!', [say(at, 'Mở đất mới! 🎉'), say({ x: at.x, y: at.y - 10 }, `-${cost} xu`, COL.coin)], 'coin');
+    log(s, `Mở thêm một ô đất (${cost} xu)`);
+    return res(true, 'Đã mở ô đất!', [say(at, 'Mở đất mới! 🎉'), say({ x: at.x, y: at.y - 10 }, `-${cost} xu`, COL.coin)], 'coin');
   },
 
   animal(s, t, id, at) {
@@ -4564,7 +4567,7 @@ export function buyStrip(s, dir) {
 export const fieldCount = s => s.farm.ents.filter(e => e.kind === 'field').length;
 export const fieldLimit = s => FIELD_LIMITS.reduce((n, [lv, k]) => (level(s) >= lv ? k : n), 0);
 export const fieldNextLevel = s => FIELD_LIMITS.find(([, k]) => k > fieldLimit(s))?.[0] ?? null;   // cấp để có thêm khối; null = đã tối đa
-export const fieldCost = s => (fieldCount(s) < 1 ? 0 : FIELD_PRICES[Math.min(fieldCount(s), FIELD_PRICES.length) - 1]);   // giá khối kế tiếp
+export const fieldCost = s => (fieldCount(s) < 1 ? 0 : FIELD_PRICES[Math.min(fieldCount(s), FIELD_PRICES.length) - 1]);   // tổng giá mở 9 ô của khối kế tiếp (đặt khung thì miễn phí)
 export const penLevel = pen => PEN_TABLE[pen]?.lv;   // cấp người chơi để xây chuồng loại đó
 export const penLimit = (s, pen) => PEN_TABLE[pen].limit.reduce((n, [lv, k]) => (level(s) >= lv ? k : n), 0);   // số chuồng loại đó tối đa ở cấp hiện tại
 export const penNextLevel = (s, pen) => PEN_TABLE[pen].limit.find(([, k]) => k > penLimit(s, pen))?.[0] ?? null;
@@ -4651,7 +4654,7 @@ export function upgradePen(s, id) {
 }
 // Giá và điều kiện (ngoài chỗ đặt) của món định đặt: xu, cấp, đồ trong túi
 export function placeCost(s, what) {
-  if (what.kind === 'field') return fieldCost(s);
+  if (what.kind === 'field') return 0;   // đặt khung miễn phí, trả xu khi mở từng ô
   if (what.kind === 'greenhouse') return GLASS.price;
   if (what.kind === 'pen') return PEN_PRICES[what.pen] ?? 0;
   return BUILD_PRICES[what.kind] ?? WATER_BUILD[what.kind]?.price ?? 0;
@@ -4666,7 +4669,9 @@ export function canAfford(s, what) {
     if (level(s) < t.lv) return no('level', `Cần cấp ${t.lv} mới xây ${BUILDING_DEFS[what.kind].name.toLowerCase()} được`);
   } else if (what.kind === 'greenhouse') {
     if (level(s) < GLASS.lv) return no('level', `Cần cấp ${GLASS.lv} mới xây nhà kính được`);
-  } else if (what.kind !== 'field' && !WATER_BUILD[what.kind]) return no('missing', 'Không đặt được món này');
+  } else if (what.kind === 'field') {
+    if (nextLockedPlot(s) >= 0) return no('unfinished', 'Mở hết các ô của khối ruộng đang dở rồi hãy đặt khối mới');
+  } else if (!WATER_BUILD[what.kind]) return no('missing', 'Không đặt được món này');
   return s.coins >= placeCost(s, what) ? { ok: true } : no('coins', 'Chưa đủ xu, cố lên nhé');
 }
 
@@ -4694,7 +4699,7 @@ export function placeEntity(s, what, c, r) {
   if (what.kind === 'field') {
     e.up = fieldUpgrades();
     e.plots = [];
-    for (let i = 0; i < FIELD_SIZE * FIELD_SIZE; i++) { e.plots.push(s.plots.length); s.plots.push(newPlot(s.plots.length, true)); }
+    for (let i = 0; i < FIELD_SIZE * FIELD_SIZE; i++) { e.plots.push(s.plots.length); s.plots.push(newPlot(s.plots.length, false)); }   // khung mới: 9 ô khóa, mở từng ô (có cờ)
   }
   s.farm.ents.push(e);
   bumpLayout(s);

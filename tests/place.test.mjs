@@ -10,6 +10,7 @@ const game = (lv = 1, coins = 0) => {
   return s;
 };
 const fields = s => s.farm.ents.filter(e => e.kind === 'field');
+const openAll = (s, f) => { for (const i of f.plots) s.plots[i].unlocked = true; return f; };   // mở hết ô của khối cho gọn
 const crop = { id: 'cai', progress: 0.4, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
 
 test('giới hạn khối ruộng theo cấp', () => {
@@ -33,16 +34,16 @@ test('giá khối tăng dần, khối đầu miễn phí', () => {
   const f = game(); f.farm.ents = f.farm.ents.filter(e => e.kind !== 'field');
   assert.equal(G.fieldCost(f), 0, 'khối đầu tiên miễn phí');
 });
-test('đặt khối ruộng mới: trừ xu, có 9 ô mới cuốc được', () => {
+test('đặt khối ruộng mới: miễn phí, 9 ô khóa; ô đã mở cuốc được', () => {
   const s = game(4, 1000);
-  const cost = G.fieldCost(s);
   const r = G.placeEntity(s, { kind: 'field' }, 36, 23);
   assert.equal(r.ok, true, r.msg);
-  assert.equal(s.coins, 1000 - cost);
+  assert.equal(s.coins, 1000);
   assert.equal(fields(s).length, 2);
   assert.equal(s.plots.length, 18);
   const m = G.mapOf(s), idx = m.plotAt(37, 24);
-  assert.ok(idx >= 9 && s.plots[idx].unlocked);
+  assert.ok(idx >= 9 && !s.plots[idx].unlocked);
+  openAll(s, fields(s)[1]);
   s.player.x = 37 * 16 + 8; s.player.y = 22 * 16 + 8;
   const till = G.perform(s, { kind: 'plot', idx }, 'till');
   assert.equal(s.plots[idx].soil, 'tilled', till.msg);
@@ -57,12 +58,11 @@ test('vượt số khối tối đa bị từ chối kèm lý do max_fields, kh�
   assert.equal(s.coins, 5000); assert.equal(fields(s).length, 1);
 });
 
-test('đặt khối ruộng cũng theo luật chung: chồng lên, thiếu xu', () => {
+test('đặt khối ruộng cũng theo luật chung: chồng lên bị từ chối; hết xu vẫn đặt được khung', () => {
   const s = game(4, 1000);
   assert.equal(G.placeEntity(s, { kind: 'field' }, 26, 15).reason, 'overlap');
-  const p = game(4, 10);
-  const r = G.placeEntity(p, { kind: 'field' }, 36, 23);
-  assert.equal(r.ok, false); assert.equal(r.reason, 'coins'); assert.equal(fields(p).length, 1);
+  const p = game(4, 0);
+  assert.equal(G.placeEntity(p, { kind: 'field' }, 36, 23).ok, true); assert.equal(fields(p).length, 2);
 });
 
 test('đặt chuồng heo: cần cấp, tốn xu, số chuồng mỗi loại theo cấp', () => {
@@ -100,8 +100,8 @@ test('cất đồ trang trí: quay về túi', () => {
 
 test('cất khối ruộng đang có cây bị từ chối; trống thì cất được, ô các khối khác giữ nguyên', () => {
   const s = game(8, 5000);
-  G.placeEntity(s, { kind: 'field' }, 36, 23);
-  G.placeEntity(s, { kind: 'field' }, 39, 23);
+  G.placeEntity(s, { kind: 'field' }, 36, 23); openAll(s, fields(s).at(-1));
+  G.placeEntity(s, { kind: 'field' }, 39, 23); openAll(s, fields(s).at(-1));
   const [a, b, c] = fields(s);
   Object.assign(s.plots[b.plots[4]], { soil: 'tilled', crop: structuredClone(crop) });
   const r = G.storeEntity(s, b.id);
@@ -127,7 +127,7 @@ test('không cất khối ruộng cuối cùng; công trình cố định không
 
 test('khối ruộng mới và ô đã gỡ lưu/tải lại vẫn đúng', () => {
   const s = game(8, 5000);
-  G.placeEntity(s, { kind: 'field' }, 36, 23);
+  G.placeEntity(s, { kind: 'field' }, 36, 23); openAll(s, fields(s).at(-1));
   G.placeEntity(s, { kind: 'field' }, 39, 23);
   G.storeEntity(s, fields(s)[1].id);
   const back = JSON.parse(JSON.stringify(s));
@@ -155,5 +155,5 @@ test('Hủy sau khi đặt/cất: xu, túi, ô ruộng về như lúc vào chế
   G.storeEntity(s, b.id);
   G.restoreLayout(s, snap2);
   assert.equal(fields(s).length, 2);
-  assert.ok(b.plots.every(i => s.plots[i].unlocked && !s.plots[i].removed));
+  assert.ok(b.plots.every(i => !s.plots[i].removed));
 });

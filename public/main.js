@@ -773,7 +773,7 @@ function buildUp(e) {
   ui.handleEvents([{ type: 'sound', name: r.ok ? 'pop' : 'error' }]);
   if (d.place) {
     const w = d.place;   // đặt xong mà không đặt thêm được (hết đồ, đủ khối, đã có chuồng): bỏ chọn
-    if (r.ok && (w.kind === 'pen' || w.kind === 'greenhouse' || WATER_BUILD[w.kind] || (w.kind === 'deco' && !canAfford(state, w).ok) || (w.kind === 'field' && fieldCount(state) >= fieldLimit(state)))) b.place = null;
+    if (r.ok && (w.kind === 'pen' || w.kind === 'greenhouse' || WATER_BUILD[w.kind] || (w.kind === 'deco' && !canAfford(state, w).ok) || w.kind === 'field')) b.place = null;
     ui.buildTray(state, b);
     ui.buildWater(state);
   }

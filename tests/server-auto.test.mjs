@@ -77,7 +77,7 @@ test('hái một lúc cả ba khối đất màu mỡ ★3 (thêm sản lượng
   const T = Date.now();
   const { reg, post } = await setup(t, T);
   const owner = await reg('Mỡ'), prev = onlineFarm('Mỡ', T);
-  for (let k = 0; k < 2; k++) { const p = spot(prev, { kind: 'field' }); assert.ok(G.placeEntity(prev, { kind: 'field' }, p.c, p.r).ok); }
+  for (let k = 0; k < 2; k++) { const p = spot(prev, { kind: 'field' }); assert.ok(G.placeEntity(prev, { kind: 'field' }, p.c, p.r).ok); for (const i of prev.farm.ents.at(-1).plots) prev.plots[i].unlocked = true; }
   const fields = prev.farm.ents.filter(e => e.kind === 'field');
   assert.equal(fields.length, 3);
   for (const f of fields) {

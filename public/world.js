@@ -743,7 +743,7 @@ export function nameOf(state, t) {
       const big = c?.giant && n && c.progress >= 1 ? ' · khổng lồ ✨' : '';   // trái khổng lồ (issue 53)
       return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (n ? ` ${'★'.repeat(n)}${'☆'.repeat(3 - n)}` : '') + (ST.wilting(c) ? ' – sắp héo!' : '') + big : `Ô ruộng ${t.idx + 1}`;
     }
-    case 'lockedPlot': return 'Đất hoang';
+    case 'lockedPlot': return 'Ô đất chưa mở';
     case 'animal': { const a = findBy(state.animals, t.id), why = a && ST.breedNote(state, a); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}${why ? `\n💡 ${why}` : ''}` : 'Vật nuôi'; }
     case 'egg': { const e = findBy(state.eggs, t.id); return e?.candled ? (e.fertile ? 'Trứng có phôi ✨' : 'Trứng trống') : 'Quả trứng'; }
     case 'poop': return 'Phân chó';
