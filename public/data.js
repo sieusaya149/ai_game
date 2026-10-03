@@ -261,8 +261,12 @@ export const LIFE = {
   meo: { non: 20 * MIN, nho: 40 * MIN, truong: 40 * HOUR, gia: Infinity },   // mèo cũng vậy: già thì lười chứ không chết vì già
 };
 // Tuổi lúc bắt đầu một giai đoạn · giai đoạn ở tuổi `age` · tuổi ra đi (Infinity = không bao giờ)
-export const stageStart = (kind, stage) => STAGES.slice(0, STAGES.indexOf(stage)).reduce((t, k) => t + LIFE[kind][k], 0);
-export const stageAt = (kind, age) => STAGES.findLast(k => age >= stageStart(kind, k)) ?? 'non';
+const STAGE_START = Object.fromEntries(Object.keys(LIFE).map(kind => [kind, Object.fromEntries(STAGES.map((st, i) => [st, STAGES.slice(0, i).reduce((t, k) => t + LIFE[kind][k], 0)]))]));
+export const stageStart = (kind, stage) => STAGE_START[kind]?.[stage] ?? STAGES.slice(0, STAGES.indexOf(stage)).reduce((t, k) => t + LIFE[kind][k], 0);
+export const stageAt = (kind, age) => {
+  for (let i = STAGES.length - 1; i > 0; i--) if (age >= stageStart(kind, STAGES[i])) return STAGES[i];
+  return 'non';
+};
 export const lifeEnd = kind => stageStart(kind, 'gia') + LIFE[kind].gia;
 export const AGING = {
   warnMs: HOUR,       // báo trước 🟡 khi còn chừng này giờ vườn nữa là vào giai đoạn già
@@ -664,7 +668,12 @@ export const COMPOST = {
 export const PEN_REFUND = 0.5;   // phá bỏ chuồng trống: hoàn tỉ lệ này của giá xây + giá các lần nâng cấp
 export const PEN_LEVELS = 3;
 export const expNeed = level => Math.floor(25 * level ** 1.5);
+let lvExp = NaN, lvOut = null;   // bộ nhớ một giá trị: tick gọi level(s) hàng chục nghìn lần với cùng exp
 export function levelInfo(exp) {
+  if (exp !== lvExp) { lvOut = levelInfoSlow(exp); lvExp = exp; }
+  return { ...lvOut };
+}
+function levelInfoSlow(exp) {
   let level = 1;
   while (exp >= expNeed(level)) exp -= expNeed(level++);
   return { level, cur: exp, need: expNeed(level) };

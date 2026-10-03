@@ -140,6 +140,8 @@ export const penLv = e => e.lv ?? 1;
 export const penCapOf = e => PEN_TABLE[e.pen].cap[penLv(e) - 1];
 export const penUse = (s, id) => s.animals.filter(a => a.pen === id).length;
 function settlePens(s) {
+  const byId = mapOf(s).penById;   // đường nhanh: mọi con đã ở đúng chuồng (gần như luôn vậy) thì khỏi duyệt danh sách công trình
+  if (s.animals.every(a => { const e = byId[a.pen]?.ent; return !!e && (e.pen === 'quarantine' || e.pen === ANIMALS[a.type].pen); })) return;
   const pens = s.farm.ents.filter(e => e.kind === 'pen');
   const home = a => { const e = pens.find(x => x.id === a.pen); return !!e && (e.pen === 'quarantine' || e.pen === ANIMALS[a.type].pen); };
   for (const a of s.animals) if (!home(a)) {
@@ -191,7 +193,7 @@ function bornPen(s, mom, type) {
   const e = s.farm.ents.find(x => x.id === mom?.pen);
   return e && penUse(s, e.id) < penCapOf(e) ? e.id : roomyPen(s, ANIMALS[type].pen)?.id;
 }
-const penTypeOf = (s, a) => s.farm.ents.find(e => e.id === a.pen)?.pen;
+const penTypeOf = (s, a) => mapOf(s).penById[a.pen]?.ent.pen;   // bản đồ nhớ tạm theo rev: khỏi duyệt cả danh sách công trình mỗi lần
 const fitToBreed = a => animalCan(a, 'product') && !a.sick && a.hunger > HUSBANDRY.growNeedsHunger && a.happy > 40;
 // Lý do con heo/bò/cừu này chưa sinh sản được (chữ cho người chơi), null = không có gì cản hay đang mang thai
 export function breedNote(s, a) {
@@ -765,12 +767,14 @@ function barkWhere(s, x, y) {
 // ---------- Tick ----------
 export function tick(s, dtGame) {
   let left = Math.max(0, dtGame);
-  while (left > 0) { const d = Math.min(1000, left); left -= d; step(s, d); }
+  // ô đang mở và khối đất màu mỡ không đổi trong một lượt tick: tính một lần rồi dùng cho mọi bước (chạy bù dài có hàng chục nghìn bước)
+  const live = s.plots.filter(p => p.unlocked), rich = richPlots(s);
+  while (left > 0) { const d = Math.min(1000, left); left -= d; step(s, d, live, rich); }
   const out = evq; evq = [];
   return out;
 }
 
-function step(s, d) {
+function step(s, d, live, rich) {
   s.time += d;
   s.simMs = (s.simMs || 0) + d;
   const day = Math.floor(s.time / DAY_MS) + 1;
@@ -790,8 +794,7 @@ function step(s, d) {
   }
   if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
   heatGlass(s, false);   // nhà kính đang ngừng sưởi vì thiếu xu: đủ xu thì tự trả
-  const rich = richPlots(s);
-  for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d, rich.has(p.idx));
+  for (const p of live) stepPlot(s, p, d, rich.has(p.idx));
   settlePower(s);    // tiền điện còn treo: đủ xu thì trả, máy chạy lại (issue 58)
   stepWater(s, d);   // bơm vào bồn rồi trừ nước theo thứ tự cố định (issue 57)
   stepAuto(s, d);    // máy phun tự động, điện của máy phun (issue 58)
@@ -929,9 +932,11 @@ export const bondPerk = a => ({ runTo: a.bond >= 4, follow: a.bond >= 5 });
 // Hệ số nguy cơ bệnh theo độ thân (lát 38 nhân vào xác suất bệnh)
 export const sickFactor = a => (a.bond >= 4 ? BOND.sickMul : 1);
 // Mốc già và mốc ra đi của con này (❤️5 sống lâu hơn 10%)
+const AGE_MARKS = {};   // nhớ theo (loài, có ❤️5 không): tick gọi hàm này mỗi con mỗi bước
 export function lifeMarks(a) {
-  const k = a.bond >= 5 ? BOND.lifeMul : 1;
-  return { gia: stageStart(a.type, 'gia') * k, end: lifeEnd(a.type) * k };
+  const five = a.bond >= 5 ? 1 : 0, per = AGE_MARKS[a.type] ??= [];
+  if (!per[five]) { const k = five ? BOND.lifeMul : 1; per[five] = Object.freeze({ gia: stageStart(a.type, 'gia') * k, end: lifeEnd(a.type) * k }); }
+  return per[five];
 }
 // Xác suất sản phẩm được sao (sữa ngon, lông xoăn): ❤️3+ tốt hơn; bò được vuốt ve nhiều ngày liền, cừu đang vui thì thêm
 export function starChance(s, a) {
