@@ -112,6 +112,14 @@ test('mỗi sáng 6h tự hồi một ít', () => {
   assert.equal(s.stamina, STAMINA.max, 'không vượt quá tối đa');
 });
 
+test('vắng nhà nhiều giờ rồi vào lại: thể lực không tự đầy (chạy bù không hồi sáng)', () => {
+  const s = newGame(); s.stamina = 0; s.savedAt = Date.now() - 6 * 3600_000;   // 6 giờ thật = 18 ngày game
+  store[G.SAVE_KEY] = JSON.stringify(s);
+  const l = quiet(() => G.loadGame());
+  assert.ok(l.day > s.day + 1, 'đã chạy bù qua nhiều ngày game');
+  assert.equal(l.stamina, 0);
+});
+
 test('ghế đá: ngồi thì hồi chậm theo thời gian, đứng dậy thì ngừng', () => {
   const s = atHour(newGame(), 9);
   s.inv.deco_bench = 1;

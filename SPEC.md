@@ -669,7 +669,7 @@ canSleep(state)                   // chỉ từ STAMINA.sleepHour (18h)
 sleep(state)                      // → R { reason: 'early', slept } tua có mô phỏng thật tới 6h sáng hôm sau, hồi đầy thể lực (như chạy bù: không quạ/trộm)
 standUp(state)                    // bỏ trạng thái ngồi
 ```
-Chi phí: `STAMINA.cost` {cuốc, tưới, gieo, thu hoạch = 1; dọn bụi 2; đập đá 3}, làm n ô một lần = `cost × GROUP_COST[n]`. Vuốt ve, cho ăn tận tay, nhặt trứng, mua bán không tốn. Hồi: sáng 6h `+morningRegen` (30), ngồi ghế đá `benchPerMin` mỗi phút.
+Chi phí: `STAMINA.cost` {cuốc, tưới, gieo, thu hoạch = 1; dọn bụi 2; đập đá 3}, làm n ô một lần = `cost × GROUP_COST[n]`. Vuốt ve, cho ăn tận tay, nhặt trứng, mua bán không tốn. Hồi: sáng 6h `+morningRegen` (30; chỉ khi đang chơi, chạy bù lúc vắng nhà không hồi), ngồi ghế đá `benchPerMin` mỗi phút.
 
 ### Công cụ, tiệm rèn
 ```js
