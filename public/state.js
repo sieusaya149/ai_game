@@ -346,6 +346,7 @@ export function loadGame(raw) {
   s.mode = s.mode === 'online' ? 'online' : 'offline';
   s.account = s.mode === 'online' && typeof s.account === 'string' ? s.account : null;
   if (s.mode === 'online') s.speed = 1;
+  if (s.mode !== 'online' || !Number.isFinite(s.sleepUntil)) s.sleepUntil = null;   // đang ngủ (online): giữ tới 6h sáng làng
   s.today = { ...base.today, ...s.today };
   s.guests = Array.isArray(s.guests) ? s.guests : [];
   s.dog.chained = !!s.dog.chained;
@@ -512,11 +513,32 @@ export const standUp = s => { s.sit = false; };
 export const canSleep = s => dayFrac(s) >= (STAMINA.sleepHour - 6) / 24;
 const SLEEP_EARLY = `Để dành cho tối nay, ${STAMINA.sleepHour} giờ chiều mới ngủ được`;
 
-// Ngủ: chạy mô phỏng thật tới 6h sáng hôm sau (cây vẫn lớn; như chạy bù offline thì không có quạ/trộm), hồi đầy thể lực.
+// Online: ngủ không tua giờ (giờ làng là chung và chạy thật; tua thì đêm vẫn còn mà vườn đã nhảy, lại ngủ được hoài).
+// Nằm giường tới 6h sáng làng (s.sleepUntil = giờ server), thể lực hồi dần trong step, tới giờ tự dậy hoặc bấm Dậy.
+export const isAsleep = s => online(s) && Number.isFinite(s.sleepUntil);
+function wakeUp(s, early) {
+  s.sleepUntil = null;
+  s.stats.slept++;
+  advanceTutorial(s);
+  toast(early ? 'Dậy rồi, làm việc thôi 💪' : 'Chào buổi sáng! ☀️');
+}
+export function wake(s) {
+  if (!isAsleep(s)) return R(false, 'Bạn đang thức mà', { reason: 'awake' });
+  wakeUp(s, true);
+  return R(true, '', { woke: true });
+}
+
+// Chơi đơn: chạy mô phỏng thật tới 6h sáng hôm sau (cây vẫn lớn; như chạy bù offline thì không có quạ/trộm), hồi đầy thể lực.
 export function sleep(s) {
+  if (isAsleep(s)) return R(false, 'Bạn đang ngủ rồi', { reason: 'asleep' });
   if (!canSleep(s)) return R(false, SLEEP_EARLY, { reason: 'early' });
-  const left = online(s) ? DAY_MS - villageCal(now()).tod : (Math.floor(s.time / DAY_MS) + 1) * DAY_MS - s.time, was = catchUp;
-  s.sit = false; s.threats = [];
+  s.sit = false;
+  if (online(s)) {
+    s.sleepUntil = now() + DAY_MS - villageCal(now()).tod;
+    return R(true, 'Ngủ ngon nhé 😴', { sleeping: true });
+  }
+  const left = (Math.floor(s.time / DAY_MS) + 1) * DAY_MS - s.time, was = catchUp;
+  s.threats = [];
   catchUp = true;
   let ev;
   try { ev = tick(s, left); } finally { catchUp = was; }
@@ -610,6 +632,10 @@ function step(s, d) {
     if (s.chore?.day === s.day) doChore(s);   // trộm bị phạt sang làm thợ không công (issue 46)
     if (!catchUp) cockCrow(s);
     toast({ sun: 'Trời nắng đẹp ☀️', cloud: 'Trời nhiều mây ⛅', rain: 'Trời mưa rồi, ruộng tự có nước 🌧️' }[s.weather]);
+  }
+  if (isAsleep(s)) {   // đang ngủ (online): hồi dần, tới 6h sáng làng thì tự dậy
+    s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.sleepPerDay * d / DAY_MS);
+    if (villageNow(s) >= s.sleepUntil) wakeUp(s, false);
   }
   if (s.sit) {   // ngồi ghế đá: hồi chậm, đầy thì tự đứng dậy
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.benchPerMin * d / MIN);
@@ -2495,6 +2521,7 @@ function posOf(s, t) {
 
 export function perform(s, t, id) {
   const at = { x: posOf(s, t).x, y: posOf(s, t).y };
+  if (isAsleep(s)) return bad('Bạn đang ngủ, bấm Dậy trước nhé', at);
   if (t.kind === 'poop' && id === 'slip') { // WORLD gọi khi người chơi giẫm phải
     const i = s.poops.findIndex(p => p.id === t.id);
     if (i < 0) return bad('Không thấy bãi phân đâu cả');
@@ -2784,6 +2811,7 @@ function sitDown(s, at) {
 // ---------- Chuyển bản đồ ----------
 // Đi qua cửa từ bản đồ đang đứng sang bản đồ to: phải có cửa dẫn tới to. Tới nơi thì đứng ở arrive[nơi vừa đi].
 export function enterScene(s, to) {
+  if (isAsleep(s)) return R(false, 'Bạn đang ngủ, bấm Dậy trước nhé', { reason: 'asleep' });
   if (!doorOf(s, to)) return R(false, 'Không có lối sang đó', { reason: 'no_door' });
   if (!hasScene(to)) return R(false, 'Chỗ này chưa mở', { reason: 'unknown' });
   const from = s.scene || 'farm';

@@ -35,6 +35,13 @@ html, body {
 /* chuyển bản đồ: màn đen mờ dần (nằm trên canvas, dưới HUD) */
 #fade { position: fixed; inset: 0; z-index: 5; background: #120a04; opacity: 0; pointer-events: none; transition: opacity 0.22s ease; }
 #fade.on { opacity: 1; pointer-events: auto; }
+/* đang ngủ (online): tối lại, Zzz bay, nút Dậy; nằm dưới HUD để vẫn thấy thanh thể lực hồi dần */
+#sleepz { position: fixed; inset: 0; z-index: 8; background: rgba(8, 10, 40, 0.62); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #fff; font-weight: 800; text-align: center; padding: 16px; }
+#sleepz[hidden] { display: none; }
+#sleepz .zzz { font-size: 56px; letter-spacing: 4px; animation: zzzfloat 2.4s ease-in-out infinite; }
+#sleepz .zzz span { font-size: 0.7em; } #sleepz .zzz span + span { font-size: 0.5em; }
+#sleepz p { margin: 0; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6); }
+@keyframes zzzfloat { 50% { transform: translateY(-10px); opacity: 0.6; } }
 #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; overflow: hidden; }
 #ui button, #ui input { font-family: inherit; }
 #ui button, #ui input, #ui .card, #ui .pill { pointer-events: auto; }

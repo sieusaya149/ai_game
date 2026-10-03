@@ -1018,7 +1018,8 @@ const HOUR = 60 * MIN;
 const GUIDE = [
   { title: 'Thể lực', art: () => [spr().stamina, spr().staminaTired, spr().bed],
     text: [`Mỗi việc ở ruộng đều tốn thể lực (thanh ⚡ cạnh tên bạn). Hết thể lực thì đi và làm chậm gấp ${D.STAMINA.slow} lần.`,
-      `Cách hồi: ngồi ghế đá (hồi ${D.STAMINA.benchPerMin} mỗi phút), ngủ (từ ${D.STAMINA.sleepHour}h), hoặc đợi 6h sáng tự hồi ${D.STAMINA.morningRegen}.`] },
+      `Cách hồi: ngồi ghế đá (hồi ${D.STAMINA.benchPerMin} mỗi phút), ngủ (từ ${D.STAMINA.sleepHour}h), hoặc đợi 6h sáng tự hồi ${D.STAMINA.morningRegen}.`,
+      'Chơi online thì ngủ không tua thời gian: bạn nằm giường tới 6h sáng của làng, thể lực hồi dần (18h tới 6h là đầy), cây và vật nuôi vẫn lớn như thường. Bấm Dậy nếu muốn thức sớm, giữ phần thể lực đã hồi.'] },
   { title: 'Công cụ', art: () => [spr().tools?.hoe[0], spr().tools?.hoe[1], spr().tools?.hoe[2], spr().tools?.can[2], spr().tools?.sickle[2], spr().smithy],
     text: ['Cuốc, bình tưới, liềm và giỏ có 3 cấp: sắt, đồng, vàng.',
       'Cấp cao làm cả hàng 3 ô hoặc khối 3×3 một lần, tốn ít thể lực hơn làm từng ô. Bình và giỏ cấp cao chứa nhiều hơn.',
@@ -1890,6 +1891,13 @@ export function showBringUp(name, solo, { bring, fresh }) {
 }
 // Biểu tượng nhỏ mất kết nối với làng (vườn online), vẫn chơi tiếp được
 // Cột biểu cảm / chat nhanh / người đang ở đây: chỉ hiện khi chơi vườn online. n = số người khác cùng bản đồ
+// Màn tối Zzz khi đang ngủ (online); onWake: nút Dậy
+export function setSleeping(on, onWake) {
+  const e = $('sleepz');
+  if (!e) return;
+  e.hidden = !on;
+  if (onWake) $('sleepz-wake').onclick = onWake;
+}
 export function setLive(on, n = 0) {
   const e = $('live');
   if (!e) return;

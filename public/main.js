@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, barrowTargets, commandDog,
+  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, wake, isAsleep, speedOf, sellQuote, barrowTargets, commandDog,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -606,8 +606,9 @@ function goSleep() {
     el.classList.remove('on');
     if (!state) return;
     const r = sleep(state);
+    if (r.sleeping) world.busy = world.sleeping = true;   // khỏi nháy một khung hình trước khi vòng lặp dựng màn Zzz
     ui.toast(r.msg);
-    if (r.ok) ui.handleEvents([{ type: 'sound', name: 'levelup' }]);
+    if (r.ok && !r.sleeping) ui.handleEvents([{ type: 'sound', name: 'levelup' }]);   // online: nằm giường, màn Zzz do vòng lặp dựng
     world.fx = []; dirty = true;
     ui.renderHUD(state);
     save();
@@ -802,6 +803,8 @@ function syncTarget(now) {
 }
 syncTarget.key = '';
 
+// Đang ngủ (online): nhân vật nằm giường, màn Zzz, không điều khiển được; dậy thì trả lại
+let wasAsleep = false;
 function frame(now) {
   requestAnimationFrame(frame);
   if (prefs.battery && now - last < 1000 / P.BATTERY_FPS - 8) return;   // tiết kiệm pin: khóa 30 khung hình (bỏ qua một nhịp màn 60Hz)
@@ -816,6 +819,13 @@ function frame(now) {
 
   // 1-2) thời gian game
   const events = tick(home ?? state, dtMs * speedOf(state)) ?? [];   // đang thăm vườn người khác: vườn mình vẫn chạy
+  const asleep = isAsleep(state);
+  if (asleep !== wasAsleep) {
+    wasAsleep = asleep; world.sleeping = asleep; world.busy = asleep;
+    if (asleep) { V.cancelMove(world); plan = null; world.input.x = world.input.y = 0; }
+    ui.setSleeping(asleep, () => { const r = wake(state); if (r.ok) { dirty = true; save(); } });
+    if (!asleep) { ui.renderHUD(state); save(); }
+  }
 
   // 3) nhập liệu → di chuyển, AI
   if (ui.isBlocking()) { keys.clear(); world.input.x = world.input.y = 0; }
