@@ -162,7 +162,8 @@ const stealHere = async page => {
 test('B trộm ô chín rồi bén mảng tới chó: Mực sủa "GÂU GÂU!" và đuổi, B đứng hình, rơi đồ vừa trộm và nộp phạt', async ({ browser, baseURL }, testInfo) => {
   test.setTimeout(180_000);
   const touch = !!testInfo.project.use.hasTouch;
-  const A = await player(browser, opts(testInfo, baseURL), guardGarden);
+  // chó thả rông thì đi theo chủ đang chơi (hotfix T), không đứng ở chuồng; xích lại để nó ở yên trong 3 ô quanh chuồng, cách ô chín 8 ô
+  const A = await player(browser, opts(testInfo, baseURL), s => guardGarden(s, { dog: { chained: true } }));
   const B = await player(browser, opts(testInfo, baseURL), guestAt(GATE_AT.x, GATE_AT.y));
   await A.open();   // chủ đang chơi: thao tác của khách đẩy thẳng sang trình duyệt chủ
   await B.open();
@@ -196,7 +197,7 @@ test('B trộm ô chín rồi bén mảng tới chó: Mực sủa "GÂU GÂU!" v
 
   // nhật ký khách của A có dòng chó đớp, chủ nhận tiền phạt và đếm được số người đã đuổi
   await expect.poll(() => st(A.page, () => globalThis.__farm.state.stats.chased ?? 0), { timeout: 20_000 }).toBe(1);
-  await A.page.locator('.bb-btn[data-panel="log"]').click();
+  await A.page.evaluate(async () => (await import('/ui.js')).openPanel('log'));   // điện thoại: Nhật ký nằm trong nút "Thêm"
   await expect(A.page.locator(`.guest-row[data-by="${B.name}"]`).first()).toContainText(new RegExp(`bị Mực đớp`));
   await expect(A.page.locator('.sheet-body')).toContainText('sủa vang');
   await A.page.screenshot({ path: `test-results/dog-log-${testInfo.project.name}.png` });
