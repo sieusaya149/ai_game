@@ -61,3 +61,15 @@ test('chủ vắng nhà: server chạy bù giao hàng tới kho, đơn chờ h�
   assert.deepEqual(f.deliveries, []);
   assert.ok(f.awayPending.lines.some(l => /giao .*tới kho/.test(l)), f.awayPending.lines.join(' | '));
 });
+
+test('giao ngay: server nhận bản lưu vừa trả xu mua hàng vừa có ngay đồ trong kho', async t => {
+  const { register } = await setup(t);
+  const a = await register('Lan'), play = await a.play();
+  const s = garden();
+  s.mode = 'offline';
+  assert.equal((await a.save(play, s)).status, 200);
+  assert.ok(G.orderOnline(s, { deco_canopy: 30 }, 'now').ok);
+  s.savedAt += 1000;
+  const r = await a.save(play, s);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+});

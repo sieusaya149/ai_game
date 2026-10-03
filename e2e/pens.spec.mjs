@@ -87,3 +87,30 @@ test('dưới cấp 3 thẻ chuồng cách ly bị khóa', async ({ page, contex
   await expect(page.locator('.bt-card', { hasText: 'Chuồng cách ly' })).toBeDisabled();
   await expect(page.locator('.bt-card', { hasText: 'Chuồng cách ly' })).toContainText('Cần cấp 3');
 });
+
+test('phá bỏ chuồng: còn gà thì bị từ chối, hết gà thì phá được và hoàn xu (hỏi lại trước)', async ({ page, context }, testInfo) => {
+  const touch = !!testInfo.project.use.hasTouch;
+  await open(page, context, save(4, s => { s.player.x = 27 * 16 + 8; s.player.y = 22 * 16 + 8; }));
+  await enterBuild(page);
+  await tap(page, touch, await tilePoint(page, 27, 25));
+  await expect(page.locator('#build-demolish')).toBeVisible();
+  await page.locator('#build-demolish').click();
+  await expect(page.locator('#build-msg')).toContainText('vật nuôi');
+  await expect(page.locator('#build-msg')).toHaveAttribute('data-ok', '0');
+  expect((await pens(page)).length).toBe(1);
+  // bán hết gà (đổi trực tiếp bản lưu đang chạy là cách dựng tình huống, không phải hook)
+  await page.evaluate(() => { globalThis.__farm.state.animals.length = 0; });
+  const coins0 = await page.evaluate(() => globalThis.__farm.state.coins);
+  await page.locator('#build-demolish').click();
+  await page.locator('.dialog-btns .btn', { hasText: 'Thôi' }).click();
+  expect((await pens(page)).length).toBe(1);
+  await page.locator('#build-demolish').click();
+  await page.locator('.dialog-btns .btn', { hasText: 'Phá bỏ' }).click();
+  await expect.poll(async () => (await pens(page)).length).toBe(0);
+  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(coins0 + 100);
+  await expect(page.locator('#build-demolish')).toBeHidden();
+  // Hủy: chuồng trở lại
+  await page.locator('#build-cancel').click();
+  await expect.poll(async () => (await pens(page)).length).toBe(1);
+  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(coins0);
+});

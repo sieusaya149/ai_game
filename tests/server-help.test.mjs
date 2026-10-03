@@ -159,18 +159,33 @@ test('chủ online vừa tự tưới ô rồi khách tưới cùng ô: "không 
   assert.equal((await A.farm()).farm.today.helps, 0);
 });
 
-test('hết 10 lượt giúp trong ngày thì từ chối kèm lý do; thao tác hỏng hoặc vườn của chính mình cũng bị từ chối', async t => {
+test('giới hạn giúp tính theo từng khách: khách khác đã dùng hết lượt thì mình vẫn giúp được; cả vườn đủ thì mới từ chối hết', async t => {
   const { player } = await setup(t);
   const day = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-  const A = await player('Lan', s => { garden(s); s.today = { day, helps: GUEST.helpMax, steals: 0, stolen: 0 }; });
+  const A = await player('Lan', s => { garden(s); s.today = { day, helps: GUEST.helpMax, helpBy: { 'Chị Tư': GUEST.helpMax }, steals: 0, stolen: 0 }; });
   const B = await player('Bình');
   const b = await B.ws();
   await join(b, { map: 'farm', owner: 'Lan' });
-  b.send({ t: 'guest', op: op('help-0301-eeee', 'water', { idx: 0 }) });
-  const r = await until(b, 'guest');
+  b.send({ t: 'guest', op: op('help-0300-eeee', 'water', { idx: 0 }) });
+  assert.equal((await until(b, 'guest')).ok, true);   // Chị Tư giúp đủ 10 rồi nhưng không ảnh hưởng Bình
+  assert.equal((await A.farm()).farm.today.helpBy.Bình, 1);
+  // cả vườn đã đủ lượt: khách mới cũng bị từ chối, lý do nói rõ
+  const D = await player('Dũng', s => { garden(s); s.today = { day, helps: GUEST.helpHostMax, helpBy: {}, steals: 0, stolen: 0 }; });
+  const C = await player('Cúc');
+  const c = await C.ws();
+  await join(c, { map: 'farm', owner: 'Dũng' });
+  c.send({ t: 'guest', op: op('help-0301-eeee', 'water', { idx: 0 }) });
+  const r = await until(c, 'guest');
   assert.equal(r.ok, false);
-  assert.equal(r.reason, 'help_full');
-  assert.equal(r.msg, 'Vườn này hôm nay đã được giúp đủ');
+  assert.equal(r.reason, 'help_host_full');
+  assert.match(r.msg, new RegExp(`đủ ${GUEST.helpHostMax} việc.*mai`));
+  // một khách giúp quá GUEST.helpMax việc thì bị chặn riêng
+  const E = await player('Em', s => { garden(s); s.today = { day, helps: GUEST.helpMax, helpBy: { Bình: GUEST.helpMax }, steals: 0, stolen: 0 }; });
+  await join(b, { map: 'farm', owner: 'Em' });
+  b.send({ t: 'guest', op: op('help-0302-eeee', 'water', { idx: 0 }) });
+  const r2 = await until(b, 'guest');
+  assert.equal(r2.reason, 'help_full');
+  assert.match(r2.msg, new RegExp(`đủ ${GUEST.helpMax} việc.*mai`));
 
   for (const bad of [{ id: 'x', kind: 'help', act: 'water', idx: 0 }, op('help-0302-ffff', 'dance', { idx: 0 }), op('help-0303-gggg', 'water', { idx: -1 }), { id: 'help-0304-hhhh', kind: 'steal', act: 'water', idx: 0 }]) {
     b.send({ t: 'guest', op: bad });

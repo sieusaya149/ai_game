@@ -148,8 +148,8 @@ state = {
   // trường cho online (issue 22), thêm từ v2 không đổi phiên bản; bản thiếu thì loadGame bù mặc định. v2→v3 giữ nguyên các trường này
   //   (`v2to3` chép cả bản lưu, chỉ đổi con vật và chó); server nhận/chạy bù bản v2 cũ qua `migrate`/`loadGame` nên tự lên v3
   mode: 'offline' | 'online', account,        // vườn chơi đơn hay vườn trên làng; account = tên tài khoản (null khi offline)
-  today: { day: 'YYYY-MM-DD', helps, steals, stolen, robs },   // thống kê hôm nay theo ngày ngoài đời (`serverDay`).
-                                              //   helps = số việc khách đã giúp vườn này (issue 28) · steals = số vụ vườn này bị trộm ·
+  today: { day: 'YYYY-MM-DD', helps, helpBy, steals, stolen, robs },   // thống kê hôm nay theo ngày ngoài đời (`serverDay`).
+                                              //   helps = số việc mọi khách đã giúp vườn này (issue 28) · helpBy = { tên khách: số việc người đó đã giúp vườn này } · steals = số vụ vườn này bị trộm ·
                                               //   stolen = tổng giá trị (xu) vườn này đã mất vì trộm · robs = số vụ chính mình đi trộm (issue 30)
   guests: [{ id, kind, act, by, lv, at, seen, item, qty, fine, ate }],  // nhật ký việc khách làm trong vườn, mới nhất ở đầu, tối đa GUEST.logMax (60).
                                               //   `id` = mã thao tác đã áp dụng (áp dụng lại cùng mã thì không làm gì), `seen` = chủ đã được báo,
@@ -180,7 +180,7 @@ Vườn online không bao giờ ghi vào `SAVE_KEY` (`nongtrai-save-v4`): bản 
 | `pen` | `pen: 'chicken'|'pig'|'pasture'|'quarantine'`, `lv?: 1..3` | chuồng, kích thước theo `PEN_DEFS` (không đổi theo cấp); `lv` thiếu = 1; nhiều chuồng mỗi loại, giới hạn theo cấp người chơi (`PEN_TABLE.limit`). Chuồng chó (`doghouse`) cũng có `lv?` |
 | `deco` | `item: 'deco_scarecrow'|'deco_flower'|'deco_lamp'|'deco_bench'|'deco_lowfence'|'deco_rattrap'|'deco_canopy'`, `shut?` (bẫy chuột đã sập) | đồ trang trí 1 ô |
 | `grave` | `animal` (loài), `name?` (chỉ con ❤️4+), `flower: bool` | ngôi mộ 1 ô, con vật mất để lại (lát 38); đặt/dời qua `canPlace` như mọi công trình |
-| `tree` | không | cây cảnh, không dời được |
+| `tree` | không | cây cảnh, không dời được; chặt được bằng `clear` của target `clutter` (xem dưới) |
 | `bush`, `rock` | không | bụi, đá **chưa dọn** trên dải đất mới; chắn đường, dọn bằng tay (`CLUTTER`) |
 | `tank`, `tank2`, `booster` | không (mực nước nằm ở `state.water`) | bồn chứa (2x2, tối đa 1, cần giếng cấp 4, phải trong tầm giếng), bồn phụ (1x1, tối đa 4), trạm bơm phụ (1x1, tối đa 4) (issue 57, mục "Bồn chứa và mạng nước"); dời được, không cất |
 | `compost` | `pile: { món: n }` (đồ đang nằm trong hố), `readyAt` (mốc `simMs` lô ủ xong, 0 = chưa đậy) | hố ủ phân (issue 61), chân đế 2x1, mỗi vườn một hố; mặc định `{ pile: {}, readyAt: 0 }` ở `fillSave` và `placeEntity`. Xem mục "Hố ủ phân" |
@@ -441,6 +441,8 @@ vaccinatePen(state, penId)       // tiêm cho mọi con khỏe trong chuồng, h
 vaccinated(state, a)             // đang còn vắc-xin bảo vệ?
 isolate(state, animalId)         // chuyển vào chuồng cách ly còn chỗ (một hành động) → { ok, msg, reason? } ('no_quarantine'|'full')
 unisolate(state, animalId)       // đưa về chuồng thường đúng loài
+barrowTargets(state, animalId)   // xe rùa: [{ id, name, use, cap, disabled? }] chuồng cùng loại (trừ chuồng hiện tại, trừ cách ly); đầy thì disabled = lý do
+carryAnimal(state, animalId, penId) // chở sang chuồng cùng loài, cần có `barrow` trong kho → { ok, msg, reason? } ('visit'|'no_barrow'|'missing'|'species'|'same'|'full'); đứng vào trong chuồng mới, giữ nguyên chỉ số
 sickLeft(a)                      // ms giờ vườn còn lại trước khi mất (chỉ khác null khi Nguy kịch) — render vẽ đếm ngược trên đầu
 SICK_NAME                        // ['Khỏe','Mệt','Bệnh nặng','Nguy kịch']
 graves(state)                    // các thực thể `grave` trong vườn
@@ -448,7 +450,7 @@ grieving(state)                  // cả trại đang buồn vì vừa có con m
 placeFlower(state, graveId)      // đặt 1 `deco_flower` lên mộ → { ok, msg, reason? } ('missing'|'done'|'no_item'); phần buồn còn lại co còn SICK.flowerGriefMul
 ```
 Số liệu ở `SICK` (data.js). **Tiến triển:** `a.sickMs` cộng theo giờ vườn, ×`oldMul` (2) với con già, ÷`quarantineMul` (1.5) khi ở chuồng cách ly (hồi nhanh hơn). Mốc: `toSevere` (1 giờ) → Bệnh nặng, `toCritical` (1 giờ 30) → Nguy kịch, `deadAt` (1 giờ 45) → mất. Dưới cấp `SICK.minLevel` (5) thì chặn ở Mệt (bảo hộ người mới).
-**Nguyên nhân mắc bệnh (hotfix: chỉ khi bị bỏ bê):** đói lả quá `HUSBANDRY.sickAfterStarving` (luôn bệnh), hoặc — CHỈ khi con vật đang đói (hunger < `HUSBANDRY.hungryBelow` = 40), dơ (`isDirty`), chuồng bẩn (`penDirty`) hay già — xác suất `HUSBANDRY.sickChancePerMin` ×`sickFactor(a)` (❤️4+ thấp hơn) ×`DIRT.sickMul` (dơ) ×`SICK.dirtyPenMul` (chuồng bẩn) ×`SICK.oldChanceMul` (già). Con đang được vắc-xin thì miễn.
+**Nguyên nhân mắc bệnh (hotfix: chỉ khi bị bỏ bê lâu):** quên cho ăn một lượt KHÔNG gây bệnh (đói < `HUSBANDRY.hungryBelow` = 40 chỉ báo `hungry` + vào việc cần làm). Đói lả (hunger 0) chỉ có nguy cơ sau `HUSBANDRY.sickRiskAfterStarving` = 30 phút, rồi xác suất/phút tăng tuyến tính tới `sickStarveMaxPerMin` = 0.08 sau `sickStarveRampMs` = 60 phút (không có mốc chắc chắn bệnh). Dơ (`isDirty`, trừ heo/bò đầm bùn), chuồng bẩn (`penDirty`) hay già — nguy cơ nền `HUSBANDRY.sickChancePerMin` ×`sickFactor(a)` (❤️4+ thấp hơn) ×`DIRT.sickMul` (dơ) ×`SICK.dirtyPenMul` (chuồng bẩn) ×`SICK.oldChanceMul` (già). Con đang được vắc-xin thì miễn.
 **Lây:** con Bệnh nặng ở chuồng thường, mỗi `SICK.spread.everyMs` (10 phút) có `SICK.spread.p` (10%) lây cho **một** con cùng chuồng còn khỏe và chưa tiêm. Chuồng cách ly không lây (và con trong đó không thả rông).
 **ADR 0004 (cứng):** khi chạy bù offline (cờ `catchUp` trong state.js, dùng chung cho trình duyệt và server), tiến triển bệnh bị kẹp ở `SICK.catchUpCap` — bệnh **dừng ở Bệnh nặng**, con đang Nguy kịch **hạ về Bệnh nặng**, và không con nào chết vì bệnh hay vì đói. Chết vì già vẫn xảy ra (đã báo trước ở lát 34).
 **Ngôi mộ:** con mất để lại thực thể `grave` ở ô hợp lệ gần góc Tây-Nam của đất (chọn qua `canPlace`, nên không chặn đường, dời được như công trình); con ❤️4+ thì mộ có tên. Cả trại buồn `SICK.griefMs`: vui tụt `griefHappy` ngay và không lên quá `griefCap` tới khi hết buồn; đặt hoa lên mộ thì hết buồn nhanh hơn.
@@ -461,6 +463,9 @@ hiddenEggs(state)        // → trứng đang nằm trong bụi: s.eggs có `til
 ```
 Mỗi bước tick (ban ngày, FREE trong data.js): tối đa `FREE.max` (30) con loài `FREE.types` (gà, vịt), không bệnh, không ở chuồng cách ly, có `a.tile`; cứ `FREE.moveMs` đổi sang ô khác cách ≤ `FREE.radius` ô (`a.tileAt` = lúc đổi kế). Sáng ra bước từ cửa chuồng; từ chạng vạng `isDusk` (18h) trở đi, hoặc bệnh/cách ly/vượt 30, thì `tile = null` và về chuồng (trừ con lạc, xem issue 42). Vịt con thì không tự chọn ô: bám `tile` của vịt mái gần nhất đang thả rông (đi thành hàng theo mẹ). Đứng ở ô ruộng có cây: con nhỡ trở lên mổ sâu (`stats.pecks`), 5% (`FREE.seedLoss`) lần mổ mất hạt vừa gieo (cây ở giai đoạn 0). Gà/vịt mái trưởng thành thả rông đẻ trứng ở ô cỏ gần bụi/đá/cây trong `FREE.layRadius`, mỗi ô một ổ. Chạy bù offline dùng đúng luật này.
 Hàng rào thấp: vật phẩm `deco_lowfence` (ITEMS, kind deco, bán ở chợ), đặt bằng `placeEntity` như đồ trang trí (qua `canPlace`), người chơi bước qua được, chỉ chặn gà. `world.js` diễn hoạt gà theo `a.tile` (`freeWalk`); `render.js` vẽ `SPR3.lowFence` (ngang/dọc theo hàng xóm) và `SPR3.eggNest` / `SPR3.eggNestDuck` cho trứng có `tile`.
+
+### Xe rùa (hotfix)
+`ITEMS.barrow` (kind `supply`, 250 xu, cấp 3, `once: true`): bán ở chợ Bà Tư tab Vật tư, chỉ mua được một lần (`buy` từ chối khi đã có, không đặt online được). Có xe thì `actionsFor` vật nuôi thêm `barrow` "Chở sang chuồng khác" (disabled khi không còn chuồng cùng loại khác). `main.js` hỏi chuồng đích (`ui.pickPen`, mỗi chuồng hiện `n/cap`, đầy thì khóa) rồi gọi `perform` với `target.penId`; chở tức thì. Chuồng cách ly không qua xe rùa (vào bằng `isolate`, ra bằng `unisolate`; con nằm cách ly vẫn chở được về chuồng thường). Ở cảnh thăm vườn không có hành động này. Art tùy chọn `artbarrow.js` (`BARROW`/`BARROW_HD`: `barrowIcon`, `barrow.{left,right}[2]`, `barrowLoaded`), thiếu thì dùng 🛒 và không vẽ xe cạnh người.
 
 ### Chạng vạng về chuồng, con lạc, lùa tay, rải thóc (issue 42, ADR 0013)
 ```js
@@ -625,6 +630,8 @@ canPlace(state, what, c, r)       // → { ok: true } | { ok: false, reason, msg
 moveEntity(state, id, c, r)       // → R { reason? } dời miễn phí, không giới hạn; dời chuồng thì con vật/trứng đi theo, con vật hoảng (scaredUntil)
 placeEntity(state, what, c, r)    // → R { id } đặt mới (khối ruộng/chuồng trừ xu, đồ trang trí lấy từ kho); qua canPlace rồi canAfford
 storeEntity(state, id)            // → R { reason? } cất: đồ trang trí về kho; khối ruộng chỉ khi không có cây và không phải khối cuối
+demolishPen(state, id)            // → R { refund, reason? } phá bỏ chuồng trống (chuồng không cất vào túi được): từ chối 'has_animals' khi còn con nào (kể cả đang đi lang thang, nằm cách ly), 'has_eggs' khi còn trứng trong chuồng / ổ ấp; hoàn floor(PEN_REFUND 0.5 x (giá xây + giá các lần nâng cấp)); xóa máng s.troughs[id], phân của loại nếu là chuồng cuối loại; bumpLayout. Chuồng cuối của loài cũng phá được. UI: chạm chuồng ở chế độ xây dựng -> nút "Phá bỏ (hoàn xu)" + hộp xác nhận; Hủy trả lại chuồng, máng, phân, xu (snapLayout/restoreLayout giữ troughs, manure)
+demolishRefund(entity)            // → số xu hoàn khi phá chuồng đó
 canAfford(state, what)            // → { ok } | { ok: false, reason: 'no_item'|'missing'|'level'|'coins', msg }
 placeCost(state, what)            // giá xu của món định đặt
 snapLayout(state) / restoreLayout(state, snap)   // chụp bố cục lúc vào chế độ xây dựng / trả lại đúng như cũ (nút Hủy)
@@ -650,7 +657,7 @@ Thêm luật đặt mới thì thêm một bước kiểm tra trong `canPlace` *
 nextStrip(state, dir)             // dir 'N'|'S'|'E'|'W' → { c, r, w, h, dir, price, level } | null (hết đất / hết bậc giá). Dải dày LAND_STRIP.depth (4) ô
 buyStrip(state, dir)              // → R { reason: 'scene'|'max'|'level'|'coins', dir, sound }; rải bụi/đá (theo tileHash) lên ô trống của dải, bump layout
 ```
-Dọn bụi/đá là hành động `clear` của target `clutter` (tốn thể lực, được gỗ/đá vào kho). Vườn không bao giờ vượt 64x48 ô.
+Dọn bụi/đá là hành động `clear` của target `clutter` (tốn thể lực, được gỗ/đá vào kho). Cây `tree` trong vườn nhà cũng là target `clutter`: `clear` = "Chặt cây" (`CHOP`, tốn `STAMINA.cost.chopTree` = 4, được 3 gỗ), cây biến mất ngay (xoá ent + bump layout, ô đi được, không mọc lại); khách đi thăm bị `guestCheck` từ chối, cây ở làng (không có ent) không chặt được; chưa có cây ăn quả dạng ent. Vườn không bao giờ vượt 64x48 ô.
 
 ### Chuyển bản đồ
 ```js
@@ -700,7 +707,7 @@ Thao tác của khách là **hàm thuần** trên bản lưu chủ: server kiể
 // who = { name, level, room } của khách
 guestOps(state, target)           // → các thao tác khách làm được lên target ngay lúc này (chưa có mã): [{ kind, act, idx|crow|egg|animal }]
 guestOpCheck(host, who, op)       // thuần, không đổi gì → { ok: true, target } (trộm thì thêm { item, qty }) | { ok: false, reason, msg }
-                                  //   reason: 'op_invalid' (thao tác lạ) · 'done' (mã này đã áp dụng rồi) · 'help_full' ("Vườn này hôm
+                                  //   reason: 'op_invalid' (thao tác lạ) · 'done' (mã này đã áp dụng rồi) · 'help_full' (khách này đã giúp đủ GUEST.helpMax việc hôm nay) · 'help_host_full' (cả vườn đã nhận đủ GUEST.helpHostMax việc) · (cũ: "Vườn này hôm
                                   //   nay đã được giúp đủ") · 'nothing' ("Ở đây không còn gì để làm/để trộm", vd chủ vừa tưới ô đó)
                                   //   trộm: 'cant_steal' (con vật, trái khổng lồ, đồ trong kho/nhà, cá) · 'host_new' ("Vườn này còn quá
                                   //   nhỏ để trộm") · 'guest_new' (khách chưa tới cấp 5) · 'robbed' (người này trộm ở đây rồi) ·
@@ -715,15 +722,16 @@ guestReward(me, reward)           // cộng xu + EXP, bỏ đồ trộm được
 takeGuestLog(state)               // các dòng guests chưa seen → [{ type: 'helped', by, act, at }] / [{ type: 'stolen', by, item, qty, at }]
                                   //   rồi đánh dấu đã xem (báo một lần)
 helpsToday(state, t?)             // số việc giúp vườn này đã nhận hôm nay (ngày ngoài đời theo serverDay)
-helpLeft(state, t?)               // số lượt giúp còn lại hôm nay (GUEST.helpMax - helpsToday)
+helpLeft(state, t?)               // trong bản đi dạo: lượt khách còn giúp được vườn này = min(helpMax - helpsBy(tên mình), helpHostMax - helpsToday); ngoài đó: lượt vườn còn nhận
+helpsBy(state, name, t?) · helpHostLeft(state, t?) · helpLeftFor(state, name, t?) · helpBlock(state, name, t?)   // giới hạn theo khách / theo vườn, lý do từ chối
 stealsToday(state, t?)            // số vụ vườn này bị trộm hôm nay · stolenToday(state, t?) = tổng giá trị đã mất
 robsToday(state, t?)              // số vụ chính mình đi trộm hôm nay (bản lưu khách)
 ripeValue(state)                  // tổng giá trị đồ đang chín chờ lấy trong vườn (cây chín, trứng dưới đất, sữa và lông đang chờ)
 stealLeft(state, t?)              // giá trị vườn này còn chịu mất hôm nay (GUEST.dayPct của ripeValue + phần đã mất)
-HELP_FULL                         // câu "Vườn này hôm nay đã được giúp đủ" · STEAL_SMALL = "Vườn này còn quá nhỏ để trộm"
+HELP_FULL / HELP_HOST_FULL        // câu "Bạn đã giúp vườn này đủ 10 việc hôm nay, mai (sau 0h giờ Việt Nam) giúp tiếp nhé" / "Vườn này hôm nay đã nhận đủ 30 việc giúp từ mọi khách, mai ... quay lại nhé" · STEAL_SMALL = "Vườn này còn quá nhỏ để trộm"
 ```
 - **Việc giúp** (`GUEST`, `HELP_JOBS` trong data.js): tưới (`water`), nhổ cỏ (`weed`), bắt sâu (`catch`), đuổi quạ (`shoo`). Điều kiện đúng như của chủ (`FIT`): ô khô mới tưới được, có cỏ mới nhổ, có sâu mới bắt, con quạ còn đó mới đuổi. Giúp không tốn nước bình, thể lực hay đồ của khách.
-- **Thưởng khách:** `GUEST.helpCoins` = 3 xu + `GUEST.helpExp` = 2 EXP mỗi việc. **Giới hạn:** mỗi vườn mỗi **ngày ngoài đời** nhận tối đa `GUEST.helpMax` = 10 việc giúp.
+- **Thưởng khách:** `GUEST.helpCoins` = 3 xu + `GUEST.helpExp` = 2 EXP mỗi việc. **Giới hạn:** mỗi **khách** giúp một vườn tối đa `GUEST.helpMax` = 10 việc mỗi **ngày ngoài đời** (giờ Việt Nam, đếm trong `today.helpBy`), và cả vườn nhận tối đa `GUEST.helpHostMax` = 30 việc từ mọi khách. Mỗi thao tác (một ô) tính một việc. Khách này dùng hết lượt không ảnh hưởng khách khác.
 - **Giao diện:** ở cảnh `visit`, chạm ô ruộng (hay con quạ) hiện các nút 💧 Tưới giúp / 🌿 Nhổ cỏ giúp / 🤏 Bắt sâu giúp / 🪶 Đuổi quạ giúp đúng theo trạng thái (id hành động `help_<act>`); hết lượt thì nút vẫn hiện nhưng **mờ** kèm lý do. Thanh `#visit-bar` có thêm dòng "Còn x lượt giúp hôm nay" (`ui.setVisit(owner, left)`).
 - **Luồng:** `perform` trả thêm `guestOp` (thao tác vừa làm, đã áp dụng lên bản đi dạo để khách thấy liền) → `main.js` gửi `{ t: 'guest', op }` lên server → server kiểm tra trên bản lưu mới nhất của chủ rồi trả `{ t: 'guest', ok, reward }` (khách lúc đó mới được cộng xu/EXP hay nhận đồ trộm được) hoặc lý do từ chối (toast). Chủ đang online nhận `{ t: 'guestop', op }` → `guestOpApply` trên vườn mình → `takeGuestLog` → toast 🟡 gộp "Lan đã tưới 3 ô giúp bạn 🙏" hay băng rôn 🔴 "Bình đã trộm 1 cà chua lúc 3h chiều 😤". Chủ vắng thì server áp dụng thẳng vào bản lưu; lần sau chủ vào làng, `takeGuestLog` báo sau khi đóng màn "Trong lúc bạn vắng nhà" (`ui.afterAway(fn)`).
 
@@ -970,17 +978,18 @@ giantKey(id, sao = 1)             // 'giant_<cây>' (+ '@2' / '@3'); giantOf(key
 ### Mua online, người giao hàng (hotfix sau Phase 2)
 ```js
 canOrder(itemId)                  // món đặt online được: ITEMS có giá, kind seed | supply (gồm thuốc thú y, vắc-xin) | feed | deco
-deliveryFee(cost)                 // phí giao = max(DELIVERY.feeMin, ceil(cost × DELIVERY.feePct)); cost 0 → 0
-orderQuote(state, cart)           // → R { items, cost, fee, total }: cart = { itemId: qty }, hàm thuần, không trừ xu (qty ≤ DELIVERY.maxQty)
-orderOnline(state, cart)          // → R { order, reason? }: trừ xu ngay (tiền hàng + phí), thêm vào state.deliveries. Đặt lúc nào cũng
+deliveryMode(id)                  // một phần tử của DELIVERY.modes: 'now' (ms 0, phí 30%) | 'm1' (1 phút, 20%) | 'm2' (2 phút, 10%); thiếu hoặc lạ → 'm2' (client cũ)
+deliveryFee(cost, mode)           // phí giao = max(DELIVERY.feeMin, ceil(cost × phí của kiểu giao)); cost 0 → 0
+orderQuote(state, cart, mode)     // → R { items, cost, fee, total }: cart = { itemId: qty }, hàm thuần, không trừ xu (qty ≤ DELIVERY.maxQty)
+orderOnline(state, cart, mode)    // → R { order, reason? }: trừ xu ngay (tiền hàng + phí theo kiểu giao). 'now': hàng vào kho tức thì (event delivered, nhật ký, không có đơn chờ, không bị giới hạn maxPending, order null). 'm1'/'m2': thêm vào state.deliveries { due, by = at + ms }. Đặt lúc nào cũng
                                   // được (chợ đóng vẫn đặt). Từ chối: giỏ trống, món không đặt được, chưa đủ cấp, reason 'coins' |
                                   // 'pending' (đã có DELIVERY.maxPending đơn chờ) | 'visit' (đang ở vườn bạn). Có hạt giống thì tính bước "mua" của hướng dẫn
 pendingDeliveries(state)          // → [{ ...đơn, total, eta, onWay }]: eta = ms giờ vườn dự kiến tới kho
-deliveryEta(state, order)         // ms dự kiến: đang trên đường → arriveAt - time; chưa đi → chờ đủ waitMs, rơi vào lúc chợ đóng thì tới 6h sáng, + quãng đi bộ
+deliveryEta(state, order)         // ms dự kiến: đang trên đường → arriveAt - time; chưa đi → chờ tới due, rơi vào lúc chợ đóng thì tới 6h sáng, + quãng đi bộ; không vượt hạn `by` khi chợ mở
 ```
-Luật trong `step` (chạy như nhau ở trình duyệt và lúc chạy bù, cả server): người giao hàng rảnh, chợ đang mở (`marketOpen`, giờ chợ không đổi 6h–18h) và có đơn đã tới `due` thì lên đường mang **mọi** đơn đã tới hạn: `courier = { state: 'coming', from: cổng (gateIn), at: trước nhà kho, arriveAt }`, thời gian đi = max(walkMin, quãng thẳng / speed × walkMul). Tới `arriveAt`: hàng vào **kho** (`inv`, không vào giỏ, kho không giới hạn nên không có chuyện đầy), các đơn đó rời `deliveries`, event `delivered`, nhật ký "Người giao hàng đã giao tới kho: …", chữ bay "Hàng tới rồi 📦"; `state = 'leaving'` rồi sau `leaveMs` thì `courier = null` (chuyến sau mới đi tiếp). Đang thăm vườn bạn thì không giao (về nhà mới giao), `startVisit` không mang người giao hàng theo. Vật nuôi, quần áo vẫn chỉ mua ở làng. Màn "Trong lúc bạn vắng nhà" có dòng "Người giao hàng đã giao N đơn hàng online tới kho 📦".
+Luật trong `step` (chạy như nhau ở trình duyệt và lúc chạy bù, cả server): người giao hàng rảnh, chợ đang mở (`marketOpen`, giờ chợ không đổi 6h–18h) và có đơn đã tới `due` (= `by` − quãng đi bộ, nên người giao hàng tới kịp hạn; đơn cũ trong bản lưu chỉ có `due` vẫn chạy như trước) thì lên đường mang **mọi** đơn đã tới hạn: `courier = { state: 'coming', from: cổng (gateIn), at: trước nhà kho, arriveAt }`, thời gian đi = max(walkMin, quãng thẳng / speed × walkMul). Đơn tới hạn `by` lúc chợ mở thì hàng vào kho đúng hạn dù người giao hàng còn đang đi (tổng thời gian đã chọn gồm cả quãng đi bộ). Tới `arriveAt`: hàng vào **kho** (`inv`, không vào giỏ, kho không giới hạn nên không có chuyện đầy), các đơn đó rời `deliveries`, event `delivered`, nhật ký "Người giao hàng đã giao tới kho: …", chữ bay "Hàng tới rồi 📦"; `state = 'leaving'` rồi sau `leaveMs` thì `courier = null` (chuyến sau mới đi tiếp). Đang thăm vườn bạn thì không giao (về nhà mới giao), `startVisit` không mang người giao hàng theo. Vật nuôi, quần áo vẫn chỉ mua ở làng. Màn "Trong lúc bạn vắng nhà" có dòng "Người giao hàng đã giao N đơn hàng online tới kho 📦".
 
-Giao diện: bảng `order` (🛒 Đặt hàng online) mở từ nút "Đặt hàng online" trong Túi đồ (cả trong nhà kho) và trong bảng điện thoại; có danh sách đơn chờ giao với giờ dự kiến (đổi từng giây, `[data-eta]`), phiếu đặt hàng (−1 / ✕, tổng = tiền hàng + phí giao, nút `#order-buy`), các tab Hạt giống / Vật tư / Thức ăn / Trang trí / Thú y với nút +1 / +5. Người giao hàng có sprite riêng (`artcourier.js`: `COURIER_ART.carry|empty[hướng][khung]` 16x24, `box` 12x10; bản 2x `COURIER_ART_HD`, `hd.js` nối), toast "Hàng đã giao tới kho" dùng icon thùng hàng.
+Giao diện: bảng `order` (🛒 Đặt hàng online) mở từ nút 🛒 "Mua hàng" ở thanh dưới (`#bb-order`, ở vườn/làng/nhà, ẩn khi đang thăm vườn bạn), từ nút "Đặt hàng online" trong Túi đồ (cả trong nhà kho) và trong bảng điện thoại; chọn kiểu giao bằng ba nút `#order-modes [data-mode]` (Giao ngay 30% · sau 1 phút 20% · sau 2 phút 10%, ghi phí xu cho phiếu hiện tại, mặc định 2 phút), chọn chợ Bà Tư / trạm Cô Út bằng `#order-shops`; có danh sách đơn chờ giao với giờ dự kiến (đổi từng giây, `[data-eta]`), phiếu đặt hàng (−1 / ✕, tổng = tiền hàng + phí giao, nút `#order-buy`), các tab Hạt giống / Vật tư / Thức ăn / Trang trí (Bà Tư), đồ thú y (Cô Út) với nút +1 / +5. Người giao hàng có sprite riêng (`artcourier.js`: `COURIER_ART.carry|empty[hướng][khung]` 16x24, `box` 12x10; bản 2x `COURIER_ART_HD`, `hd.js` nối), toast "Hàng đã giao tới kho" dùng icon thùng hàng.
 
 ### Thông báo, Việc cần làm, cài đặt
 ```js
@@ -1024,7 +1033,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'pred', id }           // chuột, diều hâu, chồn: chạm để đuổi (issue 43)
 { kind: 'cat', id }            // mèo (issue 44): ở vườn ban ngày, trong nhà ban đêm
 { kind: 'deco', id }           // đồ trang trí trong vườn (ghế đá: ngồi nghỉ)
-{ kind: 'clutter', id }        // bụi / đá chưa dọn: Dọn bụi, Đập đá
+{ kind: 'clutter', id }        // bụi / đá chưa dọn, hoặc cây trong vườn: Dọn bụi, Đập đá, Chặt cây
 { kind: 'strip', dir }         // mép vườn: mua dải đất 'N'|'S'|'E'|'W'
 // Mua đất theo dải, vườn luôn là hình chữ nhật. Hành động `buy` ghi cỡ dải và giá ("dải 4×24 ô, 500 xu, cấp 5");
 // chưa đủ cấp thì vô hiệu với lý do "Mua đất ở mép vườn từ cấp N", và ui.js nối lý do đó vào tên đích để người chơi đứng ở mép vườn là đọc thấy.
@@ -1034,7 +1043,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
                                //   Nhà: bed, wardrobe, phone (gọi bác sĩ thú y), (stove, table, plant chỉ để ngắm). Làng: market (Bà Tư), smithy (Ông Sáu),
                                //   vet (trạm thú y Cô Út), houseC (nhà Chú Ba, lái buôn mua vật nuôi đứng trước nhà), friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth mulch harvest clear` (`mulch` phủ rơm, issue 55); ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; bát ăn `fill`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; bù nhìn bị bão quật đổ (`deco`) `raise`; nhà kính kính vỡ (`glass`) `fixglass` (issue 60); `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill` (giếng thêm `upgradeWell`, issue 56; bồn chứa có `tank` luôn tắt, chỉ để xem trạng thái máy bơm, issue 57; hố ủ phân `compostAdd compostStart compostTake wait`, issue 61).
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth mulch harvest clear` (`mulch` phủ rơm, issue 55); ô khóa `expand`; vật nuôi `collect/milk/shear feed pet barrow bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; bát ăn `fill`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; bù nhìn bị bão quật đổ (`deco`) `raise`; nhà kính kính vỡ (`glass`) `fixglass` (issue 60); `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill` (giếng thêm `upgradeWell`, issue 56; bồn chứa có `tank` luôn tắt, chỉ để xem trạng thái máy bơm, issue 57; hố ủ phân `compostAdd compostStart compostTake wait`, issue 61).
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 
@@ -1279,7 +1288,7 @@ Một tiến trình Node ≥ 22.13: file tĩnh `public/`, API HTTP JSON, WebSock
     - `{ id, kind: 'bark', act: 'bark', x, y }` (chỗ chó thấy khách, số nguyên trong ±10000) — không có `reward`;
     - `{ id, kind: 'bite', act: 'bite', loot: { <món>: n } }` (tối đa 20 món, `n` nguyên 1..10000, món phải có trong `ITEMS`/`CROPS`/`PRODUCTS`) → `reward` = `{ lose, fine, bite }`;
     - `{ id, kind: 'sausage', act: 'sausage' }` → `reward` = `{ lose: { sausage: 1 } }`.
-    Server chỉ nhận đúng các trường trên; `by`, `level`, `room` (chỗ trống trong giỏ theo vườn đã lưu của khách), `sausage` (số xúc xích khách đang có) và `at` do server điền, không tin trình duyệt. `reason`: `no_session` · `not_joined` (chưa vào vườn ai) · `self` (vườn của chính mình) · `no_farm` · `op_invalid` · và các lý do của luật (`done`, `help_full`, `nothing`, `cant_steal`, `host_new`, `guest_new`, `robbed`, `full`, `day_full`, `no_guard`, `no_item`, `barking`).
+    Server chỉ nhận đúng các trường trên; `by`, `level`, `room` (chỗ trống trong giỏ theo vườn đã lưu của khách), `sausage` (số xúc xích khách đang có) và `at` do server điền, không tin trình duyệt. `reason`: `no_session` · `not_joined` (chưa vào vườn ai) · `self` (vườn của chính mình) · `no_farm` · `op_invalid` · và các lý do của luật (`done`, `help_full`, `help_host_full`, `nothing`, `cant_steal`, `host_new`, `guest_new`, `robbed`, `full`, `day_full`, `no_guard`, `no_item`, `barking`).
   - Server lấy bản lưu mới nhất của chủ, áp dụng các thao tác còn chờ trong hàng đợi rồi kiểm tra thao tác mới bằng `guestOpApply` của `state.js`. Bị từ chối thì **không** ghi vào hàng đợi. Nhận thì ghi `guest_ops` và:
     - chủ **đang online** (có WebSocket giữ phiên chơi): `applied = NULL`, đẩy `{ t: 'guestop', op }` tới mọi kết nối của chủ; trình duyệt chủ áp dụng rồi gửi bản lưu lên như thường.
     - chủ **offline**: server chạy bù vườn (issue 24) rồi áp dụng ngay trên bản lưu đó, lưu lại (`saved_at` không đổi) và đánh dấu `applied`.

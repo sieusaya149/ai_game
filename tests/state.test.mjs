@@ -285,10 +285,11 @@ test('vật nuôi: tự ăn ở máng, đói -> bệnh -> thuốc thú y', () =>
   s.troughs[penIdOf(G, s, 'chicken')] = 1;
   noBugs(() => run(s, 70 * MIN));   // hết no còn ~40%: gà ra máng ăn phần duy nhất
   assert.equal(s.troughs[penIdOf(G, s, 'chicken')], 0);
-  // đói lả: không bệnh ngay, phải đói liên tục tới sickAfterStarving mới chắc chắn bệnh
-  noBugs(() => run(s, HUSBANDRY.hungerMs));
-  assert.equal(hen.sick, 0);
-  noBugs(() => run(s, HUSBANDRY.sickAfterStarving + 2 * MIN));
+  // đói lả
+  noBugs(() => run(s, 10 * MIN));
+  assert.equal(hen.sick, 0, 'quên cho ăn một lúc chưa bệnh');
+  hen.hunger = 0; hen.starvingSince = s.time - 150 * MIN;   // bỏ đói lả rất lâu (quá sickRiskAfterStarving)
+  withRandom(0.000001, () => run(s, MIN));
   assert.equal(hen.sick, 1);   // mức Mệt
   s.inv.medicine = 1;
   assert.equal(G.actionsFor(s, { kind: 'animal', id: hen.id })[0].id, 'medicine');

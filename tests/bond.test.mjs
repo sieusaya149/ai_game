@@ -99,8 +99,8 @@ test('❤️4 giảm nguy cơ bệnh; ❤️3 chưa giảm', () => {
   assert.equal(G.sickFactor({ bond: 3 }), 1);
   assert.equal(G.sickFactor({ bond: 4 }), BOND.sickMul);
   assert.equal(G.sickFactor({ bond: 5 }), BOND.sickMul);
-  // (con dơ, tức bị bỏ bê) xác suất bệnh thật sự thấp hơn: random 1e-4 (tick chia bước 1 giây) làm con ❤️1 bệnh nhưng con ❤️4 thì không
-  const sick = bond => { const s = newGame(), a = put(s, 'ga', 'truong', { bond, dirty: 65 }); withRandom(1e-4, () => G.tick(s, MIN)); return !!a.sick; };
+  // (con già, tức có nguy cơ) xác suất bệnh thật sự thấp hơn: random 1e-4 (tick chia bước 1 giây) làm con ❤️1 bệnh nhưng con ❤️4 thì không
+  const sick = bond => { const s = newGame(), a = put(s, 'ga', 'gia', { bond }); withRandom(1e-4, () => G.tick(s, MIN)); return !!a.sick; };
   assert.equal(sick(1), true); assert.equal(sick(4), false);
 });
 

@@ -183,12 +183,12 @@ test('con vật no đẻ đều mỗi chu kỳ; đói (không có thức ăn tro
   assert.ok(eggs(s, 40 * MIN) >= 1, 'có cám trở lại thì đẻ tiếp');
 });
 
-test('đói không làm bệnh ngay: đói dưới 90 phút tuyệt đối không bệnh dù xúi quẩy; bỏ một bữa cũng không sao', () => {
-  assert.ok(HUSBANDRY.hungrySafeMs >= HOUR && HUSBANDRY.hungrySafeMs <= 2 * HOUR, 'không nguy cơ trong 1–2 giờ đói đầu');
-  const s = game(); const hen = put(s, 'ga', { hunger: 0, nextProduct: 1e15 });
-  fill(s, 0);
-  run(s, HUSBANDRY.hungrySafeMs - 5 * MIN, undefined, 1e-9);
-  assert.equal(hen.sick, 0, 'chưa tới hungrySafeMs');
+test('đói không làm bệnh ngay: đói lả dưới 90 phút tuyệt đối không bệnh dù xúi quẩy; bỏ một bữa cũng không sao', () => {
+  assert.ok(HUSBANDRY.sickRiskAfterStarving >= HOUR && HUSBANDRY.sickRiskAfterStarving <= 2 * HOUR, 'không nguy cơ trong 1–2 giờ đói lả đầu');
+  const s = game(); const hen = put(s, 'ga', { hunger: 0, starvingSince: 1, nextProduct: 1e15 });
+  s.time = 1 + 5 * MIN; hen.starvingSince = s.time; fill(s, 0);
+  run(s, HUSBANDRY.sickRiskAfterStarving - 5 * MIN, undefined, 1e-9);
+  assert.equal(hen.sick, 0, 'chưa tới sickRiskAfterStarving');
   assert.equal(G.starveRisk(s, hen), 0);
   // một bữa lỡ: máng chỉ có 1 phần, con gà ăn xong thì hết, đói lại từ từ: 2 giờ sau vẫn khỏe
   const t = game(); const hen2 = put(t, 'ga', { nextProduct: 1e15 });
@@ -197,19 +197,21 @@ test('đói không làm bệnh ngay: đói dưới 90 phút tuyệt đối khôn
   assert.equal(hen2.sick, 0, 'một bữa lỡ không bao giờ gây bệnh');
 });
 
-test('đói kéo dài: nguy cơ bệnh bằng 0 trong hungrySafeMs rồi tăng dần tới mức tối đa; đói quá lâu thì bệnh', () => {
-  const s = game(); const hen = put(s, 'ga', { hunger: 10, nextProduct: 1e15 });
-  const at = ms => { hen.hungrySince = s.time - ms; return G.starveRisk(s, hen); };
+test('đói lả kéo dài: nguy cơ bệnh bằng 0 trong sickRiskAfterStarving rồi tăng dần tới mức tối đa, không có mốc chắc chắn', () => {
+  const s = game(); const hen = put(s, 'ga', { hunger: 0, nextProduct: 1e15 });
+  const at = ms => { hen.starvingSince = s.time - ms; return G.starveRisk(s, hen); };
+  const R = HUSBANDRY.sickRiskAfterStarving, W = HUSBANDRY.sickStarveRampMs, M = HUSBANDRY.sickStarveMaxPerMin;
   assert.equal(at(0), 0);
-  assert.equal(at(HUSBANDRY.hungrySafeMs), 0);
-  const mid = at(HUSBANDRY.hungrySafeMs + HUSBANDRY.hungryRampMs / 2), full = at(HUSBANDRY.hungrySafeMs + HUSBANDRY.hungryRampMs);
+  assert.equal(at(R), 0);
+  const mid = at(R + W / 2), full = at(R + W);
   assert.ok(mid > 0 && mid < full, 'tăng dần');
-  assert.equal(full, HUSBANDRY.hungrySickMax);
-  assert.equal(at(HUSBANDRY.hungrySafeMs + 10 * HOUR), HUSBANDRY.hungrySickMax, 'không vượt mức tối đa');
+  assert.equal(full, M);
+  assert.equal(at(R + 10 * HOUR), M, 'không vượt mức tối đa');
+  assert.ok(M < 1, 'không có mốc chắc chắn bệnh');
   // thật sự bệnh (xúi quẩy) khi đã đói đủ lâu; còn chưa đủ lâu thì không
-  const sick = ms => { const g = game(); const a = put(g, 'ga', { hunger: 10, nextProduct: 1e15, hungrySince: g.time - ms }); fill(g, 0); run(g, 3 * MIN, undefined, 1e-9); return !!a.sick; };
-  assert.equal(sick(HUSBANDRY.hungrySafeMs - 10 * MIN), false);
-  assert.equal(sick(HUSBANDRY.hungrySafeMs + HUSBANDRY.hungryRampMs), true);
+  const sick = ms => { const g = game(); const a = put(g, 'ga', { hunger: 0, nextProduct: 1e15, starvingSince: g.time - ms }); fill(g, 0); run(g, 3 * MIN, undefined, 1e-9); return !!a.sick; };
+  assert.equal(sick(R - 10 * MIN), false);
+  assert.equal(sick(R + W), true);
 });
 
 test('chuồng bẩn, con dơ lâu vẫn là nguy cơ bệnh riêng (không thuộc về đói)', () => {

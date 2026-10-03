@@ -94,6 +94,7 @@ function build(f) {
       }
     } else if (e.kind === 'tree') {
       trees.push({ x: px + 8, y: py + 14, ent: e });
+      clutter.push({ id: e.id, kind: 'tree', x: px, y: py, v: 0, ent: e });   // chạm vào để chặt (chỉ vẽ ở trees)
       block(e.c, e.r);
     } else if (e.kind === 'bush' || e.kind === 'rock') {   // bụi, đá chưa dọn: chắn đường
       clutter.push({ id: e.id, kind: e.kind, x: px, y: py, v: tileHash(e.c, e.r) % 3, ent: e });

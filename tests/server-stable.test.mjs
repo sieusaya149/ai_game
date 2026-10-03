@@ -195,7 +195,7 @@ test('server khởi động lại trên cùng file SQLite: tài khoản, phiên 
 
 // ---------- Nhiều khách cùng lúc ----------
 
-test('8 khách cùng vào làng rồi cùng giúp một vườn: đúng 10 việc được nhận, không mất, không lặp, server vẫn khỏe', async t => {
+test('8 khách cùng vào làng rồi cùng giúp một vườn: cả 16 việc được nhận, không mất, không lặp, server vẫn khỏe', async t => {
   const { srv, player } = await setup(t);
   const A = await player('Lan', garden);
   const G = [];
@@ -211,21 +211,21 @@ test('8 khách cùng vào làng rồi cùng giúp một vườn: đúng 10 việ
   const enters = await Promise.all(socks.map(s => drain(s, 'enter', 300)));
   joined.forEach((j, i) => assert.equal(j.people.length + enters[i].length, 7, `khách ${i} thấy đủ 7 người kia`));
 
-  // cùng sang vườn Lan, mỗi người gửi 2 việc khác nhau cùng lúc: 16 việc > 10 lượt mỗi ngày
+  // cùng sang vườn Lan, mỗi người gửi 2 việc khác nhau cùng lúc: 16 việc, khách nào cũng còn lượt
   await Promise.all(socks.map(s => join(s, { map: 'farm', owner: 'Lan' })));
   socks.forEach((s, i) => { s.send({ t: 'guest', op: op(`help-many-w${i}00`, 'water', i) }); s.send({ t: 'guest', op: op(`help-many-g${i}00`, 'weed', i) }); });
   const acks = (await Promise.all(socks.map(async s => [await until(s, 'guest'), await until(s, 'guest')]))).flat();
   const ok = acks.filter(m => m.ok), no = acks.filter(m => !m.ok);
-  assert.equal(ok.length, GUEST.helpMax);
-  assert.ok(no.every(m => m.reason === 'help_full'), JSON.stringify(no));
+  assert.equal(ok.length, 16);   // mỗi khách 2 việc, chưa chạm giới hạn 10 việc mỗi khách hay 30 việc mỗi vườn
+  assert.equal(no.length, 0, JSON.stringify(no));
   assert.equal(new Set(ok.map(m => m.id)).size, ok.length);
   // chủ online nhận đúng các việc đã được nhận, mỗi việc một lần
   const pushed = await drain(a, 'guestop');
   assert.deepEqual(pushed.map(m => m.op.id).sort(), ok.map(m => m.id).sort());
 
-  // chủ rời đi: hàng đợi áp dụng đúng 10 việc
+  // chủ rời đi: hàng đợi áp dụng đủ 16 việc
   a.close(); await a.closed;
-  const f = await poll(() => G[0].visit('Lan'), r => r.farm.today.helps === GUEST.helpMax);
+  const f = await poll(() => G[0].visit('Lan'), r => r.farm.today.helps === 16);
   assert.deepEqual(f.farm.guests.map(g => g.id).sort(), ok.map(m => m.id).sort());
   assert.equal((await srv.json('/api/health')).body.ok, true);
 });
