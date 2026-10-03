@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, barrowTargets, commandDog,
+  startVisit, visitWorld, visitSync, visitEase, WORLD_MS, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, barrowTargets, commandDog,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -97,7 +97,7 @@ const SHAKE_MS = 400;
 let shakeUntil = 0;
 
 // ---------- API cho ui.js ----------
-function changed() { dirty = true; worldDirty = true; }
+function changed() { dirty = true; }
 
 // Bán con vật: báo giá, con ❤️4+ phải xác nhận 2 lần. Nghỉ hưu: hỏi một lần (không quay lại được)
 async function askAnimal(target, id) {
@@ -264,7 +264,7 @@ function quit() {
 const peers = createPeers();
 const me = { chat: null, emote: null, chatUntil: 0, emoteT0: 0 };   // bong bóng của chính mình
 let liveMap = null, livePos = '', livePosAt = 0;
-function liveReset() { peers.clear(); liveMap = null; watchers = 0; ui.setLive(!!sync, 0); }
+function liveReset() { peers.clear(); liveMap = null; watchers = 0; farmSent = null; ui.setLive(!!sync, 0); }
 // tin từ WebSocket (qua sync.js): kết nối (lại) thì vào lại bản đồ ở khung hình tới; rớt thì xóa người khác
 function liveMsg(m) {
   if (m.t === 'hello' || m.t === 'down') { liveReset(); return; }
@@ -272,7 +272,7 @@ function liveMsg(m) {
   if (m.t === 'visit') { ui.netEvent({ type: 'visited', by: m.name }); return; }
   if (m.t === 'guest') { guestAck(m); return; }       // server trả lời việc mình vừa giúp (issue 28)
   if (m.t === 'guestop') { guestDid(m.op); return; }  // khách vừa giúp vườn mình: áp dụng rồi cảm ơn
-  if (m.t === 'watch') { watchers = m.n | 0; worldAt = -Infinity; return; }   // khách vào / ra vườn mình: có khách mới thì gửi vườn ngay
+  if (m.t === 'watch') { watchers = m.n | 0; worldAt = -Infinity; farmSent = null; return; }   // khách vào / ra vườn mình: có khách mới thì gửi vườn ngay
   if (m.t === 'world') { hostDid(m); return; }        // chủ vườn mình đang thăm vừa làm gì đó
   // quà, lời nhắn mới ở cổng (issue 29): toast 🟡 gộp, và đếm lại để sprite hộp quà / sổ đổi theo
   if (m.t === 'gift' || m.t === 'note') { ui.netEvent({ type: m.t, name: m.name, item: m.item, qty: m.qty }); ui.refreshGate(); return; }
@@ -310,15 +310,17 @@ function guestDid(op) {
 }
 // ---------- Khách thấy chủ làm gì ngay (sửa lỗi online: chủ thu hoạch mà cây vẫn nằm trên máy khách) ----------
 // Chủ: có khách đứng trong vườn mình (server báo `watch`) thì gửi phần vườn khách thấy được (state.js visitWorld) mỗi khi
-// vườn đổi, tối đa mỗi WORLD_MS, và đều đặn mỗi WORLD_IDLE_MS cho phần tự đổi (cây lớn, gà đẻ, con vật đói...).
+// mỗi WORLD_MS (1 giây) dù có đổi hay không: chủ chạy, chó chạy, cây lớn, gà đẻ... khách thấy mượt (visitEase). `farm` (nặng) chỉ gửi
+// khi bố cục đổi hay có khách mới; tin thiếu `farm` thì khách giữ bố cục đang có.
 // Khách: áp lên bản đi dạo (visitSync), chỗ đứng của mình và việc vừa làm mà chủ chưa nhận vẫn giữ.
-const WORLD_MS = 1000, WORLD_IDLE_MS = 4000;
-let watchers = 0, worldAt = -Infinity, worldDirty = false;
+let watchers = 0, worldAt = -Infinity, farmSent = null;
 function hostWorld(now) {
   const mine = home ?? state;
   if (!sync || !watchers || !mine || world.build) return;   // đang sửa bố cục: chưa lưu nên chưa gửi
-  if (now - worldAt < (worldDirty ? WORLD_MS : WORLD_IDLE_MS)) return;
-  if (sync.send({ t: 'world', w: visitWorld(mine) })) { worldAt = now; worldDirty = false; }
+  if (now - worldAt < WORLD_MS) return;
+  const w = visitWorld(mine), fk = JSON.stringify(w.farm);
+  if (fk === farmSent) delete w.farm;
+  if (sync.send({ t: 'world', w })) { worldAt = now; farmSent = fk; }
 }
 function hostDid(m) {
   const owner = state?.visit?.owner;
@@ -824,6 +826,7 @@ function frame(now) {
     world.input.x = kx || joy.x; world.input.y = ky || joy.y;
     if (plan && (world.input.x || world.input.y)) plan = null;   // tự đi bằng tay thì bỏ kế hoạch
   }
+  visitEase(state, dt);   // khách: con vật, chó của chủ đi dần tới chỗ tin world mới nhất
   const res = V.update(state, world, dt);
   for (const r of res.results) applyResult(r);
   if (res.bark) dogBark();     // chó trong vườn người khác vừa phát hiện mình (issue 31)

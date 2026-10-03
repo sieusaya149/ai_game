@@ -3,7 +3,7 @@
 // (visitSync) mà không làm nhân vật, con vật nhảy chỗ và không làm mất việc khách vừa làm mà chủ chưa kịp nhận.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, startVisit, visitWorld, visitSync, perform, guestOpApply, helpLeft, sceneMap, moveEntity, barkOp, stageStart } from '../public/state.js';
+import { createGame, startVisit, visitWorld, visitSync, visitEase, perform, guestOpApply, helpLeft, sceneMap, moveEntity, barkOp, stageStart } from '../public/state.js';
 import { setClock } from '../public/clock.js';
 import { GUEST } from '../public/data.js';
 
@@ -134,4 +134,63 @@ test('tin hỏng (không phải vườn) thì bỏ qua, bản đi dạo vẫn ng
   for (const bad of [null, 1, 'x', [], { plots: 5 }, { plots: [], animals: 'x' }]) assert.equal(visitSync(v, bad), false);
   assert.equal(visitSync(createGame({ name: 'X' }), {}), false, 'không phải bản đi dạo');
   assert.equal(JSON.stringify(v.plots), before);
+});
+
+// Chủ gửi tin mỗi giây: con vật, mèo, chó, quạ bị chủ dời xa thì khách thấy chúng đi tới chỗ mới (visitEase mỗi khung hình), không nhảy
+test('chủ dời con vật và chó đi xa hơn 64px: khách thấy đi dần tới chỗ chủ trong chừng 1 giây, không nhảy; xa quá 8 ô thì dịch chuyển', () => {
+  const { host, v } = setup();
+  const a0 = host.animals[0], va = v.animals.find(a => a.id === a0.id);
+  const from = { x: va.x, y: va.y }, dogFrom = { x: v.dog.x, y: v.dog.y };
+  a0.x = from.x + 100; a0.y = from.y;
+  host.dog.x = dogFrom.x + 90; host.dog.y = dogFrom.y;
+  visitSync(v, wire(host));
+  assert.deepEqual({ x: va.x, y: va.y }, from, 'chưa nhảy');
+  assert.deepEqual({ x: v.dog.x, y: v.dog.y }, dogFrom);
+  const a = () => v.animals.find(o => o.id === a0.id);
+  visitEase(v, 0.4);
+  assert.ok(a().x > from.x + 10 && a().x < from.x + 90, 'đang đi giữa đường: ' + a().x);
+  assert.ok(v.dog.x > dogFrom.x + 10 && v.dog.x < dogFrom.x + 80);
+  visitEase(v, 0.4);
+  const mid = a().x;
+  assert.ok(mid > from.x + 40);
+  visitEase(v, 0.4);
+  assert.equal(a().x, from.x + 100);
+  assert.equal(v.dog.x, dogFrom.x + 90);
+  visitEase(v, 1);
+  assert.equal(a().x, from.x + 100, 'tới nơi rồi thì đứng yên cho world.js đi lại');
+  // xa quá 8 ô (đổi cảnh, chuồng dời): dịch chuyển
+  a0.x = from.x + 300; host.dog.x = dogFrom.x + 300;
+  visitSync(v, wire(host));
+  assert.equal(a().x, from.x + 300);
+  assert.equal(v.dog.x, dogFrom.x + 300);
+});
+
+test('tin không có `farm` (chủ gửi gọn) vẫn áp được và giữ bố cục hiện có; farm hỏng kiểu thì vẫn bị từ chối', () => {
+  const { host, v } = setup();
+  const m = sceneMap(v), w = wire(host);
+  delete w.farm;
+  perform(host, { kind: 'plot', idx: 0 }, 'harvest');
+  w.plots = wire(host).plots;
+  assert.equal(visitSync(v, w), true);
+  assert.equal(v.plots[0].crop, null);
+  assert.equal(sceneMap(v), m);
+  assert.equal(visitSync(v, { ...w, farm: 5 }), false);
+});
+
+test('mỗi tin world gửi mỗi giây nhẹ: in cỡ tin của một vườn lớn', () => {
+  const host = createGame({ name: 'Lan' }); host.tutorial = 99;
+  for (let i = 0; i < 60; i++) host.animals.push({ ...structuredClone(host.animals[0] ?? { id: 1, type: 'ga', stage: 'truong', x: 1, y: 1 }), id: 1000 + i });
+  const n = JSON.stringify(visitWorld(host)).length, f = JSON.stringify(visitWorld(host).farm).length;
+  console.log('world payload bytes:', n, 'farm:', f);
+  assert.ok(n > 0);
+});
+
+test('chó khách đang đuổi khách (chasing) thì không bị kéo về chỗ chó chủ', () => {
+  const { host, v } = setup();
+  const at = { x: v.dog.x, y: v.dog.y };
+  v.dog.chasing = true;
+  host.dog.x = at.x + 100; host.dog.y = at.y;
+  visitSync(v, wire(host));
+  visitEase(v, 1);
+  assert.deepEqual({ x: v.dog.x, y: v.dog.y }, at);
 });
