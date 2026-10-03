@@ -8,7 +8,7 @@ import {
   takeGuestLog, stealsToday, stolenToday, robsToday, stealLeft, ripeValue, tick, raidTonight,
 } from '../public/state.js';
 import { setClock, serverDay } from '../public/clock.js';
-import { GUEST, STAMINA, CROPS, PRODUCTS, RAID } from '../public/data.js';
+import { GUEST, STAMINA, CROPS, PRODUCTS, RAID, starKey, sellPrice } from '../public/data.js';
 import { eventMeta } from '../public/notify.js';
 
 const store = {};
@@ -20,6 +20,7 @@ test.beforeEach(() => { clock = T0; setClock(() => clock); });
 test.after(() => setClock(null));
 
 const LV5 = 500;   // đủ kinh nghiệm để lên cấp 5 (cấp tối thiểu để trộm và để bị trộm)
+const BAP2 = starKey('bap', 2);   // ô 0 bón phân, không khô, không sâu: bắp ★2 (issue 52)
 const ripe = (p, id = 'bap', fert = false) => {
   p.soil = 'tilled'; p.water = 100;
   p.crop = { id, progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
@@ -44,7 +45,7 @@ test('trộm một ô chín chỉ lấy tối đa 25% sản lượng; người k
   assert.equal(take, 2);
   const r = guestOpApply(s, who('Bình'), op('crop', { idx: 0 }));
   assert.equal(r.ok, true);
-  assert.deepEqual(r.reward.items, { bap: take });
+  assert.deepEqual(r.reward.items, { [BAP2]: take });
   assert.equal(s.plots[0].crop.stolen, take, 'ô mất đúng phần bị trộm, phần lớn vẫn còn của chủ');
   assert.match(actionsFor(s, { kind: 'plot', idx: 0 })[0].label, new RegExp(`\\(${full - take}\\)`), 'chủ thu hoạch phần còn lại');
 
@@ -58,9 +59,9 @@ test('trộm một ô chín chỉ lấy tối đa 25% sản lượng; người k
   // người khác trộm cùng ô: còn được (chưa chạm trần mỗi ngày của vườn)
   const r2 = guestOpApply(s, who('Chị Tư', 9), op('crop', { idx: 0 }));
   assert.equal(r2.ok, true);
-  assert.equal(r2.reward.items.bap, Math.floor((full - take) * GUEST.stealPct));
+  assert.equal(r2.reward.items[BAP2], Math.floor((full - take) * GUEST.stealPct));
   assert.equal(s.today.steals, 2);
-  assert.equal(s.today.stolen, (take + r2.reward.items.bap) * CROPS.bap.price);
+  assert.equal(s.today.stolen, (take + r2.reward.items[BAP2]) * sellPrice(BAP2));
 });
 
 test('cả vườn mỗi ngày ngoài đời mất tối đa 30% giá trị đồ chín; sang ngày mới thì trộm lại được', () => {
@@ -177,7 +178,7 @@ test('nhật ký vườn: mỗi vụ trộm ghi người trộm, món gì, bao n
   guestOpApply(s, who('Bình'), op('crop', { idx: 0 }));
   guestOpApply(s, who('Chị Tư', 9), op('crop', { idx: 1 }));
   const evs = takeGuestLog(s);
-  assert.deepEqual(evs.map(e => [e.type, e.by, e.item, e.qty]), [['stolen', 'Bình', 'bap', 2], ['stolen', 'Chị Tư', 'bap', 1]]);
+  assert.deepEqual(evs.map(e => [e.type, e.by, e.item, e.qty]), [['stolen', 'Bình', BAP2, 2], ['stolen', 'Chị Tư', 'bap', 1]]);
   assert.ok(evs.every(e => Number.isFinite(e.at)));
   assert.deepEqual(takeGuestLog(s), []);
   // thông báo gấp 🔴 và câu nhật ký có tên, số lượng, giờ
@@ -185,7 +186,7 @@ test('nhật ký vườn: mỗi vụ trộm ghi người trộm, món gì, bao n
   assert.equal(m.level, 'urgent');
   assert.match(m.label, /trộm/i);
   // dòng nhật ký giữ cấp của kẻ trộm để biết có sang trộm lại được không
-  assert.deepEqual(s.guests.map(g => [g.kind, g.by, g.lv, g.item, g.qty]), [['steal', 'Chị Tư', 9, 'bap', 1], ['steal', 'Bình', 5, 'bap', 2]]);
+  assert.deepEqual(s.guests.map(g => [g.kind, g.by, g.lv, g.item, g.qty]), [['steal', 'Chị Tư', 9, 'bap', 1], ['steal', 'Bình', 5, BAP2, 2]]);
 });
 
 test('trong vườn khách: ô chín hiện nút Trộm kèm số lấy được và số còn lại; trộm xong gửi kèm mã thao tác', () => {

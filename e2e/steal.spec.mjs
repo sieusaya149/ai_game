@@ -81,7 +81,7 @@ async function tapWorld(page, touch, x, y) {
 // Chạm về phía chỗ đứng (x, y) cho tới khi nút hành động hiện tên `name`
 async function reach(page, touch, x, y, name) {
   for (let i = 0; i < 25; i++) {
-    if (await page.locator('#target-name').isVisible() && (await page.locator('#target-name').textContent()) === name) return;
+    if (await page.locator('#target-name').isVisible() && (await page.locator('#target-name').textContent()).startsWith(name)) return;   // ô ruộng có cây kèm sao (issue 52): 'Cà chua ★☆☆'
     await tapWorld(page, touch, x, y);
     await page.waitForTimeout(600);
   }

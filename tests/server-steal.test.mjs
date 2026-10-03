@@ -6,9 +6,10 @@ import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
 import { createGame } from '../public/state.js';
 import { serverDay } from '../public/clock.js';
-import { CROPS, GUEST } from '../public/data.js';
+import { CROPS, GUEST, starKey, sellPrice } from '../public/data.js';
 
 const LV5 = 500;   // đủ kinh nghiệm để lên cấp 5
+const BAP2 = starKey('bap', 2);   // ô 0 bón phân, không khô, không sâu: bắp ★2 (issue 52)
 
 async function setup(t) {
   const srv = await bootServer();
@@ -68,7 +69,7 @@ test('vụ trộm hợp lệ được nhận, vào hàng đợi, đẩy tới ch
   const ack = await until(b, 'guest');
   assert.equal(ack.ok, true);
   assert.equal(ack.id, 'steal-0001-aaaa');
-  assert.deepEqual(ack.reward.items, { bap: 2 });   // 25% của 9 bắp
+  assert.deepEqual(ack.reward.items, { [BAP2]: 2 });   // 25% của 9 bắp
   assert.equal(ack.reward.steal, 1);
   // chủ đang online: server đẩy thao tác sang trình duyệt chủ
   const push = await until(a, 'guestop');
@@ -88,8 +89,8 @@ test('vụ trộm hợp lệ được nhận, vào hàng đợi, đẩy tới ch
   const seen = await poll(() => B.visit('Lan'), r => r.farm.plots[0].crop.stolen === 2);
   assert.deepEqual(seen.farm.plots[0].crop.robbed, ['Bình']);
   assert.equal(seen.farm.today.steals, 1);
-  assert.equal(seen.farm.today.stolen, 2 * CROPS.bap.price);
-  assert.deepEqual(seen.farm.guests.map(g => [g.kind, g.by, g.item, g.qty, g.seen]), [['steal', 'Bình', 'bap', 2, false]]);
+  assert.equal(seen.farm.today.stolen, 2 * sellPrice(BAP2));
+  assert.deepEqual(seen.farm.guests.map(g => [g.kind, g.by, g.item, g.qty, g.seen]), [['steal', 'Bình', BAP2, 2, false]]);
   assert.equal((await B.visit('Lan')).farm.today.steals, 1, 'đọc lại không áp dụng thêm lần nữa');
 });
 

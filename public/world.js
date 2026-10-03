@@ -633,7 +633,10 @@ export function findTarget(state, w) {
 export function nameOf(state, t) {
   use(state);
   switch (t.kind) {
-    case 'plot': { const c = state.plots[t.idx]?.crop; return c ? (CROPS[c.id]?.name ?? 'Cây trồng') : `Ô ruộng ${t.idx + 1}`; }
+    case 'plot': {   // cây còn sống: kèm số sao vụ này đang giữ (issue 52), vd "Cải xanh ★★☆"
+      const c = state.plots[t.idx]?.crop, n = c && !c.dead && !c.rotten ? ST.cropStar(c) : 0;
+      return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (n ? ` ${'★'.repeat(n)}${'☆'.repeat(3 - n)}` : '') : `Ô ruộng ${t.idx + 1}`;
+    }
     case 'lockedPlot': return 'Đất hoang';
     case 'animal': { const a = findBy(state.animals, t.id); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}` : 'Vật nuôi'; }
     case 'egg': { const e = findBy(state.eggs, t.id); return e?.candled ? (e.fertile ? 'Trứng có phôi ✨' : 'Trứng trống') : 'Quả trứng'; }

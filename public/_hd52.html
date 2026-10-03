@@ -1,0 +1,67 @@
+<!doctype html><meta charset="utf-8"><title>HD52</title>
+<style>
+  body { margin: 0; padding: 8px; background: #3a5a2a; font: 11px sans-serif; color: #fff; width: 1180px; }
+  h2 { margin: 10px 0 4px; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+  .pair { display: flex; gap: 3px; align-items: flex-end; background: rgba(0,0,0,0.18); padding: 3px; }
+  .cell { display: flex; flex-direction: column; gap: 1px; }
+  .cell span { font-size: 9px; color: #ffe9a8; }
+  canvas { image-rendering: pixelated; }
+  #bad { font-weight: bold; }
+</style>
+<body>
+<div id="bad"></div>
+<div id="root"></div>
+<script type="module">
+// Trang xem art issue 52: Cũ (bản thường) cạnh Mới (bản 2x), kiểm cỡ 2× và nối hd.js; icon 16 nông sản ★1/★2/★3; ô ruộng có sao.
+import { SPR } from './art.js';
+import { SPR4 } from './art4.js';
+import { SPR52_OLD, SPR52, starIcon } from './art52.js';
+import { hdOf } from './hd.js';
+import { CROPS } from './data.js';
+const isImg = v => v instanceof HTMLCanvasElement;
+const root = document.getElementById('root');
+const cv = (img, z) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); c.style.width = img.width * z + 'px'; c.style.height = img.height * z + 'px'; return c; };
+const cell = (img, label, z) => { const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span'); s.textContent = label; d.append(s, cv(img, z)); return d; };
+const sec = t => { const h = document.createElement('h2'); h.textContent = t; const r = document.createElement('div'); r.className = 'row'; root.append(h, r); return r; };
+const bad = [], ok = [];
+const pairs = sec('Sprite mới: Cũ = bản thường (×6) · Mới = bản 2x (×3), cùng cỡ trên màn hình');
+(function walk(o, n, path) {
+  if (isImg(o) || isImg(n)) {
+    if (n.width !== o.width * 2 || n.height !== o.height * 2) bad.push(`${path}: ${o.width}x${o.height} → ${n.width}x${n.height}`);
+    else if (hdOf(o) !== n) bad.push(`${path}: hd.js chưa nối`);
+    else ok.push(path);
+    const p = document.createElement('div'); p.className = 'pair';
+    p.append(cell(o, `Cũ ${path} ${o.width}x${o.height}`, 6), cell(n, `Mới ${n.width}x${n.height}`, 3)); pairs.append(p);
+    return;
+  }
+  for (const k of Object.keys(n)) walk(o?.[k], n[k], `${path}.${k}`);
+})(SPR52_OLD, SPR52, 'SPR52');
+document.getElementById('bad').textContent = bad.length ? 'SAI: ' + bad.join(' | ') : `Kiểm cỡ + nối hd.js: ${ok.length} sprite đều đúng 2×`;
+window.__check = { ok: ok.length, bad };
+
+// icon nông sản ★1 / ★2 / ★3, cũ (bản thường) và mới (2x)
+for (const [title, k] of [['Icon nông sản: Cũ (bản thường, ×4)', 1], ['Icon nông sản: Mới (bản 2x, ×2)', 2]]) {
+  const row = sec(title);
+  for (const id of Object.keys(CROPS)) {
+    const src = SPR.ripe[id] ?? SPR4.produce[id], img = k === 2 ? hdOf(src) ?? src : src, z = k === 2 && hdOf(src) ? 2 : 4;
+    const p = document.createElement('div'); p.className = 'pair';
+    p.append(cell(img, id, z), cell(starIcon(img, 2, img === src ? 1 : 2), '★2', z), cell(starIcon(img, 3, img === src ? 1 : 2), '★3', z));
+    row.append(p);
+  }
+}
+
+// ô ruộng đang lớn với 1 / 2 / 3 sao (đất ướt + cây dưa hấu non), cũ và mới
+const plotRow = sec('Ô ruộng đang lớn: ★1 · ★2 · ★3 (Cũ ×4 | Mới ×4, cùng khung 16 px)');
+for (const k of [1, 2]) for (const n of [1, 2, 3]) {
+  const c = document.createElement('canvas'); c.width = 16 * k; c.height = 18 * k;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  const put = (img, px, py) => { const h = k === 2 ? hdOf(img) : null; x.drawImage(h ?? img, px * k, py * k, img.width * k, img.height * k); };
+  put(SPR.soil.tilledWet, 0, 0);
+  const crop = SPR4.crop.duahau.stages[2]; put(crop, (16 - crop.width) / 2, 15 - crop.height);
+  x.fillStyle = '#f7d547'; x.fillRect(1 * k, 14 * k, 2 * k, 1 * k);
+  put(SPR52_OLD.plotStars[n - 1], 2, 0);
+  plotRow.append(cell(c, `${k === 1 ? 'Cũ' : 'Mới'} ★${n}`, 4 / k * 1));
+}
+window.__ready = true;
+</script>

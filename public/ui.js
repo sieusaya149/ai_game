@@ -12,6 +12,7 @@ import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
 import * as net from './net.js';
 import { hdOf, charFrames } from './hd.js';
+import { starIcon } from './art52.js';
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -70,8 +71,18 @@ function seasonTag(tag) {
   if (seasonTagUrl === undefined) try { seasonTagUrl = hd(SPR2?.seasonTag)?.toDataURL?.() || null; } catch { seasonTagUrl = null; }
   return h(tag, { class: 'season-tag' }, seasonTagUrl ? h('img', { class: 'season-ico', src: seasonTagUrl, alt: '', draggable: false }) : '🌿 ', 'Đúng mùa');
 }
-// Nông sản có sao ('cai@2'): tạm dùng icon của nông sản đó (viền sao trên icon là issue 52)
-const iconKey = key => D.baseOf(key);
+// Nông sản có sao ('cai@2'): icon của nông sản đó, thêm viền và dấu sao (art52.starIcon, bản 2x nếu có)
+const iconKey = key => (D.starOf(key) > 1 && starUrl(key) ? key : D.baseOf(key));
+function starUrl(key) {
+  if (iconCache.has(key)) return iconCache.get(key);
+  let u = null;
+  try {
+    const id = D.baseOf(key), src = art.SPR.ripe[id] ?? SPR4?.produce?.[id], big = src && hdOf(src);
+    u = src ? starIcon(big ?? src, D.starOf(key), big ? 2 : 1).toDataURL() : null;
+  } catch { u = null; }
+  iconCache.set(key, u);
+  return u;
+}
 function emojiFor(key) {
   if (EMOJI[key]) return EMOJI[key];
   if (key.startsWith('seed_')) return '🌱';
@@ -454,7 +465,7 @@ export function renderHUD(s) {
   $('bb-seed-n').classList.toggle('zero', n <= 0);
 
   // Chấm đỏ đơn giao được
-  $('dot-board').hidden = !(s.orders || []).some(o => Object.entries(o.items).every(([k, q]) => have(s, k) >= q));
+  $('dot-board').hidden = !(s.orders || []).some(o => Object.entries(o.items).every(([k, q]) => S.orderHave(s, k) >= q));
 
   updateTutorial(s);
   updateCoUtQuest(s);
@@ -1163,11 +1174,11 @@ PANELS.board = {
     if (!orders.length) body.append(empty('Chưa có đơn nào. Hàng xóm sẽ sớm ghé đặt hàng!'));
     const list = h('div', { class: 'list' });
     for (const o of orders) {
-      const ok = Object.entries(o.items).every(([k, q]) => have(s, k) >= q);
+      const ok = Object.entries(o.items).every(([k, q]) => S.orderHave(s, k) >= q);   // món ★n nhận hàng từ ★n trở lên (issue 52)
       list.append(h('div', { class: 'order' + (ok ? ' ready' : '') },
         h('div', { class: 'order-who' }, '🧑 ', h('b', {}, o.who), ' cần:'),
         h('div', { class: 'order-items' }, Object.entries(o.items).map(([k, q]) => {
-          const g = have(s, k);
+          const g = S.orderHave(s, k);
           return h('span', { class: 'need' + (g >= q ? ' ok' : '') }, ico(k), ` ${Math.min(g, 999)}/${q}`);
         })),
         h('div', { class: 'order-foot' },

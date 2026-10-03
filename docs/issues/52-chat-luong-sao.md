@@ -17,12 +17,12 @@ Chăm kỹ suốt vụ thì nông sản ra sao cao, bán đắt hơn. Sao đư�
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1) cho từng điều kiện: ô khô hẳn một lần thì không ra sao cao; sâu quá 30 giây thì mất sao; không bón phân thì không ra ★3; chăm đủ thì ra ★3.
-- [ ] Unit test: máy tưới và phun tự động cả vụ không chăm tay thì tối đa ★2; thêm một lần chăm tay thì ra được ★3.
-- [ ] Unit test: giá bán ★2 = ×1.5, ★3 = ×2. Túi, kho, giỏ, thùng giao hàng và đơn hàng không gộp các sao khác nhau với nhau.
-- [ ] Unit test: nông sản cũ sau chuyển v3→v4 là ★1 (đã có ở issue 50, test thêm đường bán).
-- [ ] E2E (desktop + 360px): dựng bản lưu cây chín ở cả ba mức sao → thu hoạch → túi tách thành ba dòng → bỏ vào thùng giao hàng bán, số xu đúng theo sao.
-- [ ] E2E: ô đang lớn hiện số sao hiện tại, tưới để cây khô hẳn thì số sao tụt.
+- [x] Unit test (seam 1) cho từng điều kiện: ô khô hẳn một lần thì không ra sao cao; sâu quá 30 giây thì mất sao; không bón phân thì không ra ★3; chăm đủ thì ra ★3.
+- [x] Unit test: máy tưới và phun tự động cả vụ không chăm tay thì tối đa ★2; thêm một lần chăm tay thì ra được ★3.
+- [x] Unit test: giá bán ★2 = ×1.5, ★3 = ×2. Túi, kho, giỏ, thùng giao hàng và đơn hàng không gộp các sao khác nhau với nhau.
+- [x] Unit test: nông sản cũ sau chuyển v3→v4 là ★1 (đã có ở issue 50, test thêm đường bán).
+- [x] E2E (desktop + 360px): dựng bản lưu cây chín ở cả ba mức sao → thu hoạch → túi tách thành ba dòng → bỏ vào thùng giao hàng bán, số xu đúng theo sao.
+- [x] E2E: ô đang lớn hiện số sao hiện tại, tưới để cây khô hẳn thì số sao tụt.
 
 ## Blocked by
 

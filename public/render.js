@@ -6,8 +6,10 @@ import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
 import { WELLS } from './artwell.js';
+import { SPR52_OLD } from './art52.js';   // sao trên ô ruộng (issue 52)
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul } from './state.js';
+import { cropStar } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
@@ -789,6 +791,9 @@ export function render(ctx, f) {
           if (sn) blit(sn, px + 11, py + 9);
           else { ctx.font = '6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🐌', px + 13, py + 6); }
         }
+        // vụ này đang giữ mấy sao (issue 52): ba sao nhỏ ở mép trên ô (mép dưới là chỗ hạt, mầm), tụt ngay khi lỡ chăm
+        const pips = !p.crop.dead && !p.crop.rotten && SPR52_OLD.plotStars?.[cropStar(p.crop) - 1];
+        if (pips) blit(pips, px + 2, py);
       }
       if (p.weeds) blit(SPR.problem.weed, px + 3, py + 9);
       if (p.crop?.bugs) blit(SPR.problem.bug, px + 4 + Math.round(Math.sin(now / 260 + p.idx) * 2), py + 3 + (Math.floor(now / 300 + p.idx) % 2));

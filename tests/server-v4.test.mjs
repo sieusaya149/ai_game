@@ -49,7 +49,8 @@ function kept(f, old) {
     const c = f.plots[o.idx].crop;
     assert.equal(c?.id, o.crop.id, `ô ${o.idx} còn cây`);
     assert.ok(c.progress >= o.crop.progress, `ô ${o.idx} không lùi tiến độ`);
-    assert.deepEqual(c.q, { dry: false, bugMax: 0, hand: false });
+    assert.deepEqual(Object.keys(c.q).sort(), ['bugMax', 'dry', 'hand']);   // chạy bù lâu thì đất có thể khô hẳn (mất sao, issue 52)
+    assert.equal(c.q.hand, false);
   }
   for (const [k, n] of Object.entries(old.basket)) assert.equal(f.basket[k], n, `giỏ ${k}`);
   for (const [k, n] of Object.entries(old.inv)) if (CROPS[k]) assert.equal(f.inv[k], n, `kho ${k}`);

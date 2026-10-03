@@ -39,6 +39,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/minimap.js` | Vẽ bản đồ nhỏ: `miniView`, `miniDots`, `drawMini`, `DOT` |
 | `public/perf.js` | Hiệu năng: mảng nền `CHUNK`, `dirtyChunks`, `chunksIn`, AI ngoài màn hình `aiStep`, đo FPS `createFps`, tiết kiệm pin (`BATTERY_FPS`, `shouldSuggestBattery`), tùy chọn máy `loadPrefs`/`savePrefs` (khóa `nongtrai-pref`) |
 | `public/art.js`, `public/art2.js`, `public/art3.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...; Phase 1 thêm hộp quà và sổ lưu bút ở cổng, đồ phụ của chó canh khách `barkBubble`, `dogChain`, `stunStars`, `barkArrow`, `sausage`/`sausageGround`; xem `public/_sprites2.html`); `art3.js` export `SPR3` (Phase 2: `SPR3.animal[loài][non|nho|truong|gia] = { left, right }` với loài `ga gaTrong vit vitDuc heo bo boDuc cuu cuuXoan cho meo`, `sleepBy[loài][giai đoạn]`, `angel`, chuồng, kẻ săn mồi, dáng lệnh của chó `dogSitBy/dogBegBy/dogHerdBy/dogBarkBy[giai đoạn]`...; xem `_sprites3.html`). `render.animalImg(a, face, frame, sleep)` chọn hình theo `a.type/stage/sex` (đực: `gaTrong`, `vitDuc`, `boDuc`), thiếu art thì dùng sprite cũ. Thêm sprite mới thì giữ nguyên mọi export cũ |
+| `public/art52.js` | Art chất lượng ★ (issue 52), hình mới nên tự mang cả hai bản: `SPR52_OLD` (bản thường: `starBadge[2|3]` 7x7, `starSpark` 3x3, `plotStars[0..2]` 13x5) và `SPR52` (bản 2x cùng khóa, đúng gấp đôi); `hd.js` nối hai bản qua `SPR52_OLD` (file art nào xuất `SPRn_OLD` thì khóa đó nối với bản thường của chính nó). `starIcon(img, sao, k)` dựng icon nông sản có sao. Trang xem: `public/_hd52.html` |
 | `public/render.js`, `public/world.js`, `public/main.js` | Vẽ (theo khung nhìn, nền chia mảng 16x16 ô), di chuyển/tìm đường/AI/chế độ xây dựng/camera, vòng lặp, chuyển cảnh mờ dần, input. **Không tự quyết luật**, chỉ gọi `state.js` |
 | `public/index.html`, `public/style.css`, `public/ui.js`, `public/sound.js` | HUD, nút hành động, các bảng, tạo nhân vật, thông báo, âm thanh |
 | `public/net.js`, `public/sync.js` | Phía trình duyệt của làng: tài khoản (`net.js`, issue 21) và đồng bộ vườn online (`sync.js`, issue 22), xem mục Server |
@@ -177,7 +178,7 @@ Lát dọn đường cho cả Phase 3 (issue 50). Người chơi gần như chư
 | Chỗ | Trường v4 | Mặc định | Dùng ở |
 |---|---|---|---|
 | ô ruộng | `plot.mulch` | `false` | phủ rơm (issue 55) |
-| vụ đang trồng | `crop.q = { dry, bugMax, hand }` (`cropQuality()`) | `{ dry: false, bugMax: 0, hand: false }` | chất lượng ★ (issue 52): `dry` = đã có lúc khô hẳn, `bugMax` = sâu lâu nhất (ms giờ vườn), `hand` = có ít nhất một lần chăm tay. "Có bón phân" là `crop.fert` có sẵn. Vụ mới (`plant`) có `q` mới, thu hoạch xong mất cùng `crop` |
+| vụ đang trồng | `crop.q = { dry, bugMax, hand }` (`cropQuality()`) | `{ dry: false, bugMax: 0, hand: false }` | chất lượng ★ (issue 52, xem "Chất lượng nông sản ★"): `dry` = đã có lúc khô hẳn, `bugMax` = sâu lâu nhất (ms giờ vườn), `hand` = có ít nhất một lần chăm tay. "Có bón phân" là `crop.fert` có sẵn. Vụ mới (`plant`) có `q` mới, thu hoạch xong mất cùng `crop` |
 | nông sản | khóa `starKey(id, sao)`: `'cai'` ★1, `'cai@2'` ★2, `'cai@3'` ★3 | đồ cũ giữ khóa = ★1 | issue 52: giỏ, kho, thùng giao hàng, đơn hàng (`orders[].items`), quà, trộm tách theo sao vì khóa khác nhau. Chỉ nông sản cây trồng có sao; sản phẩm vật nuôi có món "sao" riêng (`sua_ngon`, `len_xoan`) |
 | vườn | `mastery[cropId] = { lv, n }` | `{ lv: 1, n: 0 }` cho cả 16 cây | thành thạo (issue 51): cấp lưu thẳng (cân bằng lại ngưỡng không làm tụt cấp), `n` = số lần thu hoạch loại đó |
 | giếng | `ent.lv` (kind `well`) | `1` | giếng 4 cấp (issue 56); `wellLv(state)` |
@@ -245,6 +246,8 @@ checkSaveJump(prev, next, dtMs)   // → R { reason: 'time'|'coins'|'exp' }: ch�
                                   // tăng không quá dtMs × x20 + một đêm ngủ; của cải (wealthOf = xu + đồ theo giá bán/giá mua) và EXP
                                   // tăng không quá mức cho sẵn + mỗi ô ruộng mỗi phút vườn chạy (SAVE_JUMP)
                                   // + giá trần của con vật có ở bản trước mà mất ở bản sau (bán cho Chú Ba, Phase 2)
+                                  // + giá trần của cây có ở bản trước mà đã hái (issue 52): sản lượng có bón phân × giá ★3
+                                  //   (cây đã lỡ chăm kỹ thì giá ★1), nên hái cả ruộng ★3 trong một nhịp lưu 10 giây vẫn hợp lý
 wealthOf(state), SAVE_JUMP        // wealthOf tính nông sản theo sellPrice của khóa (★2 ×1.5, ★3 ×2): đổi nhãn ★1 thành ★3 là của cải tăng
 resetGame()                       // xóa save hiện tại và đặt mọi cờ "đã chuyển" (không đụng bản v1, v2, v3)
 wellLv(state)                     // → 1..4: cấp giếng (Phase 3, v4; vườn cũ 1; lv lạ trong bản lưu kẹp về 1..4). Xem mục "Giếng 4 cấp"
@@ -742,9 +745,20 @@ buyAnimal(state, type, sex = 'm')   // → R { price }: sex 'm' đực | 'f' cá
 sell(state, itemId, qty|'all')    // → R { coins }
 sellAll(state)                    // → R { coins } bán mọi nông sản & sản phẩm (không bán vật tư/hạt)
 buyOutfit(state, 'hat'|'acc', index)  setLook(state, look)
-fulfillOrder(state, orderId)      // → R
+fulfillOrder(state, orderId)      // → R; món ★n nhận nông sản cùng loại từ ★n trở lên, lấy sao thấp trước (issue 52)
+orderHave(state, key)             // số hàng giao được cho món `key` của đơn (★n: cộng các khóa từ ★n tới ★3; món khác = haveItem)
 ```
-Chợ Bà Tư thay sạp hàng và nhà kho bán hàng cũ (sạp bị bỏ khỏi vườn).
+Chợ Bà Tư thay sạp hàng và nhà kho bán hàng cũ (sạp bị bỏ khỏi vườn). Từ cấp `STARS.orderLv` (5) món nông sản trong đơn mới có lúc đòi ★2 / ★3 (`STARS.orderP` = 25% / 10%), thưởng theo giá có sao.
+
+### Chất lượng nông sản ★ (issue 52)
+```js
+cropStar(crop)                    // 1..3: số sao vụ này cho nếu thu hoạch ngay bây giờ (thuần theo crop, ô ruộng hiện số này)
+```
+- **Chăm kỹ** = cả vụ không lúc nào khô hẳn + sâu không quá `STARS.bugMs` (30 giây giờ vườn) + có bón phân → ★2; thêm **ít nhất một lần chăm tay** (`q.hand`) → ★3. Lỡ một điều (khô hẳn, sâu quá lâu, bệnh, không bón phân) → ★1 (mặc định), không lấy lại được. Cây trái mùa (`crop.offSeason`, issue 54) tối đa ★2.
+- Theo dõi trong `tick` lúc cây còn lớn (`progress < 1`): đất **vừa cạn** về 0 (có nước rồi hết; gieo xuống đất khô chưa tưới chưa tính) đặt `q.dry`; có sâu thì `q.bugMax` = max(thời gian sâu đã bò). Chạy bù offline cũng tính (mất sao không phải "chết", ADR 0004).
+- Chăm tay = tưới, bắt sâu (trúng), phun thuốc, bón phân của chính người chơi (`perform` trên ô ruộng). Khách giúp tưới / bắt sâu, mưa, và máy tưới nhỏ giọt / phun tự động (issue 58: chỉ đổi `p.water` / `c.bugs`, **không** đặt `q.hand`) không tính, nên máy cả vụ tối đa ★2.
+- Thu hoạch cho khóa `starKey(id, cropStar(c))`; trộm cây chín được đúng hàng có sao, `ripeValue` tính theo sao. Giá: `sellPrice` ★2 ×1.5, ★3 ×2 (`STARS.mul`), chợ, thùng giao hàng (`shipValue`) và đơn hàng đều theo khóa.
+- Giao diện: tên target ô ruộng kèm sao (`world.nameOf`: "Dưa hấu ★★☆"); ô có cây sống vẽ hàng ba sao nhỏ trên nền thẻ tối ở mép trên ô (mép dưới là chỗ hạt, mầm; `art52.SPR52_OLD.plotStars`); icon nông sản ★2 / ★3 có viền màu, dấu sao bạc / vàng, ★3 thêm lấp lánh (`art52.starIcon`).
 
 ### Thông báo, Việc cần làm, cài đặt
 ```js
@@ -863,7 +877,7 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - Chu trình: ô mới là `untilled` → **Cuốc đất** → `tilled` → **Gieo hạt** (tốn 1 `seed_<id>`, theo `selectedSeed`).
 - Cây lớn qua 5 giai đoạn (`CROP_STAGES`). Chỉ lớn khi `water > 0`. Có cỏ thì lớn chậm lại (×`weedSlow`), có sâu hoặc bệnh thì dừng lớn.
 - **Tưới** tốn 1 `can`, đặt `water` về 100; hết nước thì ra giếng múc (`refill`, múc đầy `canMax`; giếng cấp cao bình chứa nhiều hơn và múc nhanh hơn, mục "Giếng 4 cấp"). **Nhổ cỏ** tay. **Sâu:** phun thuốc (chắc chắn, tốn 1 `pesticide`) hoặc bắt tay (50%). Sâu để lâu → **bệnh** → **chết**; thuốc trừ sâu chữa bệnh. **Bón phân** (+50% sản lượng) và **thuốc tăng trưởng** là hành động phụ.
-- **Thu hoạch** khi chín: yield (+50% nếu bón phân), cộng EXP, vào **giỏ**. Chín quá `OVERRIPE` thì **héo**. Cây chết/héo: **Dọn cây**. Thu hoạch xong ô về `untilled`.
+- **Thu hoạch** khi chín: yield (+50% nếu bón phân), cộng EXP, vào **giỏ** theo sao của vụ (`cropStar`, mục "Chất lượng nông sản ★"). Chín quá `OVERRIPE` thì **héo**. Cây chết/héo: **Dọn cây**. Thu hoạch xong ô về `untilled`.
 - Dời khối ruộng (kể cả đang có cây) giữ nguyên trạng thái ô. Cất khối chỉ khi chưa có cây.
 - Cuốc/tưới/thu hoạch/nhổ cỏ bằng công cụ cấp cao làm nhiều ô một lần (`tiles`); ô không hợp lệ trong vùng thì bỏ qua. Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô. Công cụ đang nâng cấp thì hành động bị khóa với lý do.
 
@@ -896,7 +910,7 @@ Không có GitHub Actions. Mọi test chạy trên máy local, Chromium ẩn c�
 ```
 npm test            # = node --test (tests/*.test.mjs, gồm cả seam 3 tests/server-*.test.mjs)
 ```
-Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `dogtrick` (vòng đời chó, dạy lệnh, 6 lệnh), `notify`, `todo`, `perf`, `tutorial`, `online-save` (trường online, `checkSaveJump`), `presence` (người khác cùng bản đồ: tên mờ khi đông, nội suy), `visit` (luật khách), `help` (thao tác giúp của khách, giới hạn mỗi ngày, mã thao tác), `steal` (luật trộm: 25% mỗi ô, một lần mỗi người, trần 30% mỗi ngày, bảo vệ người mới, giỏ đầy, thể lực, trộm NPC nhường). Phase 2: `pens` (chuồng 3 cấp, cách ly), `breed` (đực cái, sinh sản, phả hệ), `dirty` (dơ, tắm), `bond` (độ thân), `trade` (bán cho Chú Ba, nghỉ hưu), `free` (thả rông), `herd` (chạng vạng, con lạc, rải thóc), `predator` (kẻ săn mồi), `cat` (mèo), `dog-guard` (một bộ luật chó cho trộm NPC và khách), `thief` (trộm NPC mới, phạt), `duck` (vịt), `coutquest` (nhiệm vụ Cô Út), `todo`/`notify` (mục vật nuôi).
+Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `dogtrick` (vòng đời chó, dạy lệnh, 6 lệnh), `notify`, `todo`, `perf`, `tutorial`, `online-save` (trường online, `checkSaveJump`), `presence` (người khác cùng bản đồ: tên mờ khi đông, nội suy), `visit` (luật khách), `help` (thao tác giúp của khách, giới hạn mỗi ngày, mã thao tác), `steal` (luật trộm: 25% mỗi ô, một lần mỗi người, trần 30% mỗi ngày, bảo vệ người mới, giỏ đầy, thể lực, trộm NPC nhường). Phase 2: `pens` (chuồng 3 cấp, cách ly), `breed` (đực cái, sinh sản, phả hệ), `dirty` (dơ, tắm), `bond` (độ thân), `trade` (bán cho Chú Ba, nghỉ hưu), `free` (thả rông), `herd` (chạng vạng, con lạc, rải thóc), `predator` (kẻ săn mồi), `cat` (mèo), `dog-guard` (một bộ luật chó cho trộm NPC và khách), `thief` (trộm NPC mới, phạt), `duck` (vịt), `coutquest` (nhiệm vụ Cô Út), `todo`/`notify` (mục vật nuôi). Phase 3: `crops16`, `save-v4`, `stars` (chất lượng ★, seam 3 ở `server-stars`).
 Luật có ngẫu nhiên (kẻ săn mồi, bệnh, con lạc...) thì test phải **tất định**: hoặc dọn sạch nguồn ngẫu nhiên không liên quan (vd `s.preds = []` mỗi bước), hoặc thay `Math.random` bằng bộ sinh số có hạt giống cố định (mulberry32, mẫu ở `tests/cat.test.mjs` `seeded`, `tests/duck.test.mjs` đặt lại hạt giống đầu mỗi test). Không thống kê "thường thì đúng" bằng `Math.random` thật.
 
 **Seam 2: trình duyệt thật qua Playwright**, chỉ cho những gì seam 1 không thấy (kéo thả, đi qua cửa, chạm để tự đi tới, giao diện 360px):
