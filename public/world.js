@@ -419,6 +419,20 @@ function guardStep(state, w, rt, dt, goTo, out) {
 }
 
 // ---------- Mèo (issue 44) ----------
+// Mèo đứng trong chỗ đặc (vd. nhà mèo bị chuồng bao kín ô cửa) thì không đường nào đi ra được: nhấc nó tới chỗ đứng được gần nhất
+// mà nối với lối vào vườn (tìm theo vòng ô tăng dần, kiểm bằng findPath từ spawn).
+function unstick(c) {
+  const sc = Math.floor(c.x / TS), sr = Math.floor(c.y / TS);
+  for (let k = 1; k < Math.max(M.mw, M.mh); k++) {
+    for (let dr = -k; dr <= k; dr++) for (let dc = -k; dc <= k; dc++) {
+      if (Math.max(Math.abs(dc), Math.abs(dr)) !== k) continue;
+      const x = (sc + dc) * TS + 8, y = (sr + dr) * TS + 8;
+      if (!canStand(x, y)) continue;
+      const p = findPath(M.spawn.x, M.spawn.y, x, y, false);
+      if (p.length && dist(p.at(-1), { x, y }) < TS) { c.x = x; c.y = y; return; }
+    }
+  }
+}
 // Luật (state.js) đã chọn ô đi tuần, ô con chuột bị vồ, lúc về cửa mèo; ở đây chỉ diễn hoạt:
 // đi tới (tx, ty), chạy vồ chuột, ngậm chiến lợi phẩm chạy tới khoe người chơi, mèo con vờn cuộn len, mèo nhỡ tập vồ.
 function updateCats(state, w, dt0) {
@@ -432,6 +446,7 @@ function updateCats(state, w, dt0) {
     rt.pounceT = Math.max(0, (rt.pounceT ?? 0) - dt);
     if (c.trophy && !rt.trophy) rt.pounceT = 0.7;   // vừa vồ trúng: dáng vồ một nhịp rồi mới ngậm chuột
     rt.trophy = !!c.trophy;
+    if (!canStand(c.x, c.y) && !c.inAt) { unstick(c); rt.cpath = null; rt.pathKey = null; }   // kẹt trong chỗ đặc: nhấc ra
     if (c.sleep || c.sun || c.sick >= 2) { rt.yarn = false; rt.shown = false; rt.anim += dt; continue; }   // ngủ, phơi nắng, bệnh nặng: nằm yên một chỗ
     // ngậm chuột thì chạy tới đứng cạnh người chơi để khoe, không thì tới chỗ luật chọn
     const show = c.trophy && !rt.pounceT;

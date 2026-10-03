@@ -26,10 +26,10 @@ const open = async (page, context, s) => {
 };
 
 // Chạy world riêng `secs` giây (bước 0.1s) trên bản sao state; fn(state, world, W, S) gọi sau mỗi bước, trả kết quả cuối
-async function sim(page, secs, hook) {
-  return page.evaluate(async ([secs, hook]) => {
+async function sim(page, secs, hook, seed = 12345) {
+  return page.evaluate(async ([secs, hook, seed]) => {
     const W = await import('/world.js'), S = await import('/state.js');
-    let a = 12345;
+    let a = seed;
     const orig = Math.random;
     Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     try {
@@ -39,7 +39,7 @@ async function sim(page, secs, hook) {
       const fn = new Function('s', 'w', 'W', 'S', 'step', 'return (' + hook + ')(s, w, W, S, step)');
       return fn(s, w, W, S, () => { S.tick(s, 100); W.update(s, w, 0.1); });
     } finally { Math.random = orig; }
-  }, [secs, String(hook)]);
+  }, [secs, String(hook), seed]);
 }
 
 test('đàn heo trong chuồng rải ra, không dồn thành cục', async ({ page, context }) => {
@@ -103,27 +103,31 @@ test('con vật chỉ bước chân khi thật sự nhích, nhịp chân theo qu
 });
 
 test('mèo không đi xuyên nhà, rào, cây, nước', async ({ page, context }) => {
+  test.setTimeout(120_000);
   await open(page, context, bigSave(s => {
     place(s, { kind: 'pen', pen: 'pig' }); place(s, { kind: 'pen', pen: 'pasture' });
     const t = place(s, { kind: 'cathouse' });
     for (let i = 0; i < 3; i++) { const r = buyCat(s, i % 2 ? 'm' : 'f'); Object.assign(s.cats.at(-1), { stage: 'truong', age: stageStart('meo', 'truong'), hunger: 40 }); }
     s.time = DAY_MS * 0.3;
   }));
-  const bad = await sim(page, 900, (s, w, W, S, step) => {
-    let inSolid = 0, moves = 0;
-    const last = new Map();
-    for (let i = 0; i < 9000; i++) {
-      step();
-      for (const c of s.cats) {
-        if ((c.scene ?? 'farm') !== 'farm') continue;
-        if (!W.canStand(c.x, c.y) && last.get(c.id)?.ok) inSolid++;   // bước từ chỗ đứng được vào chỗ vật cản
-        if (last.get(c.id) && Math.hypot(c.x - last.get(c.id).x, c.y - last.get(c.id).y) > 0.01) moves++;
-        last.set(c.id, { x: c.x, y: c.y, ok: W.canStand(c.x, c.y) });
+  // nhiều hạt giống: nhà mèo bị chuồng bao kín ô cửa từng làm mèo kẹt đứng yên ở chỗ xuất hiện cả ngày
+  for (const seed of [12345, 1, 2, 3, 4, 5, 6, 7]) {
+    const bad = await sim(page, 900, (s, w, W, S, step) => {
+      let inSolid = 0;
+      const last = new Map(), moves = {}, start = {};
+      for (let i = 0; i < 9000; i++) {
+        step();
+        for (const c of s.cats) {
+          if ((c.scene ?? 'farm') !== 'farm') continue;
+          if (!W.canStand(c.x, c.y) && last.get(c.id)?.ok) inSolid++;   // bước từ chỗ đứng được vào chỗ vật cản
+          start[c.id] ??= [c.x, c.y, W.canStand(c.x, c.y), c.tx, c.ty];
+          if (last.get(c.id) && Math.hypot(c.x - last.get(c.id).x, c.y - last.get(c.id).y) > 0.01) moves[c.id] = (moves[c.id] ?? 0) + 1;
+          last.set(c.id, { x: c.x, y: c.y, ok: W.canStand(c.x, c.y) });
+        }
       }
-    }
-    return { inSolid, moves };
-  });
-  // ~1 lần trong 30 chạy mèo đứng yên ở chỗ xuất hiện cả ngày (chưa tái hiện được nguyên nhân); ngưỡng chỉ để chứng tỏ mèo có đi
-  expect(bad.moves).toBeGreaterThan(0);
-  expect(bad.inSolid).toBe(0);
+      return { inSolid, moves, start };
+    }, seed);
+    expect(bad.inSolid, 'seed ' + seed).toBe(0);
+    for (const m of Object.values(bad.moves)) expect(m, 'seed ' + seed).toBeGreaterThan(200);
+  }
 });
