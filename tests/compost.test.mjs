@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
-import { COMPOST, BUILD_PRICES, DAY_MS, MAX_CATCHUP_MS, starKey } from '../public/data.js';
+import { CROPS, FARMING, COMPOST, BUILD_PRICES, DAY_MS, MAX_CATCHUP_MS, starKey } from '../public/data.js';
 import { setClock } from '../public/clock.js';
 
 globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
@@ -231,7 +231,7 @@ test('ô bón bằng phân từ hố ủ tính là "có bón phân": chăm kỹ 
   assert.equal(G.cropStar(s.plots[i].crop), 3);
   const h = quiet(() => G.perform(s, P(i), 'harvest'));   // không trúng thưởng đúng mùa ngẫu nhiên (issue 54)
   assert.equal(h.ok, true, h.msg);
-  assert.equal(G.haveItem(s, starKey('cai', 3)), 6);
+  assert.equal(G.haveItem(s, starKey('cai', 3)), Math.round(CROPS.cai.yield * (1 + FARMING.fertYield)));
 });
 
 test('khách thăm vườn không làm gì được ở hố ủ', () => {

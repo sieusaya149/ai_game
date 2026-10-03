@@ -328,3 +328,87 @@ Mỗi issue phải chạy e2e liên quan (không chạy toàn bộ) và smoke on
 8. Heo đẻ 12 giờ và vẫn 1-3 con/lứa; hay muốn bỏ nhân giống heo thành nguồn thu và chỉ giữ cho bò, cừu, gà?
 9. Có đổi EXP cây xuống 15% lãi ròng (chậm hơn nhiều theo giờ) hay muốn người chơi lên cấp nhanh ở cấp thấp (bù bằng EXP nhiệm vụ làm quen)?
 10. Có tặng quà bồi thường khi nâng cấp bản lưu (kho đồ, hạt giống cũ) không?
+
+## Đã chốt (03/10)
+
+Chủ game chốt số, ghi đè thời gian ở mục 4 và 5. Số thật nằm ở `public/data.js`.
+
+### Cây trồng
+
+Thời gian thật, chưa tính mùa, thời tiết, phân. Ba nhóm: chơi liên tục (2, 3, 5, 10 phút), quay lại (15 đến 60 phút), trồng rồi đi (1,5 đến 8 giờ). Lãi/vụ = sản lượng × giá bán − giá hạt. Xu/giờ/ô quanh 36 đến 60, tăng nhẹ theo cấp. EXP khoảng 15% lãi, có sàn. Cấp mở khóa giữ nguyên, trừ **lúa chuyển từ cấp 2 lên cấp 8** (cây 8 giờ ở cấp 2 cho xu và EXP quá lớn). Sản lượng đổi cho cây nhanh: cải 3, rau muống 3, dưa leo 5, lúa 8.
+
+| Cây | Cấp | Thời gian | Hạt | Bán/củ | Sản lượng | Lãi/vụ | Xu/giờ/ô | EXP |
+|---|---|---|---|---|---|---|---|---|
+| raumuong | 3 | 2 phút | 1 | 1 | 3 | 2 | 60 | 3 |
+| cai | 1 | 3 phút | 1 | 1 | 3 | 2 | 40 | 2 |
+| hanhla | 2 | 5 phút | 1 | 1 | 4 | 3 | 36 | 2 |
+| dualeo | 5 | 10 phút | 3 | 2 | 5 | 7 | 42 | 3 |
+| suhao | 4 | 15 phút | 5 | 4 | 4 | 11 | 44 | 3 |
+| carot | 1 | 20 phút | 3 | 4 | 4 | 13 | 39 | 2 |
+| bap | 4 | 30 phút | 9 | 5 | 6 | 21 | 42 | 3 |
+| cachua | 3 | 45 phút | 10 | 8 | 5 | 30 | 40 | 5 |
+| duahau | 10 | 1 giờ | 24 | 13 | 6 | 54 | 54 | 8 |
+| ot | 7 | 1.5 giờ | 24 | 12 | 8 | 72 | 48 | 11 |
+| dauphong | 9 | 2 giờ | 40 | 24 | 6 | 104 | 52 | 16 |
+| khoailang | 6 | 3 giờ | 52 | 38 | 5 | 138 | 46 | 21 |
+| bapcai | 12 | 4 giờ | 88 | 80 | 4 | 232 | 58 | 35 |
+| bingo | 8 | 5 giờ | 100 | 70 | 5 | 250 | 50 | 38 |
+| dau | 6 | 6 giờ | 72 | 58 | 6 | 276 | 46 | 41 |
+| lua | 8 | 8 giờ | 96 | 62 | 8 | 400 | 50 | 60 |
+
+### Vật nuôi
+
+| Vật nuôi | Mua | Bán (trưởng thành) | Nhịp sản phẩm |
+|---|---|---|---|
+| ga | 120 | 48 | 10 phút |
+| vit | 160 | 64 | 15 phút |
+| heo | 320 | 128 | - |
+| bo | 800 | 320 | 1 giờ |
+| cuu | 1000 | 400 | 3 giờ |
+
+- Gà: trứng nở 30 phút, gà con thành trưởng thành khoảng 1 giờ. Vịt lớn chậm hơn một chút. Bò, cừu lớn 4 đến 6 giờ. Heo mang thai 2 giờ, heo con lớn 4 giờ, nghỉ 4 giờ sau mỗi lứa. Tuổi thọ nhiều ngày thật (gà, vịt 4 ngày, bò, cừu 7 ngày). Giá mua luôn cao hơn giá bán cùng giai đoạn.
+- Heo bán theo cân (1 đến 2 xu/kg theo ngày), mua 320.
+- Sản phẩm: trứng gà 4, trứng vịt 7, sữa 55, len 160, sữa ngon 85, len xoăn 240.
+- Thức ăn: gà 15, heo 30, cỏ khô 35. Một lần no kéo dài khoảng 2,5 giờ (`hungerMs`).
+
+### Đói và bệnh
+
+- Đói: ngừng sinh sản phẩm, không bệnh ngay. 90 phút đầu đói không có nguy cơ (`hungrySafeMs`), sau đó nguy cơ tăng dần trong 180 phút (`hungryRampMs`) tới tối đa 1,5%/phút (`hungrySickMax`). Đói lả liên tục 240 phút (`sickAfterStarving`) thì bệnh chắc chắn. Một bữa bỏ lỡ không bao giờ gây bệnh.
+- Dơ, chuồng dơ, già vẫn tăng nguy cơ (`sickChancePerMin` 0,4%).
+- Offline theo ADR 0004: không bao giờ chết, thời gian bệnh và sâu bị chặn ở một nửa ngưỡng chết khi chạy bù.
+
+### Giá nâng cấp (nhân 2,5 đến 4 so với trước)
+
+| Hạng mục | Giá mới |
+|---|---|
+| Cuốc, bình tưới | 600, 2800 |
+| Liềm | 700, 3200 |
+| Giỏ | 400, 2000 |
+| Giếng | 1800, 6000, 15000 |
+| Bồn nước, bồn 2, bơm tăng áp | 4000, 2000, 3000 |
+| Nhỏ giọt, phun, phân bón tự động | 3000, 4500, 5500 |
+| Nhà kính (mua, nhiệt, sửa) | 30000, 150, 2000 |
+| Mở khối ruộng | 1000, 2500, 5000, 9000, 15000, 24000, 36000 |
+| Chuồng gà, heo, bãi cỏ, cách ly | 400, 1500, 4500, 1000 |
+| Nâng cấp chuồng gà | 900, 2500 |
+| Nâng cấp chuồng heo | 2500, 7000 |
+| Nâng cấp bãi cỏ | 7000, 16000 |
+| Nâng cấp cách ly | 1200, 3000 |
+| Hố ủ phân, nhà mèo | 500, 700 |
+| Vật tư: thuốc trừ sâu, phân bón, thuốc, vắc-xin, vitamin, rơm, xà phòng | 20, 40, 60, 90, 120, 8, 15 |
+| Kích thích lớn | 120 (thêm tối đa 90 phút tiến độ mỗi lần) |
+
+### Quy tắc khác
+
+- Đơn hàng: thưởng ×1,25, một đơn mới mỗi 15 phút.
+- Cửa sổ chín = max(thời gian lớn, 10 phút). Offline không bao giờ làm cây chết.
+- Mùa chốt lúc gieo (cây lưu `season`); cây cũ không có trường này vẫn theo mùa hiện tại.
+- Nước đất tụt 1%/phút, cỏ 0,4%/phút, sâu 0,5%/phút. Sâu thành bệnh sau 45 phút, bệnh thành chết sau 90 phút.
+- Server: `checkSaveJump` và `goneCropsValue` đổi giới hạn (xu 2000 + 10/ô/phút, EXP 1000 + 2/ô/phút), thêm `goneCropsExp`.
+- Không tặng quà bù, không nâng version bản lưu.
+
+### Cần chủ game quyết
+
+1. Chó, mèo vẫn đói sau 8 và 12 phút, giờ nhìn vô lý so với thú nuôi (chưa đụng).
+2. Đơn hàng chưa giới hạn cây ngắn ngày.
+3. Nước tụt 1%/phút khiến cây trồng-rồi-đi cần mưa, giếng, bồn hoặc nhỏ giọt sau khoảng 100 phút.

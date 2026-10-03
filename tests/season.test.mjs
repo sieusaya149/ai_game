@@ -68,7 +68,7 @@ test('qua ranh giới mùa giữa vụ: cây sống, tiến độ không lùi, t
   const s = farm(7, 5); s.time = 7 * DAY_MS - 30 * SEC;   // còn 30 giây tới hết Xuân
   let last = 0;
   quiet(() => { for (let i = 0; i < 12; i++) { s.plots[0].water = 100; G.tick(s, 5 * SEC); const c = s.plots[0].crop; assert.ok(c.progress >= last); assert.equal(c.dead, false); last = c.progress; } });
-  assert.ok(near(s.plots[0].crop.progress, 30 / 90 + 30 * SEASON.slow / 90, CROPS.cai.grow));
+  assert.ok(near(s.plots[0].crop.progress, (30 + 30 * SEASON.slow) * SEC / CROPS.cai.grow, CROPS.cai.grow));
   // một lượt chạy bù 60 giây qua ranh giới cho đúng kết quả như từng nhịp nhỏ
   const b = farm(7, 5); b.time = 7 * DAY_MS - 30 * SEC;
   quiet(() => { b.plots[0].water = 100; G.tick(b, 60 * SEC); });
@@ -78,6 +78,32 @@ test('qua ranh giới mùa giữa vụ: cây sống, tiến độ không lùi, t
   grow(l, 60 * SEC);
   assert.ok(near(l.plots[0].crop.progress, (30 * SEASON.slow + 30) * SEC / CROPS.lua.grow, CROPS.lua.grow));
   assert.equal(l.plots[0].crop.dead, false);
+});
+
+// Gieo bằng hành động thật (cây có c.season chốt lúc gieo); `before` = còn bao lâu tới hết mùa
+const sow = (day, before, id = 'cai', lv = 5) => {
+  const s = farm(day, lv, id); s.plots[0].crop = null; s.time = day * DAY_MS - before;
+  s.inv[`seed_${id}`] = 1; s.selectedSeed = id;
+  assert.equal(quiet(() => G.perform(s, plot(0), 'plant')).ok, true);
+  return s;
+};
+test('mùa chốt lúc gieo: cây gieo đúng mùa không chậm đi khi qua ranh giới mùa; gieo trái mùa thì chậm cả vụ dù sang mùa hợp', () => {
+  // cải (Xuân) gieo 30 giây trước hết Xuân, chạy 60 giây qua sang Hạ: vẫn tốc độ đầy đủ
+  const a = sow(7, 30 * SEC);
+  assert.equal(a.plots[0].crop.season, 'in');
+  grow(a, 60 * SEC);
+  assert.ok(Math.abs(a.plots[0].crop.progress - 60 * SEC / CROPS.cai.grow) < 1e-9);
+  assert.equal(G.cropOffSeason(a.plots[0].crop), false);
+  assert.equal(G.plotSeasonMul(a, a.plots[0]), 1);
+  // lúa (Thu) gieo 30 giây trước hết Hạ (trái mùa), sang Thu (đúng mùa của lúa): vẫn chậm cả vụ
+  const l = sow(14, 30 * SEC, 'lua', 8);
+  assert.equal(l.plots[0].crop.season, 'off');
+  grow(l, 60 * SEC);
+  assert.ok(Math.abs(l.plots[0].crop.progress - 60 * SEC * SEASON.slow / CROPS.lua.grow) < 1e-9);
+  assert.equal(G.cropOffSeason(l.plots[0].crop), true);
+  assert.equal(G.plotSeasonMul(l, l.plots[0]), SEASON.slow);
+  // người mới (dưới cấp 5): không chốt mùa nào
+  assert.equal(sow(7, 30 * SEC, 'cai', 4).plots[0].crop.season, '');
 });
 
 test('chín quá thì vẫn héo như cũ, mùa không thêm cái chết nào', () => {

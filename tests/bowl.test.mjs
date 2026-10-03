@@ -92,11 +92,11 @@ test('chó đang đi theo chủ ra làng thì chưa ăn, về vườn mới ăn'
 test('chạy bù lúc vắng nhà: chó tự ăn từng phần trong bát khi đói, tóm tắt có ghi lại', () => {
   const s = newGame();
   while (s.dog.bowl < DOG.bowlMax) fill(s);
-  s.savedAt = Date.now() - 15 * MIN;
+  s.savedAt = Date.now() - 200 * MIN;
   const empty = structuredClone(s); empty.dog.bowl = 0;
   const l = quiet(() => G.loadGame(structuredClone(s)));
   const e = quiet(() => G.loadGame(empty));
-  assert.equal(l.dog.bowl, 0, 'ăn hết bát trong 15 phút');
+  assert.equal(l.dog.bowl, 0, 'ăn hết bát trong 200 phút (mỗi bữa no được ~1 giờ)');
   assert.ok(l.dog.hunger > e.dog.hunger, 'có bát thì đỡ đói hơn');
   assert.ok(l.away.lines.some(x => x.includes(`${DOG.bowlMax} bữa`)), l.away.lines.join(' | '));
 });

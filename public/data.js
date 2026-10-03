@@ -1,5 +1,6 @@
 // Nội dung game: mọi con số cân bằng nằm ở đây. Thời gian tính bằng mili-giây THỜI GIAN GAME (tốc độ x1 = thời gian thật).
 const MIN = 60_000;
+const HOUR = 60 * MIN;
 
 export const DAY_MS = 20 * MIN;           // 1 ngày trong game = 20 phút ở tốc độ x1
 export const NIGHT_FROM = 0.75;           // từ 3/4 ngày trở đi là ban đêm (tới hết ngày)
@@ -18,10 +19,10 @@ export const STAMINA = {
 // Công cụ 3 cấp (sắt/đồng/vàng). area: vùng tác động theo cấp (one = 1 ô · row = hàng 3 ô theo hướng nhìn · block = 3×3 tâm ô mục tiêu)
 // price: xu nâng lên cấp 2, cấp 3 (mất DAY_MS ở tiệm rèn) · act: hành động ruộng dùng công cụ này · canMax: sức chứa bình tưới theo cấp
 export const TOOLS = {
-  hoe:    { name: 'Cuốc',      icon: '⛏️', area: ['one', 'row', 'block'], price: [200, 800], act: ['till'] },
-  can:    { name: 'Bình tưới', icon: '💧', area: ['one', 'row', 'block'], price: [200, 800], act: ['water'], canMax: [10, 20, 40] },
-  sickle: { name: 'Liềm',      icon: '🌾', area: ['one', 'row', 'block'], price: [250, 900], act: ['harvest', 'weed'] },
-  basket: { name: 'Giỏ',       icon: '🧺', area: [],                      price: [150, 600], act: [], cap: [30, 60, 120] },   // cap: sức chứa giỏ (số món nông sản & sản phẩm) theo cấp
+  hoe:    { name: 'Cuốc',      icon: '⛏️', area: ['one', 'row', 'block'], price: [600, 2800], act: ['till'] },
+  can:    { name: 'Bình tưới', icon: '💧', area: ['one', 'row', 'block'], price: [600, 2800], act: ['water'], canMax: [10, 20, 40] },
+  sickle: { name: 'Liềm',      icon: '🌾', area: ['one', 'row', 'block'], price: [700, 3200], act: ['harvest', 'weed'] },
+  basket: { name: 'Giỏ',       icon: '🧺', area: [],                      price: [400, 2000], act: [], cap: [30, 60, 120] },   // cap: sức chứa giỏ (số món nông sản & sản phẩm) theo cấp
 };
 export const TOOL_MAX = 3;
 export const TOOL_LEVEL = ['sắt', 'đồng', 'vàng'];
@@ -30,9 +31,9 @@ export const TOOL_LEVEL = ['sắt', 'đồng', 'vàng'];
 // Cấp 4 (Máy bơm) có bồn chứa: issue 57.
 export const WELL = [
   { name: 'Giếng đất', can: 10, refillMs: 900, price: 0 },
-  { name: 'Giếng xây', can: 15, refillMs: 500, price: 600 },
-  { name: 'Bơm tay',   can: 25, refillMs: 350, price: 2000 },
-  { name: 'Máy bơm',   can: 40, refillMs: 250, price: 5000 },
+  { name: 'Giếng xây', can: 15, refillMs: 500, price: 1800 },
+  { name: 'Bơm tay',   can: 25, refillMs: 350, price: 6000 },
+  { name: 'Máy bơm',   can: 40, refillMs: 250, price: 15000 },
 ];
 // Bồn chứa và mạng nước (issue 57, ADR 0015): bồn là một con số "lần nước". cap: bồn chính chứa · extra: mỗi bồn phụ thêm ·
 // perHour: máy bơm (giếng cấp 4) bơm vào bồn mỗi giờ vườn chạy, hạn hán × drought · range: tầm nước (ô) quanh bồn, trạm bơm phụ ·
@@ -45,9 +46,9 @@ export const TANK = { cap: 200, extra: 150, perHour: 20, drought: 0.5, range: 8,
 // power.spray: số điện mỗi giờ của mỗi khối có máy phun (lúc có điện) · price: xu mỗi số điện, trừ lúc 6h sáng.
 export const AUTO = {
   ups: {
-    drip:  { name: 'Tưới nhỏ giọt', icon: '💧', price: 800,  desc: 'Đất sắp khô thì tự tưới, lấy 1 lần nước bồn cho mỗi ô. Khối phải trong tầm nước.' },
-    spray: { name: 'Phun thuốc tự động', icon: '🧴', price: 1200, desc: 'Có sâu 20 giây thì tự phun, trừ 1 thuốc trừ sâu trong kho. Tốn điện.' },
-    rich:  { name: 'Đất màu mỡ', icon: '🌱', price: 1500, desc: 'Cỏ mọc chậm hơn, thêm 25% sản lượng, tính như đã bón phân khi xét sao. Không cần nước.' },
+    drip:  { name: 'Tưới nhỏ giọt', icon: '💧', price: 3000, desc: 'Đất sắp khô thì tự tưới, lấy 1 lần nước bồn cho mỗi ô. Khối phải trong tầm nước.' },
+    spray: { name: 'Phun thuốc tự động', icon: '🧴', price: 4500, desc: 'Có sâu 20 giây thì tự phun, trừ 1 thuốc trừ sâu trong kho. Tốn điện.' },
+    rich:  { name: 'Đất màu mỡ', icon: '🌱', price: 5500, desc: 'Cỏ mọc chậm hơn, thêm 25% sản lượng, tính như đã bón phân khi xét sao. Không cần nước.' },
   },
   dripAt: 5,
   sprayMs: 20_000,
@@ -58,9 +59,9 @@ export const AUTO = {
 };
 // Công trình nước đặt ở chế độ xây dựng: giá xây, số cái tối đa
 export const WATER_BUILD = {
-  tank:    { price: 1500, max: 1 },
-  tank2:   { price: 800,  max: 4 },
-  booster: { price: 1200, max: 4 },
+  tank:    { price: 4000, max: 1 },
+  tank2:   { price: 2000, max: 4 },
+  booster: { price: 3000, max: 4 },
 };
 // Làm n ô một lần tốn thể lực = cost × GROUP_COST[n] (làm nhiều ô một lần nhẹ hơn làm từng ô: 3×3 tốn 5 thay vì 9)
 export const GROUP_COST = [0, 1, 2, 2, 3, 3, 4, 4, 5, 5];
@@ -73,26 +74,30 @@ export const START_PLOTS = 9;
 // ---------- Cây trồng ----------
 // lv: cấp người chơi mua được hạt · seed: giá hạt · grow: thời gian lớn tới lúc chín · yield: số nông sản · price: giá bán mỗi cái
 // season: mùa hợp (xuan | ha | thu | dong, mỗi mùa 4 cây) · group: nhóm thời gian cho ngưỡng thành thạo (CROP_GROUPS)
+// Cân bằng thời gian thật (chốt 03/10, docs/proposals/balance-time-economy.md): ba nhịp chơi. Đang chơi (≤ 10 phút): rau muống,
+// cải, hành, dưa leo · quay lại (15–60 phút): su hào, cà rốt, bắp, cà chua, dưa hấu · gieo rồi đi (1,5–8 giờ): ớt … lúa.
+// Lãi ròng mỗi vụ (yield × price − seed) tăng theo thời gian lớn nên lãi mỗi giờ mỗi ô xêm xêm nhau (36 xu/giờ ở cấp 1 → 58 ở cấp 12:
+// không cây nào áp đảo, cây dài trả nhiều mỗi vụ vì gieo một lần rồi đi). Hạt ≈ 20–30% doanh thu. EXP ≈ 15% lãi ròng,
+// tối thiểu 2 (cấp 1–2) hay 3 (cấp 3–5) để các cấp đầu không chậm.
 export const CROPS = {
-  cai:       { name: 'Cải xanh',  lv: 1,  seed: 8,   grow: 1.5 * MIN, yield: 4, price: 5,  exp: 2,  season: 'xuan', group: 'short' },
-  carot:     { name: 'Cà rốt',    lv: 1,  seed: 15,  grow: 3 * MIN,   yield: 4, price: 9,  exp: 4,  season: 'dong', group: 'short' },
-  lua:       { name: 'Lúa',       lv: 2,  seed: 20,  grow: 5 * MIN,   yield: 5, price: 10, exp: 6,  season: 'thu',  group: 'mid' },
-  cachua:    { name: 'Cà chua',   lv: 3,  seed: 35,  grow: 8 * MIN,   yield: 5, price: 18, exp: 10, season: 'dong', group: 'mid' },
-  bap:       { name: 'Bắp',       lv: 4,  seed: 50,  grow: 10 * MIN,  yield: 6, price: 22, exp: 14, season: 'ha',   group: 'mid' },
-  dau:       { name: 'Dâu tây',   lv: 6,  seed: 80,  grow: 12 * MIN,  yield: 6, price: 35, exp: 20, season: 'xuan', group: 'long' },
-  bingo:     { name: 'Bí ngô',    lv: 8,  seed: 120, grow: 15 * MIN,  yield: 5, price: 60, exp: 28, season: 'thu',  group: 'long' },
-  duahau:    { name: 'Dưa hấu',   lv: 10, seed: 180, grow: 20 * MIN,  yield: 6, price: 80, exp: 40, season: 'ha',   group: 'long' },
-  // 8 cây mới Phase 3 (issue 50), mở dần theo cấp
-  hanhla:    { name: 'Hành lá',   lv: 2,  seed: 10,  grow: 2 * MIN,   yield: 4, price: 7,  exp: 3,  season: 'xuan', group: 'short' },
-  raumuong:  { name: 'Rau muống', lv: 3,  seed: 12,  grow: 2.5 * MIN, yield: 5, price: 6,  exp: 3,  season: 'ha',   group: 'short' },
-  suhao:     { name: 'Su hào',    lv: 4,  seed: 30,  grow: 6 * MIN,   yield: 4, price: 18, exp: 8,  season: 'dong', group: 'mid' },
-  dualeo:    { name: 'Dưa leo',   lv: 5,  seed: 40,  grow: 7 * MIN,   yield: 6, price: 16, exp: 10, season: 'ha',   group: 'mid' },
-  khoailang: { name: 'Khoai lang', lv: 6, seed: 45,  grow: 9 * MIN,   yield: 5, price: 22, exp: 12, season: 'thu',  group: 'mid' },
-  ot:        { name: 'Ớt',        lv: 7,  seed: 60,  grow: 10 * MIN,  yield: 8, price: 18, exp: 14, season: 'thu',  group: 'mid' },
-  dauphong:  { name: 'Đậu phộng', lv: 9,  seed: 100, grow: 13 * MIN,  yield: 6, price: 38, exp: 22, season: 'xuan', group: 'long' },
-  bapcai:    { name: 'Bắp cải',   lv: 12, seed: 150, grow: 18 * MIN,  yield: 4, price: 95, exp: 34, season: 'dong', group: 'long' },
+  cai:       { name: 'Cải xanh',   lv: 1,  seed: 1,   grow: 3 * MIN,    yield: 3, price: 1,  exp: 2,  season: 'xuan', group: 'short' },
+  carot:     { name: 'Cà rốt',     lv: 1,  seed: 3,   grow: 20 * MIN,   yield: 4, price: 4,  exp: 2,  season: 'dong', group: 'mid' },
+  hanhla:    { name: 'Hành lá',    lv: 2,  seed: 1,   grow: 5 * MIN,    yield: 4, price: 1,  exp: 2,  season: 'xuan', group: 'short' },
+  lua:       { name: 'Lúa',        lv: 8,  seed: 96,  grow: 8 * HOUR,   yield: 8, price: 62, exp: 60, season: 'thu',  group: 'long' },
+  raumuong:  { name: 'Rau muống',  lv: 3,  seed: 1,   grow: 2 * MIN,    yield: 3, price: 1,  exp: 3,  season: 'ha',   group: 'short' },
+  cachua:    { name: 'Cà chua',    lv: 3,  seed: 10,  grow: 45 * MIN,   yield: 5, price: 8,  exp: 5,  season: 'dong', group: 'mid' },
+  suhao:     { name: 'Su hào',     lv: 4,  seed: 5,   grow: 15 * MIN,   yield: 4, price: 4,  exp: 3,  season: 'dong', group: 'mid' },
+  bap:       { name: 'Bắp',        lv: 4,  seed: 9,   grow: 30 * MIN,   yield: 6, price: 5,  exp: 3,  season: 'ha',   group: 'mid' },
+  dualeo:    { name: 'Dưa leo',    lv: 5,  seed: 3,   grow: 10 * MIN,   yield: 5, price: 2,  exp: 3,  season: 'ha',   group: 'short' },
+  dau:       { name: 'Dâu tây',    lv: 6,  seed: 72,  grow: 6 * HOUR,   yield: 6, price: 58, exp: 41, season: 'xuan', group: 'long' },
+  khoailang: { name: 'Khoai lang', lv: 6,  seed: 52,  grow: 3 * HOUR,   yield: 5, price: 38, exp: 21, season: 'thu',  group: 'long' },
+  ot:        { name: 'Ớt',         lv: 7,  seed: 24,  grow: 1.5 * HOUR, yield: 8, price: 12, exp: 11, season: 'thu',  group: 'long' },
+  bingo:     { name: 'Bí ngô',     lv: 8,  seed: 100, grow: 5 * HOUR,   yield: 5, price: 70, exp: 38, season: 'thu',  group: 'long' },
+  dauphong:  { name: 'Đậu phộng',  lv: 9,  seed: 40,  grow: 2 * HOUR,   yield: 6, price: 24, exp: 16, season: 'xuan', group: 'long' },
+  duahau:    { name: 'Dưa hấu',    lv: 10, seed: 24,  grow: 1 * HOUR,   yield: 6, price: 13, exp: 8,  season: 'ha',   group: 'mid' },
+  bapcai:    { name: 'Bắp cải',    lv: 12, seed: 88,  grow: 4 * HOUR,   yield: 4, price: 80, exp: 35, season: 'dong', group: 'long' },
 };
-// Nhóm thời gian lớn (ngưỡng thành thạo theo nhóm ở issue 51): ngắn ≤ 3 phút · trung bình 5–10 phút · dài ≥ 12 phút
+// Nhóm thời gian lớn (ngưỡng thành thạo theo nhóm ở issue 51): ngắn ≤ 10 phút (đang chơi) · trung bình 15–60 phút (quay lại) · dài ≥ 1,5 giờ (gieo rồi đi)
 export const CROP_GROUPS = { short: 'Ngắn ngày', mid: 'Trung bình', long: 'Dài ngày' };
 // Thành thạo (issue 51): số lần thu hoạch để lên cấp 2 và 3 theo nhóm; thưởng theo cấp (chỉ số 0 = cấp 1)
 // yield: +sản lượng · giant: tỉ lệ trái khổng lồ (dùng ở issue 53) · bugMul: nhân xác suất sâu tới · seedBack: tỉ lệ được lại 1 hạt · exp: EXP khi lên tới cấp đó
@@ -108,7 +113,7 @@ export const masteryLevel = (group, n) => 1 + MASTERY.thresholds[group].filter(t
 // Luật "chăm kỹ" (issue 52): không lúc nào khô hẳn khi cây đang lớn, sâu không quá bugMs (giờ vườn), có bón phân thì ★2;
 // thêm ít nhất một lần chăm tay (máy, khách, trời không tính) thì ★3; lỡ một điều thì ★1.
 // orderLv: từ cấp này đơn hàng có lúc đòi ★2 / ★3 (xác suất orderP)
-export const STARS = { max: 3, mul: [1, 1.5, 2], bugMs: 30_000, orderLv: 5, orderP: [0.25, 0.1] };
+export const STARS = { max: 3, mul: [1, 1.5, 2], bugMs: 10 * MIN, orderLv: 5, orderP: [0.25, 0.1] };
 export const starKey = (id, star = 1) => (star > 1 ? `${id}@${star}` : id);
 // Trái khổng lồ (issue 53): món riêng theo loại cây, khóa 'giant_<cây>' (★2/★3 thêm hậu tố như nông sản: 'giant_cai@3').
 // Tung một lần lúc cây vừa chín: tỉ lệ MASTERY.giant theo cấp thành thạo, vụ đang ★3 thì nhân star3Mul (cao nhất ở cấp 3 + ★3).
@@ -126,8 +131,8 @@ export const isProduce = k => !!(CROPS[baseOf(k)] || giantOf(k) || PRODUCTS[k]);
 export const itemSlots = k => (giantOf(k) ? GIANT.slots : 1);
 // Các giai đoạn theo % thời gian lớn: 0 hạt · 1 mầm · 2 cây non · 3 ra hoa/trái non · 4 chín.
 export const CROP_STAGES = [0, 0.1, 0.35, 0.7, 1];
-export const OVERRIPE = 1.5;              // chín quá (grow × 1.5) mà chưa hái thì héo, mất trắng (cây ngắn ngày: xem RIPE_FLOOR)
-export const RIPE_FLOOR = 10 * MIN;       // cửa sổ chín→héo ít nhất 10 phút game, kể cả cây lớn nhanh
+export const OVERRIPE = 2;                // chín quá (grow × 2, tức cửa sổ héo = đúng thời gian lớn) mà chưa hái thì héo, mất trắng (cây ngắn ngày: xem RIPE_FLOOR)
+export const RIPE_FLOOR = 10 * MIN;       // cửa sổ chín→héo = max(thời gian lớn, 10 phút): cây 2 phút vẫn có 10 phút để hái. Héo chỉ là để thối ngoài đồng; chạy bù offline thì cây đứng yên (ADR 0004)
 export const WILT_WARN = 0.8;             // đã qua 80% cửa sổ thì báo "sắp héo"
 
 // Mùa tác dụng lên cây (issue 54): trái mùa lớn chậm ×slow và không ra ★3 (cờ crop.offSeason), đúng mùa 10% lần thu thêm bonusQty.
@@ -173,31 +178,36 @@ export const WEATHER = {
 // Ô bên trong bỏ qua mùa (★3 quanh năm), không bị sương muối, bão, quạ; trộm vẫn vào qua cửa.
 // Mùa Đông sưởi tốn heat xu mỗi nhà kính lúc 6h sáng (không đủ xu thì ngừng sưởi, mất tác dụng tới khi đủ, không nợ).
 // Mỗi ngày bão, mỗi nhà kính có breakChance bị vỡ kính (hàm thuần theo hạt giống, ngày, khối); sửa tốn fix xu.
-export const GLASS = { lv: 14, max: 2, price: 12000, heat: 60, fix: 800, breakChance: 0.2 };
+export const GLASS = { lv: 14, max: 2, price: 30000, heat: 150, fix: 2000, breakChance: 0.2 };
 
 export const FARMING = {
-  waterDrainPerMin: 25,   // đất mất bao nhiêu % nước mỗi phút (trời nắng ×1.5, trời mưa luôn đầy)
+  waterDrainPerMin: 1,    // đất mất bao nhiêu % nước mỗi phút: một lần tưới đủ ~100 phút, cây 2 phút khỏi tưới lại (trời nắng ×1.5, hạn ×2, mưa luôn đầy)
+  dryGrowMul: 0.5,    // đất khô hẳn (nước 0): cây lớn chậm bằng chừng này, không dừng và không bao giờ chết vì khô (kể cả lúc chạy bù offline). Có nước, mưa, bồn, nhỏ giọt thì lớn đủ tốc độ
   canMax: 10,             // bình tưới cấp 1 chứa 10 lần tưới, ra giếng múc lại (cấp cao hơn: TOOLS.can.canMax)
-  weedChancePerMin: 0.06, // xác suất mọc cỏ mỗi phút trên ô đã cuốc
+  weedChancePerMin: 0.004, // xác suất mọc cỏ mỗi phút trên ô đã cuốc (chừng 1 đợt cỏ mỗi 4 giờ)
   weedSlow: 0.5,          // có cỏ thì cây lớn chậm một nửa
-  bugChancePerMin: 0.07,  // xác suất có sâu mỗi phút khi cây đang lớn
-  bugToSick: 2 * MIN,     // sâu không diệt sau 2 phút thì cây bệnh
-  sickToDead: 4 * MIN,    // bệnh không chữa sau 4 phút thì cây chết
+  bugChancePerMin: 0.005, // xác suất có sâu mỗi phút khi cây đang lớn (chừng 1 đợt sâu mỗi 3 giờ)
+  bugToSick: 45 * MIN,    // sâu không diệt sau 45 phút thì cây bệnh
+  sickToDead: 90 * MIN,   // bệnh không chữa sau 90 phút thì cây chết. Chạy bù offline không bao giờ làm cây chết (ADR 0004): đồng hồ sâu, bệnh dừng lại ở nửa chặng
   handCatchChance: 0.5,   // bắt sâu bằng tay: 50% thành công, không tốn gì
   fertYield: 0.5,         // bón phân: +50% sản lượng
   fertSpeed: 1.2,         // bón phân: lớn nhanh ×1.2
-  growthBoost: 0.5,       // thuốc tăng trưởng: cộng ngay 50% tổng thời gian lớn (tối đa 2 lần mỗi cây)
+  growthBoost: 0.5,       // thuốc tăng trưởng: cộng ngay 50% tổng thời gian lớn (tối đa 2 lần mỗi cây) ...
+  growthBoostMaxMs: 90 * MIN,   // ... nhưng mỗi lần không quá chừng này (cây 8 giờ không bị rút ngắn tới 4 giờ chỉ với một lọ thuốc)
   growthMax: 2,
 };
 
 // ---------- Vật nuôi ----------
 // price: giá mua con non · every: chu kỳ ra sản phẩm khi trưởng thành (thời gian lớn: bảng LIFE) · sell: giá bán con trưởng thành
+// Cân bằng thời gian thật (chốt 03/10): gà trứng mỗi 10 phút, vịt 15 phút, bò sữa mỗi giờ, cừu lông mỗi 3 giờ; mỗi con ra khoảng 24–55 xu/giờ
+// (xêm xêm một ô ruộng), thức ăn ~12% giá trị sản phẩm. Giá bán (sell) chỉ bằng 40% giá mua: con cái đắt hơn con đực 30% và độ thân ❤️5
+// chỉ cộng 50% giá bán, nên mua con non nuôi lớn rồi bán lại không bao giờ có lời (heo bán theo cân: xem TRADE.pigKg)
 export const ANIMALS = {
-  ga:  { name: 'Gà',  baby: 'Gà con',  lv: 1, price: 40,  feed: 'feed_ga',  pen: 'chicken', product: 'trung', every: 2.5 * MIN, sell: 90,  exp: 3 },
-  vit: { name: 'Vịt', baby: 'Vịt con', lv: 2, price: 55,  feed: 'feed_ga',  pen: 'chicken', product: 'trung_vit', every: 3 * MIN, sell: 120, exp: 4 },
-  heo: { name: 'Heo', baby: 'Heo con', lv: 3, price: 120, feed: 'feed_heo', pen: 'pig',     product: null,    every: 0,         sell: 380, exp: 12 },
-  bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 300, feed: 'hay',      pen: 'pasture', product: 'sua',   every: 4 * MIN,   sell: 700, exp: 8 },
-  cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 400, feed: 'hay',      pen: 'pasture', product: 'len',   every: 6 * MIN,   sell: 800, exp: 10 },
+  ga:  { name: 'Gà',  baby: 'Gà con',  lv: 1, price: 120,  feed: 'feed_ga',  pen: 'chicken', product: 'trung', every: 10 * MIN, sell: 48,  exp: 3 },
+  vit: { name: 'Vịt', baby: 'Vịt con', lv: 2, price: 160,  feed: 'feed_ga',  pen: 'chicken', product: 'trung_vit', every: 15 * MIN, sell: 64, exp: 4 },
+  heo: { name: 'Heo', baby: 'Heo con', lv: 3, price: 320,  feed: 'feed_heo', pen: 'pig',     product: null,    every: 0,         sell: 128, exp: 12 },
+  bo:  { name: 'Bò',  baby: 'Bê con',  lv: 5, price: 800,  feed: 'hay',      pen: 'pasture', product: 'sua',   every: HOUR,      sell: 320, exp: 8 },
+  cuu: { name: 'Cừu', baby: 'Cừu con', lv: 7, price: 1000, feed: 'hay',      pen: 'pasture', product: 'len',   every: 3 * HOUR,  sell: 400, exp: 10 },
   // Mèo là thú cưng (issue 44): ở nhà mèo chứ không ở chuồng có rào, không cho sản phẩm, không bán được, không dơ
   meo: { name: 'Mèo', baby: 'Mèo con', lv: 5, price: 180, feed: 'catfood', pen: 'cathouse', product: null,    every: 0,         sell: 0,   exp: 6, pet: true },
 };
@@ -219,27 +229,28 @@ export const SHOWER = { happy: 5, until: 0.25, fxMs: 3000 };
 // Phân chuồng tích dần theo giờ vườn (0..100); đầy thì chuồng bẩn
 export const MANURE = { fullMs: 2 * 60 * MIN, dirtyAt: 100, perScoop: 25 };   // xúc: nhận 1 phân chuồng mỗi perScoop độ đầy (tối thiểu 1)
 export const HUSBANDRY = {
-  hungerMs: 5 * MIN,          // từ no (100) xuống đói hẳn (0)
-  autoEatBelow: 60,           // đói hơn mức này thì tự ra máng ăn nếu máng còn cám
-  troughMax: 20,              // máng chứa tối đa 20 phần ăn; 1 bao thức ăn = 5 phần
+  hungerMs: 150 * MIN,        // từ no (100) xuống đói hẳn (0): một lần no kéo dài ~2,5 giờ chơi. Đói dưới growNeedsHunger thì con vật ngừng đẻ, ngừng lớn
+  autoEatBelow: 60,           // đói hơn mức này thì tự ra máng ăn nếu máng còn cám (mỗi con ~1 phần mỗi giờ)
+  troughMax: 40,              // máng chứa tối đa 40 phần ăn (6 gà đủ ăn ~6 giờ); 1 bao thức ăn = 5 phần
   unitsPerBag: 5,
   growNeedsHunger: 30,        // phải no trên 30 mới lớn và mới đẻ
   happyDecayPerMin: 4,
   petHappy: 25,
-  // Quên cho ăn một lượt KHÔNG gây bệnh. Từ no: 3 phút tới "đang đói" (<40, báo + việc cần làm), 5 phút tới đói lả (0);
-  // con đói thì ngừng sinh sản/lớn (growNeedsHunger) nhưng chưa bệnh. Chỉ bỏ đói lả RẤT LÂU mới có nguy cơ bệnh:
-  // từ lúc hunger = 0 phải qua sickRiskAfterStarving (30 phút, ~6 chu kỳ ăn) mới bắt đầu có xác suất, rồi xác suất
-  // tăng dần tuyến tính từ 0 tới sickStarveMaxPerMin sau sickStarveRampMs. Không có mốc "chắc chắn bệnh". Chỉnh lại cân bằng thì sửa 3 số này.
-  sickRiskAfterStarving: 30 * MIN,
-  sickStarveRampMs: 60 * MIN,
-  sickStarveMaxPerMin: 0.08,  // xác suất/phút khi đã đói lả hết thời gian tăng dần
-  sickChancePerMin: 0.004,    // xác suất/phút: áp dụng khi bị bỏ bê (đói lả lâu, dơ, chuồng bẩn hoặc già). No, sạch thì không tự bệnh
+  // Quên cho ăn một lượt KHÔNG gây bệnh: con đói chỉ ngừng sinh sản/lớn (growNeedsHunger). Xuống dưới hungryBelow là "đang đói" (báo + vào việc cần làm).
+  // Chỉ bỏ đói lả (hunger 0) RẤT LÂU mới có nguy cơ bệnh: qua sickRiskAfterStarving mới bắt đầu có xác suất, rồi xác suất tăng dần tuyến tính
+  // tới sickStarveMaxPerMin sau sickStarveRampMs. Không có mốc "chắc chắn bệnh". Chỉnh cân bằng thì sửa 3 số này.
+  sickRiskAfterStarving: 90 * MIN,
+  sickStarveRampMs: 180 * MIN,
+  sickStarveMaxPerMin: 0.015, // xác suất/phút khi đã đói lả hết thời gian tăng dần
+  sickChancePerMin: 0.004,    // xác suất/phút: áp dụng khi bị bỏ bê (dơ, chuồng bẩn hoặc già). No, sạch thì không tự bệnh
   hungryBelow: 40,            // đói hơn mức này là "đang đói": báo đói, vào việc cần làm, hiện nút Cho ăn (CHƯA có nguy cơ bệnh)
-  eggHatchChance: 0.2,        // trứng bỏ quên quá 10 phút có 20% tự nở thành gà con
-  eggForgetMs: 10 * MIN,
-  nestHatchMs: 3 * MIN,       // đặt trứng vào ổ ấp: 3 phút nở gà con
-  pigBreedChancePerMin: 0.25, // có ≥2 heo trưởng thành no & vui: mỗi phút 25% có heo nái mang bầu
-  pigGestation: 6 * MIN,
+  eggHatchChance: 0.15,       // trứng có phôi bỏ quên: mỗi eggForgetMs có 15% tự nở thành gà con
+  eggForgetMs: 60 * MIN,
+  eggMax: 60,                 // số trứng nằm ngoài tối đa cho cả trại (người đi vắng 6 giờ vẫn thu được cả mẻ)
+  nestHatchMs: 30 * MIN,      // đặt trứng vào ổ ấp: 30 phút nở gà con
+  pigBreedChancePerMin: 0.02, // có ≥2 heo trưởng thành no & vui: mỗi phút 2% có heo nái mang bầu (chờ ghép đôi ~50 phút)
+  pigGestation: 2 * HOUR,     // heo nái mang bầu 2 giờ
+  pigRestMs: 4 * HOUR,        // đẻ xong nái nghỉ chừng này mới có lứa sau (heo con lớn tới trưởng thành mất 4 giờ)
   pigLitter: [1, 3],          // đẻ 1–3 heo con
   vitaminBoost: 0.5,          // vitamin: cộng ngay nửa giai đoạn đang ở cho con non, con nhỡ
 };
@@ -248,21 +259,25 @@ export const HUSBANDRY = {
 // Tuổi tính bằng GIỜ VƯỜN đã chạy (simMs, ADR 0003): vườn đóng băng thì con vật không già đi.
 // LIFE[loài][giai đoạn] = thời lượng giai đoạn đó. Infinity = ở mãi giai đoạn đó (chó, mèo không già, không chết vì già).
 // Hết giai đoạn già thì con vật ra đi (hóa thiên thần); chết vì già được phép cả lúc chạy bù (ADR 0004).
-const HOUR = 60 * MIN;
 export const STAGES = ['non', 'nho', 'truong', 'gia'];
 export const STAGE_NAME = { non: 'Non', nho: 'Nhỡ', truong: 'Trưởng thành', gia: 'Già' };
 export const LIFE = {
-  ga:  { non: 5 * MIN,  nho: 10 * MIN, truong: 20 * HOUR, gia: 4 * HOUR },
-  vit: { non: 5 * MIN,  nho: 10 * MIN, truong: 20 * HOUR, gia: 4 * HOUR },
-  heo: { non: 10 * MIN, nho: 20 * MIN, truong: 30 * HOUR, gia: 6 * HOUR },
-  bo:  { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
-  cuu: { non: 15 * MIN, nho: 30 * MIN, truong: 45 * HOUR, gia: 8 * HOUR },
+  // Cân bằng thời gian thật: gà lớn tới trưởng thành sau 1 giờ, vịt 1,25 giờ, heo 4 giờ, bò và cừu 5 giờ; sống nhiều ngày thật (gà ~5 ngày, bò ~8 ngày)
+  ga:  { non: 20 * MIN, nho: 40 * MIN, truong: 96 * HOUR,  gia: 24 * HOUR },
+  vit: { non: 25 * MIN, nho: 50 * MIN, truong: 96 * HOUR,  gia: 24 * HOUR },
+  heo: { non: 90 * MIN, nho: 150 * MIN, truong: 120 * HOUR, gia: 24 * HOUR },
+  bo:  { non: 2 * HOUR, nho: 3 * HOUR, truong: 168 * HOUR, gia: 36 * HOUR },
+  cuu: { non: 2 * HOUR, nho: 3 * HOUR, truong: 168 * HOUR, gia: 36 * HOUR },
   cho: { non: 30 * MIN, nho: HOUR,     truong: 40 * HOUR, gia: Infinity },   // chó có tuổi già nhưng không bao giờ ra đi
   meo: { non: 20 * MIN, nho: 40 * MIN, truong: 40 * HOUR, gia: Infinity },   // mèo cũng vậy: già thì lười chứ không chết vì già
 };
 // Tuổi lúc bắt đầu một giai đoạn · giai đoạn ở tuổi `age` · tuổi ra đi (Infinity = không bao giờ)
-export const stageStart = (kind, stage) => STAGES.slice(0, STAGES.indexOf(stage)).reduce((t, k) => t + LIFE[kind][k], 0);
-export const stageAt = (kind, age) => STAGES.findLast(k => age >= stageStart(kind, k)) ?? 'non';
+const STAGE_START = Object.fromEntries(Object.keys(LIFE).map(kind => [kind, Object.fromEntries(STAGES.map((st, i) => [st, STAGES.slice(0, i).reduce((t, k) => t + LIFE[kind][k], 0)]))]));
+export const stageStart = (kind, stage) => STAGE_START[kind]?.[stage] ?? STAGES.slice(0, STAGES.indexOf(stage)).reduce((t, k) => t + LIFE[kind][k], 0);
+export const stageAt = (kind, age) => {
+  for (let i = STAGES.length - 1; i > 0; i--) if (age >= stageStart(kind, STAGES[i])) return STAGES[i];
+  return 'non';
+};
 export const lifeEnd = kind => stageStart(kind, 'gia') + LIFE[kind].gia;
 export const AGING = {
   warnMs: HOUR,       // báo trước 🟡 khi còn chừng này giờ vườn nữa là vào giai đoạn già
@@ -326,7 +341,7 @@ export const TRADE = {
   bondMul: [0.85, 1, 1.15, 1.3, 1.5],   // ❤️1..5
   sickMul: 0.6, dirtyMul: 0.8,
   confirmBond: 4, confirms: 2,
-  pigKg: [4, 5, 5, 6, 7, 6, 4],         // lịch giá heo hơi (xu/kg) theo ngày game, lặp mỗi 7 ngày
+  pigKg: [1, 2, 2, 1, 2, 2, 1],         // lịch giá heo hơi (xu/kg) theo ngày game, lặp mỗi 7 ngày: heo 100 kg bán 100–200 xu (rẻ hơn giá mua heo)
   walkPx: 16,                           // px/giây heo đi hết ga; ít đi hơn thì coi là ít vận động
   gainActive: 0.6, gainLazy: 1.5,       // hệ số tăng cân khi hay vận động / nằm ườn
   gainFull: 1.25, fullAt: 90,           // ăn no (đói ≥ fullAt) tăng thêm
@@ -338,7 +353,7 @@ export const pigKgPrice = day => TRADE.pigKg[((day | 0) % 7 + 7) % 7];
 // ---------- Chó ----------
 export const DOG = {
   name: 'Mực',
-  hungerMs: 8 * MIN,
+  hungerMs: 2 * HOUR,         // từ no (100) xuống đói hẳn (0): một lần no kéo dài ~2 giờ chơi, cùng nhịp với vật nuôi (xem HUSBANDRY.hungerMs)
   poopEvery: [2 * MIN, 4 * MIN], // chó ỉa bậy ngẫu nhiên trong khoảng này
   maxPoops: 8,
   poopPupMul: 0.55,           // chó con nghịch và ỉa nhiều hơn hẳn
@@ -369,7 +384,7 @@ export const COAT = { price: 20, def: { cho: 'den', meo: 'vang' } };
 // Săn chuột là luật trừu tượng theo ô và xác suất (ADR 0013): mỗi huntEvery một lượt rình, nhắm con chuột gần nhất
 // theo ô, trúng với xác suất catchChance[giai đoạn] × hệ số theo mức đói. Chạy bù offline ra đúng kết quả đó.
 export const CAT = {
-  hungerMs: 12 * MIN,         // từ no (100) xuống đói hẳn (0)
+  hungerMs: 3 * HOUR,         // từ no (100) xuống đói hẳn (0): một lần no kéo dài ~3 giờ chơi
   happyDecayPerMin: 3,
   sickMul: 0.25,              // thú cưng khỏe hơn vật nuôi: nguy cơ mắc bệnh chỉ bằng chừng này
   petHappy: 25,
@@ -530,22 +545,22 @@ export const ITEMS = {
   ...Object.fromEntries(Object.entries(CROPS).map(([id, c]) => [
     `seed_${id}`, { name: `Hạt ${c.name.toLowerCase()}`, kind: 'seed', crop: id, price: c.seed, lv: c.lv },
   ])),
-  pesticide:  { name: 'Thuốc trừ sâu',     kind: 'supply', price: 15, lv: 1, desc: 'Diệt sâu và chữa cây bệnh ngay lập tức.' },
-  growth:     { name: 'Thuốc tăng trưởng', kind: 'supply', price: 30, lv: 2, desc: 'Cây lớn vọt thêm 50% thời gian. Tối đa 2 lần mỗi cây.' },
-  fertilizer: { name: 'Phân bón',          kind: 'supply', price: 12, lv: 1, desc: 'Bón trước khi chín: +50% sản lượng, lớn nhanh hơn.' },
-  medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 1, desc: 'Mệt: 1 liều là khỏi. Bệnh nặng: 2 liều. Nguy kịch: phải gọi bác sĩ thú y.' },
-  vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 60, lv: 1, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
-  vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
-  straw:      { name: 'Rơm phủ luống',     kind: 'supply', price: 5,  lv: 1, desc: 'Phủ lên ô ruộng: đất giữ ẩm lâu gấp đôi (đỡ khổ lúc hạn hán), cây non không sợ sương muối. Thu hoạch hay dọn ô thì rơm mất.' },
-  barrow:     { name: 'Xe rùa',           kind: 'supply', price: 250, lv: 3, once: true, desc: 'Mua một lần. Chạm con vật chọn "Chở sang chuồng khác" để đưa nó sang chuồng cùng loại còn chỗ.' },
-  soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
+  pesticide:  { name: 'Thuốc trừ sâu',     kind: 'supply', price: 20, lv: 1, desc: 'Diệt sâu và chữa cây bệnh ngay lập tức.' },
+  growth:     { name: 'Thuốc tăng trưởng', kind: 'supply', price: 120, lv: 2, desc: 'Cây lớn vọt thêm 50% thời gian lớn (tối đa 90 phút mỗi lần). Tối đa 2 lần mỗi cây.' },
+  fertilizer: { name: 'Phân bón',          kind: 'supply', price: 40, lv: 1, desc: 'Bón trước khi chín: +50% sản lượng, lớn nhanh hơn.' },
+  medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 60, lv: 1, desc: 'Mệt: 1 liều là khỏi. Bệnh nặng: 2 liều. Nguy kịch: phải gọi bác sĩ thú y.' },
+  vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 90, lv: 1, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
+  vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 120, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
+  straw:      { name: 'Rơm phủ luống',     kind: 'supply', price: 8,  lv: 1, desc: 'Phủ lên ô ruộng: đất giữ ẩm lâu gấp đôi (đỡ khổ lúc hạn hán), cây non không sợ sương muối. Thu hoạch hay dọn ô thì rơm mất.' },
+  barrow:     { name: 'Xe rùa',           kind: 'supply', price: 750, lv: 3, once: true, desc: 'Mua một lần. Chạm con vật chọn "Chở sang chuồng khác" để đưa nó sang chuồng cùng loại còn chỗ.' },
+  soap:       { name: 'Xà phòng',         kind: 'supply', price: 15, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
   manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
   phan_cho:   { name: 'Phân chó',          kind: 'material', price: 0, lv: 0, desc: 'Xúc bãi phân của chó. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
   cay_heo:    { name: 'Cây héo',           kind: 'material', price: 0, lv: 0, desc: 'Dọn ô cây chín quá héo thì được. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
   cay_chet:   { name: 'Cây chết',          kind: 'material', price: 0, lv: 0, desc: 'Dọn ô cây bệnh chết thì được. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
-  feed_ga:    { name: 'Cám gà',           kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
-  feed_heo:   { name: 'Cám heo',           kind: 'feed',   price: 10, lv: 3, desc: 'Thức ăn cho heo.' },
-  hay:        { name: 'Cỏ khô',            kind: 'feed',   price: 8,  lv: 5, desc: 'Thức ăn cho bò và cừu.' },
+  feed_ga:    { name: 'Cám gà',           kind: 'feed',   price: 15, lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
+  feed_heo:   { name: 'Cám heo',           kind: 'feed',   price: 30, lv: 3, desc: 'Thức ăn cho heo.' },
+  hay:        { name: 'Cỏ khô',            kind: 'feed',   price: 35, lv: 5, desc: 'Thức ăn cho bò và cừu.' },
   wood:       { name: 'Gỗ',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi dọn bụi cây trên đất mới.' },
   stone:      { name: 'Đá',               kind: 'material', price: 0, lv: 0, desc: 'Nhặt được khi đập đá trên đất mới.' },
   dogfood:    { name: 'Xương cho chó',     kind: 'feed',   price: 8,  lv: 1, desc: 'Cho chó Mực ăn để nó lớn và chịu giữ nhà.' },
@@ -564,7 +579,7 @@ export const ITEMS = {
 // ---------- Mua đất ----------
 // Dải đất dày depth ô, dài bằng cạnh hiện tại của vườn. LAND_STRIPS[n] = giá & cấp của dải thứ n+1 đã mua (tăng dần).
 export const LAND_STRIP = { depth: 4 };
-export const LAND_STRIPS = [500, 800, 1200, 1700, 2400, 3300, 4500, 6000, 8000, 10500, 14000, 18000, 23000, 29000, 36000, 44000, 53000, 63000, 75000, 90000]
+export const LAND_STRIPS = [1200, 2000, 3200, 5000, 8000, 12000, 18000, 26000, 20000, 26000, 35000, 45000, 57000, 72000, 90000, 110000, 132000, 157000, 187000, 225000]
   .map((price, i) => ({ price, lv: Math.min(40, 5 + 2 * i) }));
 export const DIR_NAME = { N: 'Bắc', S: 'Nam', E: 'Đông', W: 'Tây' };
 // Bụi, đá rải trên dải mới: xác suất mỗi ô (theo băm toạ độ, không ngẫu nhiên). Dọn tay: tốn thể lực STAMINA.cost[cost], được qty món item.
@@ -578,14 +593,14 @@ export const CLUTTER = {
 
 // Nông sản & sản phẩm bán ở kho.
 export const PRODUCTS = {
-  trung: { name: 'Trứng gà', price: 14 },
-  trung_phoi: { name: 'Trứng có phôi', price: 14 },   // đã soi: nở được trong ổ ấp
-  trung_vit: { name: 'Trứng vịt', price: 18 },
-  trung_vit_phoi: { name: 'Trứng vịt có phôi', price: 18 },   // đã soi: nở thành vịt con trong ổ ấp
-  sua:   { name: 'Sữa bò',   price: 40 },
-  len:   { name: 'Lông cừu', price: 60 },
-  sua_ngon: { name: 'Sữa ngon',    price: 60 },   // sao: bò được vuốt ve đều
-  len_xoan: { name: 'Lông xoăn',   price: 90 },   // sao: cừu vui vẻ
+  trung: { name: 'Trứng gà', price: 4 },
+  trung_phoi: { name: 'Trứng có phôi', price: 4 },   // đã soi: nở được trong ổ ấp
+  trung_vit: { name: 'Trứng vịt', price: 7 },
+  trung_vit_phoi: { name: 'Trứng vịt có phôi', price: 7 },   // đã soi: nở thành vịt con trong ổ ấp
+  sua:   { name: 'Sữa bò',   price: 55 },
+  len:   { name: 'Lông cừu', price: 160 },
+  sua_ngon: { name: 'Sữa ngon',    price: 85 },   // sao: bò được vuốt ve đều
+  len_xoan: { name: 'Lông xoăn',   price: 240 },   // sao: cừu vui vẻ
 };
 // ---------- Độ thân ❤️1–5 (Phase 2) ----------
 // Mỗi tim = perHeart điểm ẩn (a.bondXp). gain: điểm mỗi lần · perDay: số lần được tính mỗi ngày game cho mỗi cách (chống cày)
@@ -634,26 +649,26 @@ export const START = {
   animals: [{ type: 'ga', stage: 'truong', sex: 'f' }, { type: 'ga', stage: 'non', sex: 'm' }],
   dogStage: 'non',
 };
-export const expandCost = n => Math.round(60 * 1.2 ** (n - START_PLOTS) / 10) * 10;
+export const expandCost = n => Math.round(120 * 1.25 ** (n - START_PLOTS) / 10) * 10;
 export const expandLevel = n => 1 + Math.floor((n - START_PLOTS) / 3);
 // Khối ruộng 3x3 (chế độ xây dựng): [cấp, số khối tối đa]; giá khối thứ (n+1) khi đã có n khối (khối đầu có sẵn, miễn phí)
 export const FIELD_LIMITS = [[1, 1], [4, 2], [8, 3], [12, 4], [16, 5], [20, 6], [25, 7], [30, 8]];
-export const FIELD_PRICES = [300, 600, 1000, 1500, 2200, 3000, 4000];
+export const FIELD_PRICES = [1000, 2500, 5000, 9000, 15000, 24000, 36000];
 // Giá xây chuồng (mở theo cấp mua được con vật tương ứng trong ANIMALS)
-export const PEN_PRICES = { chicken: 200, pig: 600, pasture: 1500, quarantine: 400 };
+export const PEN_PRICES = { chicken: 400, pig: 1500, pasture: 4500, quarantine: 1000 };
 // Bảng chuồng theo (loại, cấp). cap: sức chứa 3 cấp; lv: cấp người chơi để xây; limit: [cấp, số chuồng tối đa] (như FIELD_LIMITS);
 // up: giá nâng lên cấp 2, 3; upLv: cấp người chơi để nâng; extra3: đồ có thêm ở cấp 3 (shower: vòi sen chạy bằng nước bồn, issue 59; cách ly nhận mọi loài).
 export const PEN_TABLE = {
-  chicken:    { cap: [6, 12, 18], lv: 1, limit: [[1, 1], [4, 2], [8, 3]],  up: [300, 800],   upLv: [2, 4], extra3: ['autoNest', 'sandbox'] },
-  pig:        { cap: [3, 5, 8],   lv: 3, limit: [[3, 1], [6, 2], [10, 3]], up: [800, 2000],  upLv: [4, 6], extra3: ['mudPit', 'shower'] },
-  pasture:    { cap: [3, 6, 9],   lv: 5, limit: [[5, 1], [8, 2], [12, 3]], up: [2000, 4500], upLv: [6, 8], extra3: ['autoGrass', 'shower'] },
-  quarantine: { cap: [1, 2, 3],   lv: 3, limit: [[3, 1], [7, 2]],         up: [500, 1200],  upLv: [5, 7], extra3: [] },
-  doghouse:   { cap: [1, 1, 1],   lv: 1, limit: [[1, 1]],                 up: [150, 400],   upLv: [2, 4], extra3: ['bed', 'toy'] },
-  cathouse:   { cap: [1, 2, 3],   lv: 5, limit: [[5, 1], [9, 2]],         up: [250, 600],   upLv: [5, 7], extra3: ['bed', 'toy'] },
+  chicken:    { cap: [6, 12, 18], lv: 1, limit: [[1, 1], [4, 2], [8, 3]],  up: [900, 2500],   upLv: [2, 4], extra3: ['autoNest', 'sandbox'] },
+  pig:        { cap: [3, 5, 8],   lv: 3, limit: [[3, 1], [6, 2], [10, 3]], up: [2500, 7000],  upLv: [4, 6], extra3: ['mudPit', 'shower'] },
+  pasture:    { cap: [3, 6, 9],   lv: 5, limit: [[5, 1], [8, 2], [12, 3]], up: [7000, 16000], upLv: [6, 8], extra3: ['autoGrass', 'shower'] },
+  quarantine: { cap: [1, 2, 3],   lv: 3, limit: [[3, 1], [7, 2]],         up: [1200, 3000],  upLv: [5, 7], extra3: [] },
+  doghouse:   { cap: [1, 1, 1],   lv: 1, limit: [[1, 1]],                 up: [300, 900],   upLv: [2, 4], extra3: ['bed', 'toy'] },
+  cathouse:   { cap: [1, 2, 3],   lv: 5, limit: [[5, 1], [9, 2]],         up: [600, 1500],   upLv: [5, 7], extra3: ['bed', 'toy'] },
   compost:    { cap: [1],         lv: 2, limit: [[2, 1]],                 up: [],           upLv: [],     extra3: [] },   // hố ủ phân (issue 61): một hố, không nâng cấp
 };
 // Công trình đặt được ở chế độ xây dựng mà không phải chuồng có rào (nhà mèo, hố ủ phân): giá xây
-export const BUILD_PRICES = { cathouse: 350, compost: 250 };
+export const BUILD_PRICES = { cathouse: 700, compost: 500 };
 // Hố ủ phân (issue 61): bỏ đầu vào (tối đa cap món một lô), đậy hố thì ủ ms giờ vườn; mỗi per món ra 1 phân bón, món lẻ trả lại túi.
 // Đầy hố thì tự đậy. Chạy theo giờ vườn (simMs): đóng băng thì đứng yên, chạy bù thì chạy.
 export const COMPOST = {
@@ -664,7 +679,12 @@ export const COMPOST = {
 export const PEN_REFUND = 0.5;   // phá bỏ chuồng trống: hoàn tỉ lệ này của giá xây + giá các lần nâng cấp
 export const PEN_LEVELS = 3;
 export const expNeed = level => Math.floor(25 * level ** 1.5);
+let lvExp = NaN, lvOut = null;   // bộ nhớ một giá trị: tick gọi level(s) hàng chục nghìn lần với cùng exp
 export function levelInfo(exp) {
+  if (exp !== lvExp) { lvOut = levelInfoSlow(exp); lvExp = exp; }
+  return { ...lvOut };
+}
+function levelInfoSlow(exp) {
   let level = 1;
   while (exp >= expNeed(level)) exp -= expNeed(level++);
   return { level, cur: exp, need: expNeed(level) };
@@ -673,8 +693,8 @@ export function levelInfo(exp) {
 // ---------- Đơn hàng của hàng xóm (NPC) ----------
 export const ORDERS = {
   max: 3,
-  newEvery: 3 * MIN,
-  rewardMul: 1.6,             // thưởng = tổng giá bán × 1.6
+  newEvery: 15 * MIN,         // một đơn mới mỗi 15 phút (tối đa max đơn chờ)
+  rewardMul: 1.25,            // thưởng = tổng giá bán × 1.25 (chợ trả 1.0, thùng giao hàng 0.8)
   people: ['Bà Tư', 'Chú Ba', 'Cô Út', 'Bé Bi', 'Ông Sáu', 'Chị Hai', 'Anh Tám', 'Dì Năm'],
 };
 

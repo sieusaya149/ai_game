@@ -13,7 +13,7 @@ import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng
 import { GIANT, giantKey, giantOf, itemSlots } from './data.js';   // trái khổng lồ (issue 53)
 import { COMPOST } from './data.js';   // hố ủ phân (issue 61)
 import { SHOWER } from './data.js';   // vòi sen chuồng cấp 3 (issue 59)
-import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
+import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash, penRemap } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
 import { now, villageCal, serverDay, VILLAGE_SEED } from './clock.js';
@@ -140,6 +140,8 @@ export const penLv = e => e.lv ?? 1;
 export const penCapOf = e => PEN_TABLE[e.pen].cap[penLv(e) - 1];
 export const penUse = (s, id) => s.animals.filter(a => a.pen === id).length;
 function settlePens(s) {
+  const byId = mapOf(s).penById;   // đường nhanh: mọi con đã ở đúng chuồng (gần như luôn vậy) thì khỏi duyệt danh sách công trình
+  if (s.animals.every(a => { const e = byId[a.pen]?.ent; return !!e && (e.pen === 'quarantine' || e.pen === ANIMALS[a.type].pen); })) return;
   const pens = s.farm.ents.filter(e => e.kind === 'pen');
   const home = a => { const e = pens.find(x => x.id === a.pen); return !!e && (e.pen === 'quarantine' || e.pen === ANIMALS[a.type].pen); };
   for (const a of s.animals) if (!home(a)) {
@@ -191,7 +193,7 @@ function bornPen(s, mom, type) {
   const e = s.farm.ents.find(x => x.id === mom?.pen);
   return e && penUse(s, e.id) < penCapOf(e) ? e.id : roomyPen(s, ANIMALS[type].pen)?.id;
 }
-const penTypeOf = (s, a) => s.farm.ents.find(e => e.id === a.pen)?.pen;
+const penTypeOf = (s, a) => mapOf(s).penById[a.pen]?.ent.pen;   // bản đồ nhớ tạm theo rev: khỏi duyệt cả danh sách công trình mỗi lần
 const fitToBreed = a => animalCan(a, 'product') && !a.sick && a.hunger > HUSBANDRY.growNeedsHunger && a.happy > 40;
 // Lý do con heo/bò/cừu này chưa sinh sản được (chữ cho người chơi), null = không có gì cản hay đang mang thai
 export function breedNote(s, a) {
@@ -480,8 +482,8 @@ export function awaySummary(events, frozenMs = 0) {
 // chỉ thu hoạch, đơn hàng, thưởng mới tăng: nên bán cả kho một lúc vẫn hợp lý, còn sửa xu/đồ thì không.
 export const SAVE_JUMP = {
   simSlack: DAY_MS / 2 + MIN,   // ngủ một đêm chạy thẳng tới sáng (tối đa nửa ngày game) + sai số
-  wealth: 3000, wealthPerPlotMin: 150,   // mức cho sẵn (lên cấp, thành tựu, đơn hàng) + mỗi ô ruộng mỗi phút vườn chạy
-  exp: 1000, expPerPlotMin: 30,
+  wealth: 2000, wealthPerPlotMin: 10,   // mức cho sẵn (lên cấp, thành tựu, đơn hàng) + mỗi ô ruộng mỗi phút vườn chạy (thu nhập thật ≤ ~1,2 xu/phút/ô)
+  exp: 1000, expPerPlotMin: 2,          // EXP thật ≤ ~0,3/phút/ô; EXP và đồ của cây vừa hái tính riêng (goneCropsValue, goneCropsExp)
   plotsExtra: 10,               // phần con vật, trứng, đơn hàng tính như thêm từng này ô
 };
 export function wealthOf(s) {
@@ -514,6 +516,16 @@ function goneCropsValue(prev, next) {
   }
   return v;
 }
+// EXP của các vụ vừa hái giữa hai lần lưu (cây dài ngày hái một lần ở ô lớn có thể cho cả nghìn EXP): cộng thêm chừng đó
+function goneCropsExp(prev, next) {
+  let v = 0;
+  for (const p of prev.plots ?? []) {
+    const c = p.crop, n = next.plots?.[p.idx]?.crop;
+    if (!c || c.dead || c.rotten || !CROPS[c.id] || (n && n.id === c.id && n.planted === c.planted)) continue;
+    v += CROPS[c.id].exp;
+  }
+  return v;
+}
 // Trái khổng lồ (issue 53): vụ đã có cờ giant, hoặc chưa chín mà loại cây đã thành thạo tới cấp ra được trái khổng lồ (cấp đọc ở
 // bản sau vì có thể vừa lên cấp giữa hai lần lưu). Cây đã chín sẵn mà không có trái khổng lồ thì không ra nữa.
 const mayGiant = (prev, next, c) => !!c.giant || (c.progress < 1 && MASTERY.giant[Math.max(mastery(prev, c.id).lv, mastery(next, c.id).lv) - 1] > 0);
@@ -535,7 +547,7 @@ export function checkSaveJump(prev, next, dtMs) {
   if (sim > Math.max(0, dtMs) * speed + J.simSlack) return { ok: false, reason: 'time', msg: 'Vườn chạy nhanh hơn thời gian thật' };
   const k = ((prev.plots ?? []).filter(p => p.unlocked && !p.removed).length + J.plotsExtra) * sim / MIN;
   if (wealthOf(next) - wealthOf(prev) > J.wealth + J.wealthPerPlotMin * k + goneAnimalsValue(prev, next) + goneCropsValue(prev, next)) return { ok: false, reason: 'coins', msg: 'Xu và đồ tăng nhanh vô lý' };
-  if ((next.exp || 0) - (prev.exp || 0) > J.exp + J.expPerPlotMin * k + goneGiantsExp(prev, next)) return { ok: false, reason: 'exp', msg: 'Kinh nghiệm tăng nhanh vô lý' };
+  if ((next.exp || 0) - (prev.exp || 0) > J.exp + J.expPerPlotMin * k + goneGiantsExp(prev, next) + goneCropsExp(prev, next)) return { ok: false, reason: 'exp', msg: 'Kinh nghiệm tăng nhanh vô lý' };
   return { ok: true };
 }
 
@@ -557,6 +569,10 @@ export const seasonFit = (s, cropId) => (CROPS[cropId]?.season === seasonOf(s).k
 export const seasonGrowMul = (s, cropId) => (seasonActive(s) && seasonFit(s, cropId) === 'off' ? SEASON.slow : 1);
 // Cây từng lớn lúc trái mùa (đã tính bảo hộ): không ra ★3
 export const cropOffSeason = c => !!c?.offSeason;
+// Mùa chốt LÚC GIEO (cân bằng thời gian thật): cây gieo hợp mùa thì cả vụ hợp mùa, gieo trái mùa thì cả vụ trái mùa, dù vụ dài
+// qua mấy mùa. '' = người mới chưa bị ảnh hưởng mùa. Cây từ bản lưu cũ (chưa có c.season) thì đọc mùa hiện tại như trước.
+export const seasonAtPlanting = (s, cropId) => (seasonActive(s) ? seasonFit(s, cropId) : '');
+export const cropSeason = (s, c) => c.season ?? seasonAtPlanting(s, c.id);
 
 // ---------- Thời tiết (issue 55, ADR 0014) ----------
 // Trời của một ngày là hàm thuần weatherOn(hạt giống, ngày game) ở weather.js. Online: hạt giống làng (VILLAGE_SEED) + lịch làng,
@@ -611,7 +627,7 @@ const glassIntact = (s, p) => { const g = glassOf(s, p); return !!g && !g.broken
 // Nhà kính đang có tác dụng với ô p (kính lành, đang sưởi): bỏ qua mùa, không bị sương muối
 export const glassOn = (s, p) => { const g = glassOf(s, p); return !!g && !g.broken && !g.unpaid; };
 // Hệ số tốc độ lớn theo mùa của cây trên ô p: trong nhà kính đang chạy thì luôn 1
-export const plotSeasonMul = (s, p) => (p.crop && !glassOn(s, p) ? seasonGrowMul(s, p.crop.id) : 1);
+export const plotSeasonMul = (s, p) => (p.crop && !glassOn(s, p) ? (cropSeason(s, p.crop) === 'off' ? SEASON.slow : 1) : 1);
 // Tiền điện sưởi mùa Đông (6h sáng, morning = true): mỗi nhà kính kính lành GLASS.heat xu, ghi nhật ký. Không đủ xu thì nhà đó
 // ngừng sưởi (unpaid), bước tick nào đủ xu thì tự trả rồi sưởi lại. Không bao giờ nợ. Chỉ chạy khi vườn chạy (đóng băng không tính).
 function heatGlass(s, morning) {
@@ -765,12 +781,14 @@ function barkWhere(s, x, y) {
 // ---------- Tick ----------
 export function tick(s, dtGame) {
   let left = Math.max(0, dtGame);
-  while (left > 0) { const d = Math.min(1000, left); left -= d; step(s, d); }
+  // ô đang mở và khối đất màu mỡ không đổi trong một lượt tick: tính một lần rồi dùng cho mọi bước (chạy bù dài có hàng chục nghìn bước)
+  const live = s.plots.filter(p => p.unlocked), rich = richPlots(s);
+  while (left > 0) { const d = Math.min(1000, left); left -= d; step(s, d, live, rich); }
   const out = evq; evq = [];
   return out;
 }
 
-function step(s, d) {
+function step(s, d, live, rich) {
   s.time += d;
   s.simMs = (s.simMs || 0) + d;
   const day = Math.floor(s.time / DAY_MS) + 1;
@@ -790,8 +808,7 @@ function step(s, d) {
   }
   if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
   heatGlass(s, false);   // nhà kính đang ngừng sưởi vì thiếu xu: đủ xu thì tự trả
-  const rich = richPlots(s);
-  for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d, rich.has(p.idx));
+  for (const p of live) stepPlot(s, p, d, rich.has(p.idx));
   settlePower(s);    // tiền điện còn treo: đủ xu thì trả, máy chạy lại (issue 58)
   stepWater(s, d);   // bơm vào bồn rồi trừ nước theo thứ tự cố định (issue 57)
   stepAuto(s, d);    // máy phun tự động, điện của máy phun (issue 58)
@@ -815,7 +832,7 @@ function cockCrow(s) {
   list.forEach((r, i) => { fxEv(r.x, r.y - 10, 'Ò ó o o! 🐓', COL.coin); emit({ type: 'cockcrow', id: r.id }); if (!i) snd('cockcrow'); });
 }
 
-// Cửa sổ từ chín tới héo (ms): nửa thời gian lớn, tối thiểu RIPE_FLOOR
+// Cửa sổ từ chín tới héo (ms): max(thời gian lớn, RIPE_FLOOR). Cây gieo rồi đi 8 giờ có thêm 8 giờ để quay lại hái
 export const ripeWindow = id => Math.max((OVERRIPE - 1) * CROPS[id].grow, RIPE_FLOOR);
 // Còn bao nhiêu phần cửa sổ trước khi héo (1 → 0); null nếu chưa chín hay đã héo/chết
 export function ripeLeft(c) {
@@ -841,6 +858,10 @@ function stepPlot(s, p, d, rich = false) {
     if (c.progress >= 1 + ripeWindow(c.id) / def.grow) { c.rotten = true; emit({ type: 'rotten', crop: c.id }); fxEv(at.x, at.y, 'Héo mất rồi 🥀', COL.bad); log(s, `${def.name} chín quá nên héo mất`); }
     return;
   }
+  if (catchUp) {   // chạy bù offline: đồng hồ sâu, bệnh dừng ở nửa chặng, về tới nơi vẫn còn nửa thời gian để cứu cây (ADR 0004)
+    if (c.sick) c.sickSince = Math.max(c.sickSince, s.time - FARMING.sickToDead / 2);
+    if (c.bugs) c.bugSince = Math.max(c.bugSince, s.time - FARMING.bugToSick / 2);
+  }
   if (c.sick) {
     if (s.time - c.sickSince >= FARMING.sickToDead) { c.dead = true; emit({ type: 'dead', crop: c.id }); fxEv(at.x, at.y, 'Cây chết rồi 💀', COL.bad); log(s, `${def.name} bị bệnh nặng và chết mất`); }
     return;
@@ -849,10 +870,10 @@ function stepPlot(s, p, d, rich = false) {
     if (s.time - c.bugSince >= FARMING.bugToSick) { c.bugs = false; c.sick = true; c.sickSince = s.time; fxEv(at.x, at.y, 'Cây bệnh rồi 🤒', COL.bad); log(s, `${def.name} bị bệnh vì sâu`); }
     return;
   }
-  if (p.water > 0 && !frostHold(s, p)) {   // sương muối: cây hạt, mầm đứng yên hôm nay (không chết)
+  if (!frostHold(s, p)) {   // sương muối: cây hạt, mầm đứng yên hôm nay (không chết). Đất khô hẳn thì lớn chậm một nửa chứ không dừng, không bao giờ chết vì khô
     const sm = plotSeasonMul(s, p);   // trong nhà kính đang chạy thì không chậm (issue 60)
     if (sm < 1) c.offSeason = true;   // đã lớn lúc trái mùa: không ra ★3 (issue 54)
-    c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm;
+    c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm * (p.water > 0 ? 1 : FARMING.dryGrowMul);
   }
   if (c.progress >= 1) { ripen(s, c); emit({ type: 'ripe', crop: c.id }); fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
   else if (chance(FARMING.bugChancePerMin * MASTERY.bugMul[mastery(s, c.id).lv - 1], d)) { c.bugs = true; c.bugSince = s.time; fxEv(at.x, at.y, 'Có sâu! 🐛', COL.bad); }
@@ -929,9 +950,11 @@ export const bondPerk = a => ({ runTo: a.bond >= 4, follow: a.bond >= 5 });
 // Hệ số nguy cơ bệnh theo độ thân (lát 38 nhân vào xác suất bệnh)
 export const sickFactor = a => (a.bond >= 4 ? BOND.sickMul : 1);
 // Mốc già và mốc ra đi của con này (❤️5 sống lâu hơn 10%)
+const AGE_MARKS = {};   // nhớ theo (loài, có ❤️5 không): tick gọi hàm này mỗi con mỗi bước
 export function lifeMarks(a) {
-  const k = a.bond >= 5 ? BOND.lifeMul : 1;
-  return { gia: stageStart(a.type, 'gia') * k, end: lifeEnd(a.type) * k };
+  const five = a.bond >= 5 ? 1 : 0, per = AGE_MARKS[a.type] ??= [];
+  if (!per[five]) { const k = five ? BOND.lifeMul : 1; per[five] = Object.freeze({ gia: stageStart(a.type, 'gia') * k, end: lifeEnd(a.type) * k }); }
+  return per[five];
 }
 // Xác suất sản phẩm được sao (sữa ngon, lông xoăn): ❤️3+ tốt hơn; bò được vuốt ve nhiều ngày liền, cừu đang vui thì thêm
 export function starChance(s, a) {
@@ -1086,7 +1109,8 @@ export function passGate(s, id) {
 export function gateOf(s, id) {
   const p = mapOf(s).penById[id];
   if (!p?.gates.length) return null;
-  return { x: p.gates.reduce((n, g) => n + g[0], 0) / p.gates.length * TS + 8, y: p.gates[0][1] * TS + 8 };
+  const n = p.gates.length;
+  return { x: p.gates.reduce((t, g) => t + g[0], 0) / n * TS + 8, y: p.gates.reduce((t, g) => t + g[1], 0) / n * TS + 8 };
 }
 // Số con thả rông của chuồng đã về: { type, home, total } (total = 0: chuồng không có loài thả rông)
 export function penHome(s, id) {
@@ -1190,7 +1214,7 @@ function stepAnimals(s, d) {
     if (!animalCan(a, 'product') || a.type === 'heo' || s.time < a.nextProduct) continue;
     if (a.sex === 'm' && a.type !== 'cuu') continue;   // gà trống, vịt cồ không đẻ, bò đực không có sữa
     if (POULTRY.includes(a.type)) {
-      if (s.eggs.length < 30) {   // chỉ mái mới đẻ (trống đã bỏ qua ở trên); đang thả rông thì đẻ trong bụi do luật chọn
+      if (s.eggs.length < HUSBANDRY.eggMax) {   // chỉ mái mới đẻ (trống đã bỏ qua ở trên); đang thả rông thì đẻ trong bụi do luật chọn
         const roos = roosters(s, a.type), fert = roos.length > 0 && Math.random() < BREED.fertile;   // có trống: 40% trứng có phôi
         const e = { id: s.nextId++, sp: a.type, x: a.x, y: a.y, laidAt: s.time, fertile: fert, mom: ref(a), dad: fert ? ref(pick(roos)) : null, ...(a.tile ? bushSpot(s, a) : null) };
         s.eggs.push(e); emit({ type: 'egg' }); spawnEv('egg', e.x, e.y);
@@ -1215,7 +1239,7 @@ export const SICK_NAME = ['Khỏe', 'Mệt', 'Bệnh nặng', 'Nguy kịch'];
 export const sickLeft = a => (a.sick >= 3 ? Math.max(0, SICK.deadAt - a.sickMs) : null);
 // Bỏ đói lả đủ lâu (từ hunger 0) mới là bỏ bê; đói thường (quên cho ăn một lượt) thì chưa
 // Nguy cơ bệnh/phút do đói lả: 0 tới sickRiskAfterStarving, rồi tăng dần tới sickStarveMaxPerMin
-const starveRisk = (s, a) => a.starvingSince ? HUSBANDRY.sickStarveMaxPerMin * Math.max(0, Math.min(1, (s.time - a.starvingSince - HUSBANDRY.sickRiskAfterStarving) / HUSBANDRY.sickStarveRampMs)) : 0;
+export const starveRisk = (s, a) => a.starvingSince ? HUSBANDRY.sickStarveMaxPerMin * Math.max(0, Math.min(1, (s.time - a.starvingSince - HUSBANDRY.sickRiskAfterStarving) / HUSBANDRY.sickStarveRampMs)) : 0;
 // Bị bỏ bê (dơ, chuồng bẩn hoặc già) thì có nguy cơ nền sickChancePerMin; đói lả rất lâu cộng thêm starveRisk
 const dirtyNeglect = a => isDirty(a) && !DIRT.mud.includes(a.type);   // heo, bò tắm bùn là tính tự nhiên, không phải bỏ bê
 const neglected = (s, a, def) => dirtyNeglect(a) || penDirty(s, def.pen) || a.stage === 'gia';
@@ -1380,7 +1404,7 @@ function stepBreeding(s, d) {
       const n = Math.min(type === 'heo' ? rint(...(a.stage === 'gia' ? BREED.litterOld : HUSBANDRY.pigLitter)) : 1, free);
       a.pregnant = false; a.fullAt = 0;
       const mom = ref(a), dad = a.mate; a.mate = null;
-      if (type === 'heo') a.nextProduct = s.time + HUSBANDRY.pigGestation;   // nghỉ trước lứa sau
+      if (type === 'heo') a.nextProduct = s.time + HUSBANDRY.pigRestMs;   // nghỉ trước lứa sau
       for (let i = 0; i < n; i++) {
         const b = newborn(s, type, mom, dad, a.x + rnd(-6, 6), a.y + rnd(-6, 6), bornPen(s, a, type));
         spawnEv(type === 'heo' ? 'piglet' : type === 'bo' ? 'calf' : 'lamb', b.x, b.y);
@@ -3161,7 +3185,7 @@ const DO = {
       case 'plant': {
         const def = CROPS[s.selectedSeed];
         take(s, `seed_${s.selectedSeed}`); s.stats.planted++;
-        p.crop = { id: s.selectedSeed, progress: 0, planted: s.time, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: cropQuality(), giant: false };
+        p.crop = { id: s.selectedSeed, progress: 0, planted: s.time, season: seasonAtPlanting(s, s.selectedSeed), bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: cropQuality(), giant: false };
         return res(true, `Đã gieo ${def.name}`, [say(at, '🌱')], 'plant');
       }
       case 'water': s.can--; p.water = 100; handCare(c); return res(true, 'Đã tưới nước', [say(at, '💧', '#7ad7ff')], 'water');
@@ -3178,14 +3202,14 @@ const DO = {
         return res(true, 'Con sâu chạy mất, thử lại nhé', [say(at, 'Trượt rồi!', COL.bad)], 'pop');
       case 'fertilize': take(s, 'fertilizer'); c.fert = true; handCare(c); return res(true, 'Đã bón phân', [say(at, '+50% thu hoạch')], 'plant');
       case 'growth':
-        take(s, 'growth'); c.boosts++; c.progress += FARMING.growthBoost;
+        take(s, 'growth'); c.boosts++; c.progress += Math.min(FARMING.growthBoost, FARMING.growthBoostMaxMs / CROPS[c.id].grow);
         if (c.progress >= 1 && !c.ripeAt) ripen(s, c);
         return res(true, 'Cây lớn vọt lên', [say(at, 'Lớn vọt! ⚡')], 'spray');
       case 'harvest': {
         const def = CROPS[c.id], fx = [], key = starKey(c.id, cropStar(c)), nm = itemName(key);   // nông sản theo sao (issue 52)
         let qty = harvestQty(c, s);
         // đúng mùa: 10% lần thu thêm sản lượng (chỉ khi giỏ còn chỗ), từ cấp SEASON.minLevel
-        const bonus = seasonActive(s) && seasonFit(s, c.id) === 'in' && qty > 0 && room(s) >= qty + SEASON.bonusQty + (c.giant ? GIANT.slots : 0) && Math.random() < SEASON.bonusChance ? SEASON.bonusQty : 0;
+        const bonus = cropSeason(s, c) === 'in' && qty > 0 && room(s) >= qty + SEASON.bonusQty + (c.giant ? GIANT.slots : 0) && Math.random() < SEASON.bonusChance ? SEASON.bonusQty : 0;
         qty += bonus;
         give(s, key, qty); s.stats.harvests++; addExp(s, def.exp);
         const gk = c.giant ? giantKey(c.id, cropStar(c)) : null;   // trái khổng lồ (issue 53): món riêng, cùng sao với vụ
@@ -4380,7 +4404,7 @@ export function canPlace(s, what, c, r) {
     if (f.ents.filter(e => e.kind === what.kind).length >= max) return no('max', max > 1 ? `Đã đủ ${max} ${nm}` : `Vườn chỉ có một ${nm}`);
   }
   if (!old && what.kind === 'greenhouse') return glassCheck(s, c, r);
-  const e = { ...(old ?? what), c, r }, ft = footprint(e), o = f.owned;
+  const e = { ...(old ?? what), c, r, ...(what.rot != null ? { rot: what.rot } : {}) }, ft = footprint(e), o = f.owned;   // what.rot: thử xoay chuồng đang có
   if (ft.c < o.c || ft.r < o.r || ft.c + ft.w > o.c + o.w || ft.r + ft.h > o.r + o.h) return no('outside', 'Chỗ này ngoài đất của bạn');
   if (f.ents.some(x => CLUTTER[x.kind] && overlaps(ft, footprint(x)))) return no('uncleared', 'Còn bụi cây, đá chưa dọn');
   if (f.ents.some(x => x !== old && overlaps(ft, footprint(x)))) return no('overlap', 'Chồng lên công trình khác');
@@ -4652,6 +4676,24 @@ export function moveEntity(s, id, c, r) {
   bumpLayout(s);
   unstick(s);
   return R(true, `Đã dời ${entName(e).toLowerCase()}`);
+}
+
+// Xoay chuồng id theo vòng 0 → 1 (cửa trái) → 2 (cửa phải) → 0, giữ góc trên-trái. Qua canPlace nên cùng luật với dời (vừa chỗ, không chồng, còn đường).
+// Con vật và trứng trong chuồng đi theo cùng phép xoay với PEN_DEFS (penRemap), hoảng một lúc.
+export function rotateEntity(s, id) {
+  const e = s.farm.ents.find(x => x.id === id);
+  if (!e || e.kind !== 'pen') return R(false, 'Chỉ xoay được chuồng', { reason: 'missing' });
+  const from = e.rot ?? 0, rot = (from + 1) % 3, chk = canPlace(s, { id, rot }, e.c, e.r);
+  if (!chk.ok) return R(false, chk.msg, { reason: chk.reason });
+  settlePens(s);
+  const ft = footprint(e), inPen = o => o.x >= ft.c * TS && o.x < (ft.c + ft.w) * TS && o.y >= ft.r * TS && o.y < (ft.r + ft.h) * TS;
+  const mv = o => Object.assign(o, (({ x, y }) => ({ x: e.c * TS + x, y: e.r * TS + y }))(penRemap(e.pen, from, rot, { x: o.x - e.c * TS, y: o.y - e.r * TS })));
+  for (const a of s.animals) if (a.pen === e.id && a.x != null && !a.tile) { mv(a); a.scaredUntil = s.time + SCARED_MS; }
+  for (const o of s.eggs) if (o.x != null && inPen(o)) mv(o);
+  e.rot = rot;
+  bumpLayout(s);
+  unstick(s);
+  return R(true, 'Đã xoay chuồng');
 }
 
 // Chụp lại bố cục + vị trí lúc vào chế độ xây dựng; restoreLayout trả về đúng như cũ (nút Hủy).

@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
-import { levelInfo } from '../public/data.js';
+import { levelInfo, PEN_TABLE } from '../public/data.js';
 
 const store = {};
 globalThis.localStorage = { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
@@ -37,10 +37,10 @@ test('sức chứa heo 3/5/8, đồng cỏ 3/6/9, cách ly 1/2/3', () => {
 test('nâng cấp: trừ đúng xu, con vật giữ nguyên', () => {
   const s = game(10, 1000);
   const e = pensOf(s, 'chicken')[0], before = s.animals.map(a => ({ id: a.id, x: a.x, y: a.y, pen: a.pen }));
-  assert.equal(G.upgradeInfo(s, e.id).price, 300);
+  assert.equal(G.upgradeInfo(s, e.id).price, PEN_TABLE.chicken.up[0]);
   const r = G.upgradePen(s, e.id);
   assert.equal(r.ok, true); assert.equal(r.lv, 2);
-  assert.equal(s.coins, 700); assert.equal(e.lv, 2);
+  assert.equal(s.coins, 1000 - PEN_TABLE.chicken.up[0]); assert.equal(e.lv, 2);
   assert.deepEqual(s.animals.map(a => ({ id: a.id, x: a.x, y: a.y, pen: a.pen })), before);
   assert.equal(G.mapOf(s).pens.chicken.lv, 2, 'bản đồ dựng lại theo cấp mới');
 });

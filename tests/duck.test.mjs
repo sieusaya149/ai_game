@@ -2,7 +2,7 @@
 import test, { beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
-import { ANIMALS, LIFE, DAY_MS, MAX_CATCHUP_MS, PRODUCTS, FREE, DIRT } from '../public/data.js';
+import { ANIMALS, LIFE, HUSBANDRY, DAY_MS, MAX_CATCHUP_MS, PRODUCTS, FREE, DIRT } from '../public/data.js';
 import { mapOf } from '../public/farm.js';
 
 const MIN = 60_000, HOUR = 60 * MIN;
@@ -28,7 +28,9 @@ const penned = s => { for (const a of s.animals) { a.tile = null; a.stray = fals
 
 test('vịt có bảng loài riêng, cùng thang tuổi với gà, nuôi chung chuồng gia cầm', () => {
   assert.equal(ANIMALS.vit.pen, ANIMALS.ga.pen);
-  assert.deepEqual(LIFE.vit, LIFE.ga);
+  // cùng thang tuổi với gà (trưởng thành, già như nhau), chỉ non và nhỡ lâu hơn chút
+  assert.ok(LIFE.vit.non >= LIFE.ga.non && LIFE.vit.nho >= LIFE.ga.nho && LIFE.vit.non + LIFE.vit.nho <= 2 * (LIFE.ga.non + LIFE.ga.nho));
+  assert.deepEqual([LIFE.vit.truong, LIFE.vit.gia], [LIFE.ga.truong, LIFE.ga.gia]);
   assert.ok(FREE.types.includes('vit'));
   assert.equal(ANIMALS.vit.product, 'trung_vit');
   assert.ok(PRODUCTS.trung_vit.price > 0);
@@ -38,9 +40,10 @@ test('vịt đi đủ 4 giai đoạn đúng mốc giờ', () => {
   const s = newGame(), d = bird(s, 'vit', 'non', 'f', { age: 0, nextProduct: 1e15 });
   assert.equal(d.stage, 'non');
   const seen = [];
-  for (let t = 0; t < 21 * HOUR; t += MIN) { feed(s); penned(s); G.tick(s, MIN); if (!seen.includes(d.stage)) seen.push(d.stage); if (d.stage === 'truong') break; }
+  const grown = LIFE.vit.non + LIFE.vit.nho;
+  for (let t = 0; t < grown + HOUR; t += MIN) { feed(s); penned(s); G.tick(s, MIN); if (!seen.includes(d.stage)) seen.push(d.stage); if (d.stage === 'truong') break; }
   assert.deepEqual(seen, ['non', 'nho', 'truong']);
-  assert.ok(d.age >= 15 * MIN && d.age < 16 * MIN + 1, 'lên trưởng thành sau 5+10 phút');
+  assert.ok(d.age >= grown && d.age < grown + MIN + 1, 'lên trưởng thành sau non + nhỡ');
   d.age = G.stageStart('vit', 'gia'); feed(s); G.tick(s, 1000);
   assert.equal(d.stage, 'gia');
 });
@@ -48,7 +51,7 @@ test('vịt đi đủ 4 giai đoạn đúng mốc giờ', () => {
 test('vịt mái trưởng thành đẻ trứng vịt, nhặt vào kho và bán được', () => {
   const s = newGame(); bird(s, 'vit', 'truong', 'f');
   s.eggs = [];
-  run(s, 4 * MIN);
+  run(s, ANIMALS.vit.every + MIN);
   assert.ok(s.eggs.length >= 1, 'có trứng');
   assert.equal(s.eggs[0].sp, 'vit');
   const e = s.eggs[0];
@@ -92,7 +95,7 @@ test('trứng vịt có phôi: soi, nhặt, ấp nở ra vịt con', () => {
   assert.equal(G.haveItem(s, 'trung_vit_phoi'), 1);
   const ducks = s.animals.length;
   assert.ok(G.perform(s, { kind: 'nest' }, 'incubate').ok);
-  run(s, 4 * MIN);
+  run(s, HUSBANDRY.nestHatchMs + MIN, s => { calm(s); penned(s); });   // qua cả đêm: ở yên trong chuồng cho chồn hương khỏi bắt
   assert.equal(s.animals.length, ducks + 1);
   const b = s.animals.at(-1);
   assert.equal(b.type, 'vit'); assert.equal(b.stage, 'non'); assert.equal(b.mom.name, 'Mẹ');

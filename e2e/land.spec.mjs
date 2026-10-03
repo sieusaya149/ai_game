@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { makeSave, seedSave, tilePoint, startDrag } from './helpers.mjs';
+import { LAND_STRIPS } from '../public/data.js';
 
 // Cấp 5, đủ xu, đứng sát mép Đông của đất nhà, có một chậu hoa trong túi.
 const save = () => makeSave(s => {
@@ -21,12 +22,12 @@ test('mua dải Đông → dọn một bụi → có gỗ → đặt chậu hoa 
   // mua đất: nút hành động chính hiện giá và cấp, hỏi lại trước khi trừ xu
   const main = page.locator('#main-action');
   await expect(main).toContainText('Mua đất phía Đông');
-  await expect(main).toContainText('500 xu');
+  await expect(main).toContainText(`${LAND_STRIPS[0].price} xu`);
   await main.click();
   await expect(page.locator('.dialog')).toBeVisible();
   await page.locator('.dialog').getByRole('button', { name: 'Mua' }).click();
   await expect.poll(async () => (await st(page)).owned.w).toBe(28);
-  expect((await st(page)).coins).toBe(1500);
+  expect((await st(page)).coins).toBe(2000 - LAND_STRIPS[0].price);
 
   // dọn bụi gần nhất: chạm vào bụi, nhân vật tự đi tới rồi dọn
   const before = await st(page);

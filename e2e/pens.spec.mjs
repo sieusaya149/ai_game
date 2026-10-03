@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { makeSave, seedSave, tilePoint, startDrag } from './helpers.mjs';
 import { buyAnimal } from '../public/state.js';
+import { PEN_PRICES, PEN_TABLE, PEN_REFUND } from '../public/data.js';
 
 // Cấp 4 (xây được 2 chuồng gà), nhiều xu; đất mở rộng sang phải và xuống dưới cho thoải mái đặt chuồng.
 const save = (lv = 4, extra) => makeSave(s => {
@@ -38,7 +39,7 @@ test('chuồng gà đầy cấp 1 → nâng cấp trong chế độ xây dựng 
   const coins0 = await page.evaluate(() => globalThis.__farm.state.coins);
   await page.locator('#build-upgrade').click();
   await expect.poll(async () => (await pens(page))[0].lv).toBe(2);
-  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(coins0 - 300);
+  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(coins0 - PEN_TABLE.chicken.up[0]);
   expect(await buy(page, 'ga')).toEqual({ ok: true });
   expect(await page.evaluate(() => globalThis.__farm.state.animals.filter(a => a.type === 'ga').length)).toBe(7);
   await page.locator('#build-done').click();
@@ -60,7 +61,7 @@ test('xây chuồng gà thứ hai trong chế độ xây dựng', async ({ page,
   await expect(page.locator('#build-msg')).toHaveAttribute('data-ok', '1');
   await d.end();
   await expect.poll(async () => (await pens(page)).filter(p => p.pen === 'chicken').length).toBe(2);
-  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(4800);
+  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(5000 - PEN_PRICES.chicken);
   await expect(page.locator('.bt-card', { hasText: 'Chuồng gà 2/2' })).toBeDisabled();
   await expect(page.locator('.bt-card', { hasText: 'Chuồng gà 2/2' })).toContainText('Cấp 8');
 });
@@ -77,7 +78,7 @@ test('chuồng cách ly: khóa dưới cấp 3, xây được từ cấp 3', asy
   await expect(page.locator('#build-msg')).toHaveAttribute('data-ok', '1');
   await d.end();
   await expect.poll(async () => (await pens(page)).filter(p => p.pen === 'quarantine').length).toBe(1);
-  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(4600);
+  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(5000 - PEN_PRICES.quarantine);
 });
 
 test('dưới cấp 3 thẻ chuồng cách ly bị khóa', async ({ page, context }) => {
@@ -107,7 +108,7 @@ test('phá bỏ chuồng: còn gà thì bị từ chối, hết gà thì phá đ
   await page.locator('#build-demolish').click();
   await page.locator('.dialog-btns .btn', { hasText: 'Phá bỏ' }).click();
   await expect.poll(async () => (await pens(page)).length).toBe(0);
-  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(coins0 + 100);
+  expect(await page.evaluate(() => globalThis.__farm.state.coins)).toBe(coins0 + Math.floor(PEN_PRICES.chicken * PEN_REFUND));
   await expect(page.locator('#build-demolish')).toBeHidden();
   // Hủy: chuồng trở lại
   await page.locator('#build-cancel').click();

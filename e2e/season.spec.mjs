@@ -55,12 +55,12 @@ test('trồng cây trái mùa (cấp 5): ô hiện dấu lớn chậm và lớn 
   expect(await page.evaluate(() => globalThis.__farm.state.plots[1].crop.offSeason)).toBeFalsy();
 });
 
-test('tua qua đổi mùa giữa vụ: cây vẫn sống, đổi tốc độ; Bà Tư giải thích mùa ở đầu mùa thứ 2', async ({ page, context }, testInfo) => {
+test('tua qua đổi mùa giữa vụ: cây vẫn sống, tốc độ giữ nguyên vì mùa chốt lúc gieo; Bà Tư giải thích mùa ở đầu mùa thứ 2', async ({ page, context }, testInfo) => {
   test.setTimeout(60_000);
   const sec = 1000;
   const save = makeSave(s => {
     s.exp = expFor(6); s.time = 7 * DAY_MS - 100 * sec; s.day = 7; s.weather = 'cloud';   // 100 giây nữa hết Xuân
-    Object.assign(s.plots[0], { soil: 'tilled', water: 100, crop: crop('dau', 0) });   // dâu tây hợp mùa Xuân, sang Hạ thì chậm
+    Object.assign(s.plots[0], { soil: 'tilled', water: 100, crop: { ...crop('dau', 0), season: 'in' } });   // dâu tây gieo đúng mùa Xuân: sang Hạ vẫn tốc độ đầy đủ
   });
   await installWarp(context);
   await seedSave(context, save);
@@ -71,11 +71,11 @@ test('tua qua đổi mùa giữa vụ: cây vẫn sống, đổi tốc độ; B�
   const c = await page.evaluate(() => { const st = globalThis.__farm.state; return { crop: st.plots[0].crop, day: st.day, weeds: st.plots[0].weeds }; });
   expect(c.crop.dead).toBe(false);
   expect(c.day).toBe(8);
-  // 100 giây hợp mùa + 100 giây trái mùa (×0.6): 160/720 ≈ 0.22 (dư vài giây do chờ tải); tất cả hợp mùa sẽ là 0.28, tất cả trái mùa 0.17
+  // mùa chốt lúc gieo: cả 200 giây đều đúng mùa nên tốc độ đầy đủ, 200/21600 ≈ 0.0093 (dư vài giây do chờ tải); nếu mùa đổi giữa vụ thì chỉ còn 160/21600 ≈ 0.0074
   // (sâu hay cỏ mọc ngẫu nhiên trong lúc chạy bù làm cây lớn chậm hơn nữa: lúc đó chỉ kiểm cây sống)
   if (!c.crop.bugs && !c.crop.sick && !c.weeds) {
-    expect(c.crop.progress).toBeGreaterThan(0.2);
-    expect(c.crop.progress).toBeLessThan(0.25);
+    expect(c.crop.progress).toBeGreaterThan(200 * sec / CROPS.dau.grow * 0.97);
+    expect(c.crop.progress).toBeLessThan(200 * sec / CROPS.dau.grow * 1.1);
   }
   // đầu mùa thứ 2 trở đi (đã qua ngày 8) Bà Tư giải thích mùa, nhận thưởng một lần
   const box = page.locator('#seasonquest');
@@ -95,6 +95,7 @@ test('Bà Tư giải thích mùa bỏ qua được, không thưởng', async ({ 
   await seedSave(context, save);
   await page.goto('/');
   await ready(page);
+  await closeAway(page);   // gà đẻ trứng lúc vắng: màn "vắng nhà" che bảng Bà Tư
   const box = page.locator('#seasonquest');
   await expect(box).toBeVisible();
   const coins = await page.evaluate(() => globalThis.__farm.state.coins);

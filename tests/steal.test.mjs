@@ -108,6 +108,7 @@ test('bảo vệ người mới: vườn dưới cấp 5 không bị trộm, kh�
 
 test('trộm trứng dưới đất và sữa, lông đang chờ lấy thì được; con vật, trái khổng lồ, đồ trong kho / nhà, cá thì không', () => {
   const s = host(h => {
+    for (const i of [6, 7, 8]) ripe(h.plots[i], 'bapcai');   // đồ chín đủ giá trị để một ngày trộm được cả sữa, lông (giới hạn 30% giá trị đồ chín)
     h.eggs = [{ id: 501, x: 10, y: 10, at: 0 }];
     h.animals = [
       { id: 601, type: 'bo', adult: true, ready: true, hunger: 80, happy: 80, sick: false, age: 0, x: 0, y: 0, nextProduct: 0, starvingSince: 0 },

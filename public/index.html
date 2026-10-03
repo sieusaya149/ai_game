@@ -70,8 +70,9 @@
       <button class="bb-btn" id="bb-build" title="Chế độ xây dựng: dời công trình"><span class="bb-ico">🔨</span><span class="bb-lbl">Xây dựng</span></button>
       <button class="bb-btn" id="bb-order" data-panel="order" title="Đặt hàng online"><span class="bb-ico">🛒</span><span class="bb-lbl">Mua hàng</span></button>
       <button class="bb-btn" data-panel="board"><span class="bb-ico">📋</span><i class="dot" id="dot-board" hidden></i><span class="bb-lbl">Đơn hàng</span></button>
-      <button class="bb-btn" data-panel="achievements"><span class="bb-ico">🏆</span><span class="bb-lbl">Thành tựu</span></button>
-      <button class="bb-btn" data-panel="log"><span class="bb-ico">📜</span><span class="bb-lbl">Nhật ký</span></button>
+      <button class="bb-btn bb-wide" data-panel="achievements"><span class="bb-ico">🏆</span><span class="bb-lbl">Thành tựu</span></button>
+      <button class="bb-btn bb-wide" data-panel="log"><span class="bb-ico">📜</span><span class="bb-lbl">Nhật ký</span></button>
+      <button class="bb-btn" id="bb-more" data-panel="more"><span class="bb-ico">⋯</span><span class="bb-lbl">Thêm</span></button>
       <button class="bb-btn" data-panel="settings"><span class="bb-ico">⚙️</span><span class="bb-lbl">Cài đặt</span></button>
     </nav>
 
@@ -79,10 +80,13 @@
     <div id="buildbar" hidden>
       <div id="build-msg" class="card">Chạm và kéo công trình để dời chỗ</div>
       <div id="build-water" class="card" hidden></div>
-      <button class="btn red sm" id="build-store" type="button" hidden>Cất</button>
-<button class="btn green sm" id="build-upgrade" type="button" hidden>Nâng cấp</button>
-<button class="btn green sm" id="build-fieldup" type="button" hidden>🔧 Nâng cấp khối</button>
-      <button class="btn red sm" id="build-demolish" type="button" hidden>Phá bỏ</button>
+      <div class="build-acts">
+        <button class="btn red sm" id="build-store" type="button" hidden>Cất</button>
+        <button class="btn green sm" id="build-upgrade" type="button" hidden>Nâng cấp</button>
+        <button class="btn sm" id="build-rotate" type="button" hidden>🔄 Xoay</button>
+        <button class="btn green sm" id="build-fieldup" type="button" hidden>🔧 Nâng cấp khối</button>
+        <button class="btn red sm" id="build-demolish" type="button" hidden>Phá bỏ</button>
+      </div>
       <div id="build-tray" class="card"></div>
       <div class="build-btns">
         <button class="btn red big" id="build-cancel" type="button">✖ Hủy</button>
