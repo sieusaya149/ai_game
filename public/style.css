@@ -561,7 +561,9 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 #build-msg[data-ok="0"] { background: #ffd9d2; border-color: var(--red-d); }
 #ui #build-water { pointer-events: none; max-width: 420px; padding: 4px 12px; font-size: 13px; font-weight: 900; text-align: center; background: #dcefff; border-color: #3a6fa8; }
 .bt-card img.ico { object-fit: contain; image-rendering: pixelated; }
-#build-store, #build-upgrade, #build-fieldup, #build-rotate { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
+#buildbar .build-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 100%; }
+#buildbar .build-acts:not(:has(.btn:not([hidden]))) { display: none; }
+#build-store, #build-upgrade, #build-fieldup, #build-rotate, #build-demolish { pointer-events: auto; min-height: 44px; min-width: 44px; padding: 8px 12px; font-size: 14px; }
 /* bảng nâng cấp khối ruộng (issue 58) */
 .fu-block { margin-top: 8px; padding: 2px 8px 8px; border-radius: 14px; border: 2px solid transparent; }
 .fu-block.on { border-color: #ffd23f; background: #fff8dc; }
