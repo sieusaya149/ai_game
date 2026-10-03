@@ -12,6 +12,7 @@ import { drawMini } from './minimap.js';
 import * as net from './net.js';
 import { hdOf, charFrames } from './hd.js';
 import { COURIER_ART } from './artcourier.js';
+const barrowArt = await import('./artbarrow.js').catch(() => null);
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -45,7 +46,7 @@ const btn = (label, onClick, cls = '', extra = {}) => h('button', { class: 'btn 
 // ---------- Biểu tượng (art.icon, không có thì dùng emoji) ----------
 const EMOJI = {
   cai: '🥬', carot: '🥕', lua: '🌾', cachua: '🍅', bap: '🌽', dau: '🍓', bingo: '🎃', duahau: '🍉',
-  trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊',
+  barrow: '🛒', trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴', catfood: '🐟',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧', deco_rattrap: '🪤', deco_canopy: '⛱️',
   wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩',
@@ -58,6 +59,7 @@ function iconUrl(key) {
   let u = null;
   try { const A = art.SPR, src = A.items[key] || A.ripe[key] || A.product[key] || A.baby[key]?.left[0] || A.animal[key]?.left[0] || A[key]; u = (hdOf(src) ? hdOf(src).toDataURL() : art.icon(key)) || null; } catch { u = null; }
   if (!u) try { u = ({ trung_phoi: SPR3?.eggFertile, trung_vit_phoi: SPR3?.eggDuckFertile, trung_vit: SPR3?.eggDuck, vit: SPR3?.animal?.vit?.non?.left?.[0], meo: SPR3?.animal?.meo?.truong?.left?.[0], cathouse: SPR3?.cathouse?.[0] }[key] ?? SPR2?.[key]); u = hd(u)?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
+  if (!u && key === 'barrow') try { u = hd(barrowArt?.BARROW?.barrowIcon)?.toDataURL?.() || null; } catch { u = null; }   // art xe rùa vẽ sau (artbarrow.js), thiếu thì dùng 🛒
   if (!u) try { u = hd(SPR3?.items?.[ITEM3[key]])?.toDataURL?.() || null; } catch { u = null; }   // xà phòng, phân chuồng vẽ ở art3
   iconCache.set(key, u);
   return u;
@@ -226,6 +228,21 @@ export function confirmBox(text, yes = 'Đồng ý', no = 'Thôi', danger = fals
       h('div', { class: 'dialog-btns' },
         btn(no, () => done(false), 'plain'),
         btn(yes, () => done(true), danger ? 'red' : 'green'))));
+    root.hidden = false;
+  });
+}
+
+// Xe rùa: chọn chuồng đích. targets = S.barrowTargets(...); chuồng đầy thì khóa kèm lý do. Trả id chuồng hoặc null.
+export function pickPen(text, targets) {
+  return new Promise(resolve => {
+    const root = $('dialog-root');
+    const done = v => { root.hidden = true; root.replaceChildren(); dialogResolve = null; resolve(v); };
+    dialogResolve = () => done(null);
+    root.replaceChildren(h('div', { class: 'dialog' },
+      h('div', { class: 'dialog-text' }, text),
+      h('div', { class: 'dialog-btns pen-pick', style: 'flex-direction:column;align-items:stretch' },
+        ...targets.map(t => btn(`${t.name} ${t.use}/${t.cap}${t.disabled ? ` (${t.disabled})` : ''}`, () => done(t.id), 'plain', { 'data-pen': t.id, disabled: !!t.disabled, title: t.disabled || '' })),
+        btn('Thôi', () => done(null), 'plain'))));
     root.hidden = false;
   });
 }
@@ -1040,6 +1057,9 @@ const GUIDE = [
     text: [`Mỗi con vật lớn qua 4 giai đoạn: ${D.STAGE_NAME.non} → ${D.STAGE_NAME.nho} → ${D.STAGE_NAME.truong} → ${D.STAGE_NAME.gia}, mỗi giai đoạn một hình và nết riêng.`,
       'Tuổi tính theo giờ vườn thật sự chạy (đóng băng thì không già đi). Gà vịt sống nhanh nhất rồi tới heo, bò cừu sống lâu nhất; chó mèo không bao giờ ra đi vì già.',
       `Sắp vào giai đoạn già thì được báo trước khoảng ${D.AGING.warnMs / HOUR} giờ vườn để chuẩn bị hoặc bán đi. Con già đẻ thưa, cho ít sản phẩm hơn và hay ngủ.`] },
+  { title: 'Xe rùa', lv: D.ITEMS.barrow.lv, art: () => [barrowArt?.BARROW?.barrowIcon],
+    text: [`Mua ${D.ITEMS.barrow.name.toLowerCase()} một lần ở chợ Bà Tư (${D.ITEMS.barrow.price} xu, mục Vật tư). Có xe rồi, chạm vào con vật chọn Chở sang chuồng khác, rồi chọn chuồng cùng loại còn chỗ (hiện số con/sức chứa; chuồng đầy thì khóa).`,
+      'Con vật giữ nguyên chỉ số. Chuồng cách ly vẫn dùng nút Chuyển vào chuồng cách ly / Đưa về chuồng thường; con nằm cách ly cũng chở về được chuồng thường bằng xe rùa. Đang thăm vườn người khác thì không dùng được.'] },
   { title: 'Tắm cho vật nuôi', lv: 2, art: () => [SPR3?.items?.soapBar, SPR3?.fx?.soap?.m?.[0], SPR3?.fx?.sparkleClean?.[0]],
     text: [`Con vật dơ dần theo giờ vườn, dơ hẳn sau khoảng ${D.DIRT.fullMs / HOUR} giờ; trời mưa hoặc chuồng bẩn thì nhanh gấp ${D.DIRT.fastMul} lần. Dơ từ ${D.DIRT.high} trở lên là mất vui, dễ bệnh hơn, sản phẩm kém.`,
       `Tắm tốn 1 ${D.ITEMS.soap.name.toLowerCase()} (mua ở chợ Bà Tư) và 1 nước trong bình tưới: sủi bọt, con vật lắc mình văng nước rồi sạch bong, +${D.DIRT.bathHappy} vui và thân hơn một chút.`,

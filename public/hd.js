@@ -52,6 +52,10 @@ for (const [i, m] of mods) {
 const courierArt = await import('./artcourier.js').catch(() => null);
 if (courierArt?.COURIER_ART) { stats.files.push('artcourier.js'); link(courierArt.COURIER_ART, courierArt.COURIER_ART_HD, 'COURIER_ART'); }
 
+// Xe rùa (artbarrow.js): BARROW (1x) và BARROW_HD (2x) cùng khóa barrowIcon, barrow, barrowLoaded
+const barrowArt = await import('./artbarrow.js').catch(() => null);
+if (barrowArt?.BARROW) { stats.files.push('artbarrow.js'); link(barrowArt.BARROW, barrowArt.BARROW_HD, 'BARROW'); }
+
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);
 // Ghi cặp ảnh dẫn xuất (lật, tô màu...) làm từ ảnh cũ và ảnh 2x bằng cùng một phép
