@@ -3,6 +3,7 @@
 // Con vật quay mặt sang TRÁI ở bản gốc; 'right' là bản lật. Chân chạm hàng điểm ảnh dưới cùng (hàng cuối là viền).
 
 import { canvas as rawCanvas, flip, hash } from './art.js';
+import { dogBowl } from './art14.js';   // bát ăn của chó: cùng hình học với bản 2x (SPR14)
 
 const canvas = (w, h) => { const c = rawCanvas(w, h); c.getContext('2d', { willReadFrequently: true }); return c; };
 const OUT = '#3b2412';
@@ -2960,6 +2961,7 @@ export const SPR3 = {
   ratTrapFull: ratTrapFull(),
   canopy: canopy(),
   vetClinic: vetClinic(),
+  dogBowl: { empty: dogBowl(false), full: dogBowl(true) },   // bát ăn cạnh chuồng chó: trống / có hạt và xương
   items: { soapBar: soapBar(), vaccine: vaccine(), medicine: medicine(), treat: treat(), catfood: catfood(), sausage: sausage(), manure: manure(), feedSack: feedSack() },
   status: {
     heart1: heartN(1), heart2: heartN(2), heart3: heartN(3), heart4: heartN(4), heart5: heartN(5),

@@ -7,6 +7,7 @@ export const SAVE_MS = 10_000;
 const RETRY_MS = 3000;
 const DRAFT_KEY = 'nongtrai-online-draft';
 const BEACON_MAX = 60_000;   // trình duyệt giới hạn thân request keepalive ~64 KB
+const WS_MAX = 200_000;      // server nhận tin WebSocket tối đa 256 KB (chữ có dấu tốn tới 3 byte)
 
 // Đo độ lệch giờ máy với server (GET /api/health trả `now`) rồi trỏ clock.js sang giờ server. Mất mạng thì giữ giờ cũ.
 export async function syncClock() {
@@ -107,7 +108,14 @@ export function startSync({ name, play, rev, getSave, onStatus, onKicked, onReje
     draft(s) { if (!stopped) writeDraft({ name, rev, save: s }); },
     pushNow: () => later(0),
     // gửi một tin qua WebSocket (chỉ khi đã kết nối xong); trả true nếu đã gửi
-    send(m) { if (!wsOk || ws?.readyState !== 1) return false; ws.send(JSON.stringify(m)); return true; },
+    // tin quá to (server ngắt kết nối nếu vượt giới hạn) thì không gửi
+    send(m) {
+      if (!wsOk || ws?.readyState !== 1) return false;
+      const t = JSON.stringify(m);
+      if (t.length > WS_MAX) return false;
+      ws.send(t);
+      return true;
+    },
     // đóng trang / ẩn tab: gửi bản mới nhất bằng keepalive (vẫn đi khi trang đã đóng)
     flush() { if (!stopped) push(getSave(), true); },
     // rời vườn online (Cài đặt → Đăng xuất): gửi bản cuối rồi ngắt

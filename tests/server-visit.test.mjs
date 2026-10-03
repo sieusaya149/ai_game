@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
-import { createGame } from '../public/state.js';
+import { createGame, visitWorld, VISIT_KEYS } from '../public/state.js';
 
 async function setup(t) {
   const srv = await bootServer();
@@ -116,4 +116,47 @@ test('đọc vườn người khác: không đổi dữ liệu của chủ, khô
   assert.deepEqual(await A.farm(), before);
   // chưa đăng nhập thì không đọc được
   assert.equal((await srv.json('/api/visit?name=Lan')).status, 401);
+});
+
+// Sửa lỗi online: khách đứng trong vườn không thấy chủ làm gì (thu hoạch xong cây vẫn nằm đó). Server báo chủ số khách
+// đang đứng trong vườn (`watch`); trình duyệt chủ gửi phần vườn khách thấy được (`world`), server chuyển cho mọi người
+// trong vườn đó trừ chủ, chỉ giữ các trường của phần vườn, và chỉ nhận từ máy đang giữ phiên chơi của chủ.
+test('vườn real-time: chủ được báo có khách; vườn chủ gửi đi tới khách trong vườn (chỉ các trường của vườn), không tới làng; chỉ máy giữ phiên chơi của chủ gửi được', async t => {
+  const { player } = await setup(t);
+  const A = await player('Lan'), B = await player('Bình'), C = await player('Chị Tư');
+  const a = await A.ws(), b = await B.ws(), c = await C.ws(), aSpy = await A.ws();   // aSpy: kết nối khác của A, không giữ phiên chơi
+  a.send({ t: 'hello', play: A.play });
+  await until(a, 'hello');
+  await join(a, { map: 'house' });                // chủ đang ở trong nhà: vẫn được báo, vẫn gửi được
+  await join(c, { map: 'village' });
+  await join(b, { map: 'farm', owner: 'Lan' });
+  assert.deepEqual(await until(a, 'watch'), { t: 'watch', n: 1 });
+
+  const host = createGame({ name: 'Lan' });
+  const w = { ...visitWorld(host), coins: 999, inv: { x: 1 } };
+  a.send({ t: 'world', w });
+  const got = await until(b, 'world');
+  assert.equal(got.owner, 'Lan');
+  assert.deepEqual(Object.keys(got.w).sort(), [...VISIT_KEYS].sort());
+  assert.deepEqual(got.w.plots, JSON.parse(JSON.stringify(host.plots)));
+  await none(c, ['world']);
+  await none(a, ['world']);
+
+  // khách hay kết nối không giữ phiên chơi của chủ gửi thì không ai nhận
+  b.send({ t: 'world', w });
+  aSpy.send({ t: 'world', w });
+  await none(b, ['world']);
+  await none(a, ['world']);
+  // tin hỏng thì bỏ qua, không ngắt kết nối
+  a.send({ t: 'world', w: 'x' });
+  a.send({ t: 'world' });
+  await none(b, ['world']);
+
+  // chủ kết nối lại khi khách còn trong vườn: được báo ngay sau hello; khách ra làng: báo 0
+  const a2 = await A.ws();
+  a2.send({ t: 'hello', play: A.play });
+  await until(a2, 'hello');
+  assert.deepEqual(await until(a2, 'watch'), { t: 'watch', n: 1 });
+  await join(b, { map: 'village' });
+  assert.deepEqual(await until(a, 'watch'), { t: 'watch', n: 0 });
 });

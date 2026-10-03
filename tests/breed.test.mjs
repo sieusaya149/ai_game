@@ -237,8 +237,8 @@ test('chuồng đầy thì không sinh sản và hiện lý do "Chuồng đầy"
   assert.equal(s.animals.length, 3);
   assert.equal(cow.pregnant, false);
   assert.ok(ev.some(x => x.type === 'fx' && /Chuồng đầy/.test(x.text)));
-  assert.equal(G.breedNote(s, cow), 'Chuồng đầy');
-  assert.equal(G.breedNote(s, bull), null);
+  assert.match(G.breedNote(s, cow), /^Chuồng đầy/);
+  assert.match(G.breedNote(s, bull), /Chuồng đầy/);
   G.upgradePen(s, e.id);   // nâng chuồng: hết đầy, đẻ được
   run(s, 12 * HOUR);
   assert.ok(s.animals.length > 3);
@@ -331,4 +331,58 @@ test('bản lưu v3 cũ chưa có trường mới: nạp được, trứng thư�
   assert.equal(l.nest.mom, null);
   assert.equal(G.perform(l, { kind: 'egg', id: 900 }, 'collect').ok, true);
   assert.equal(l.basket.trung, 1);
+});
+
+test('hotfix: breedNote nói rõ vì sao heo không sinh sản', () => {
+  const s = pigGame(), boar = put(s, 'heo', 'm');
+  quiet(() => G.tick(s, 1));
+  assert.match(G.breedNote(s, boar), /Cần 1 heo cái trưởng thành/);
+  const sow = put(s, 'heo', 'f', 'nho');
+  quiet(() => G.tick(s, 1));
+  assert.match(G.breedNote(s, sow), /lớn|trưởng thành/i, 'còn nhỏ');
+  assert.match(G.breedNote(s, boar), /Cần 1 heo cái trưởng thành/, 'heo cái chưa lớn không tính là đủ cặp');
+  sow.stage = 'truong'; sow.hunger = 20; sow.happy = 100;
+  assert.match(G.breedNote(s, sow), /đói/);
+  sow.hunger = 100; sow.happy = 10;
+  assert.match(G.breedNote(s, sow), /Chưa vui/);
+  sow.happy = 100; sow.sick = 1;
+  assert.match(G.breedNote(s, sow), /bệnh/);
+  assert.match(G.breedNote(s, boar), /cái cùng chuồng còn đói, chưa vui hoặc đang bệnh/, 'bạn đời đang bệnh thì đực cũng thấy lý do');
+  sow.sick = 0;
+  assert.equal(G.breedNote(s, sow), null, 'đủ cặp, còn chỗ: không có lý do gì cản');
+  assert.equal(G.breedNote(s, boar), null);
+  put(s, 'heo', 'm');   // chuồng heo cấp 1 chứa 3: đầy
+  assert.match(G.breedNote(s, sow), /Chuồng đầy, nâng cấp chuồng để có chỗ cho heo con/);
+  assert.match(G.breedNote(s, boar), /Chuồng đầy/);
+  sow.pregnant = true;
+  assert.equal(G.breedNote(s, sow), null, 'đang mang thai thì không cần lý do');
+});
+
+test('hotfix: mua heo chỉ một giới thì được nhắc mua thêm giới còn lại', () => {
+  const s = pigGame();
+  assert.match(G.breedAdvice(s, 'heo'), /đực và cái/, 'chưa có con nào');
+  const r = G.buyAnimal(s, 'heo', 'm');
+  assert.equal(r.ok, true);
+  assert.match(r.msg, /mua thêm 1 heo cái/i, 'chỉ có đực: nhắc mua cái');
+  assert.match(G.breedAdvice(s, 'heo'), /chỉ có heo đực/);
+  const r2 = G.buyAnimal(s, 'heo', 'f');
+  assert.equal(r2.ok, true);
+  assert.doesNotMatch(r2.msg, /mua thêm/);
+  assert.equal(G.breedAdvice(s, 'heo'), null);
+  assert.equal(G.breedAdvice(s, 'ga'), null, 'gà không cần cặp để sống');
+});
+
+test('hotfix: quả trứng có phôi đầu tiên báo một lần cách dùng ổ ấp', () => {
+  const s = game(); put(s, 'ga', 'f'); put(s, 'ga', 'm');
+  const toasts = [];
+  withRandom(0.1, () => {   // trứng nào cũng có phôi
+    for (let i = 0; i < 40; i++) {
+      feed(s); for (const a of s.animals) a.age = G.stageStart('ga', 'truong');
+      toasts.push(...G.tick(s, MIN).filter(x => x.type === 'toast'));
+    }
+  });
+  assert.ok(s.eggs.some(e => e.fertile) || s.stats.eggs > 0 || s.eggs.length > 0, 'có trứng');
+  const hints = toasts.filter(x => /ổ ấp/i.test(x.text));
+  assert.equal(hints.length, 1, 'chỉ báo đúng một lần');
+  assert.match(hints[0].text, /trứng có phôi/);
 });

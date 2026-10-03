@@ -106,7 +106,7 @@ test('vịt dùng luật chung: thả rông ban ngày, chạng vạng về chu�
   assert.ok(ds.every(d => !d.tile || d.stray), 'tối về chuồng, trừ con lạc (issue 42)');
   // chạy bù offline (ADR 0004): dù đói lả và bệnh, không con vịt nào chết
   const o = newGame(); const od = [bird(o, 'vit', 'truong', 'f'), bird(o, 'vit', 'non', 'm'), bird(o, 'vit', 'truong', 'm', { sick: 2, sickMs: 1 })];
-  o.troughs.chicken = 100; G.tick(o, 1);
+  o.troughs[G.mapOf(o).pens.chicken.id] = 100; G.tick(o, 1);
   o.savedAt = Date.now() - Math.min(MAX_CATCHUP_MS, 3 * HOUR);
   store[G.SAVE_KEY] = JSON.stringify(o);
   const l = G.loadGame();

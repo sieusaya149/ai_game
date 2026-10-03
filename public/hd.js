@@ -8,7 +8,7 @@ import { SPR3 } from './art3.js';
 import { SPR4 } from './art4.js';
 import { characterHD } from './art5.js';
 
-const FILES = [6, 7, 8, 9, 10, 11, 12, 13, 52, 53, 61];   // art52: dấu sao nông sản (issue 52), art53: trái khổng lồ (issue 53), art61: hố ủ phân (issue 61) — hình mới nên tự mang bản thường SPRn_OLD
+const FILES = [6, 7, 8, 9, 10, 11, 12, 13, 14, 52, 53, 61];   // art14: người giao hàng (mua online); art52: dấu sao nông sản (issue 52), art53: trái khổng lồ (issue 53), art61: hố ủ phân (issue 61) — hình mới nên tự mang
 const OLD = [SPR, SPR2, SPR3, SPR4];
 const MAP = new WeakMap();
 const stats = { files: [], linked: 0, bad: [] };
@@ -61,6 +61,9 @@ if (showerArt?.SHOWER_ART) { stats.files.push('art59.js'); link(showerArt.SHOWER
 // Tự động hóa khối ruộng (issue 58): đất màu mỡ, ống nhỏ giọt, máy phun, biểu tượng nâng cấp, cùng cây khóa trong art58.js
 const autoArt = await import('./art58.js').catch(() => null);
 if (autoArt?.AUTO_ART) { stats.files.push('art58.js'); link(autoArt.AUTO_ART, autoArt.AUTO_ART_HD, 'AUTO_ART'); }
+// Người giao hàng và thùng hàng (mua online): bộ thường COURIER_ART và bộ 2x COURIER_ART_HD cùng nằm trong artcourier.js
+const courierArt = await import('./artcourier.js').catch(() => null);
+if (courierArt?.COURIER_ART) { stats.files.push('artcourier.js'); link(courierArt.COURIER_ART, courierArt.COURIER_ART_HD, 'COURIER_ART'); }
 
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);

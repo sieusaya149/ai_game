@@ -287,3 +287,40 @@ test('con bệnh nặng là việc gấp, có mũi tên chỉ hướng; con mệ
   a.sick = 3;
   assert.match(G.urgentSpots(s)[0].text, /nguy kịch/);
 });
+
+test('hotfix: cấp 1 nuôi gà bị mệt vẫn mua được thuốc và vắc-xin thú y', () => {
+  const s = game(1);
+  assert.equal(levelInfo(s.exp).level, 1);
+  const hen = put(s, 'ga', { sick: 1, x: 100, y: 100 });
+  assert.equal(G.buy(s, 'medicine', 1).ok, true);
+  assert.equal(G.buy(s, 'vaccine', 1).ok, true);
+  const r = G.perform(s, { kind: 'animal', id: hen.id }, 'medicine');
+  assert.equal(r.ok, true, r.msg);
+  assert.equal(hen.sick, 0);
+});
+
+test('hotfix: con vật no, sạch, chuồng sạch thì không bao giờ tự bệnh; bỏ bê (đói, dơ, chuồng bẩn) hoặc già mới có nguy cơ', () => {
+  const unlucky = fn => withRandom(0.000001, fn);   // mọi lần quay xác suất đều trúng
+  const tryIt = (type, extra) => {
+    const s = game(8); const a = put(s, type, { hunger: 100, happy: 100, ...extra });
+    for (const k of Object.keys(s.troughs)) s.troughs[k] = (extra?.hunger ?? 100) < 60 ? 0 : 20;
+    unlucky(() => { for (let i = 0; i < 5; i++) { a.hunger = extra?.hunger ?? 100; G.tick(s, MIN); } });
+    return s.animals.some(x => x.id === a.id && x.sick);
+  };
+  assert.equal(tryIt('ga', {}), false, 'no, sạch: không bệnh dù xúi quẩy');
+  assert.equal(tryIt('ga', { hunger: 30 }), true, 'đói (dưới 40) thì có nguy cơ');
+  assert.equal(tryIt('ga', { dirty: 100 }), true, 'dơ thì có nguy cơ');
+  assert.equal(tryIt('ga', { stage: 'gia', age: G.stageStart('ga', 'gia') }), true, 'già thì có nguy cơ');
+  // chuồng bẩn (phân chưa dọn) cũng có nguy cơ
+  const s = game(8); const a = put(s, 'ga', {});
+  s.manure.chicken = 1e6;
+  unlucky(() => { for (let i = 0; i < 5; i++) { a.dirty = 0; G.tick(s, MIN); } });
+  assert.ok(a.sick > 0, 'chuồng bẩn thì có nguy cơ');
+  // vắc-xin chặn hết, đói lả lâu vẫn bệnh
+  const v = game(8); const b = put(v, 'ga', { hunger: 30, vaccUntil: 1e12 }); for (const k of Object.keys(v.troughs)) v.troughs[k] = 0;
+  unlucky(() => { for (let i = 0; i < 5; i++) { b.hunger = 30; G.tick(v, MIN); } });
+  assert.equal(b.sick, 0);
+  const h = game(8); const c = put(h, 'ga', { hunger: 0 });
+  for (let i = 0; i < 5; i++) { c.hunger = 0; withRandom(0.99, () => G.tick(h, MIN)); }
+  assert.ok(c.sick > 0, 'đói lả hơn 3 phút là bệnh');
+});
