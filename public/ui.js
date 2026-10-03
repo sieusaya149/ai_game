@@ -605,6 +605,26 @@ const empty = text => h('div', { class: 'empty' }, text);
 const section = t => h('h3', { class: 'sec' }, t);
 const coinTag = n => h('span', { class: 'price' }, '🪙 ' + fmt(n));
 
+// ---------- Chọn màu lông chó, mèo ----------
+// Mỗi nút là hình con vật trưởng thành đúng màu đó (dựng như trong vườn, bộ 2x nếu có); data-coat = khóa màu
+function coatPicker(sp, cur, onPick, disabled = false) {
+  return h('div', { class: 'coats', role: 'group', 'data-sp': sp }, Object.entries(D.COATS[sp]).map(([k, name]) => {
+    const pet = { stage: 'truong', sex: 'f', coat: k }, im = hd(sp === 'cho' ? R.dogImg(pet, 'left', 0) : R.catImg(pet));
+    const c = im && h('canvas', { width: im.width, height: im.height });
+    c?.getContext('2d').drawImage(im, 0, 0);
+    return h('button', { class: 'coat nosound' + (k === cur ? ' on' : ''), type: 'button', 'data-coat': k, 'aria-pressed': String(k === cur), title: name, disabled,
+      on: { click: () => { sound.play('click'); onPick(k); } } }, c, h('span', {}, name));
+  }));
+}
+// Hình con vật đúng giai đoạn và màu lông hiện tại, cho ô biểu tượng của hàng
+function petIco(sp, a) {
+  const im = hd(sp === 'cho' ? R.dogImg(a, 'left', 0) : R.catImg({ ...a, sleep: false, sun: false, trophy: null }));
+  const c = h('canvas', { class: 'thumb', width: im?.width ?? 1, height: im?.height ?? 1 });
+  if (im) c.getContext('2d').drawImage(im, 0, 0);
+  return c;
+}
+let catCoat = D.COAT.def.meo;   // màu lông đang chọn để mua mèo ở chợ
+
 // ---------- Chợ Bà Tư ----------
 const PEN_NAME = { chicken: 'chuồng gà', pig: 'chuồng heo', pasture: 'bãi cỏ', cathouse: 'nhà mèo' };
 async function buyItem(id, qty) {
@@ -650,10 +670,11 @@ PANELS.market = {
         const what = a.pet ? 'thú cưng bắt chuột · không bán' : `${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`;
         list.append(row({
           icon: ico(type), name: a.baby, locked,
-          desc: [`Trưởng thành sau ${D.stageStart(type, 'truong') / MIN} phút · ${what}`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`],
+          desc: [`Trưởng thành sau ${D.stageStart(type, 'truong') / MIN} phút · ${what}`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`,
+            type === 'meo' && !locked && coatPicker('meo', catCoat, k => { catCoat = k; refreshPanel(); })],
           right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + a.lv)
             : h('div', { class: 'sexbuy' }, ['m', 'f'].map(sex => h('div', { class: 'sexopt' }, coinTag(D.animalPrice(type, sex)),
-              btn(full ? (cap ? 'Đầy' : a.pet ? 'Chưa có nhà mèo' : 'Chưa có chuồng') : (sex === 'm' ? 'Mua ♂ đực' : 'Mua ♀ cái'), () => res(S.buyAnimal(st(), type, sex), 'coin')?.ok && (flags.bought = true), 'green sm', { disabled: shut || full || s.coins < D.animalPrice(type, sex), 'data-sex': sex })))),
+              btn(full ? (cap ? 'Đầy' : a.pet ? 'Chưa có nhà mèo' : 'Chưa có chuồng') : (sex === 'm' ? 'Mua ♂ đực' : 'Mua ♀ cái'), () => res(S.buyAnimal(st(), type, sex, type === 'meo' ? catCoat : undefined), 'coin')?.ok && (flags.bought = true), 'green sm', { disabled: shut || full || s.coins < D.animalPrice(type, sex), 'data-sex': sex })))),
         }));
       }
       return;
@@ -789,6 +810,17 @@ PANELS.vet = {
           : [coinTag(it.price), h('div', { class: 'qtys' },
             btn('×1', () => buyItem(id, 1), 'green sm', { disabled: shut || s.coins < it.price }),
             btn('×5', () => buyItem(id, 5), 'green sm', { disabled: shut || s.coins < it.price * 5 }))],
+      }));
+    }
+    // đổi màu lông chó, mèo (góp ý người chơi): mỗi lần đổi tốn D.COAT.price xu
+    body.append(section(`✂️ Tỉa lông, đổi màu lông (${D.COAT.price} xu một lần)`));
+    const pets = h('div', { class: 'list', id: 'vet-coats' });
+    body.append(pets);
+    for (const [who, a, sp] of [['dog', s.dog, 'cho'], ...S.cats(s).map(c => [c.id, c, 'meo'])]) {
+      pets.append(row({
+        icon: petIco(sp, a), name: `${a.name} · lông ${D.COATS[sp][a.coat]?.toLowerCase() ?? ''}`,
+        desc: coatPicker(sp, a.coat, k => res(S.setCoat(st(), who, k), 'coin'), shut || s.coins < D.COAT.price),
+        data: { pet: String(who) },
       }));
     }
     const ill = sickOnes(s);
@@ -1642,10 +1674,15 @@ export function showCreator(online) {
     root.hidden = true;
     root.replaceChildren();
     sound.play('levelup');
-    api.newGame({ name, look: { ...look } });
+    api.newGame({ name, look: { ...look }, dogCoat });
   };
   input.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
   const preview = makePreview(() => look, 6);
+  // màu lông chó Mực (góp ý người chơi): chọn lúc nhận nuôi, đổi lại ở trạm thú y Cô Út
+  let dogCoat = D.COAT.def.cho;
+  const coats = h('div', { class: 'dog-coat' });
+  const pickCoat = () => coats.replaceChildren(h('p', { class: 'mini' }, `Chó ${D.DOG.name} của bạn màu lông:`), coatPicker('cho', dogCoat, k => { dogCoat = k; pickCoat(); }));
+  pickCoat();
   root.replaceChildren(h('div', { class: 'creator-card' },
     h('h1', {}, 'Nông Trại Vui'),
     h('p', { class: 'sub' }, online ? `Vườn mới của ${online.name} trên làng. Chọn ngoại hình nào!` : 'Chào mừng bạn tới nông trại mới! Hãy giới thiệu bản thân nào.'),
@@ -1653,6 +1690,7 @@ export function showCreator(online) {
     dice,
     input,
     editor,
+    coats,
     h('p', { class: 'mini' }, 'Mũ đẹp, kính và khăn quàng mua thêm ở chợ Bà Tư trong làng sau nhé!'),
     btn('🌾 Vào nông trại', go, 'orange big')));
   root.hidden = false;

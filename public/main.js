@@ -348,8 +348,8 @@ const api = {
   setBattery(on) { prefs.battery = !!on; P.savePrefs(prefs); },
   doAction,
   changed,
-  newGame({ name, look }) {
-    const s = createGame({ name, look });
+  newGame({ name, look, dogCoat }) {
+    const s = createGame({ name, look, dogCoat });
     if (pending) { playOnline(s); sync.pushNow(); return; }   // vườn online mới: gửi lên làng ngay
     if (sync) {   // Chơi lại từ đầu khi đang online: vườn mới thay vườn trên làng, bản chơi đơn không đổi
       Object.assign(s, { mode: 'online', account: state?.account ?? name });

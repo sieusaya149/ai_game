@@ -53,7 +53,7 @@ function build(f) {
   for (let r = 0; r < mh; r++) for (let c = 0; c < mw; c++) if (!inRect(owned, c, r)) { ground[idx(c, r)] = GROUND.FOREST; solid[idx(c, r)] = 1; }
   for (const [c, r] of f.paths) if (inside(c, r)) ground[idx(c, r)] = GROUND.ROAD;
 
-  let spawn = null, dogHome = null, catHome = null, catDoor = null, gateIn = null, mud = null, mudSpot = null;
+  let spawn = null, dogHome = null, dogBowl = null, catHome = null, catDoor = null, gateIn = null, mud = null, mudSpot = null;
   const doors = [], unblock = [], arrive = {};
   for (const e of f.ents) {
     const px = e.c * TS, py = e.r * TS;
@@ -110,6 +110,7 @@ function build(f) {
       buildings.push(b);
       block(e.c, e.r, d.foot.w, d.foot.h);
       if (d.home) dogHome = { x: px + d.home.x, y: py + d.home.y };
+      if (d.bowl) dogBowl = { x: px + d.bowl.x, y: py + d.bowl.y };   // bát ăn của chó: điểm chân (giữa đáy) của bát
       if (d.catHome) catHome = { x: px + d.catHome.x, y: py + d.catHome.y, lv: e.lv ?? 1 };
       if (d.catDoor) catDoor = { x: px + d.catDoor.x, y: py + d.catDoor.y };   // cửa mèo trên nhà: mèo ra vào tự do
       if (d.in) gateIn = { x: px + d.in.x, y: py + d.in.y };
@@ -136,7 +137,7 @@ function build(f) {
   return {
     scene: 'farm', garden: true, rev: f.rev, mw, mh, W, H, owned, view, ground, solid, fences, buildings, pens, penList, penById, troughs, trees, border, bushes, decos, fields, clutter, mud, mudSpot,
     doors, arrive,
-    spawn: spawn ?? { x: (owned.c + 2) * TS, y: (owned.r + 2) * TS }, dogHome: dogHome ?? spawn, catHome, catDoor, gateIn,
+    spawn: spawn ?? { x: (owned.c + 2) * TS, y: (owned.r + 2) * TS }, dogHome: dogHome ?? spawn, dogBowl, catHome, catDoor, gateIn,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)),
     isOwned: (c, r) => inRect(owned, c, r),
     building: id => buildings.find(b => b.id === id) ?? null,
@@ -215,7 +216,7 @@ function buildFixed(id, d) {
   return {
     scene: id, interior: !out, outdoor: out, name: d.name, mw, mh, W, H, owned, view, ground, solid,
     fences: [], buildings, pens: {}, penList: [], penById: {}, troughs: [], trees, border: border.filter(p => !clear(p)), bushes, decos: [], fields: [], clutter: [], mud: null, mudSpot: null,
-    props: d.props, doors, arrive: d.arrive, spawn: Object.values(d.arrive)[0], dogHome: null, catHome: null, catDoor: null, gateIn: null,
+    props: d.props, doors, arrive: d.arrive, spawn: Object.values(d.arrive)[0], dogHome: null, dogBowl: null, catHome: null, catDoor: null, gateIn: null,
     isSolid, isSolidPx: (x, y) => isSolid(Math.floor(x / TS), Math.floor(y / TS)), isOwned: (c, r) => inside(c, r),
     building: bid => buildings.find(b => b.id === bid) ?? null,
     plotTile: () => null, plotCenter: () => null, plotAt: () => -1,

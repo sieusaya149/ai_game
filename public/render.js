@@ -5,6 +5,7 @@ import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
+import { recolor } from './coat.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -263,16 +264,30 @@ const angelFallback = () => once('angel', () => {
   rect(x, '#f7d547', 3, 0, 4, 1); rect(x, '#ffffff', 0, 4, 3, 2); rect(x, '#ffffff', 7, 4, 3, 2); rect(x, '#fff3e0', 3, 2, 4, 8);
   return c;
 });
-export const dogImg = (dog, face, frame, sleep) => animalImg({ type: 'dog', stage: dog.stage, sex: 'm' }, face, frame, sleep);
+// Màu lông (coat.js): dựng từ chính sprite gốc ở cả bộ cũ lẫn bộ 2x; màu mặc định (thiếu / lạ) thì dùng ảnh gốc
+const coated = (img, sp, coat) => (img && coat ? derived(img, 'coat:' + coat, (im, k) => recolor(im, sp, coat, k)) : img);
+export const dogImg = (dog, face, frame, sleep) => coated(animalImg({ type: 'dog', stage: dog.stage, sex: 'm' }, face, frame, sleep), 'cho', dog.coat);
 // Dáng chó theo động tác lệnh (issue 45): mỗi giai đoạn một bộ art riêng; thiếu art thì về dáng đứng
 const DOG_POSE = { sit: 'dogSitBy', beg: 'dogBegBy', herd: 'dogHerdBy', bark: 'dogBarkBy' };
+// Cúi đầu ăn ở bát: phần đầu (phía mặt quay về, nửa trên) dịch xuống 1 điểm của bộ cũ, dựng từ chính khung đứng
+// của giai đoạn đó (cả bộ cũ lẫn 2x, đúng màu lông) nên không dùng chung hình giữa các giai đoạn
+const dipped = (img, face) => derived(img, 'dip' + face, (im, k) => {
+  const c = mkCanvas(im.width, im.height), x = c.getContext('2d'), w = im.width, cut = Math.round(w * 0.42), hh = Math.round(im.height * 0.62);
+  x.drawImage(im, 0, 0);
+  const sx = face === 'right' ? w - cut : 0;
+  x.clearRect(sx, 0, cut, hh);
+  x.drawImage(im, sx, 0, cut, hh - k, sx, k, cut, hh - k);
+  return c;
+});
 export function dogPoseImg(dog, pose, face, frame) {
+  if (pose === 'eat') { const im = dogImg(dog, face, 0); return frame % 2 ? dipped(im, face) : im; }
   const set = pose && SPR3?.[DOG_POSE[pose]]?.[dog.stage];
-  return set ? set[face][frame % set[face].length] : dogImg(dog, face, frame);
+  return set ? coated(set[face][frame % set[face].length], 'cho', dog.coat) : dogImg(dog, face, frame);
 }
 // Mèo (issue 44): mỗi dáng một bộ art riêng theo giai đoạn ở art3 (vồ, phơi nắng, ngậm chuột); thiếu art thì về dáng đứng.
 // rt = dữ liệu chạy của world.js (hướng, đang đi, đang vồ, đã tới chỗ khoe)
-export function catImg(c, rt = {}) {
+export const catImg = (c, rt) => coated(catBase(c, rt), 'meo', c.coat);
+function catBase(c, rt = {}) {
   const st = c.stage ?? 'truong', face = rt.face ?? 'left', base = { type: 'meo', stage: st, sex: c.sex };
   const fr = Math.floor((rt.anim ?? 0) * (rt.walking ? (rt.run ? 10 : 7) : 2)) % 2;
   const pose = key => { const set = SPR3?.[key]?.[st]; return set ? set[face][fr % set[face].length] : null; };
@@ -288,7 +303,7 @@ function guardImg(dog, face, rt, now) {
   const fr = Math.floor(now / 110);
   if (!rt.walking) return dogPoseImg(dog, 'bark', face, fr);
   const frames = SPR3?.dogRunBy?.[dog.stage ?? 'truong']?.[face];
-  if (frames?.length) return frames[fr % frames.length];
+  if (frames?.length) return coated(frames[fr % frames.length], 'cho', dog.coat);
   return dogImg(dog, face, Math.floor(rt.anim * 10) % 2);
 }
 // Sao quay quanh đầu lúc đứng hình; chưa có sprite thì vẽ tạm ba chấm vàng
@@ -733,6 +748,8 @@ export function render(ctx, f) {
         else { ctx.fillStyle = '#767686'; for (let i = 0; i < 6; i++) ctx.fillRect(Math.round(b.x + 4 + i * 3), Math.round(b.y + img.height - 3 + (i % 2)), 2, 2); }
       });
     }
+    const bw = b.id === 'doghouse' && farm && m.dogBowl && SPR3?.dogBowl?.[state.dog?.bowl > 0 ? 'full' : 'empty'];
+    if (bw) add(m.dogBowl.y, () => blit(bw, m.dogBowl.x - bw.width / 2, m.dogBowl.y - bw.height));   // bát ăn cạnh chuồng chó
   }
   for (const p of m.penList) {   // nhà/mái chuồng theo cấp, rồi máng
     const hs = p.house, hi = hs.sprite === 'quarantine' ? SPR3?.quarantine : SPR3?.pen?.[hs.sprite]?.[p.lv - 1];
