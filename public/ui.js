@@ -510,7 +510,7 @@ export function renderHUD(s) {
   }
   let clock = '';
   try { clock = S.clockText(s); } catch { clock = ''; }
-  if (!/Ngày/i.test(clock)) clock = `Ngày ${S.dayOf(s)} · ${clock}`;
+  if (!/Ngày/i.test(clock)) clock = `Ngày ${S.dayNumber(s)} · ${clock}`;
   setText('hud-time', clock);
   const se = S.seasonOf(s);
   if (memo.get('hud-season') !== se.key) {
@@ -1004,7 +1004,7 @@ function wxLines(body, s) {
   const today = s.weather, next = S.forecast(s), bad = D.WEATHER.bad.includes(next);
   body.append(h('div', { class: 'wx-day' + (bad ? ' bad' : ''), id: 'wx-tomorrow', 'data-kind': next },
     wxIcon(next, 36),
-    h('div', {}, h('b', {}, `Ngày mai (ngày ${S.dayOf(s) + 1}): ${wxName(next)}`), h('small', {}, D.WEATHER.kinds[next]?.tip ?? ''))));
+    h('div', {}, h('b', {}, `Ngày mai (ngày ${S.dayNumber(s) + 1}): ${wxName(next)}`), h('small', {}, D.WEATHER.kinds[next]?.tip ?? ''))));
   body.append(h('div', { class: 'wx-day today', id: 'wx-today', 'data-kind': today }, wxIcon(today, 24), h('div', {}, h('b', {}, `Hôm nay: ${wxName(today)}`))));
   if (!S.weatherActive(s)) body.append(h('div', { class: 'note' }, `Dưới cấp ${D.WEATHER.minLevel} trời còn hiền: chưa có bão, hạn hán hay sương muối.`));
   else body.append(h('div', { class: 'note' }, 'Bão quật đổ bù nhìn, con vật ngoài trời mất vui · hạn hán đất khô gấp đôi · sương muối làm cây hạt, cây mầm đứng yên một ngày. Phủ rơm (mua ở chợ) giữ ẩm và chống sương. Thời tiết không bao giờ làm chết cây hay con vật.'));
@@ -1513,7 +1513,7 @@ PANELS.house = {
       const li = S.levelInfo(s.exp);
       const list = h('div', { class: 'stats' },
         h('div', { class: 'stat big' }, h('span', {}, '⭐ Cấp độ'), h('b', {}, li.level)),
-        h('div', { class: 'stat big' }, h('span', {}, '📅 Ngày thứ'), h('b', {}, S.dayOf(s))),
+        h('div', { class: 'stat big' }, h('span', {}, '📅 Ngày thứ'), h('b', {}, S.dayNumber(s))),
         h('div', { class: 'stat big' }, h('span', {}, '🐾 Vật nuôi'), h('b', {}, (s.animals || []).length)),
         STAT_LABELS.map(([k, l]) => h('div', { class: 'stat' }, h('span', {}, l), h('b', {}, fmt(s.stats?.[k] || 0)))));
       return body.append(list);

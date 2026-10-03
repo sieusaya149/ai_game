@@ -14,6 +14,8 @@ export function realDay(t = now()) {
 // ---------- Giờ server và lịch làng (issue 23, ADR 0003, 0014) ----------
 // Online: đo độ lệch giờ máy so với server rồi trỏ now() sang giờ server; chơi đơn không gọi gì.
 export const VILLAGE_EPOCH = Date.UTC(2026, 0, 1);   // mốc chung của cả làng: 0h giờ UTC là 6:00 sáng ngày 1
+// Ngày mở làng (0h giờ VN 2026-09-01): chỉ để đếm "Ngày N" hiển thị, không dùng cho luật chơi
+export const VILLAGE_OPEN = Date.UTC(2026, 7, 31, 17);
 export const REAL_TZ_MS = 7 * 3600_000;              // "ngày ngoài đời" tính theo giờ Việt Nam (UTC+7)
 // Hạt giống thời tiết của làng (ADR 0014, issue 55): server và mọi trình duyệt dùng chung module này, nên cả làng cùng một trời.
 // Đổi số này là đổi thời tiết cả quá khứ lẫn tương lai của làng (chỉ ảnh hưởng chạy bù sau lần đổi).

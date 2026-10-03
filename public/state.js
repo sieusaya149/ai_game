@@ -16,7 +16,7 @@ import { SHOWER } from './data.js';   // vòi sen chuồng cấp 3 (issue 59)
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash, penRemap } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
-import { now, villageCal, serverDay, VILLAGE_SEED } from './clock.js';
+import { now, villageCal, serverDay, VILLAGE_SEED, VILLAGE_OPEN } from './clock.js';
 import { weatherOn, outageOn, droughtOf, isWet, glassBreakOn } from './weather.js';
 
 export { animalPrice, levelInfo, mapOf, reachable, footprint, sceneMap, stageStart, stageAt, lifeEnd, weatherOn, outageOn, droughtOf, isWet, glassBreakOn };
@@ -693,7 +693,9 @@ export function clockText(s) {
   const part = h < 12 ? 'sáng' : h < 18 ? 'chiều' : h < 22 ? 'tối' : 'đêm';
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${part}`;
 }
-export const dayText = s => `Ngày ${dayOf(s)}`;
+// Số ngày HIỂN THỊ cho người chơi: online tính từ ngày mở làng (Ngày 1); dayOf (nội bộ, cho mùa/thời tiết/hạn mức) không đổi.
+export const dayNumber = s => online(s) ? Math.max(1, dayOf(s) - villageCal(VILLAGE_OPEN).day + 1) : dayOf(s);
+export const dayText = s => `Ngày ${dayNumber(s)}`;
 
 // Chợ Bà Tư mở từ MARKET.open tới MARKET.close (giờ trong game). Mua bán đều qua cổng kiểm tra này.
 const hourOf = s => (6 + dayFrac(s) * 24) % 24;
