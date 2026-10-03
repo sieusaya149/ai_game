@@ -295,8 +295,8 @@ for (const size of SIZES) {
       await audit(page, 'online-village', size, true);
       await page.locator('#live-chat').click();
       await expect(page.locator('#live-says')).toBeVisible();
-      // mọi câu chat chạm được: không nút nào bị bản đồ nhỏ / nút Việc cần làm che
-      expect(await page.evaluate(() => [...document.querySelectorAll('#live-says .btn')].filter(b => { const r = b.getBoundingClientRect(); return [[r.left + 4, r.top + 4], [r.right - 4, r.top + 4], [r.right - 4, r.bottom - 4], [r.left + r.width / 2, r.top + r.height / 2]].some(([x, y]) => !b.contains(document.elementFromPoint(x, y))); }).map(b => b.textContent))).toEqual([]);
+      // mọi câu chat chạm được: không nút nào bị bản đồ nhỏ / nút Việc cần làm che (điểm rơi vào chính khung chat, như góc bo tròn của nút, không tính là bị che)
+      expect(await page.evaluate(() => [...document.querySelectorAll('#live-says .btn')].filter(b => { const r = b.getBoundingClientRect(); return [[r.left + 4, r.top + 4], [r.right - 4, r.top + 4], [r.right - 4, r.bottom - 4], [r.left + r.width / 2, r.top + r.height / 2]].some(([x, y]) => !document.querySelector('#live-says').contains(document.elementFromPoint(x, y))); }).map(b => b.textContent))).toEqual([]);
       await audit(page, 'online-chat', size, true);
       await page.locator('#live-chat').click();
       for (const id of ['online', 'friends', 'giftbox', 'guestbook', 'log']) {
