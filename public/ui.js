@@ -1167,7 +1167,8 @@ const HOUR = 60 * MIN;
 const GUIDE = [
   { title: 'Thể lực', art: () => [spr().stamina, spr().staminaTired, spr().bed],
     text: [`Mỗi việc ở ruộng đều tốn thể lực (thanh ⚡ cạnh tên bạn). Hết thể lực thì đi và làm chậm gấp ${D.STAMINA.slow} lần.`,
-      `Cách hồi: ngồi ghế đá (hồi ${D.STAMINA.benchPerMin} mỗi phút), ngủ (từ ${D.STAMINA.sleepHour}h), hoặc đợi 6h sáng tự hồi ${D.STAMINA.morningRegen}.`] },
+      `Cách hồi: ngồi ghế đá (hồi ${D.STAMINA.benchPerMin} mỗi phút), ngủ (từ ${D.STAMINA.sleepHour}h), hoặc đợi 6h sáng tự hồi ${D.STAMINA.morningRegen}.`,
+      'Chơi online thì ngủ không tua thời gian: bạn nằm giường tới 6h sáng của làng, thể lực hồi dần (18h tới 6h là đầy), cây và vật nuôi vẫn lớn như thường. Bấm Dậy nếu muốn thức sớm, giữ phần thể lực đã hồi.'] },
   { title: 'Công cụ', art: () => [spr().tools?.hoe[0], spr().tools?.hoe[1], spr().tools?.hoe[2], spr().tools?.can[2], spr().tools?.sickle[2], spr().smithy],
     text: ['Cuốc, bình tưới, liềm và giỏ có 3 cấp: sắt, đồng, vàng.',
       'Cấp cao làm cả hàng 3 ô hoặc khối 3×3 một lần, tốn ít thể lực hơn làm từng ô. Bình và giỏ cấp cao chứa nhiều hơn.',
@@ -1201,7 +1202,13 @@ const GUIDE = [
       `Chạm vào chó, chọn Dạy lệnh. Mỗi ngày game một buổi, mỗi buổi tốn 1 ${D.ITEMS.treat.name.toLowerCase()} (mua ở chợ Bà Tư). Bấm Khen đúng lúc kim chạy vào vạch xanh là đạt.`,
       `Chó vui thì học nhanh gấp đôi; chó đói hay buồn thì hay bỏ dở giữa chừng (vẫn mất bánh). Phải thuộc lệnh ${D.TRICKS.sit.name} trước rồi mới học lệnh khác.`,
       `Sáu lệnh: ${Object.values(D.TRICKS).map(t => `${t.icon} ${t.name} (${t.sessions})`).join(' · ')}. Thuộc đủ cả sáu thì chó không ăn xúc xích của người lạ.`,
-      'Chạm vào chuồng chó (hoặc vào chó) để Xích hay Thả chó: xích thì chó chỉ canh 3 ô quanh chuồng và không nhận lệnh gác, lùa, đi theo; thả thì chó chạy rông canh cả vườn. Chó chưa lớn, đói hoặc buồn thì không canh nhà.'] },
+      'Chạm vào chuồng chó (hoặc vào chó) để Xích hay Thả chó: xích thì chó chỉ canh 3 ô quanh chuồng và không nhận lệnh gác, lùa, đi theo; thả thì chó chạy rông canh cả vườn. Chó con hay đói lả thì không canh nhà, xem thêm trang Chó canh nhà.'] },
+  { title: 'Chó canh nhà', art: () => [SPR3?.animal?.cho?.truong?.left?.[0], SPR2?.barkBubble, SPR3?.animal?.cho?.gia?.left?.[0]],
+    text: ['Chạm vào chó, dòng 🐕 cho biết nó đang canh hay không và vì sao. Chó sủa là khi thấy kẻ lạ (khách online, thằng Tèo, Tí Sún, chồn hương) bước vào tầm nhìn; sủa xong nó đuổi, đớp được thì khách nộp phạt.',
+      `Tầm nhìn: chó nhỡ ${D.DOG.guardRadius.nho} ô, chó trưởng thành ${D.DOG.guardRadius.truong} ô, chó già ${D.DOG.guardRadius.gia} ô, tính từ chỗ chó đang đứng (lệnh Canh khu: gấp đôi tại chỗ gác). Chó con chưa biết canh, chó nhỡ vẫn sủa lung tung cả ngày cho vui.`,
+      `Chó KHÔNG canh khi: đói dưới ${D.GUARD.hungryStop}, đang mải ăn xúc xích của người lạ (khoảng ${D.GUARD.quietMs / 1000} giây), đang đi theo bạn sang làng hay vào nhà. Buồn dưới ${D.GUARD.sadHappy} thì chỉ nhìn được một nửa; ban đêm chừng ${Math.round(D.GUARD.napRate * 100)}% thời gian chó ngủ gật, chỉ thấy kẻ lạ sát bên (${D.GUARD.napRadius} ô).`,
+      `Bị xích thì chó chỉ canh ${D.GUARD.chainRadius} ô quanh chuồng. Trộm NPC và diều hâu, chồn cũng bị chó đuổi theo đúng luật này, nhưng mỗi lần chỉ ${Math.round(D.DOG.guardChance * 100)}% là đuổi được.`,
+      `Chó sủa báo chủ tối đa mỗi ${D.GUARD.barkEvery / 1000} giây một lần (khỏi spam), băng rôn đỏ và mũi tên chỉ về chỗ khách lạ hiện ${D.GUARD.barkShowMs / 1000} giây. Cho chó ăn no, đổ xương vào bát và vuốt ve thì nó canh tốt nhất.`] },
   { title: 'Vòng đời', art: () => [SPR3?.animal?.ga?.non?.left?.[0], SPR3?.animal?.ga?.nho?.left?.[0], SPR3?.animal?.ga?.truong?.left?.[0], SPR3?.animal?.ga?.gia?.left?.[0]],
     text: [`Mỗi con vật lớn qua 4 giai đoạn: ${D.STAGE_NAME.non} → ${D.STAGE_NAME.nho} → ${D.STAGE_NAME.truong} → ${D.STAGE_NAME.gia}, mỗi giai đoạn một hình và nết riêng.`,
       'Tuổi tính theo giờ vườn thật sự chạy (đóng băng thì không già đi). Gà vịt sống nhanh nhất rồi tới heo, bò cừu sống lâu nhất; chó mèo không bao giờ ra đi vì già.',
@@ -2115,6 +2122,13 @@ export function showBringUp(name, solo, { bring, fresh }) {
 }
 // Biểu tượng nhỏ mất kết nối với làng (vườn online), vẫn chơi tiếp được
 // Cột biểu cảm / chat nhanh / người đang ở đây: chỉ hiện khi chơi vườn online. n = số người khác cùng bản đồ
+// Màn tối Zzz khi đang ngủ (online); onWake: nút Dậy
+export function setSleeping(on, onWake) {
+  const e = $('sleepz');
+  if (!e) return;
+  e.hidden = !on;
+  if (onWake) $('sleepz-wake').onclick = onWake;
+}
 export function setLive(on, n = 0) {
   const e = $('live');
   if (!e) return;

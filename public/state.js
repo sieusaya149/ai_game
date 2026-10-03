@@ -384,6 +384,7 @@ export function loadGame(raw) {
   s.mode = s.mode === 'online' ? 'online' : 'offline';
   s.account = s.mode === 'online' && typeof s.account === 'string' ? s.account : null;
   if (s.mode === 'online') s.speed = 1;
+  if (s.mode !== 'online' || !Number.isFinite(s.sleepUntil)) s.sleepUntil = null;   // đang ngủ (online): giữ tới 6h sáng làng
   s.today = { ...base.today, ...s.today };
   s.guests = Array.isArray(s.guests) ? s.guests : [];
   s.dog.chained = !!s.dog.chained;
@@ -664,6 +665,12 @@ export const speedOf = s => online(s) ? 1 : s.speed || 1;
 export const isNight = s => dayFrac(s) >= NIGHT_FROM;
 // Đã qua chạng vạng (18h) chưa: mốc gà vịt thôi thả rông mà về chuồng, cũng là lúc cửa chuồng có biển "đã về" và rải thóc được (issue 42)
 export const isDusk = s => dayFrac(s) >= FREE.duskAt;
+// Độ tối màn hình 0..1, cùng đồng hồ với chữ trên HUD: tối dần từ 18h (chữ "tối"), tối hẳn từ 21h tới 5h, sáng dần tới 6h
+const smooth = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+export function nightAmount(s) {
+  const f = dayFrac(s);
+  return Math.min(smooth(FREE.duskAt, FREE.duskAt + 0.125, f), 1 - smooth(0.958, 1, f));
+}
 export function clockText(s) {
   const t = (6 + dayFrac(s) * 24) % 24;
   const h = Math.floor(t), m = Math.floor((t - h) * 60);
@@ -685,11 +692,32 @@ export const standUp = s => { s.sit = false; };
 export const canSleep = s => dayFrac(s) >= (STAMINA.sleepHour - 6) / 24;
 const SLEEP_EARLY = `Để dành cho tối nay, ${STAMINA.sleepHour} giờ chiều mới ngủ được`;
 
-// Ngủ: chạy mô phỏng thật tới 6h sáng hôm sau (cây vẫn lớn; như chạy bù offline thì không có quạ/trộm), hồi đầy thể lực.
+// Online: ngủ không tua giờ (giờ làng là chung và chạy thật; tua thì đêm vẫn còn mà vườn đã nhảy, lại ngủ được hoài).
+// Nằm giường tới 6h sáng làng (s.sleepUntil = giờ server), thể lực hồi dần trong step, tới giờ tự dậy hoặc bấm Dậy.
+export const isAsleep = s => online(s) && Number.isFinite(s.sleepUntil);
+function wakeUp(s, early) {
+  s.sleepUntil = null;
+  s.stats.slept++;
+  advanceTutorial(s);
+  toast(early ? 'Dậy rồi, làm việc thôi 💪' : 'Chào buổi sáng! ☀️');
+}
+export function wake(s) {
+  if (!isAsleep(s)) return R(false, 'Bạn đang thức mà', { reason: 'awake' });
+  wakeUp(s, true);
+  return R(true, '', { woke: true });
+}
+
+// Chơi đơn: chạy mô phỏng thật tới 6h sáng hôm sau (cây vẫn lớn; như chạy bù offline thì không có quạ/trộm), hồi đầy thể lực.
 export function sleep(s) {
+  if (isAsleep(s)) return R(false, 'Bạn đang ngủ rồi', { reason: 'asleep' });
   if (!canSleep(s)) return R(false, SLEEP_EARLY, { reason: 'early' });
-  const left = online(s) ? DAY_MS - villageCal(now()).tod : (Math.floor(s.time / DAY_MS) + 1) * DAY_MS - s.time, was = catchUp;
-  s.sit = false; s.threats = [];
+  s.sit = false;
+  if (online(s)) {
+    s.sleepUntil = now() + DAY_MS - villageCal(now()).tod;
+    return R(true, 'Ngủ ngon nhé 😴', { sleeping: true });
+  }
+  const left = (Math.floor(s.time / DAY_MS) + 1) * DAY_MS - s.time, was = catchUp;
+  s.threats = [];
   catchUp = true;
   let ev;
   try { ev = tick(s, left); } finally { catchUp = was; }
@@ -784,6 +812,10 @@ function step(s, d) {
   }
   const wd = dayOf(s);   // thời tiết theo lịch game: online là lịch làng (có thể lệch với s.day của vườn)
   if (s.wday !== wd) newWeatherDay(s, wd);
+  if (isAsleep(s)) {   // đang ngủ (online): hồi dần, tới 6h sáng làng thì tự dậy
+    s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.sleepPerDay * d / DAY_MS);
+    if (villageNow(s) >= s.sleepUntil) wakeUp(s, false);
+  }
   if (s.sit) {   // ngồi ghế đá: hồi chậm, đầy thì tự đứng dậy
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.benchPerMin * d / MIN);
     if (s.stamina >= STAMINA.max) { s.sit = false; toast('Khỏe re rồi, làm tiếp thôi 💪'); }
@@ -1494,7 +1526,8 @@ function stepBowl(s) {
   if (b) fxEv(b.x, b.y - 8, 'Măm măm 🦴', COL.good);
 }
 
-const guardOn = s => (s.dog.stage === 'truong' || s.dog.stage === 'gia') && s.dog.hunger > 40 && s.dog.happy > 50;
+// Chó canh được không (trộm NPC, kẻ săn mồi, chạy bù): cùng luật guardRadius với khách online. Chạy bù thì xét theo giờ đang mô phỏng.
+const guardOn = s => guardRadius(s, catchBase != null ? villageNow(s) : now()) > 0;
 
 // ---------- Vòng đời chó và dạy lệnh bằng minigame (issue 45) ----------
 // Minigame chỉ gửi vào luật một kết quả "đạt / không đạt"; luật quyết định tiến độ (ADR 0013).
@@ -1803,11 +1836,27 @@ export const dogQuiet = (s, t = now()) => t < (s?.dog?.quiet || 0);   // đang m
 export function guardRadius(s, t = now()) {
   const g = s?.dog;
   const base = DOG.guardRadius[g?.stage] ?? 0;
-  if (!base || g.hunger < GUARD.hungryStop || dogQuiet(s, t)) return 0;
+  if (!base || g.hunger < GUARD.hungryStop || dogQuiet(s, t) || dogAway(s)) return 0;
   const chain = g.chained ? GUARD.chainRadius : Infinity;
   if (dogAsleep(s)) return Math.min(GUARD.napRadius, chain);
   const r = (g.happy < GUARD.sadHappy ? base / 2 : base) * (dogPost(s) ? DOG.guardPostMul : 1);
   return Math.min(r, chain);
+}
+// Chó đang đi theo chủ sang làng / vào nhà: tọa độ của nó không phải của vườn nên vườn không có ai canh
+const dogAway = s => (s?.dog?.scene ?? 'farm') !== 'farm';
+// Vì sao chó đang canh hay không, cho người chơi đọc khi chạm vào chó: { on, label, why }.
+// on = có phát hiện được kẻ lạ ngay lúc này (kể cả tầm gần). Cùng luật với guardRadius.
+export function dogGuardStatus(s, t = now()) {
+  const g = s.dog, r = guardRadius(s, t), name = g.name || DOG.name;
+  if (dogAway(s)) return { on: false, label: `Đang đi theo bạn`, why: `${name} không ở vườn nên không canh trộm` };
+  if (!(DOG.guardRadius[g.stage] > 0)) return { on: false, label: 'Còn bé, chưa biết canh', why: `${name} lớn thành chó nhỡ mới bắt đầu canh nhà` };
+  if (g.hunger < GUARD.hungryStop) return { on: false, label: 'Đói nên lười canh', why: `${name} đói lả nằm bẹp, cho ăn hoặc đổ xương vào bát nhé` };
+  if (dogQuiet(s, t)) return { on: false, label: 'Đang mải ăn xúc xích', why: `${name} quên sủa chừng một phút` };
+  if (dogAsleep(s)) return { on: true, label: 'Đang ngủ gật', why: `chỉ thấy kẻ lạ sát bên, dậy sau ${Math.max(1, Math.ceil(((g.nap || 0) - (s.time || 0)) / 1000))} giây` };
+  const post = dogPost(s);
+  const why = [`thấy kẻ lạ trong ${r} ô`, g.happy < GUARD.sadHappy ? 'đang buồn nên nhìn gần hơn, vuốt ve cho vui' : '', g.stage === 'gia' ? 'già nên nhìn xa kém' : '', post ? 'đang gác một chỗ nên xa gấp đôi ở đó' : ''].filter(Boolean).join('; ');
+  if (g.chained) return { on: true, label: 'Đang bị xích', why: `chỉ canh trong ${GUARD.chainRadius} ô quanh chuồng; ${why}` };
+  return { on: true, label: 'Đang canh', why };
 }
 // Vùng chó chạy được khi bị xích: { x, y, r } theo điểm ảnh bản đồ. null = thả rông, chạy khắp vườn.
 export function guardArea(s) {
@@ -3105,6 +3154,7 @@ function posOf(s, t) {
 
 export function perform(s, t, id) {
   const at = { x: posOf(s, t).x, y: posOf(s, t).y };
+  if (isAsleep(s)) return bad('Bạn đang ngủ, bấm Dậy trước nhé', at);
   if (t.kind === 'poop' && id === 'slip') { // WORLD gọi khi người chơi giẫm phải
     const i = s.poops.findIndex(p => p.id === t.id);
     if (i < 0) return bad('Không thấy bãi phân đâu cả');
@@ -3435,6 +3485,7 @@ function sitDown(s, at) {
 // ---------- Chuyển bản đồ ----------
 // Đi qua cửa từ bản đồ đang đứng sang bản đồ to: phải có cửa dẫn tới to. Tới nơi thì đứng ở arrive[nơi vừa đi].
 export function enterScene(s, to) {
+  if (isAsleep(s)) return R(false, 'Bạn đang ngủ, bấm Dậy trước nhé', { reason: 'asleep' });
   if (!doorOf(s, to)) return R(false, 'Không có lối sang đó', { reason: 'no_door' });
   if (!hasScene(to)) return R(false, 'Chỗ này chưa mở', { reason: 'unknown' });
   const from = s.scene || 'farm';
@@ -3540,14 +3591,38 @@ export function visitWorld(h) {
   return Object.assign(w, { threats: crowsOf(h), level: levelInfo(h.exp || 0).level });
 }
 // Tên các trường của tin `world` (server chỉ chuyển tiếp đúng các trường này)
+// Chủ gửi tin `world` mỗi WORLD_MS khi có khách (cả khi không có gì đổi, để khách thấy chó, con vật đi mượt); server cho tối đa 4 tin/giây/chủ
+export const WORLD_MS = 1000;
 export const VISIT_KEYS = [...VISIT_WORLD, 'threats', 'level'];
 const PENDING_MS = 15_000;   // việc khách vừa làm: giữ trên máy khách chừng này chờ tin chủ có nó
-const nearBy = (a, b) => b && Number.isFinite(b.x) && Number.isFinite(b.y) && Math.hypot((a.x ?? 1e9) - b.x, (a.y ?? 1e9) - b.y) < 64;
-// Con nào còn (cùng id) và chưa bị chủ dời đi xa thì giữ chỗ đứng trên máy khách: world.js đang cho nó đi lại
+// Con nào còn (cùng id): gần chỗ chủ gửi (< 64px) thì giữ chỗ đứng trên máy khách (world.js đang cho nó đi lại); xa hơn thì
+// KHÔNG nhảy: đứng nguyên chỗ cũ, ghi đích (ex, ey) cho visitEase đưa tới trong EASE_S giây; xa quá EASE_TELEPORT thì nhảy luôn.
+// `always` (chó): luôn đi tới chỗ chủ gửi, khách thấy chó của chủ chạy mượt.
+const EASE_S = 1, EASE_TELEPORT = 8 * 16;
+function easeFrom(o, p, always) {
+  if (p?.chasing) { o.x = p.x; o.y = p.y; o.chasing = true; return; }
+  if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(o.x) || !Number.isFinite(o.y)) return;
+  const far = Math.hypot(o.x - p.x, o.y - p.y);
+  if (far > EASE_TELEPORT) return;
+  if (!always && far < 64) { o.x = p.x; o.y = p.y; return; }
+  if (far < 0.5) { o.x = p.x; o.y = p.y; return; }
+  Object.assign(o, { ex: o.x, ey: o.y, et: EASE_S, x: p.x, y: p.y });
+}
 function keepPlaces(list, old) {
   const by = new Map((old ?? []).map(o => [o.id, o]));
-  for (const o of list) { const p = by.get(o.id); if (p && nearBy(o, p)) { o.x = p.x; o.y = p.y; } }
+  for (const o of list) easeFrom(o, by.get(o.id), false);
   return list;
+}
+// Mỗi khung hình của khách: đưa con vật, mèo, quạ, chó đang có đích (ex, ey) tới đích dần dần (chia đều trong thời gian còn lại)
+export function visitEase(v, dt) {
+  if (!v?.visit) return;
+  for (const list of [v.animals, v.cats, v.threats, [v.dog]]) for (const o of list ?? []) {
+    if (!o || o.ex == null) continue;
+    if (o.chasing) { delete o.ex; delete o.ey; delete o.et; continue; }   // chó khách đang đuổi khách: do world.js chạy
+    const k = dt >= o.et ? 1 : dt / o.et;
+    o.x += (o.ex - o.x) * k; o.y += (o.ey - o.y) * k; o.et -= dt;
+    if (k >= 1) { o.x = o.ex; o.y = o.ey; delete o.ex; delete o.ey; delete o.et; }
+  }
 }
 // Áp phần vườn chủ `w` (tin `world`) lên bản đi dạo `v`. Trả false nếu tin hỏng hoặc `v` không phải bản đi dạo.
 // Giữ của khách: chỗ đứng, phần của khách, chỗ con vật đang đi; lần sủa / nghỉ của chó (mới hơn thì giữ);
@@ -3555,10 +3630,10 @@ function keepPlaces(list, old) {
 const LISTS = ['plots', 'animals', 'eggs', 'cats', 'poops', 'threats', 'guests'];
 export function visitSync(v, w) {
   if (!v?.visit || !w || typeof w !== 'object' || Array.isArray(w)) return false;
-  if (!Array.isArray(w.plots) || LISTS.some(k => w[k] != null && !Array.isArray(w[k])) || !w.dog || typeof w.dog !== 'object' || !w.farm || typeof w.farm !== 'object') return false;
+  if (!Array.isArray(w.plots) || LISTS.some(k => w[k] != null && !Array.isArray(w[k])) || !w.dog || typeof w.dog !== 'object' || (w.farm != null && typeof w.farm !== 'object')) return false;
   const old = { animals: v.animals, cats: v.cats, threats: v.threats, dog: v.dog };
   for (const k of VISIT_WORLD) {
-    if (k === 'farm' && JSON.stringify(w.farm) === JSON.stringify(v.farm)) continue;   // bố cục y nguyên: khỏi dựng lại bản đồ
+    if (k === 'farm' && (w.farm == null || JSON.stringify(w.farm) === JSON.stringify(v.farm))) continue;   // thiếu (chủ gửi gọn) hay y nguyên: giữ bố cục, khỏi dựng lại bản đồ
     if (k in w) v[k] = w[k];
   }
   v.threats = crowsOf(w);
@@ -3568,7 +3643,7 @@ export function visitSync(v, w) {
   keepPlaces(v.threats, old.threats);
   const d = v.dog = guestDog(w.dog), od = old.dog;
   if (od) {
-    if (nearBy(d, od)) { d.x = od.x; d.y = od.y; }
+    easeFrom(d, od, true);
     if ((od.barkAt || 0) > (d.barkAt || 0)) { d.barkAt = od.barkAt; d.barkX = od.barkX; d.barkY = od.barkY; }
     d.quiet = Math.max(d.quiet || 0, od.quiet || 0);
   }
@@ -3978,7 +4053,9 @@ function sausageDo(s, at) {
 // Chó vừa phát hiện khách: báo cho chủ kèm chỗ thấy. Đang trong thời gian nghỉ giữa hai lần sủa thì trả null.
 export function barkOp(s) {
   if (s?.scene !== 'visit') return null;
-  return guestGuardOp(s, 'bark', { x: Math.round(s.player.x), y: Math.round(s.player.y) });
+  const r = guestGuardOp(s, 'bark', { x: Math.round(s.player.x), y: Math.round(s.player.y) });
+  // đang nghỉ giữa hai lần báo chủ (GUARD.barkEvery): chó vẫn sủa cho khách nghe và rung máy, chỉ không báo chủ thêm
+  return r ?? (guardRadius(s) > 0 ? { ok: true, msg: GUARD_MSG.bark(s.dog.name), guestOp: null } : null);
 }
 // Chó đuổi kịp và đớp được khách: rơi hết đồ vừa trộm, nộp phạt, đứng hình GUARD.biteStunMs
 export function biteOp(s) {

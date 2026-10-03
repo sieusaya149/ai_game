@@ -61,6 +61,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 - `state.time`: thời gian game (ms), tăng mỗi khung hình thêm `dtReal * state.speed` (speed ∈ `SPEEDS` = 1, 5, 20). Nút tốc độ chỉ có khi chơi một mình; online luôn x1 (`speedOf(state)`; `loadGame` ép `speed = 1`; `checkSaveJump` coi vườn online là x1).
 - Mọi bộ đếm giờ trong luật chơi dùng `state.time`, **không dùng `Date.now()`**. Chỗ cần giờ ngoài đời (`savedAt`, chạy bù) dùng `now()` của `clock.js`.
 - Ngày: `DAY_MS` = 20 phút. `dayFraction = (time % DAY_MS) / DAY_MS`. Ban đêm khi `dayFraction >= NIGHT_FROM` (0.75 = 0h, lúc màn hình tối nhất). Giờ hiển thị: `6:00 + dayFraction × 24h`. Ngày 1 bắt đầu lúc 6:00 sáng.
+- **Độ tối màn hình:** `nightAmount(state)` (state.js, `render.js` dùng lại) đọc cùng `dayFraction` với đồng hồ HUD: 0 ban ngày, tối dần từ 18h (`FREE.duskAt`, chữ "tối") tới tối hẳn lúc 21h, giữ tới 5h rồi sáng dần tới 6h; vườn, làng, trong nhà, đi thăm vườn người khác, online hay chơi đơn đều như nhau. Đèn lồng (`deco_lamp`), đèn đường trong làng và cửa sổ nhà phát sáng (gradient tròn cộng sáng) lên lớp tối này; tắt khi tiết kiệm pin.
 - **Chạng vạng** `isDusk(state)`: `dayFraction >= FREE.duskAt` (0.5 = **18h**). Mốc gà vịt thôi thả rông mà về chuồng (issue 42); đừng nhầm với `isNight` (nửa đêm).
 - **Thời tiết** (issue 55, ADR 0014): hàm thuần của ngày game và hạt giống, chốt lúc 6h sáng mỗi ngày game (theo `dayOf`), xem mục "Thời tiết" bên dưới. Mưa, bão: mọi ô luôn đủ nước. Nắng: đất khô nhanh gấp 1.5 lần; hạn hán gấp đôi ngày nắng.
 - **Mùa** (Phase 0 chỉ hiển thị, từ issue 54 có tác dụng lên cây, xem mục Mùa có tác dụng lên cây): mỗi mùa 7 ngày game, Xuân, Hạ, Thu, Đông. `seasonOf(state)`.
@@ -685,15 +686,19 @@ guestCheck(v, target, actionId)   // → { ok: true } | { ok: false, reason, msg
                                   //   các lý do của việc trộm (actionId 'steal', issue 30), 'guest' (mọi việc khác)
 visitWorld(h)                     // → phần vườn chủ khách thấy được (tin `world`, sửa lỗi "khách không thấy chủ thu hoạch"): đúng các
                                   //   trường bản sao ở trên + threats (chỉ quạ) + level (cấp chủ). Không có xu, kho, giỏ, tên, chỗ đứng...
+WORLD_MS                          // = 1000: chủ gửi tin `world` mỗi giây khi có khách (cả khi vườn không đổi); server giới hạn 4 tin/giây/chủ, thừa thì bỏ
+visitEase(v, dt)                  // khách, mỗi khung hình (dt giây): đưa con vật, mèo, quạ, chó có đích (ex, ey) tới đích dần trong ~1 giây
 VISIT_KEYS                        // tên các trường của visitWorld (server chỉ chuyển tiếp đúng các trường này)
 visitSync(v, w)                   // → true | false (tin hỏng / v không phải bản đi dạo: không đổi gì). Áp visitWorld của chủ lên bản
                                   //   đi dạo. Giữ: phần của khách, chỗ đứng của khách; chỗ đứng của con vật, mèo, quạ (cùng id, cách
-                                  //   chỗ chủ gửi < 64px) và chó (world.js đang cho đi lại); lần sủa / nghỉ của chó mới hơn
+                                  //   chỗ chủ gửi < 64px). Xa hơn thì không nhảy: đứng chỗ cũ, ghi đích (ex, ey, et) cho visitEase đưa tới
+                                  //   trong ~1 giây (chó luôn đi tới chỗ chủ, trừ lúc đang đuổi khách: `dog.chasing`); xa hơn 8 ô thì dịch chuyển. Tin thiếu `farm` (chủ chỉ gửi
+                                  //   `farm` khi bố cục đổi hay có khách mới) thì giữ bố cục hiện có (máy khách cũ bỏ qua tin thiếu `farm`); lần sủa / nghỉ của chó mới hơn
                                   //   (barkAt, barkX, barkY, quiet: khỏi sủa lại ngay); `farm` y nguyên thì giữ đối tượng cũ (khỏi dựng lại
                                   //   bản đồ). Việc giúp / trộm khách vừa làm (v.visit.mine, ghi lúc perform) mà nhật ký khách của tin
                                   //   chưa có mã đó thì áp lại bằng guestOpApply; tin có rồi, áp không được nữa hay quá 15 giây thì bỏ.
 ```
-Bản đi dạo **không tự chạy mô phỏng** (`main.js` chỉ `tick` vườn mình); nó đổi theo tin `world` của chủ. `main.js` phía chủ: server báo có khách (`watch`, n > 0) thì gửi `{ t: 'world', w: visitWorld(vườn mình) }` ngay, rồi mỗi khi vườn đổi (`changed()`: mọi hành động, việc khách) tối đa 1 lần/giây và đều đặn 4 giây/lần cho phần tự đổi (cây lớn, gà đẻ...); đang thăm vườn khác vẫn gửi vườn nhà; đang ở chế độ xây dựng thì chưa gửi. Phía khách: tin `world` có `owner` đúng vườn đang thăm thì `visitSync` rồi `ensurePositions`. `sync.send` không gửi tin dài quá 200 000 ký tự (server ngắt ở 256 KB).
+Bản đi dạo **không tự chạy mô phỏng** (`main.js` chỉ `tick` vườn mình); nó đổi theo tin `world` của chủ. `main.js` phía chủ: server báo có khách (`watch`, n > 0) thì gửi `{ t: 'world', w: visitWorld(vườn mình) }` ngay, rồi mỗi giây (`WORLD_MS`, dù vườn đổi hay không) cho phần tự đổi (cây lớn, gà đẻ...); đang thăm vườn khác vẫn gửi vườn nhà; đang ở chế độ xây dựng thì chưa gửi. Phía khách: tin `world` có `owner` đúng vườn đang thăm thì `visitSync` rồi `ensurePositions`. `sync.send` không gửi tin dài quá 200 000 ký tự (server ngắt ở 256 KB).
 Ở cảnh `visit`, `actionsFor` chỉ còn: cổng (`enter` → `go: 'village'`), hộp quà và sổ lưu bút ở cổng (`open`, issue 29), chó (`pet`, `feed` bằng `dogfood` trong **giỏ** của khách; cho ăn rồi thì chó quen tới hết lượt thăm), các việc giúp ở ô ruộng và con quạ (issue 28), việc trộm ở ô chín / trứng dưới đất / con vật đang chờ lấy sữa, lông (`steal`, issue 30), công trình riêng (hành động thường nhưng `disabled` = lý do); còn lại `[]`. `todoList` trả `[]`. `main.js`: nút **🚪 Vào** ở mỗi cổng vườn trong bảng `friends` (chạm Cổng bạn bè trong làng khi online, issue 26) gọi `api.visit(name)` (chỉ khi đang đứng ở làng; lỗi hiện trong bảng) → `net.visitFarm(name)` → `startVisit` → mờ màn hình rồi `state` = bản đi dạo, vườn mình giữ ở `home` (vẫn `tick`, vẫn lưu/gửi như thường; bỏ báo gấp 🔴 khi đang thăm). Ra cổng (bước qua ô cổng, nút cổng, hoặc nút **🚪 Về làng** ở `#visit-bar` tự đi ra cổng) → về `home`, đứng ở làng đúng chỗ lúc vào. Vào hay ra đều dựng lại `world` nên thao tác đang dở bị hủy. Chế độ xây dựng ẩn nút; gọi vẫn chỉ hiện lý do.
 
 ### Giúp và trộm vườn bạn: thao tác của khách (issue 28, 30, ADR 0012)
@@ -751,7 +756,12 @@ guardRadius(state, t?)            // bán kính canh tính theo Ô (0 = không c
                                   //   theo giai đoạn DOG.guardRadius (non 0 · nhỡ 4 · trưởng thành 6 · già 4);
                                   //   vui < GUARD.sadHappy (50) còn một nửa; đang gác (lệnh Canh khu) ×DOG.guardPostMul;
                                   //   đói < GUARD.hungryStop (30) hay đang mải ăn xúc xích thì 0; ngủ gật còn
-                                  //   GUARD.napRadius = 1; bị xích thì tối đa GUARD.chainRadius = 3
+                                  //   GUARD.napRadius = 1; bị xích thì tối đa GUARD.chainRadius = 3; chó đang đi theo chủ
+                                  //   sang làng / vào nhà (dog.scene != 'farm') thì 0. Kẻ săn mồi, trộm NPC và chạy bù
+                                  //   offline (guardOn) dùng đúng luật này (> 0), không còn ngưỡng riêng
+dogGuardStatus(state, t?)         // { on, label, why } cho dòng 🐕 khi chạm vào chó: "Đang canh" / "Đang bị xích" /
+                                  //   "Đói nên lười canh" / "Đang ngủ gật" / "Còn bé, chưa biết canh" / "Đang mải ăn xúc xích" /
+                                  //   "Đang đi theo bạn", kèm lý do và tầm nhìn
 dogSees(state, pos, { mul = 1, t }?) // chó có thấy kẻ lạ đứng ở pos ({ x, y } điểm ảnh bản đồ) không. Tâm vùng canh: chỗ gác
                                   //   (lệnh Canh khu), chuồng chó khi bị xích, không thì chính con chó. mul < 1 = đi lặng lẽ
 guardArea(state)                  // vùng chó chạy được khi bị xích: { x, y, r } (điểm ảnh); null = thả rông, khắp vườn
@@ -762,7 +772,8 @@ setChained(state, on)             // chủ xích chó / thả rông (hành độ
                                   //   Canh khu / Lùa / Đi theo (issue 45)
 barkOp(state) / biteOp(state)     // chỉ ở cảnh 'visit': kiểm bằng luật, xem trước ngay trên con chó của bản đi dạo
                                   //   rồi trả { msg, guestOp, ... } cho main.js gửi lên server (biteOp còn trả `stunMs`);
-                                  //   null = chưa làm được. KHÔNG ghi sổ của chủ ở đây: trong bản đi dạo `coins`,
+                                  //   null = chó không canh được. Đang nghỉ GUARD.barkEvery giữa hai lần báo chủ thì trả
+                                  //   `guestOp: null` (khách vẫn nghe sủa và rung máy, chỉ không gửi thêm). KHÔNG ghi sổ của chủ ở đây: trong bản đi dạo `coins`,
                                   //   `stats`, `log` là của khách, nên xu phạt và thống kê để server + trình duyệt chủ làm
 keepLoot(state, items)            // ghi đồ khách vừa trộm được trong lượt thăm (gọi khi server xác nhận); bị đớp là rơi hết
 ```
@@ -801,10 +812,15 @@ takeGifts(state, box)             // chủ mở hộp: splitGifts theo chỗ tr�
 ```js
 slowFactor(state)                 // 1, hoặc STAMINA.slow (2) khi hết thể lực: world chia tốc độ đi, main nhân thời gian làm
 canSleep(state)                   // chỉ từ STAMINA.sleepHour (18h)
-sleep(state)                      // → R { reason: 'early', slept } tua có mô phỏng thật tới 6h sáng hôm sau, hồi đầy thể lực (như chạy bù: không quạ/trộm)
+sleep(state)                      // → R { reason: 'early'|'asleep', slept | sleeping } CHƠI ĐƠN: tua có mô phỏng thật tới 6h sáng hôm sau, hồi đầy thể lực (như chạy bù: không quạ/trộm).
+                                  // ONLINE: không tua; đặt state.sleepUntil (giờ server của 6h sáng làng kế tiếp), trả sleeping: true
+isAsleep(state)                   // online và đang có sleepUntil
+wake(state)                       // → R { reason: 'awake', woke } nút Dậy (online): thức sớm, giữ thể lực đã hồi
 standUp(state)                    // bỏ trạng thái ngồi
 ```
 Chi phí: `STAMINA.cost` {cuốc, tưới, gieo, thu hoạch = 1; dọn bụi 2; đập đá 3}, làm n ô một lần = `cost × GROUP_COST[n]`. Vuốt ve, cho ăn tận tay, nhặt trứng, mua bán không tốn. Hồi: sáng 6h `+morningRegen` (30; chỉ khi đang chơi, chạy bù lúc vắng nhà không hồi), ngồi ghế đá `benchPerMin` mỗi phút.
+
+Ngủ online (hotfix): giờ làng chung và chạy thật nên không tua. Ngủ = nằm giường trong nhà tới 6h sáng làng; trong lúc đó vườn, cây, vật nuôi chạy bình thường, thể lực hồi `STAMINA.sleepPerDay * dt / DAY_MS` (200/ngày làng: ngủ 18h→6h từ 0 lên đầy). Tới 6h tự dậy (toast "Chào buổi sáng! ☀️") hoặc bấm Dậy; `stats.slept` và bước hướng dẫn tính lúc dậy. Khi ngủ `perform`/`enterScene` bị từ chối (`reason: 'asleep'`), màn Zzz + nút Dậy che game. `sleepUntil` nằm trong bản lưu: tải lại giữa đêm vẫn ngủ, vào lại sau 6h thì dậy với thể lực đã hồi (chạy bù). `simMs` chỉ nhích theo thời gian thật nên `checkSaveJump` không cần đổi và không còn kẽ tua vườn bằng cách ngủ lặp.
 
 ### Công cụ, tiệm rèn
 ```js

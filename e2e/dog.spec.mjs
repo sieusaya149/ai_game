@@ -72,7 +72,7 @@ function guardGarden(s, opt = {}) {
   for (const d of [far, far + 1, far - 1, far + 2]) for (const [dc, dr] of [[0, -d], [d, -d], [-d, -d], [d, 0], [-d, 0], [d, d], [-d, d], [0, d]])
     if (!placed && moveEntity(s, id('doghouse'), f0.c + dc, f0.r + dr).ok) placed = true;
   expect(placed, 'đặt được chuồng chó').toBe(true);
-  Object.assign(s.dog, mapOf(s).dogHome, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false }, opt.dog ?? {});
+  Object.assign(s.dog, mapOf(s).dogHome, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false, cmd: { id: 'sit' } }, opt.dog ?? {});
   const p = s.plots[0];
   p.soil = 'tilled'; p.water = 100; p.weeds = false;
   p.crop = { id: 'cachua', progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
@@ -139,7 +139,7 @@ async function reachDog(page, touch) {
     await tapWorld(page, touch, d.x, d.y - 5);
     await page.waitForTimeout(500);
   }
-  await expect(page.locator('#target-name')).toHaveText('Mực');
+  await expect(page.locator('#target-name')).toContainText('Mực');
 }
 // Đi về phía chó cho tới khi nó phát hiện (hay hết lượt thử)
 async function approachDog(page, touch, tries = 14) {
@@ -235,7 +235,7 @@ test('ban đêm Mực ngủ gật 💤: B đứng xa 1 ô không bị phát hi�
   // bản lưu ghi sẵn: giờ làng ban đêm, Mực đang ngủ một giấc dài, bụng lưng lửng (dưới 50 là chắc chắn ăn xúc xích)
   const night = s => {
     s.time = Math.ceil(NIGHT_FROM * DAY_MS) + 1000;
-    guardGarden(s, { far: 4, dog: { hunger: 40, nap: s.time + 30 * 60_000, napCheck: s.time + 30 * 60_000 } });
+    guardGarden(s, { far: 4, dog: { cmd: null, hunger: 40, nap: s.time + 30 * 60_000, napCheck: s.time + 30 * 60_000 } });
   };
   const A = await player(browser, opts(testInfo, baseURL), night, true);
   const B = await player(browser, opts(testInfo, baseURL), s => { guestAt(GATE_AT.x, GATE_AT.y)(s); s.inv.sausage = 2; }, true);

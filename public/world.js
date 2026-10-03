@@ -12,6 +12,8 @@ const HW = 5, HH = 3;             // nửa hộp chân 10x6
 const DIRV = [[0, 1], [-1, 0], [1, 0], [0, -1]];
 const THREAT_NAME = { crow: 'Con quạ', thief: 'Thằng Tèo', tisun: 'Tí Sún', civet: 'Con chồn hương' };
 const isBeast = t => t.kind === 'crow' || t.kind === 'civet';   // con thú: chạm nhỏ, không có bong bóng cao như người
+// Hình bước chân chạy theo quãng đã đi (không theo đồng hồ): STRIDE px đi được ứng với 1 đơn vị rt.anim (render nhân 7 ra số lần đổi chân)
+const STRIDE = 24;
 const A_SPEED = { ga: 20, vit: 17, heo: 16, bo: 11, cuu: 13 };
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -156,12 +158,14 @@ function herd(state, a, rt, dt, R, src = state.player, radius = FREE.shyRadius, 
   const st = speed * (STAGE_SPEED[a.stage] ?? 1) * dt, ux = dx / (d || 1), uy = d ? dy / d : 1;
   let nx = a.x + ux * st, ny = a.y + uy * st;
   if (!ok(nx, ny)) { if (ok(nx, a.y)) ny = a.y; else if (ok(a.x, ny)) nx = a.x; else { nx = a.x; ny = a.y; } }
+  const moved = Math.hypot(nx - a.x, ny - a.y), was = rt.walking;
   a.x = nx; a.y = ny;
   const c = Math.floor(a.x / TS), r = Math.floor(a.y / TS);
   if (gates.some(g => g[0] === c && g[1] === r)) { ST.passGate(state, a.id); return true; }
   if (R.has(c, r)) a.tile = { c, r };
   if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
-  rt.walking = true; rt.peck = false; rt.scared = true; rt.anim += dt * 2;
+  rt.peck = false; rt.scared = true; rt.walking = moved > 0.01;
+  if (rt.walking) { if (!was) rt.anim = 0; rt.anim += moved / STRIDE; }
   return true;
 }
 function freeWalk(state, a, w, dt0) {
@@ -171,13 +175,37 @@ function freeWalk(state, a, w, dt0) {
   if (a.stray && herd(state, a, rt, dt, R)) return;
   const tx = a.tile.c * TS + 3 + (a.id * 7) % 10, ty = a.tile.r * TS + 6 + (a.id * 5) % 8;
   const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
+  const was = rt.walking, wasPeck = rt.peck;
   rt.walking = false; rt.peck = false;
-  if (d < 1.5) { rt.stuck = 0; rt.peck = true; rt.anim += dt; return; }   // tới nơi: bới đất
+  if (d < 1.5) { rt.stuck = 0; rt.peck = true; if (!wasPeck) rt.anim = 0; rt.anim += dt; return; }   // tới nơi: bới đất
   const st = Math.min(d, (A_SPEED[a.type] ?? 14) * (STAGE_SPEED[a.stage] ?? 1) * dt), nx = a.x + dx / d * st, ny = a.y + dy / d * st;
   const ok = (x, y) => R.has(Math.floor(x / TS), Math.floor(y / TS));
-  if (ok(nx, ny) || !ok(a.x, a.y)) { a.x = nx; a.y = ny; rt.stuck = 0; } else if ((rt.stuck = (rt.stuck || 0) + dt) > 1.5) { a.x = tx; a.y = ty; rt.stuck = 0; }
+  const ox = a.x, oy = a.y;
+  if (ok(nx, ny) || !ok(a.x, a.y)) { a.x = nx; a.y = ny; } else if (ok(nx, a.y)) a.x = nx; else if (ok(a.x, ny)) a.y = ny;   // chạm ranh vùng đi lại: trượt dọc theo ranh
   if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
-  rt.walking = true; rt.anim += dt;
+  // hình bước chân chỉ khi thật sự nhích; bị chặn thì đứng yên, hơn 1.5s thì nhảy tới nơi
+  const moved = Math.hypot(a.x - ox, a.y - oy);
+  if (moved > st * 0.3) { rt.walking = true; if (!was) rt.anim = 0; rt.anim += moved / STRIDE; rt.stuck = 0; }
+  else if ((rt.stuck = (rt.stuck || 0) + dt) > 1.5) { a.x = tx; a.y = ty; rt.stuck = 0; }
+}
+// Chọn điểm đi tới trong vùng chuồng sao cho cách con khác (và chỗ con khác đang đi tới) cỡ SPREAD_D px: thử vài điểm, lấy điểm thoáng nhất.
+// Đàn khỏi dồn thành cục; tới máng/vũng bùn thì vẫn tụ được nhưng mỗi con một chỗ.
+const SPREAD_D = 13;
+function spreadPoint(state, w, a, pen, gen) {
+  const others = [];
+  for (const o of state.animals) {
+    if (o === a || o.x == null || o.tile || ST.animalPen(state, o)?.id !== pen.id) continue;
+    others.push(o);
+    const r = w.rt.get('a' + o.id);
+    if (r?.mode === 'walk') others.push({ x: r.tx, y: r.ty });
+  }
+  let best = null, bestD = -1;
+  for (let i = 0; i < 8; i++) {
+    const pt = gen(), md = others.reduce((m, o) => Math.min(m, dist(pt, o)), Infinity);
+    if (md >= SPREAD_D) return pt;
+    if (md > bestD) { best = pt; bestD = md; }
+  }
+  return best;
 }
 function updateAnimals(state, w, dt0, out) {
   const p = state.player;
@@ -194,6 +222,7 @@ function updateAnimals(state, w, dt0, out) {
     const near = Math.hypot(p.x - a.x, p.y - a.y) < 26;
     const scared = state.time < (a.scaredUntil ?? 0);   // vừa bị dời chuồng: chạy loạn một lúc
     const speed = (A_SPEED[a.type] ?? 14) * (STAGE_SPEED[a.stage] ?? 1) * (a.sick ? 0.5 : 1) * (scared ? 3 : 1);
+    const was = rt.walking, wasPeck = rt.peck;
     rt.walking = false; rt.peck = false;
     // gà con kêu chiếp (thỉnh thoảng, khi đang ở trên màn hình)
     if (POULTRY.includes(a.type) && a.stage === 'non' && seen && out && state.scene === 'farm' && Math.random() < dt * 0.06) {
@@ -211,17 +240,20 @@ function updateAnimals(state, w, dt0, out) {
         const dx = rt.tx - a.x, dy = rt.ty - a.y, d = Math.hypot(dx, dy);
         if (d < 1.5) { rt.mode = 'idle'; rt.timer = a.type === 'heo' && inMudSpot(a) ? rnd(3, 7) : rnd(1.2, 4); }
         else {
-          const st = Math.min(d, speed * dt);
+          const st = Math.min(d, speed * dt), ox = a.x, oy = a.y;
           a.x = clamp(a.x + dx / d * st, area.x, area.x + area.w);
           a.y = clamp(a.y + dy / d * st, area.y, area.y + area.h);
-          a.walk = (a.walk || 0) + st;   // quãng đã đi (heo ít đi thì mau béo)
+          const moved = Math.hypot(a.x - ox, a.y - oy);
+          a.walk = (a.walk || 0) + moved;   // quãng đã đi (heo ít đi thì mau béo)
           if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
-          rt.walking = true; rt.anim += dt;
+          // đứng yên thì hình đứng yên; kẹt (không nhích được) hơn 0.6s thì bỏ đích này, nghỉ một nhịp rồi chọn đích khác
+          if (moved > st * 0.3) { rt.walking = true; if (!was) rt.anim = 0; rt.anim += moved / STRIDE; rt.stuck = 0; }
+          else if ((rt.stuck = (rt.stuck || 0) + dt) > 0.6) { rt.stuck = 0; rt.mode = 'idle'; rt.timer = rnd(0.3, 1); }
         }
       }
     } else {
       rt.timer -= dt;
-      if (rt.mode === 'peck') { rt.peck = true; rt.anim += dt; if (rt.timer <= 0) rt.mode = 'idle'; }
+      if (rt.mode === 'peck') { rt.peck = true; if (!wasPeck) rt.anim = 0; rt.anim += dt; if (rt.timer <= 0) rt.mode = 'idle'; }
       if (rt.mode === 'nap' && (rt.timer <= 0 || scared)) { rt.mode = 'idle'; rt.nap = false; }
       if (rt.timer <= 0 && !near) {
         rt.nap = false;
@@ -236,13 +268,15 @@ function updateAnimals(state, w, dt0, out) {
         } else if (a.stage === 'gia' && Math.random() < 0.45) {   // con già hay ngủ gật
           rt.mode = 'nap'; rt.nap = true; rt.timer = rnd(4, 9);
         } else if (a.hunger < 60 && trough > 0 && Math.random() < 0.6) {
-          rt.tx = clamp(pen.trough.x + rnd(-14, 14), area.x, area.x + area.w); rt.ty = area.y + rnd(1, 8); rt.mode = 'walk';
+          const t = spreadPoint(state, w, a, pen, () => ({ x: clamp(pen.trough.x + rnd(-14, 14), area.x, area.x + area.w), y: area.y + rnd(1, 8) }));
+          rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk';
         } else if (a.type === 'heo' && ms && !inMud && Math.random() < 0.45) {
-          rt.tx = rnd(ms.x0, ms.x1); rt.ty = rnd(ms.y0, ms.y1); rt.mode = 'walk';
+          const t = spreadPoint(state, w, a, pen, () => ({ x: rnd(ms.x0, ms.x1), y: rnd(ms.y0, ms.y1) }));
+          rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk';
         } else if (POULTRY.includes(a.type) && Math.random() < (a.stage === 'nho' ? 0.7 : 0.4)) {   // gà nhỡ bới đất nhiều
           rt.mode = 'peck'; rt.timer = rnd(0.8, 1.8);
         } else {
-          const t = inArea(area, 2); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk';
+          const t = spreadPoint(state, w, a, pen, () => inArea(area, 2)); rt.tx = t.x; rt.ty = t.y; rt.mode = 'walk';
         }
       }
     }
@@ -284,7 +318,7 @@ function updateDog(state, w, dt0, out) {
     if (dogCan(d.x, d.y + dy / len * st)) d.y += dy / len * st;
     const moved = Math.hypot(d.x - ox, d.y - oy);
     if (Math.abs(dx) > 0.5) rt.face = dx < 0 ? 'left' : 'right';
-    rt.walking = moved > 0.01; rt.anim += dt;
+    rt.walking = moved > 0.01; rt.anim += moved / speed;   // chân đổi theo quãng đi
     rt.stuck = moved < st * 0.3 ? rt.stuck + dt : 0;
     return false;
   };
@@ -366,7 +400,7 @@ function guardStep(state, w, rt, dt, goTo, out) {
     g.lost += dt * 1000;
     if (g.lost > GUARD.loseMs) g.chasing = false;
   }
-  rt.bark = g.chasing;
+  rt.bark = d.chasing = g.chasing;   // khách: đang đuổi thì visitEase thôi kéo chó về chỗ chủ
   if (!g.chasing) return false;
   // bị xích thì chỉ chạy tới mép vùng xích, thả rông thì đuổi tới chân khách
   const area = ST.guardArea(state);
@@ -390,11 +424,12 @@ function updateCats(state, w, dt0) {
     const rt = rtOf(w, 'c' + c.id);
     const dt = aiStep(rt, dt0, onScreen(w, c));
     if (!dt) continue;
-    rt.walking = false; rt.anim += dt;
+    rt.walking = false;
+    if (rt.pounceT > 0) rt.anim += dt;   // dáng vồ đổi khung theo giờ
     rt.pounceT = Math.max(0, (rt.pounceT ?? 0) - dt);
     if (c.trophy && !rt.trophy) rt.pounceT = 0.7;   // vừa vồ trúng: dáng vồ một nhịp rồi mới ngậm chuột
     rt.trophy = !!c.trophy;
-    if (c.sleep || c.sun || c.sick >= 2) { rt.yarn = false; rt.shown = false; continue; }   // ngủ, phơi nắng, bệnh nặng: nằm yên một chỗ
+    if (c.sleep || c.sun || c.sick >= 2) { rt.yarn = false; rt.shown = false; rt.anim += dt; continue; }   // ngủ, phơi nắng, bệnh nặng: nằm yên một chỗ
     // ngậm chuột thì chạy tới đứng cạnh người chơi để khoe, không thì tới chỗ luật chọn
     const show = c.trophy && !rt.pounceT;
     const tx = show ? p.x + (c.x < p.x ? -12 : 12) : c.tx ?? c.x, ty = show ? p.y + 2 : c.ty ?? c.y;
@@ -403,12 +438,24 @@ function updateCats(state, w, dt0) {
     const rat = !show &&(state.preds ?? []).some(r => r.kind === 'rat' && Math.abs(r.x - tx) < 2 && Math.abs(r.y - ty) < 2);
     rt.run = show || rat || !!c.inAt;
     if (d > 1 && !rt.pounceT) {
-      const st = Math.min(d, (rt.run ? 64 : 26) * STAGE_SPEED[c.stage] * dt);
-      c.x += dx / d * st; c.y += dy / d * st;
-      if (Math.abs(dx) > 0.4) rt.face = dx < 0 ? 'left' : 'right';
-      rt.walking = true;
-      rt.yarn = false;
+      // mèo cũng đi theo đường tìm được, không xuyên công trình, rào, nước, cây (chỉ chạy được tới đâu lối đi tới đó)
+      const key = Math.round(tx) + ',' + Math.round(ty);
+      rt.pathT = (rt.pathT ?? 0) - dt;
+      if (rt.pathKey !== key || (show && rt.pathT <= 0)) { rt.cpath = findPath(c.x, c.y, tx, ty); rt.pathKey = key; rt.pathT = 0.5; }
+      while (rt.cpath?.length && dist(c, rt.cpath[0]) < 1.5) rt.cpath.shift();
+      const wp = rt.cpath?.[0] ?? { x: tx, y: ty };   // hết đường: bước thẳng nốt tới đích (vật cản vẫn chặn, mèo chỉ sát được tới đó)
+      let moved = 0;
+      if (wp) {
+        const wx = wp.x - c.x, wy = wp.y - c.y, wd = Math.hypot(wx, wy), spd = (rt.run ? 64 : 26) * STAGE_SPEED[c.stage], st = Math.min(wd, spd * dt), ox = c.x, oy = c.y;
+        // ngoại lệ duy nhất: cửa mèo nằm trên tường nhà, đoạn cuối chui vào cửa (c.inAt) đi thẳng, không bị tường chặn
+        if (c.inAt && !rt.cpath?.length && wd < 14) { c.x += wx / wd * st; c.y += wy / wd * st; } else moveBox(c, wx / wd * st, wy / wd * st);
+        moved = Math.hypot(c.x - ox, c.y - oy);
+        if (Math.abs(wx) > 0.4) rt.face = wx < 0 ? 'left' : 'right';
+        if (moved > st * 0.3) rt.anim += moved / spd; else if ((rt.stuck = (rt.stuck ?? 0) + dt) > 0.5) { rt.cpath = null; rt.pathKey = null; rt.stuck = 0; }
+      }
+      if (moved > 0.01) { rt.walking = true; rt.yarn = false; rt.stuck = 0; } else rt.anim += dt;
     } else if (!rt.pounceT) {
+      rt.cpath = null; rt.pathKey = null; rt.anim += dt;
       // đứng yên: mèo con nghịch cuộn len, mèo nhỡ thỉnh thoảng tập vồ
       if (c.stage === 'non') rt.yarn = true;
       else if (c.stage === 'nho' && Math.random() < dt * 0.25) rt.pounceT = 0.6;
@@ -684,7 +731,7 @@ export function nameOf(state, t) {
     case 'poop': return 'Phân chó';
     case 'threat': return THREAT_NAME[findBy(state.threats, t.id)?.kind] ?? 'Con quạ';
     case 'pred': { const p = findBy(state.preds, t.id); return p ? 'Con ' + ST.PRED_NAME[p.kind].toLowerCase() : ''; }
-    case 'dog': return state.dog.name || DOG.name;
+    case 'dog': { const g = ST.dogGuardStatus(state); return `${state.dog.name || DOG.name}\n🐕 ${g.label} · ${g.why}`; }
     case 'bowl': { const n = state.dog.bowl || 0; return `Bát ăn của ${state.dog.name || DOG.name} · ${n ? `còn ${n}/${DOG.bowlMax} phần` : 'trống'}`; }
     case 'cat': { const c = findBy(state.cats, t.id); return c ? `${ST.animalLabel(c)} ${'❤️'.repeat(c.bond || 1)}\n🐀 Đã bắt ${ST.catCatches(c)} con chuột` : 'Mèo'; }
     case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;
