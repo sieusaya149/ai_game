@@ -3,7 +3,7 @@ import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, RIPE_FLOOR, WILT_WARN, FARMING,
   ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, GUARD, WALK_SPEED, THREATS, RAID, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
-  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
+  LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CHOP, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
   TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, COATS, COAT, DELIVERY,
 } from './data.js';
@@ -2424,8 +2424,9 @@ function decoActs(s, t) {
 }
 
 // Bụi, đá trên đất mới: { kind: 'clutter', id }. Dọn bằng tay, tốn thể lực, được gỗ / đá vào kho.
+const clutterDef = e => CLUTTER[e?.kind] ?? (e?.kind === 'tree' ? CHOP : null);
 function clutterActs(s, t) {
-  const e = s.farm.ents.find(x => x.id === t.id), d = e && CLUTTER[e.kind];
+  const e = s.farm.ents.find(x => x.id === t.id), d = clutterDef(e);
   return d ? [mk('clear', d.icon, `${d.act} (+${d.qty} ${itemName(d.item).toLowerCase()})`)] : [];
 }
 // Mua dải đất ở mép vườn: { kind: 'strip', dir }
@@ -2730,7 +2731,7 @@ const DO = {
   },
 
   clutter(s, t, id, at) {
-    const i = s.farm.ents.findIndex(x => x.id === t.id), d = CLUTTER[s.farm.ents[i]?.kind];
+    const i = s.farm.ents.findIndex(x => x.id === t.id), d = clutterDef(s.farm.ents[i]);
     if (!d) return bad('Không thấy đâu cả', at);
     s.farm.ents.splice(i, 1);
     bumpLayout(s);

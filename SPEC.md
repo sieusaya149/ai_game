@@ -165,7 +165,7 @@ Vườn online không bao giờ ghi vào `SAVE_KEY` (`nongtrai-save-v3`): bản 
 | `pen` | `pen: 'chicken'|'pig'|'pasture'|'quarantine'`, `lv?: 1..3` | chuồng, kích thước theo `PEN_DEFS` (không đổi theo cấp); `lv` thiếu = 1; nhiều chuồng mỗi loại, giới hạn theo cấp người chơi (`PEN_TABLE.limit`). Chuồng chó (`doghouse`) cũng có `lv?` |
 | `deco` | `item: 'deco_scarecrow'|'deco_flower'|'deco_lamp'|'deco_bench'|'deco_lowfence'|'deco_rattrap'|'deco_canopy'`, `shut?` (bẫy chuột đã sập) | đồ trang trí 1 ô |
 | `grave` | `animal` (loài), `name?` (chỉ con ❤️4+), `flower: bool` | ngôi mộ 1 ô, con vật mất để lại (lát 38); đặt/dời qua `canPlace` như mọi công trình |
-| `tree` | không | cây cảnh, không dời được |
+| `tree` | không | cây cảnh, không dời được; chặt được bằng `clear` của target `clutter` (xem dưới) |
 | `bush`, `rock` | không | bụi, đá **chưa dọn** trên dải đất mới; chắn đường, dọn bằng tay (`CLUTTER`) |
 
 ### Con vật (v3)
@@ -523,7 +523,7 @@ Thêm luật đặt mới thì thêm một bước kiểm tra trong `canPlace` *
 nextStrip(state, dir)             // dir 'N'|'S'|'E'|'W' → { c, r, w, h, dir, price, level } | null (hết đất / hết bậc giá). Dải dày LAND_STRIP.depth (4) ô
 buyStrip(state, dir)              // → R { reason: 'scene'|'max'|'level'|'coins', dir, sound }; rải bụi/đá (theo tileHash) lên ô trống của dải, bump layout
 ```
-Dọn bụi/đá là hành động `clear` của target `clutter` (tốn thể lực, được gỗ/đá vào kho). Vườn không bao giờ vượt 64x48 ô.
+Dọn bụi/đá là hành động `clear` của target `clutter` (tốn thể lực, được gỗ/đá vào kho). Cây `tree` trong vườn nhà cũng là target `clutter`: `clear` = "Chặt cây" (`CHOP`, tốn `STAMINA.cost.chopTree` = 4, được 3 gỗ), cây biến mất ngay (xoá ent + bump layout, ô đi được, không mọc lại); khách đi thăm bị `guestCheck` từ chối, cây ở làng (không có ent) không chặt được; chưa có cây ăn quả dạng ent. Vườn không bao giờ vượt 64x48 ô.
 
 ### Chuyển bản đồ
 ```js
@@ -764,7 +764,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'pred', id }           // chuột, diều hâu, chồn: chạm để đuổi (issue 43)
 { kind: 'cat', id }            // mèo (issue 44): ở vườn ban ngày, trong nhà ban đêm
 { kind: 'deco', id }           // đồ trang trí trong vườn (ghế đá: ngồi nghỉ)
-{ kind: 'clutter', id }        // bụi / đá chưa dọn: Dọn bụi, Đập đá
+{ kind: 'clutter', id }        // bụi / đá chưa dọn, hoặc cây trong vườn: Dọn bụi, Đập đá, Chặt cây
 { kind: 'strip', dir }         // mép vườn: mua dải đất 'N'|'S'|'E'|'W'
 // Mua đất theo dải, vườn luôn là hình chữ nhật. Hành động `buy` ghi cỡ dải và giá ("dải 4×24 ô, 500 xu, cấp 5");
 // chưa đủ cấp thì vô hiệu với lý do "Mua đất ở mép vườn từ cấp N", và ui.js nối lý do đó vào tên đích để người chơi đứng ở mép vườn là đọc thấy.
