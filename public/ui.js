@@ -64,6 +64,12 @@ function iconUrl(key) {
   iconCache.set(key, u);
   return u;
 }
+// Nhãn "Đúng mùa" (issue 54): icon mầm SPR2.seasonTag (bản 2x) + chữ; thiếu sprite thì emoji
+let seasonTagUrl;
+function seasonTag(tag) {
+  if (seasonTagUrl === undefined) try { seasonTagUrl = hd(SPR2?.seasonTag)?.toDataURL?.() || null; } catch { seasonTagUrl = null; }
+  return h(tag, { class: 'season-tag' }, seasonTagUrl ? h('img', { class: 'season-ico', src: seasonTagUrl, alt: '', draggable: false }) : '🌿 ', 'Đúng mùa');
+}
 // Nông sản có sao ('cai@2'): tạm dùng icon của nông sản đó (viền sao trên icon là issue 52)
 const iconKey = key => D.baseOf(key);
 function emojiFor(key) {
@@ -706,7 +712,7 @@ PANELS.market = {
       const desc = c ? `Lớn sau ${c.grow / MIN} phút · thu ${c.yield} · bán ${c.price} xu/quả` : it.desc;
       const inSeason = c && S.seasonFit(s, it.crop) === 'in';   // nhãn đúng mùa (issue 54)
       list.append(row({
-        icon: ico(id), name: inSeason ? [it.name, ' ', h('span', { class: 'season-tag' }, '🌿 Đúng mùa')] : it.name, locked,
+        icon: ico(id), name: inSeason ? [it.name, ' ', seasonTag('span')] : it.name, locked,
         desc: [desc, h('br'), `Đang có: ${have(s, id)}`],
         right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + it.lv)
           : [coinTag(it.price), h('div', { class: 'qtys' },
@@ -1141,7 +1147,7 @@ PANELS.seeds = {
         list.append(h('button', { class: 'cell pick nosound' + (on ? ' on' : ''), type: 'button', on: { click: () => { S.selectSeed(st(), D.ITEMS[k].crop); sound.play('pop'); commit(); closePanel(); } } },
           ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + s.inv[k]), h('div', { class: 'cell-name' }, c.name), h('div', { class: 'cell-sub' }, `${c.grow / MIN} phút`),
           h('div', { class: 'cell-sub mastery', 'data-crop': D.ITEMS[k].crop }, `🟡 Cấp ${m.lv}` + (m.next ? ` · ${m.n}/${m.next} lần` : ' · tối đa')),
-          S.seasonFit(s, D.ITEMS[k].crop) === 'in' && h('div', { class: 'season-tag' }, '🌿 Đúng mùa')));
+          S.seasonFit(s, D.ITEMS[k].crop) === 'in' && seasonTag('div')));
       }
       body.append(list);
     }

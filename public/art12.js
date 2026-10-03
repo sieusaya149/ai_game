@@ -7,7 +7,7 @@
 //                      problem.{weed,bug,dry}, deco.{deco_scarecrow,deco_flower,deco_lamp,deco_bench}, items.{seed_<16 cây> (8 túi cây
 //                      mới do art4.js ghi thêm vào SPR.items), ...}, grain, bubble, sparkle, arrow, sign, status.{hungry,sick,heart,zzz,milk,wool,pregnant}
 //   từ SPR2 (art2.js): bush, bushes[3], rock, rocks[3], stump, forestTile, forest[6], lampPost, bench, tools.{hoe,can,sickle,
-//                      basket}[3], stamina, staminaTired, sweat[2], season.{xuan,ha,thu,dong}, wood, stone, guidebook, todo,
+//                      basket}[3], stamina, staminaTired, sweat[2], season.{xuan,ha,thu,dong}, seasonTag, slowSnail[2], wood, stone, guidebook, todo,
 //                      giftIcon, alertArrow, barkBubble, dogChain, stunStars[3], barkArrow, sausage, sausageGround,
 //                      badges.{helper,robber,guard}.{on,off}
 //   từ SPR3 (art3.js): items.{soapBar,vaccine,medicine,treat,catfood,sausage,manure,feedSack}, status.{heart1..5,dirtyIcon,
@@ -1578,6 +1578,56 @@ function snowHD() {
   });
   return outline(c, '#24508a', 0.35);
 }
+// Lá thuôn 4 sắc cho mầm "Đúng mùa": nửa hứng sáng (trên-trái) nhạt có vệt bóng, nửa kia đậm, gân giữa tối
+function tagLeaf(x, x0, y0, x1, y1, w, G) {
+  const L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+  for (let py = Math.floor(Math.min(y0, y1) - w - 1); py <= Math.max(y0, y1) + w + 1; py++) for (let px = Math.floor(Math.min(x0, x1) - w - 1); px <= Math.max(x0, x1) + w + 1; px++) {
+    const X = px + 0.5 - x0, Y = py + 0.5 - y0, t = (X * ux + Y * uy) / L, s = -X * uy + Y * ux;
+    if (t < 0 || t > 1) continue;
+    const hw = w * Math.sin(Math.PI * Math.min(1, t * 1.08)) ** 0.7;
+    if (Math.abs(s) > hw) continue;
+    const lit = Math.sign(s) * (uy * 0.6 - ux * 0.8) > 0;
+    let col = lit ? G[1] : G[2];
+    if (lit && Math.abs(s) > hw * 0.4 && t > 0.25 && t < 0.7) col = G[0];
+    if (!lit && Math.abs(s) > hw * 0.6) col = G[3];
+    if (Math.abs(s) < 0.5 && t > 0.08 && t < 0.85) col = G[2];
+    R(x, col, px, py);
+  }
+}
+// Nhãn "Đúng mùa" 20x20 (2x của SPR2.seasonTag): mầm hai lá trên thân cong
+function seasonTagHD() {
+  const G = ['#c4ec8a', '#8fd65a', '#5fb33e', '#3d8c2a'];
+  const c = draw(20, 20, x => {
+    line(x, '#6fb840', 10, 8, 9, 11); line(x, '#3d7c26', 11, 9, 10, 11);
+    R(x, '#6fb840', 8, 11, 1, 6); R(x, '#4f9a30', 9, 11, 1, 6);
+    R(x, '#2f6b1f', 6, 17, 6, 1); R(x, '#4f9a30', 7, 16, 1, 1); R(x, '#2f6b1f', 10, 16, 1, 1);
+    tagLeaf(x, 8.5, 11.5, 2, 6.5, 2.6, G);
+    tagLeaf(x, 10.5, 9.5, 16.5, 2, 3.2, G);
+  });
+  return outline(c, '#1e3d10', 0.35);
+}
+// Dấu "lớn chậm" 20x14 (2x của SPR2.slowSnail[f]): ốc sên vỏ cam xoắn, khung 1 thân co, đầu thụt vào
+function slowSnailHD(f) {
+  const SHELL = ['#ffe9a0', '#ffd06a', '#e89a3a', '#c06a28'], BODY = ['#f8f2dc', '#e4dcb6', '#c9bf98', '#a39670'];
+  const tail = f ? 4 : 2;
+  const c = draw(20, 14, x => {
+    // thân: dải dưới vỏ, đuôi thon trái, cổ + đầu tròn bên phải
+    R(x, BODY[1], tail, 10, 16 - tail, 1); R(x, BODY[2], tail, 11, 18 - tail, 1); R(x, BODY[3], tail, 11, 2, 1);
+    R(x, BODY[2], 12, 9, 3, 2); R(x, BODY[1], 12, 9, 2, 1);
+    ball(x, 16, 8, 2, 2.4, BODY, { noise: 0 });
+    ball(x, 7, 6, 5, 4.2, SHELL, { spec: true, noise: 0.04, seed: 7 });
+    // vân xoắn: từ tâm ra mép phải, mép sáng ở trong vòng xoắn
+    const SP = [[7, 6], [8, 6], [8, 7], [7, 8], [5, 8], [4, 7], [4, 5], [5, 4], [7, 3], [9, 4], [10, 6], [10, 8], [9, 9]];
+    for (let i = 1; i < SP.length; i++) line(x, '#a85a1e', SP[i - 1][0], SP[i - 1][1], SP[i][0], SP[i][1]);
+    dots(x, '#fff0b8', [[6, 5], [6, 4], [5, 5]]);
+  });
+  outline(c, OUT, 0.35);
+  // râu mắt (2x của các điểm SNAIL_EYES bộ cũ): nét 1px, mắt 2x2 có chấm sáng
+  const x = c.getContext('2d');
+  const eyes = f ? [[16, 5, 16, 2], [14, 5, 12, 2]] : [[16, 5, 18, 2], [14, 5, 14, 2]];
+  for (const [x0, y0, x1, y1] of eyes) { line(x, OUT, x0, y0, x1, y1); R(x, OUT, Math.min(x1, 18), y1 - 2, 2, 2); R(x, '#ffffff', Math.min(x1, 18), y1 - 2); }
+  return c;
+}
 function woodHD() {
   const c = draw(24, 24, x => {
     const log = (lx, ly) => {
@@ -2273,6 +2323,8 @@ Object.assign(SPR12, {
   staminaTired: boltHD(true),
   sweat: [sweatHD(0), sweatHD(1)],
   season: { xuan: hoaMaiHD(), ha: sunHD(), thu: mapleHD(), dong: snowHD() },
+  seasonTag: seasonTagHD(),
+  slowSnail: [slowSnailHD(0), slowSnailHD(1)],
   wood: woodHD(),
   stone: stoneHD(),
   guidebook: guidebookHD(),
@@ -2319,7 +2371,7 @@ export const SPR12_FROM = {
   bushes: 'SPR2', rock: 'SPR2', rocks: 'SPR2', stump: 'SPR2', forestTile: 'SPR2', forest: 'SPR2', lampPost: 'SPR2', bench: 'SPR2',
   ripe: 'SPR', product: 'SPR', grain: 'SPR', bubble: 'SPR', sparkle: 'SPR', arrow: 'SPR', sign: 'SPR',
   items: 'SPR+SPR3', status: 'SPR+SPR3',
-  tools: 'SPR2', stamina: 'SPR2', staminaTired: 'SPR2', sweat: 'SPR2', season: 'SPR2', wood: 'SPR2', stone: 'SPR2', guidebook: 'SPR2',
+  tools: 'SPR2', stamina: 'SPR2', staminaTired: 'SPR2', sweat: 'SPR2', season: 'SPR2', seasonTag: 'SPR2', slowSnail: 'SPR2', wood: 'SPR2', stone: 'SPR2', guidebook: 'SPR2',
   todo: 'SPR2', giftIcon: 'SPR2', alertArrow: 'SPR2', barkBubble: 'SPR2', dogChain: 'SPR2', stunStars: 'SPR2', barkArrow: 'SPR2',
   sausage: 'SPR2', sausageGround: 'SPR2', badges: 'SPR2',
   fx: 'SPR3', strayArrow: 'SPR3', grainScatter: 'SPR3', praise: 'SPR3', trickIcon: 'SPR3', cmdBubble: 'SPR3', sniffMark: 'SPR3',

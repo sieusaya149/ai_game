@@ -122,6 +122,7 @@ kbd {
 #seasonquest { background: #eaf8e0; border-color: #5aa83c; box-shadow: 0 3px 0 #3c7a28, 0 6px 10px rgba(0, 0, 0, 0.22); }
 #seasonquest .btn { pointer-events: auto; margin-top: 4px; }
 .season-tag { display: inline-block; padding: 0 6px; border-radius: 8px; background: #d8f2c4; color: #2f6b1c; font-size: 11px; font-weight: 900; white-space: nowrap; }
+.season-tag .season-ico { width: 10px; height: 10px; margin-right: 3px; vertical-align: -1px; image-rendering: pixelated; }
 #tutorial.pop, #coutquest.pop, #seasonquest.pop { animation: pop 0.35s; }
 .tut-step { font-size: 10.5px; font-weight: 900; color: var(--orange-d); text-transform: uppercase; letter-spacing: 0.05em; }
 .tut-text { font-size: 13.5px; font-weight: 800; line-height: 1.25; }
