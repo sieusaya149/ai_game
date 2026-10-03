@@ -31,10 +31,18 @@ export function plantedCrop(s, idx, progress) {
 }
 
 // Ghi sẵn bản lưu trước khi trang tải. Chỉ ghi khi chưa có save, nên tải lại không ghi đè.
+// Bản lưu vừa dựng (savedAt trong 20 giây quanh lúc gọi) thì lấy giờ lúc trang tải làm savedAt: máy chậm tải trang quá 3 giây
+// thì game tưởng người chơi vắng nhà, chạy bù (xóa kẻ săn mồi, kẹp bệnh) và hiện màn "Trong lúc bạn vắng nhà" chắn đường.
+// Test cố ý lùi savedAt (tua giờ) hay dời về tương lai thì không bị đụng tới.
 export async function seedSave(context, save, opts = {}) {
-  await context.addInitScript(([key, json]) => {
-    try { if (!localStorage.getItem(key)) localStorage.setItem(key, json); } catch {}
-  }, [SAVE_KEY, JSON.stringify(save)]);
+  await context.addInitScript(([key, json, at]) => {
+    try {
+      if (localStorage.getItem(key)) return;
+      const o = JSON.parse(json);
+      if (o.savedAt >= at - 20_000 && o.savedAt <= at + 1000) o.savedAt = Date.now();
+      localStorage.setItem(key, JSON.stringify(o));
+    } catch {}
+  }, [SAVE_KEY, JSON.stringify(save), Date.now()]);
   // Đã gợi ý tiết kiệm pin rồi: khỏi hiện hộp gợi ý giữa chừng lúc máy ảo chạy chậm (test riêng cho gợi ý dùng seedSave với { hint: true })
   if (!opts.hint) await context.addInitScript(() => { try { if (!localStorage.getItem('nongtrai-pref')) localStorage.setItem('nongtrai-pref', JSON.stringify({ battery: false, hinted: true })); } catch {} });
 }
