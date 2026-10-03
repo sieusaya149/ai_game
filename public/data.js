@@ -54,7 +54,10 @@ export const CROPS = {
 export const CROP_GROUPS = { short: 'Ngắn ngày', mid: 'Trung bình', long: 'Dài ngày' };
 // Chất lượng nông sản ★1–3 (Phase 3): khóa vật phẩm ★1 là id cây như bản lưu cũ ('cai'), ★2/★3 thêm hậu tố ('cai@2').
 // Chỉ nông sản cây trồng có sao; sản phẩm vật nuôi có món "sao" riêng (sua_ngon, len_xoan).
-export const STARS = { max: 3, mul: [1, 1.5, 2] };
+// Luật "chăm kỹ" (issue 52): không lúc nào khô hẳn khi cây đang lớn, sâu không quá bugMs (giờ vườn), có bón phân thì ★2;
+// thêm ít nhất một lần chăm tay (máy, khách, trời không tính) thì ★3; lỡ một điều thì ★1.
+// orderLv: từ cấp này đơn hàng có lúc đòi ★2 / ★3 (xác suất orderP)
+export const STARS = { max: 3, mul: [1, 1.5, 2], bugMs: 30_000, orderLv: 5, orderP: [0.25, 0.1] };
 export const starKey = (id, star = 1) => (star > 1 ? `${id}@${star}` : id);
 export const starOf = k => { const m = /@([23])$/.exec(k); return m && CROPS[k.slice(0, -2)] ? +m[1] : 1; };
 export const baseOf = k => (starOf(k) > 1 ? k.slice(0, -2) : k);

@@ -131,7 +131,7 @@ test('bón phân tăng sản lượng, thuốc tăng trưởng đẩy nhanh', ()
   assert.ok(s.plots[0].crop.progress >= 1);
   assert.equal(G.perform(s, T(0), 'growth').ok, false);
   G.perform(s, T(0), 'harvest');
-  assert.equal(s.basket.cai, Math.round(CROPS.cai.yield * 1.5));
+  assert.equal(s.basket['cai@3'], Math.round(CROPS.cai.yield * 1.5));   // tưới tay, bón phân, không khô, không sâu: ★3 (issue 52)
 });
 
 test('mở rộng đất theo thứ tự (vườn chuyển từ v1 còn ô khóa)', () => {

@@ -8,7 +8,7 @@ import { SPR3 } from './art3.js';
 import { SPR4 } from './art4.js';
 import { characterHD } from './art5.js';
 
-const FILES = [6, 7, 8, 9, 10, 11, 12, 13];
+const FILES = [6, 7, 8, 9, 10, 11, 12, 13, 52];   // art52: dấu sao nông sản (issue 52), hình mới nên tự mang bản thường SPR52_OLD
 const OLD = [SPR, SPR2, SPR3, SPR4];
 const MAP = new WeakMap();
 const stats = { files: [], linked: 0, bad: [] };
@@ -41,8 +41,9 @@ for (const [i, m] of mods) {
   // cặp không đặt chung đường khóa được (trùng tên ở hai bộ cũ khác cỡ): SPRn_EXTRA.<tên> nối tay theo EXTRA
   for (const [n, img] of Object.entries(m[`SPR${i}_EXTRA`] ?? {})) { const o = EXTRA[n]?.(); if (o) linkPair(o, img); else stats.bad.push(`SPR${i}_EXTRA.${n}: không biết thay ảnh nào`); }
   const from = m[`SPR${i}_FROM`] ?? {};   // khóa nào chỉ thay cho một bộ cũ (vd crow: 'SPR')
+  const own = m[`SPR${i}_OLD`];           // hình mới (không có trong bộ cũ): file tự xuất bản thường cùng khóa
   for (const k of Object.keys(S)) {
-    const olds = (from[k] ? String(from[k]).split('+').map(n => OLD_BY[n]) : OLD).filter(O => O?.[k] != null);
+    const olds = own?.[k] != null ? [own] : (from[k] ? String(from[k]).split('+').map(n => OLD_BY[n]) : OLD).filter(O => O?.[k] != null);
     if (!olds.length) stats.bad.push(`SPR${i}.${k}: bộ cũ không có khóa này`);
     for (const O of olds) link(O[k], S[k], `SPR${i}.${k}`);
   }

@@ -7,6 +7,7 @@ import {
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
   TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce,
 } from './data.js';
+import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng ★ (issue 52)
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
@@ -413,6 +414,18 @@ function goneAnimalsValue(prev, next) {
   }
   return v;
 }
+// Cây có ở bản trước mà đã hái (ô trống hoặc đã gieo vụ khác) đã thành nông sản: cho tăng thêm chừng giá trần của chúng
+// (issue 52: thu hoạch cả ruộng ★3 một lúc). Giá trần = sản lượng có bón phân × giá sao cao nhất vụ đó còn giữ được.
+function goneCropsValue(prev, next) {
+  let v = 0;
+  for (const p of prev.plots ?? []) {
+    const c = p.crop, n = next.plots?.[p.idx]?.crop;
+    if (!c || c.dead || c.rotten || !CROPS[c.id] || (n && n.id === c.id && n.planted === c.planted)) continue;
+    const top = careLost(c) ? 1 : STARS.max;   // chưa lỡ chăm kỹ thì còn kịp bón phân, chăm tay lên ★3
+    v += sellPrice(starKey(c.id, top)) * Math.max(0, cropYield({ ...c, fert: true }) - (c.stolen || 0));
+  }
+  return v;
+}
 // prev, next: hai bản lưu liên tiếp của cùng vườn; dtMs: thời gian ngoài đời giữa hai bản (server tính, có chặn trên).
 // Hàm thuần → { ok: true } hoặc { ok: false, reason: 'time'|'coins'|'exp', msg }
 export function checkSaveJump(prev, next, dtMs) {
@@ -420,7 +433,7 @@ export function checkSaveJump(prev, next, dtMs) {
   const speed = next.mode === 'online' ? 1 : Math.max(...SPEEDS);   // online khóa x1 (issue 23)
   if (sim > Math.max(0, dtMs) * speed + J.simSlack) return { ok: false, reason: 'time', msg: 'Vườn chạy nhanh hơn thời gian thật' };
   const k = ((prev.plots ?? []).filter(p => p.unlocked && !p.removed).length + J.plotsExtra) * sim / MIN;
-  if (wealthOf(next) - wealthOf(prev) > J.wealth + J.wealthPerPlotMin * k + goneAnimalsValue(prev, next)) return { ok: false, reason: 'coins', msg: 'Xu và đồ tăng nhanh vô lý' };
+  if (wealthOf(next) - wealthOf(prev) > J.wealth + J.wealthPerPlotMin * k + goneAnimalsValue(prev, next) + goneCropsValue(prev, next)) return { ok: false, reason: 'coins', msg: 'Xu và đồ tăng nhanh vô lý' };
   if ((next.exp || 0) - (prev.exp || 0) > J.exp + J.expPerPlotMin * k) return { ok: false, reason: 'exp', msg: 'Kinh nghiệm tăng nhanh vô lý' };
   return { ok: true };
 }
@@ -592,11 +605,13 @@ function cockCrow(s) {
 }
 
 function stepPlot(s, p, d) {
+  const wet = p.water > 0;
   if (s.weather === 'rain') p.water = 100;
   else if (p.water > 0) p.water = Math.max(0, p.water - FARMING.waterDrainPerMin * (d / MIN) * (s.weather === 'sun' ? 1.5 : 1));
   if (!p.weeds && chance(FARMING.weedChancePerMin, d)) p.weeds = true;
   const c = p.crop;
   if (!c || c.dead || c.rotten) return;
+  if (c.progress < 1) careWatch(s, p, c, wet);
   const def = CROPS[c.id], at = plotCenter(s, p.idx);
   if (c.progress >= 1) { // chín: tiếp tục già đi, quá OVERRIPE thì héo
     c.progress += d / def.grow;
@@ -615,6 +630,27 @@ function stepPlot(s, p, d) {
   if (c.progress >= 1) { c.ripeAt = s.time; emit({ type: 'ripe', crop: c.id }); fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
   else if (chance(FARMING.bugChancePerMin, d)) { c.bugs = true; c.bugSince = s.time; fxEv(at.x, at.y, 'Có sâu! 🐛', COL.bad); }
 }
+
+// ---------- Chất lượng ★ (issue 52) ----------
+// Theo dõi "chăm kỹ" trong lúc cây còn lớn: đất vừa cạn hẳn (có nước rồi về 0; gieo xuống đất khô chưa tính) và sâu lâu nhất.
+// Ghi vào crop.q nên sao chỉ tụt chứ không lên lại; bón phân là crop.fert, chăm tay là q.hand (DO.plot đặt).
+const qOf = c => (c.q ??= cropQuality());
+function careWatch(s, p, c, wet) {   // gọi mỗi bước tick, trước khi xét sâu/bệnh
+  const q = qOf(c);
+  if (wet && p.water <= 0) q.dry = true;
+  if (c.bugs) q.bugMax = Math.max(q.bugMax || 0, s.time - c.bugSince);
+}
+// Đã lỡ "chăm kỹ" (khô hẳn, sâu quá lâu, bệnh): vụ này chỉ còn ★1, không lấy lại được
+const careLost = c => { const q = c.q ?? cropQuality(); return !!(q.dry || c.sick || (q.bugMax || 0) > STARS.bugMs); };
+// Số sao vụ này cho nếu thu hoạch ngay bây giờ (1..3). Thuần theo crop: mọi điều kiện đã ghi sẵn trong crop.q / crop.fert.
+// Chăm kỹ (không khô hẳn, sâu ≤ 30 giây, có bón phân) thì ★2; thêm ít nhất một lần chăm tay thì ★3. Còn lại ★1.
+// Cây trái mùa (issue 54 đặt crop.offSeason) không ra ★3.
+export function cropStar(c) {
+  if (!c || !c.fert || careLost(c)) return 1;
+  return c.q?.hand && !c.offSeason ? 3 : 2;
+}
+// Chăm tay của chính người chơi (tưới, bắt sâu, phun thuốc, bón phân): điều kiện để ra ★3. Máy (issue 58) và khách không gọi.
+const handCare = c => { if (c) qOf(c).hand = true; };
 
 // ---------- Vòng đời ----------
 // Việc con vật làm được ở giai đoạn hiện tại: 'product' | 'plow' | 'sell' | 'vitamin' (bảng STAGE_CAN)
@@ -1990,13 +2026,23 @@ function stepOrders(s) {
   emit({ type: 'order' });
 }
 
+// Từ cấp STARS.orderLv, món nông sản trong đơn có lúc đòi ★2 / ★3 (issue 52); thưởng tính theo giá có sao
+function orderStar(lv, id) {
+  if (lv < STARS.orderLv) return id;
+  const r = Math.random(), [p2, p3] = STARS.orderP;
+  return starKey(id, r < p3 ? 3 : r < p3 + p2 ? 2 : 1);
+}
+// Đơn hàng đọc sao: món ★n nhận nông sản cùng loại từ ★n trở lên (khóa xếp sao thấp trước, giao thì lấy sao thấp trước)
+const orderKeys = k => (CROPS[baseOf(k)] ? [1, 2, 3].filter(n => n >= starOf(k)).map(n => starKey(baseOf(k), n)) : [k]);
+export const orderHave = (s, k) => orderKeys(k).reduce((a, x) => a + have(s, x), 0);
+
 function makeOrder(s) {
   const lv = level(s), pool = Object.keys(CROPS).filter(k => CROPS[k].lv <= lv), items = {};
-  for (let i = rint(1, 2); i > 0 && pool.length; i--) items[pool.splice(rint(0, pool.length - 1), 1)[0]] = rint(2, 5);
+  for (let i = rint(1, 2); i > 0 && pool.length; i--) items[orderStar(lv, pool.splice(rint(0, pool.length - 1), 1)[0])] = rint(2, 5);
   // trứng: gà, hoặc trứng vịt khi làng đã biết nhà mình nuôi được vịt
   if (Math.random() < 0.3) items[lv >= ANIMALS.vit.lv && Math.random() < 0.4 ? 'trung_vit' : 'trung'] = rint(2, 4);
   let price = 0, exp = 0;
-  for (const [k, n] of Object.entries(items)) { price += sellPrice(k) * n; exp += (CROPS[k]?.exp ?? 2) * n; }
+  for (const [k, n] of Object.entries(items)) { price += sellPrice(k) * n; exp += (CROPS[baseOf(k)]?.exp ?? 2) * n; }
   return { id: s.nextId++, who: pick(ORDERS.people), items, coins: Math.round(price * ORDERS.rewardMul), exp: Math.round(exp * ORDERS.rewardMul / 2) };
 }
 
@@ -2403,27 +2449,27 @@ const DO = {
         p.crop = { id: s.selectedSeed, progress: 0, planted: s.time, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: cropQuality() };
         return res(true, `Đã gieo ${def.name}`, [say(at, '🌱')], 'plant');
       }
-      case 'water': s.can--; p.water = 100; return res(true, 'Đã tưới nước', [say(at, '💧', '#7ad7ff')], 'water');
+      case 'water': s.can--; p.water = 100; handCare(c); return res(true, 'Đã tưới nước', [say(at, '💧', '#7ad7ff')], 'water');
       case 'weed': p.weeds = false; return res(true, 'Đã nhổ cỏ', [say(at, '🌿')], 'pop');
       case 'spray': {
         take(s, 'pesticide');
         if (c.bugs) s.stats.bugs++;
-        c.bugs = false; c.sick = false;
+        c.bugs = false; c.sick = false; handCare(c);
         return res(true, 'Cây khỏe lại rồi', [say(at, 'Hết sâu! ✨')], 'spray');
       }
       case 'catch':
-        if (Math.random() < FARMING.handCatchChance) { c.bugs = false; s.stats.bugs++; return res(true, 'Bắt được sâu rồi!', [say(at, 'Bắt được! 🐛')], 'pop'); }
+        if (Math.random() < FARMING.handCatchChance) { c.bugs = false; s.stats.bugs++; handCare(c); return res(true, 'Bắt được sâu rồi!', [say(at, 'Bắt được! 🐛')], 'pop'); }
         return res(true, 'Con sâu chạy mất, thử lại nhé', [say(at, 'Trượt rồi!', COL.bad)], 'pop');
-      case 'fertilize': take(s, 'fertilizer'); c.fert = true; return res(true, 'Đã bón phân', [say(at, '+50% thu hoạch')], 'plant');
+      case 'fertilize': take(s, 'fertilizer'); c.fert = true; handCare(c); return res(true, 'Đã bón phân', [say(at, '+50% thu hoạch')], 'plant');
       case 'growth':
         take(s, 'growth'); c.boosts++; c.progress += FARMING.growthBoost;
         if (c.progress >= 1 && !c.ripeAt) c.ripeAt = s.time;
         return res(true, 'Cây lớn vọt lên', [say(at, 'Lớn vọt! ⚡')], 'spray');
       case 'harvest': {
-        const qty = harvestQty(c), def = CROPS[c.id];
-        give(s, c.id, qty); s.stats.harvests++; addExp(s, def.exp);
+        const qty = harvestQty(c), def = CROPS[c.id], key = starKey(c.id, cropStar(c)), nm = itemName(key);   // nông sản theo sao (issue 52)
+        give(s, key, qty); s.stats.harvests++; addExp(s, def.exp);
         p.crop = null; p.soil = 'untilled';
-        return res(true, `Thu hoạch ${qty} ${def.name}`, [say(at, `+${qty} ${def.name}`), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp)], 'harvest');
+        return res(true, `Thu hoạch ${qty} ${nm}`, [say(at, `+${qty} ${nm}`, starOf(key) > 2 ? COL.coin : COL.good), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp)], 'harvest');
       }
       case 'clear': p.crop = null; p.soil = 'untilled'; return res(true, 'Đã dọn sạch ô đất', [say(at, '🧹')], 'dig');
     }
@@ -2819,7 +2865,7 @@ const hostLevel = h => (h?.visit ? h.visit.level || 1 : level(h));
 const STEAL = {
   crop: {
     find: (s, o) => { const p = s.plots?.[o.idx]; return p?.unlocked && ripeCrop(p) ? p : null; },
-    item: p => p.crop.id,
+    item: p => starKey(p.crop.id, cropStar(p.crop)),   // cây chín có sao thì trộm được đúng hàng có sao
     left: p => harvestQty(p.crop),
     thieves: p => p.crop.robbed ?? [],
     do: (s, p, by, n) => { p.crop.stolen = (p.crop.stolen || 0) + n; p.crop.robbed = [...(p.crop.robbed ?? []), by]; },
@@ -2884,7 +2930,7 @@ export const robsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.t
 // Tổng giá trị đồ đang chín chờ lấy trong vườn (cây chín, trứng dưới đất, sữa và lông đang chờ)
 export function ripeValue(s) {
   let v = 0;
-  for (const p of s?.plots ?? []) if (p.unlocked && ripeCrop(p)) v += sellPrice(p.crop.id) * harvestQty(p.crop);
+  for (const p of s?.plots ?? []) if (p.unlocked && ripeCrop(p)) v += sellPrice(starKey(p.crop.id, cropStar(p.crop))) * harvestQty(p.crop);
   v += (s?.eggs?.length ?? 0) * sellPrice('trung');
   for (const a of s?.animals ?? []) if (a.ready && ANIMALS[a.type]?.product) v += sellPrice(ANIMALS[a.type].product);
   return v;
@@ -3291,8 +3337,11 @@ export function setLook(s, look) {
 export function fulfillOrder(s, orderId) {
   const o = s.orders.find(x => x.id === orderId);
   if (!o) return R(false, 'Không thấy đơn hàng này');
-  for (const [k, n] of Object.entries(o.items)) if (have(s, k) < n) return R(false, `Chưa đủ ${itemName(k).toLowerCase()} (cần ${n})`);
-  for (const [k, n] of Object.entries(o.items)) take(s, k, n);
+  for (const [k, n] of Object.entries(o.items)) if (orderHave(s, k) < n) return R(false, `Chưa đủ ${itemName(k).toLowerCase()} (cần ${n})`);
+  for (const [k, n] of Object.entries(o.items)) {
+    let left = n;
+    for (const x of orderKeys(k)) { const m = Math.min(left, have(s, x)); if (m) take(s, x, m); left -= m; }
+  }
   addCoins(s, o.coins); addExp(s, o.exp); s.stats.orders++;
   s.orders.splice(s.orders.indexOf(o), 1);
   log(s, `Giao đơn cho ${o.who}, nhận ${o.coins} xu`);
