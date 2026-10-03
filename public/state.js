@@ -5,7 +5,7 @@ import {
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
-  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON,
+  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON, MASTERY, masteryLevel,
 } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
@@ -85,6 +85,27 @@ function addExp(s, n) {
     log(s, `Lên cấp ${l}, thưởng ${l * 20} xu`);
     snd('levelup');
   }
+}
+
+// Thành thạo (issue 51): { lv, n, next } của một loại cây; next = số lần thu hoạch cần cho cấp kế, null khi đã cấp 3
+export function masteryOf(s, id) {
+  const m = s.mastery?.[id] ?? { lv: 1, n: 0 }, th = MASTERY.thresholds[CROPS[id].group];
+  return { lv: m.lv, n: m.n, next: th[m.lv - 1] ?? null };
+}
+const mastery = masteryOf;
+const chance1 = p => p > 0 && Math.random() < p;
+// Cộng một lần thu hoạch cho loại cây; chạm ngưỡng thì lên cấp (cấp lưu thẳng, không tụt khi chỉnh bảng). Trả chữ bay.
+function bumpMastery(s, id, at) {
+  const m = (s.mastery ||= {})[id] ||= { lv: 1, n: 0 };
+  m.n++;
+  const lv = masteryLevel(CROPS[id].group, m.n);
+  if (lv <= m.lv) return [];
+  m.lv = lv;
+  emit({ type: 'mastery', crop: id, lv });
+  log(s, `Thành thạo ${CROPS[id].name} lên cấp ${lv}`);
+  addExp(s, MASTERY.exp[lv - 1]);
+  snd('levelup');
+  return [say({ x: at.x, y: at.y - 30 }, `Thành thạo cấp ${lv}! 🟡`, COL.coin)];
 }
 
 function checkAch(s) {
@@ -630,7 +651,7 @@ function stepPlot(s, p, d) {
     c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm;
   }
   if (c.progress >= 1) { c.ripeAt = s.time; emit({ type: 'ripe', crop: c.id }); fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
-  else if (chance(FARMING.bugChancePerMin, d)) { c.bugs = true; c.bugSince = s.time; fxEv(at.x, at.y, 'Có sâu! 🐛', COL.bad); }
+  else if (chance(FARMING.bugChancePerMin * MASTERY.bugMul[mastery(s, c.id).lv - 1], d)) { c.bugs = true; c.bugSince = s.time; fxEv(at.x, at.y, 'Có sâu! 🐛', COL.bad); }
 }
 
 // ---------- Vòng đời ----------
@@ -2060,7 +2081,7 @@ export function toolArea(s, tool, idx, id = TOOLS[tool]?.act[0]) {
 // Thu hoạch nhiều ô: lấy theo thứ tự tới khi giỏ không chứa thêm được nữa
 function fitBasket(s, tiles) {
   let left = room(s);
-  return tiles.filter(i => { const q = harvestQty(s.plots[i].crop); if (q > left) { left = 0; return false; } left -= q; return true; });
+  return tiles.filter(i => { const q = harvestQty(s.plots[i].crop, s); if (q > left) { left = 0; return false; } left -= q; return true; });
 }
 
 // Gắn danh sách ô (tiles) và khóa theo công cụ vào các hành động trên ô ruộng
@@ -2127,7 +2148,7 @@ function plotActs(s, t) {
     return A;
   }
   if (c.dead || c.rotten) return [mk('clear', '🧹', c.dead ? 'Dọn cây chết' : 'Dọn cây héo')];
-  if (c.progress >= 1) return [mk('harvest', '🧺', `Thu hoạch ${CROPS[c.id].name} (${harvestQty(c)})`, room(s) < harvestQty(c) ? FULL : null)];
+  if (c.progress >= 1) return [mk('harvest', '🧺', `Thu hoạch ${CROPS[c.id].name} (${harvestQty(c, s)})`, room(s) < harvestQty(c, s) ? FULL : null)];
   const noPest = have(s, 'pesticide') <= 0 ? noItem('pesticide') : null;
   if (c.sick) A.push(mk('spray', '🧴', 'Phun thuốc chữa bệnh', noPest));
   if (c.bugs) A.push(mk('spray', '🧴', 'Phun thuốc trừ sâu', noPest), mk('catch', '🤏', 'Bắt sâu bằng tay'));
@@ -2346,8 +2367,9 @@ function doorActs(s, t) {
 
 // ---------- perform ----------
 // Sản lượng một ô: trừ phần khách đã trộm mất (issue 30, `crop.stolen`)
-const cropYield = c => Math.round(CROPS[c.id].yield * (c.fert ? 1 + FARMING.fertYield : 1));
-const harvestQty = c => Math.max(0, cropYield(c) - (c.stolen || 0));
+// Thành thạo cộng thẳng vào sản lượng (đọc cấp lúc thu hoạch)
+const cropYield = (c, s) => Math.round(CROPS[c.id].yield * (c.fert ? 1 + FARMING.fertYield : 1)) + (s ? MASTERY.yield[mastery(s, c.id).lv - 1] : 0);
+const harvestQty = (c, s) => Math.max(0, cropYield(c, s) - (c.stolen || 0));
 const res = (ok, msg, fx = [], sound, extra) => ({ ok, msg, fx, ...(sound ? { sound } : {}), ...extra });
 const bad = (msg, at) => res(false, msg, at ? [{ text: msg, color: COL.bad, x: at.x, y: at.y }] : [], 'error');
 
@@ -2437,14 +2459,16 @@ const DO = {
         if (c.progress >= 1 && !c.ripeAt) c.ripeAt = s.time;
         return res(true, 'Cây lớn vọt lên', [say(at, 'Lớn vọt! ⚡')], 'spray');
       case 'harvest': {
-        const def = CROPS[c.id];
-        let qty = harvestQty(c);
+        const def = CROPS[c.id], fx = [];
+        let qty = harvestQty(c, s);
         // đúng mùa: 10% lần thu thêm sản lượng (chỉ khi giỏ còn chỗ), từ cấp SEASON.minLevel
         const bonus = seasonActive(s) && seasonFit(s, c.id) === 'in' && qty > 0 && room(s) >= qty + SEASON.bonusQty && Math.random() < SEASON.bonusChance ? SEASON.bonusQty : 0;
         qty += bonus;
         give(s, c.id, qty); s.stats.harvests++; addExp(s, def.exp);
+        if (chance1(MASTERY.seedBack[mastery(s, c.id).lv - 1])) { give(s, `seed_${c.id}`); fx.push(say({ x: at.x, y: at.y - 20 }, '+1 hạt 🌱')); }
+        fx.push(...bumpMastery(s, c.id, at));
         p.crop = null; p.soil = 'untilled';
-        return res(true, `Thu hoạch ${qty} ${def.name}${bonus ? ` (đúng mùa +${bonus})` : ''}`,[say(at, `+${qty} ${def.name}`), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp)], 'harvest');
+        return res(true, `Thu hoạch ${qty} ${def.name}${bonus ? ` (đúng mùa +${bonus})` : ''}`, [say(at, `+${qty} ${def.name}`), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp), ...fx], 'harvest');
       }
       case 'clear': p.crop = null; p.soil = 'untilled'; return res(true, 'Đã dọn sạch ô đất', [say(at, '🧹')], 'dig');
     }
@@ -2841,7 +2865,7 @@ const STEAL = {
   crop: {
     find: (s, o) => { const p = s.plots?.[o.idx]; return p?.unlocked && ripeCrop(p) ? p : null; },
     item: p => p.crop.id,
-    left: p => harvestQty(p.crop),
+    left: (p, s) => harvestQty(p.crop, s),
     thieves: p => p.crop.robbed ?? [],
     do: (s, p, by, n) => { p.crop.stolen = (p.crop.stolen || 0) + n; p.crop.robbed = [...(p.crop.robbed ?? []), by]; },
   },
@@ -2905,7 +2929,7 @@ export const robsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.t
 // Tổng giá trị đồ đang chín chờ lấy trong vườn (cây chín, trứng dưới đất, sữa và lông đang chờ)
 export function ripeValue(s) {
   let v = 0;
-  for (const p of s?.plots ?? []) if (p.unlocked && ripeCrop(p)) v += sellPrice(p.crop.id) * harvestQty(p.crop);
+  for (const p of s?.plots ?? []) if (p.unlocked && ripeCrop(p)) v += sellPrice(p.crop.id) * harvestQty(p.crop, s);
   v += (s?.eggs?.length ?? 0) * sellPrice('trung');
   for (const a of s?.animals ?? []) if (a.ready && ANIMALS[a.type]?.product) v += sellPrice(ANIMALS[a.type].product);
   return v;
@@ -2960,7 +2984,7 @@ function stealCheck(host, who, op, job, t) {
   if (!target) return no('nothing', NOTHING_STEAL);
   const by = String(who?.name ?? 'Người lạ');
   if (job.thieves(target).includes(by)) return no('robbed', 'Bạn trộm ở đây một lần rồi, để phần người khác');
-  const item = job.item(target), qty = stealQty(job.left(target));
+  const item = job.item(target), qty = stealQty(job.left(target, host));
   if ((who?.room ?? 0) < qty) return no('full', FULL);
   if (sellPrice(item) * qty > stealLeft(host, t)) return no('day_full', 'Vườn này hôm nay bị trộm nhiều rồi, mai quay lại nhé');
   return { ok: true, target, item, qty };
@@ -3077,7 +3101,7 @@ function helpDo(s, t, act, at) {
 }
 // Nhãn nút Trộm: lấy được mấy món và ô (hay con) còn lại bao nhiêu
 function stealLabel(s, o) {
-  const job = STEAL[o.act], target = job.find(s, o), left = job.left(target), qty = stealQty(left);
+  const job = STEAL[o.act], target = job.find(s, o), left = job.left(target, s), qty = stealQty(left);
   return `Trộm ${qty} ${itemName(job.item(target)).toLowerCase()} (còn ${left - qty})`;
 }
 function stealDo(s, t, at) {

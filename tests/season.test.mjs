@@ -91,6 +91,7 @@ test('đúng mùa: khoảng 10% lần thu có thêm sản lượng; trái mùa v
     const s = farm(day, lv); let extra = 0;
     for (let i = 0; i < n; i++) {
       s.basket = {}; s.exp = expFor(lv);   // EXP thu hoạch không làm lên cấp giữa chừng
+      s.mastery.cai = { lv: 1, n: 0 };     // giữ thành thạo cấp 1: thưởng sản lượng của issue 51 không lẫn vào phần đếm
       Object.assign(s.plots[0], { soil: 'tilled', water: 100, crop: { ...farm(day, lv).plots[0].crop, progress: 1 } });
       const r = G.perform(s, plot(0), 'harvest');
       assert.ok(r.ok);

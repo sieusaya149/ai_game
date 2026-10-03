@@ -21,11 +21,11 @@ Mỗi loại cây có cấp thành thạo 1–3, tăng theo số lần thu hoạ
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): với một cây mỗi nhóm, thu hoạch đúng số lần ngưỡng thì lên đúng cấp 2 rồi cấp 3, không sớm hơn một lần. Cấp 2 thu +1, cấp 3 thu +2 sản lượng.
-- [ ] Unit test: cấp 3 có kháng sâu (sâu tới chậm hơn cấp 1 với cùng hạt giống ngẫu nhiên cố định) và về lâu dài khoảng 30% lần thu được lại 1 hạt (thống kê nhiều lượt, dung sai rộng).
-- [ ] Unit test: cấp thành thạo giữ qua lưu và nạp, và là riêng cho từng loại cây.
-- [ ] Unit test: lên cấp phát sự kiện mức 🟡 có khóa gộp, và cộng EXP.
-- [ ] E2E (desktop + 360px): dựng bản lưu cây ngắn ngày ở 19 lần thu hoạch → thu một ô → thấy thông báo và màn chúc mừng lên cấp 2; mở chọn hạt thấy cấp và tiến độ đúng.
+- [x] Unit test (seam 1): với một cây mỗi nhóm, thu hoạch đúng số lần ngưỡng thì lên đúng cấp 2 rồi cấp 3, không sớm hơn một lần. Cấp 2 thu +1, cấp 3 thu +2 sản lượng.
+- [x] Unit test: cấp 3 có kháng sâu (sâu tới chậm hơn cấp 1 với cùng hạt giống ngẫu nhiên cố định) và về lâu dài khoảng 30% lần thu được lại 1 hạt (thống kê nhiều lượt, dung sai rộng).
+- [x] Unit test: cấp thành thạo giữ qua lưu và nạp, và là riêng cho từng loại cây.
+- [x] Unit test: lên cấp phát sự kiện mức 🟡 có khóa gộp, và cộng EXP.
+- [x] E2E (desktop + 360px): dựng bản lưu cây ngắn ngày ở 19 lần thu hoạch → thu một ô → thấy thông báo và màn chúc mừng lên cấp 2; mở chọn hạt thấy cấp và tiến độ đúng.
 
 ## Blocked by
 
