@@ -25,7 +25,7 @@ function profile(db, a, m) {
   for (const k of Object.keys(DEFAULT_LOOK)) look[k] = Number.isInteger(src[k]) && src[k] >= 0 && src[k] < (LOOK[k] ?? 100) ? src[k] : DEFAULT_LOOK[k];
   return { name: a.name, level: s ? levelInfo(s.exp || 0).level : 1, look };
 }
-const pub = p => ({ id: p.id, name: p.name, level: p.level, look: p.look, x: p.x, y: p.y, dir: p.dir });
+const pub = p => ({ id: p.id, name: p.name, level: p.level, look: p.look, x: p.x, y: p.y, dir: p.dir, sit: p.sit });
 
 export function createPresence(ctx, send) {
   const { db } = ctx;
@@ -53,7 +53,7 @@ export function createPresence(ctx, send) {
   }
   function flush(p) {
     p.timer = 0; p.sent = Date.now();
-    cast(p, { t: 'pos', id: p.id, x: p.x, y: p.y, dir: p.dir });
+    cast(p, { t: 'pos', id: p.id, x: p.x, y: p.y, dir: p.dir, sit: p.sit });
   }
   const chatLogs = new Map();   // tài khoản → giờ các tin tự gõ gần đây (đổi bản đồ / kết nối lại không xóa giới hạn)
   const say = (sock, ok, m) => {
@@ -79,7 +79,7 @@ export function createPresence(ctx, send) {
       const old = maps.get(map)?.get(a.id);
       if (old) leave(old.sock);   // cùng tài khoản ở kết nối cũ (máy cũ, kết nối chưa kịp đóng): thay luôn
       const room = maps.get(map) ?? maps.set(map, new Map()).get(map);
-      const p = { sock, id: a.id, map, ...profile(db, a, m), x: num(m.x, 0, 4096) ?? 0, y: num(m.y, 0, 4096) ?? 0, dir: num(m.dir, 0, 3) | 0, sent: 0, timer: 0 };
+      const p = { sock, id: a.id, map, ...profile(db, a, m), x: num(m.x, 0, 4096) ?? 0, y: num(m.y, 0, 4096) ?? 0, dir: num(m.dir, 0, 3) | 0, sit: m.sit === true, sent: 0, timer: 0 };
       sock.pres = p;
       send(sock, { t: 'joined', map: m.map, me: p.id, people: others(p).map(pub) });
       cast(p, { t: 'enter', p: pub(p) });
@@ -92,7 +92,7 @@ export function createPresence(ctx, send) {
       if (!p) return;
       const x = num(m.x, 0, 4096), y = num(m.y, 0, 4096);
       if (x == null || y == null) return;
-      Object.assign(p, { x, y, dir: num(m.dir, 0, 3) | 0 });
+      Object.assign(p, { x, y, dir: num(m.dir, 0, 3) | 0, sit: m.sit === true });
       if (p.timer) return;   // đã hẹn phát ở nhịp tới: lúc đó lấy vị trí mới nhất
       const wait = p.sent + GAP - Date.now();
       if (wait <= 0) flush(p); else p.timer = setTimeout(flush, wait, p);

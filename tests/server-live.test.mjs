@@ -62,6 +62,8 @@ test('làng: hai người cùng làng thấy nhau (tên, ngoại hình, cấp) v
   assert.deepEqual([p.id, p.x, p.y, p.dir], [r.people[0].id, 140, 182, 2]);
   b.send({ t: 'pos', x: 150, y: 200, dir: 1 });
   assert.equal((await until(a, 'pos')).x, 150);
+  a.send({ t: 'pos', x: 150, y: 190, dir: 0, sit: true });   // ngồi ghế: người khác thấy ngồi
+  assert.equal((await until(b, 'pos')).sit, true);
   await none(c, 'pos');
   await none(c, 'enter', 50);
 

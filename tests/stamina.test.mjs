@@ -60,6 +60,37 @@ test('hết thể lực vẫn làm được nhưng hệ số chậm là 2, khôn
   assert.equal(s.stamina, 0);
 });
 
+test('ngồi ghế đá: nhân vật được đặt đúng mặt ghế, đứng dậy thì về chỗ cũ', () => {
+  const s = atHour(newGame(), 9);
+  s.inv.deco_bench = 1;
+  assert.ok(G.placeDeco(s, 'deco_bench').ok);
+  const e = s.farm.ents.find(x => x.item === 'deco_bench');
+  const t = { kind: 'deco', id: e.id };
+  s.stamina = 40;
+  const from = { x: s.player.x, y: s.player.y };
+  assert.ok(G.perform(s, t, 'sit').ok);
+  const seat = G.seatOf(s, t);
+  assert.ok(seat);
+  assert.deepEqual({ x: s.player.x, y: s.player.y }, { x: seat.x, y: seat.y });
+  assert.equal(s.player.dir, 0);
+  G.standUp(s);
+  assert.deepEqual({ x: s.player.x, y: s.player.y }, from);
+  assert.equal(s.sit, false);
+});
+
+test('ngồi ghế đá trong làng: đặt giữa ghế, đứng dậy về chỗ cạnh ghế', () => {
+  const s = atHour(newGame(), 9);
+  G.enterScene(s, 'village');
+  s.stamina = 40;
+  const t = { kind: 'building', id: 'bench0' };
+  const from = { x: s.player.x, y: s.player.y };
+  assert.ok(G.perform(s, t, 'sit').ok);
+  const seat = G.seatOf(s, t);
+  assert.deepEqual({ x: s.player.x, y: s.player.y }, { x: seat.x, y: seat.y });
+  G.standUp(s);
+  assert.deepEqual({ x: s.player.x, y: s.player.y }, from);
+});
+
 test('ngủ trước 18h bị từ chối, bảng hành động của giường báo lý do', () => {
   const s = atHour(newGame(), 15);
   s.stamina = 20;

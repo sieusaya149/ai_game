@@ -350,16 +350,16 @@ function dogBite() {
 // mỗi khung hình: đổi bản đồ thì báo join, đi thì gửi vị trí tối đa LIVE.hz lần mỗi giây
 function liveFrame(now) {
   if (!sync || !state) return;
-  const p = state.player, x = Math.round(p.x), y = Math.round(p.y), dir = p.dir ?? 0, key = `${x},${y},${dir}`;
+  const p = state.player, x = Math.round(p.x), y = Math.round(p.y), dir = p.dir ?? 0, sit = !!state.sit, key = `${x},${y},${dir},${sit}`;
   const owner = state.visit?.owner, map = owner ? 'farm:' + owner : state.scene;   // vườn người khác: bản đồ vườn của chủ
   if (liveMap !== map) {
-    if (!sync.send({ t: 'join', map: owner ? 'farm' : state.scene, owner, x, y, dir, look: state.look })) return;
+    if (!sync.send({ t: 'join', map: owner ? 'farm' : state.scene, owner, x, y, dir, sit, look: state.look })) return;
     peers.clear(); ui.setLive(true, 0);
     liveMap = map; livePos = key; livePosAt = now;
     return;
   }
   if (key === livePos || now - livePosAt < 1000 / LIVE.hz) return;
-  if (sync.send({ t: 'pos', x, y, dir })) { livePos = key; livePosAt = now; }
+  if (sync.send({ t: 'pos', x, y, dir, sit })) { livePos = key; livePosAt = now; }
 }
 // câu chat nhanh / biểu cảm: hiện trên đầu mình ngay, gửi cho người cùng bản đồ
 function say(raw) { const text = cleanChat(raw); if (!text) return; me.chat = text; me.chatUntil = performance.now() + chatMs(text); sync?.send({ t: 'chat', text }); }

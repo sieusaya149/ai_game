@@ -30,7 +30,7 @@ export function sampleTrack(track, t) {
 // now = giờ trình duyệt (performance.now()), dùng làm mốc nhận
 export function createPeers() {
   const peers = new Map();
-  const add = (p, now) => peers.set(p.id, { id: p.id, name: p.name, level: p.level, look: p.look, dir: p.dir ?? 0, track: [{ t: now - LIVE.delayMs, x: p.x, y: p.y }], chat: null, emote: null });
+  const add = (p, now) => peers.set(p.id, { id: p.id, name: p.name, level: p.level, look: p.look, dir: p.dir ?? 0, sit: !!p.sit, track: [{ t: now - LIVE.delayMs, x: p.x, y: p.y }], chat: null, emote: null });
   return {
     clear: () => peers.clear(),
     get size() { return peers.size; },
@@ -47,7 +47,7 @@ export function createPeers() {
             const last = p.track.at(-1), gap = 1000 / LIVE.hz;
             if (now - last.t > gap * 2) p.track.push({ t: now - gap, x: last.x, y: last.y });
           }
-          p.track.push({ t: now, x: m.x, y: m.y }); p.dir = m.dir;
+          p.track.push({ t: now, x: m.x, y: m.y }); p.dir = m.dir; p.sit = !!m.sit;
           if (p.track.length > 8) p.track.splice(0, p.track.length - 8);
           return false;
         case 'chat': if (p) p.chat = { text: m.text, until: now + chatMs(m.text) }; return false;
@@ -59,7 +59,7 @@ export function createPeers() {
     view(me, now) {
       const list = [...peers.values()].map(p => {
         const at = sampleTrack(p.track, now - LIVE.delayMs);
-        return { id: p.id, name: p.name, level: p.level, look: p.look, dir: p.dir, x: at.x, y: at.y, moving: at.moving,
+        return { id: p.id, name: p.name, level: p.level, look: p.look, dir: p.dir, sit: p.sit, x: at.x, y: at.y, moving: at.moving,
           chat: p.chat && p.chat.until > now ? p.chat.text : null, emote: p.emote && p.emote.until > now ? { e: p.emote.e, age: (now - p.emote.t0) / LIVE.emoteMs } : null };
       });
       const full = crowdSplit(me, list);

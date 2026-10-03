@@ -1402,7 +1402,13 @@ export function render(ctx, f) {
     const fr = o.moving ? [1, 0, 2, 0][Math.floor(now / 125) % 4] : 0;
     const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
     shadow(o.x, o.y, 6);
-    add(o.y, () => person(o.look, dir, k, o.x - 8, o.y - 23));
+    add(o.y, () => {
+      if (o.sit && !o.moving) {   // người khác đang ngồi ghế: cùng dáng ngồi như mình
+        ctx.save(); ctx.beginPath(); ctx.rect(o.x - 12, o.y - 36, 24, 37); ctx.clip();
+        person(o.look, dir, 0, o.x - 8, o.y - 19);
+        ctx.restore();
+      } else person(o.look, dir, k, o.x - 8, o.y - 23);
+    });
   }
 
   items.sort((a, b) => a.y - b.y);

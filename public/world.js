@@ -870,6 +870,7 @@ export function hitTest(state, wx, wy) {
 // ---------- Lệnh đi tới ----------
 export function walkTo(state, w, x, y) {
   use(state);
+  ST.standUp(state);
   const p = state.player;
   w.pending = null; w.tapKey = null;
   w.path = findPath(p.x, p.y, x, y);
@@ -937,11 +938,13 @@ export function update(state, w, dt) {
     if (len > 0.15) {
       w.path = null; w.pending = null; w.tapKey = null;
       if (len > 1) { vx /= len; vy /= len; }
+      ST.standUp(state);   // đang ngồi ghế: đứng dậy về chỗ cạnh ghế rồi mới đi
       const ox = p.x, oy = p.y;
       moveBox(p, vx * speed * dt, vy * speed * dt);
       p.dir = dirOf(vx, vy);
       w.moving = Math.hypot(p.x - ox, p.y - oy) > 0.01;
     } else if (w.path?.length) {
+      ST.standUp(state);
       const wp = w.path[0], dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy);
       if (d < 1.5) { w.path.shift(); if (!w.path.length) w.path = null; }
       else {
@@ -975,6 +978,7 @@ export function update(state, w, dt) {
     else {
       w.repathT -= dt;
       if (!w.path || w.repathT <= 0) {
+        ST.standUp(state);
         const pos = targetPos(state, t);
         w.path = findPath(p.x, p.y, pos.x, pos.y);
         w.repathT = 0.5;

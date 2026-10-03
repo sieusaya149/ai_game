@@ -368,7 +368,7 @@ export function loadGame(raw) {
   s.carry = s.carry?.animalId != null ? { animalId: s.carry.animalId } : null; carriedAnimal(s);   // đang chở trên xe rùa (bản cũ không có): con không còn thì bỏ
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
-  s.stamina = clamp(s.stamina, 0, STAMINA.max); s.sit = false;
+  s.stamina = clamp(s.stamina, 0, STAMINA.max); standUp(s);   // lưu lúc đang ngồi: đứng dậy về chỗ cũ
   // bản lưu cũ: mọi công cụ cấp 1, bình tưới giữ số nước đang có (tối đa sức chứa)
   s.tools = Object.fromEntries(Object.keys(TOOLS).map(k => [k, { lv: clamp(Math.floor(s.tools?.[k]?.lv) || 1, 1, TOOL_MAX) }]));
   if (!(s.smith?.tool in TOOLS) || !Number.isFinite(s.smith.doneAt)) s.smith = null;
@@ -701,7 +701,17 @@ const closed = extra => ({ ok: false, msg: CLOSED, reason: 'closed', ...extra })
 // ---------- Thể lực & ngủ ----------
 // Hết thể lực thì đi và làm chậm: world chia tốc độ đi, main nhân thời gian hành động với hệ số này.
 export const slowFactor = s => (s.stamina <= 0 ? STAMINA.slow : 1);
-export const standUp = s => { s.sit = false; };
+// Đứng dậy khỏi ghế đá: về chỗ đứng cạnh ghế (s.sitFrom, nhớ lúc ngồi)
+export function standUp(s) {
+  if (s.sit && s.sitFrom) { s.player.x = s.sitFrom.x; s.player.y = s.sitFrom.y; }
+  s.sit = false; s.sitFrom = null;
+}
+// Chỗ ngồi trên mặt ghế (giữa ghế, sát mép dưới để vẽ sau ghế): ghế đá trang trí ngoài vườn hoặc ghế đá trong làng
+export function seatOf(s, t) {
+  if (t.kind === 'deco') { const d = mapOf(s).decos.find(x => x.id === t.id); return d ? { x: d.x, y: d.y + 0.5 } : null; }
+  const f = sceneMap(s).building(t.id)?.foot;
+  return f ? { x: (f.c + f.w / 2) * TS, y: (f.r + f.h) * TS + 0.5 } : null;
+}
 export const canSleep = s => dayFrac(s) >= (STAMINA.sleepHour - 6) / 24;
 const SLEEP_EARLY = `Để dành cho tối nay, ${STAMINA.sleepHour} giờ chiều mới ngủ được`;
 
@@ -724,7 +734,7 @@ export function wake(s) {
 export function sleep(s) {
   if (isAsleep(s)) return R(false, 'Bạn đang ngủ rồi', { reason: 'asleep' });
   if (!canSleep(s)) return R(false, SLEEP_EARLY, { reason: 'early' });
-  s.sit = false;
+  standUp(s);
   if (online(s)) {
     s.sleepUntil = now() + DAY_MS - villageCal(now()).tod;
     return R(true, 'Ngủ ngon nhé 😴', { sleeping: true });
@@ -833,7 +843,7 @@ function step(s, d, live, rich) {
   }
   if (s.sit) {   // ngồi ghế đá: hồi chậm, đầy thì tự đứng dậy
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.benchPerMin * d / MIN);
-    if (s.stamina >= STAMINA.max) { s.sit = false; toast('Khỏe re rồi, làm tiếp thôi 💪'); }
+    if (s.stamina >= STAMINA.max) { standUp(s); toast('Khỏe re rồi, làm tiếp thôi 💪'); }
   }
   if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
   heatGlass(s, false);   // nhà kính đang ngừng sưởi vì thiếu xu: đủ xu thì tự trả
@@ -3125,7 +3135,7 @@ function buildingActs(s, t) {
 }
 
 // Ghế đá (đồ trang trí ngoài vườn, ghế ngoài làng): ngồi thì hồi chậm tới khi đứng dậy (đi đâu đó) hoặc đầy
-const benchActs = s => [mk('sit', '🪑', 'Ngồi nghỉ', s.stamina >= STAMINA.max ? 'Bạn còn khỏe lắm, chưa cần nghỉ' : s.sit ? 'Đang ngồi nghỉ rồi' : null)];
+const benchActs = (s) => [mk('sit', '🪑', 'Ngồi nghỉ', s.stamina >= STAMINA.max ? 'Bạn còn khỏe lắm, chưa cần nghỉ' : s.sit ? 'Đang ngồi nghỉ rồi' : null)];
 function decoActs(s, t) {
   const e = s.farm.ents.find(x => x.id === t.id);
   if (e?.kind === 'grave') return [mk('flower', '🌸', e.flower ? 'Mộ đã có hoa' : `Đặt hoa lên mộ (chậu hoa còn ${have(s, 'deco_flower')})`, e.flower ? 'Mộ đã có hoa rồi' : have(s, 'deco_flower') <= 0 ? 'Cần một chậu hoa, mua ở chợ nhé' : null)];
@@ -3196,7 +3206,7 @@ export function perform(s, t, id) {
   if (!act) return bad('Chưa làm được việc này', at);
   if (act.disabled) return bad(act.disabled, at);
   if (s.scene === 'visit') return guestDo(s, t, id, at);
-  if (id !== 'sit') s.sit = false;
+  if (id !== 'sit') standUp(s);
   const area = t.kind === 'plot' && act.tiles?.length && !(act.tiles.length === 1 && act.tiles[0] === t.idx);   // dùng công cụ cấp cao: làm nhiều ô một lần
   const n = area ? act.tiles.length : 1;
   const r = area ? doArea(s, act.tiles, id, act.short) : DO[t.kind](s, t, id, at);
@@ -3474,7 +3484,7 @@ const DO = {
     }
     if (id === 'enter') return res(true, '', [], 'click', { go: BUILDING_DEFS[t.id].door.to });
     if (id === 'talk') return res(true, TALK[t.id].msg, [], 'click');
-    if (id === 'sit') return sitDown(s, at);
+    if (id === 'sit') return sitDown(s, at, seatOf(s, t));
     if (id === 'sleep') return res(true, '', [], 'click', { sleep: true });   // main mờ màn hình rồi gọi sleep(s)
     return res(true, '', [], 'click', { open: t.id === 'wardrobe' ? 'house' : t.id });
   },
@@ -3492,7 +3502,7 @@ const DO = {
       e.shut = false;
       return res(true, 'Đã gài lại bẫy chuột', [say(at, 'Gài bẫy 🪤')], 'click');
     }
-    return sitDown(s, at);
+    return sitDown(s, at, seatOf(s, t));
   },
 
   clutter(s, t, id, at) {
@@ -3512,8 +3522,9 @@ const DO = {
   door(s, t) { return res(true, '', [], 'click', { go: t.to }); },
 };
 
-function sitDown(s, at) {
+function sitDown(s, at, seat) {
   s.sit = true;
+  if (seat) { s.sitFrom = { x: s.player.x, y: s.player.y }; Object.assign(s.player, { x: seat.x, y: seat.y, dir: 0 }); }   // ngồi lên mặt ghế, quay mặt ra trước
   return res(true, 'Ngồi nghỉ một chút', [say(at, 'Hù... 😌')], 'click');
 }
 
@@ -3524,7 +3535,7 @@ export function enterScene(s, to) {
   if (!doorOf(s, to)) return R(false, 'Không có lối sang đó', { reason: 'no_door' });
   if (!hasScene(to)) return R(false, 'Chỗ này chưa mở', { reason: 'unknown' });
   const from = s.scene || 'farm';
-  s.scene = to; s.sit = false;
+  standUp(s); s.scene = to;
   const m = sceneMap(s), a = m.arrive[from] ?? m.spawn;
   Object.assign(s.player, { x: a.x, y: a.y, dir: a.dir ?? 0 });
   // lệnh Đi theo: chó lẽo đẽo sang bản đồ mới luôn; không thì nó ở lại vườn
@@ -3603,6 +3614,7 @@ export function startVisit(me, raw, owner) {
   if (!h) return null;
   // quạ của chủ đi theo (khách đuổi giúp được); thằng Tèo thì không, bắt trộm là việc của chủ
   // visit.level = cấp của chủ vườn: trong bản đi dạo `exp` là của khách, nên luật trộm phải đọc cấp chủ ở đây
+  standUp(me);
   const v = { ...me, threats: (h.threats ?? []).filter(t => t.kind === 'crow'), sit: false, scene: 'visit', visit: { owner, fed: false, level: levelInfo(h.exp || 0).level } };
   for (const k of VISIT_LIVE) Object.defineProperty(v, k, { get: () => me[k], set: x => { me[k] = x; }, enumerable: true });
   for (const k of VISIT_WORLD) v[k] = h[k];
