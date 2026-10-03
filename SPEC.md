@@ -146,6 +146,10 @@ state = {
   //   kind: 'help' | 'steal' | 'bark' | 'bite' | 'sausage'; `fine` chỉ có ở dòng 'bite', `ate` chỉ có ở dòng 'sausage' (issue 31)
   // dog (issue 31): chained = xích chó (mặc định false) · nap = giấc ngủ gật tới lúc nào (giờ vườn) · napCheck = lần quay kế tiếp
   //   · quiet = mải ăn xúc xích tới lúc nào (giờ NGOÀI ĐỜI) · barkAt/barkX/barkY = lần sủa gần nhất và chỗ thấy khách lạ
+  deliveries: [{ id, items: { itemId: qty }, cost, fee, at, due }],  // mua online: đơn đã trả tiền, chờ giao (at/due theo state.time).
+                                              //   Bản lưu cũ thiếu thì [] (không đổi phiên bản v3)
+  courier: null | { id, ids, state: 'coming'|'leaving', from, at, since, arriveAt, x?, y? },  // người giao hàng đang đi: ids = các đơn
+                                              //   đang mang, from = cổng, at = trước cửa nhà kho, x/y do world.js diễn. Thiếu/hỏng thì null
 }
 ```
 Vườn online không bao giờ ghi vào `SAVE_KEY` (`nongtrai-save-v3`): bản chơi đơn và vườn trên làng là hai bản riêng, chỉ chép một lần lúc "Mang vườn này lên làng?".
@@ -216,7 +220,8 @@ loadGame(raw?)                    // → state | null. Không truyền: đọc v
 saveGame(state)                   // cập nhật savedAt; vườn chơi đơn thì ghi SAVE_KEY, vườn online (mode 'online') thì không ghi gì
 checkSaveJump(prev, next, dtMs)   // → R { reason: 'time'|'coins'|'exp' }: chống gian lận nhẹ, hàm thuần (server dùng). Giờ vườn (simMs)
                                   // tăng không quá dtMs × x20 + một đêm ngủ; của cải (wealthOf = xu + đồ theo giá bán/giá mua) và EXP
-                                  // tăng không quá mức cho sẵn + mỗi ô ruộng mỗi phút vườn chạy (SAVE_JUMP)
+                                  // tăng không quá mức cho sẵn + mỗi ô ruộng mỗi phút vườn chạy (SAVE_JUMP). wealthOf tính cả hàng mua
+                                  // online đang chờ giao (deliveries), nên đặt hàng chỉ giảm của cải (phí giao) và nhận hàng không tăng
                                   // + giá trần của con vật có ở bản trước mà mất ở bản sau (bán cho Chú Ba, Phase 2)
 wealthOf(state), SAVE_JUMP
 resetGame()                       // xóa save hiện tại và đặt mọi cờ "đã chuyển" (không đụng bản v1, v2)
@@ -680,6 +685,21 @@ fulfillOrder(state, orderId)      // → R
 ```
 Chợ Bà Tư thay sạp hàng và nhà kho bán hàng cũ (sạp bị bỏ khỏi vườn).
 
+### Mua online, người giao hàng (hotfix sau Phase 2)
+```js
+canOrder(itemId)                  // món đặt online được: ITEMS có giá, kind seed | supply (gồm thuốc thú y, vắc-xin) | feed | deco
+deliveryFee(cost)                 // phí giao = max(DELIVERY.feeMin, ceil(cost × DELIVERY.feePct)); cost 0 → 0
+orderQuote(state, cart)           // → R { items, cost, fee, total }: cart = { itemId: qty }, hàm thuần, không trừ xu (qty ≤ DELIVERY.maxQty)
+orderOnline(state, cart)          // → R { order, reason? }: trừ xu ngay (tiền hàng + phí), thêm vào state.deliveries. Đặt lúc nào cũng
+                                  // được (chợ đóng vẫn đặt). Từ chối: giỏ trống, món không đặt được, chưa đủ cấp, reason 'coins' |
+                                  // 'pending' (đã có DELIVERY.maxPending đơn chờ) | 'visit' (đang ở vườn bạn). Có hạt giống thì tính bước "mua" của hướng dẫn
+pendingDeliveries(state)          // → [{ ...đơn, total, eta, onWay }]: eta = ms giờ vườn dự kiến tới kho
+deliveryEta(state, order)         // ms dự kiến: đang trên đường → arriveAt - time; chưa đi → chờ đủ waitMs, rơi vào lúc chợ đóng thì tới 6h sáng, + quãng đi bộ
+```
+Luật trong `step` (chạy như nhau ở trình duyệt và lúc chạy bù, cả server): người giao hàng rảnh, chợ đang mở (`marketOpen`, giờ chợ không đổi 6h–18h) và có đơn đã tới `due` thì lên đường mang **mọi** đơn đã tới hạn: `courier = { state: 'coming', from: cổng (gateIn), at: trước nhà kho, arriveAt }`, thời gian đi = max(walkMin, quãng thẳng / speed × walkMul). Tới `arriveAt`: hàng vào **kho** (`inv`, không vào giỏ, kho không giới hạn nên không có chuyện đầy), các đơn đó rời `deliveries`, event `delivered`, nhật ký "Người giao hàng đã giao tới kho: …", chữ bay "Hàng tới rồi 📦"; `state = 'leaving'` rồi sau `leaveMs` thì `courier = null` (chuyến sau mới đi tiếp). Đang thăm vườn bạn thì không giao (về nhà mới giao), `startVisit` không mang người giao hàng theo. Vật nuôi, quần áo vẫn chỉ mua ở làng. Màn "Trong lúc bạn vắng nhà" có dòng "Người giao hàng đã giao N đơn hàng online tới kho 📦".
+
+Giao diện: bảng `order` (🛒 Đặt hàng online) mở từ nút "Đặt hàng online" trong Túi đồ (cả trong nhà kho) và trong bảng điện thoại; có danh sách đơn chờ giao với giờ dự kiến (đổi từng giây, `[data-eta]`), phiếu đặt hàng (−1 / ✕, tổng = tiền hàng + phí giao, nút `#order-buy`), các tab Hạt giống / Vật tư / Thức ăn / Trang trí / Thú y với nút +1 / +5. Người giao hàng có sprite riêng (`artcourier.js`: `COURIER_ART.carry|empty[hướng][khung]` 16x24, `box` 12x10; bản 2x `COURIER_ART_HD`, `hd.js` nối), toast "Hàng đã giao tới kho" dùng icon thùng hàng.
+
 ### Thông báo, Việc cần làm, cài đặt
 ```js
 notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, help, gate, guard, visit, old, stray, ill, pest, birth)
@@ -777,6 +797,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `trick` | `trick`, `name` | info — chó vừa học xong một lệnh (kèm `toast`) |
 | `dogHerd` | `n` | info — tối đến chó tự lùa đàn về |
 | `shipped` | `coins`, `items`, `t` | info |
+| `delivered` | `orders` (số đơn), `items` ({ món: số }) | important (cat `parcel`): "Hàng đã giao tới kho 📦" |
 | `log` | `text` (đã ghi vào `state.log`) | info |
 | `toast` | `text` | direct |
 | `achievement` | `id`, `name`, `coins` | direct |
@@ -830,7 +851,7 @@ Không có GitHub Actions. Mọi test chạy trên máy local, Chromium ẩn c�
 ```
 npm test            # = node --test (tests/*.test.mjs, gồm cả seam 3 tests/server-*.test.mjs)
 ```
-Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `dogtrick` (vòng đời chó, dạy lệnh, 6 lệnh), `notify`, `todo`, `perf`, `tutorial`, `online-save` (trường online, `checkSaveJump`), `presence` (người khác cùng bản đồ: tên mờ khi đông, nội suy), `visit` (luật khách), `help` (thao tác giúp của khách, giới hạn mỗi ngày, mã thao tác), `steal` (luật trộm: 25% mỗi ô, một lần mỗi người, trần 30% mỗi ngày, bảo vệ người mới, giỏ đầy, thể lực, trộm NPC nhường). Phase 2: `pens` (chuồng 3 cấp, cách ly), `breed` (đực cái, sinh sản, phả hệ), `dirty` (dơ, tắm), `bond` (độ thân), `trade` (bán cho Chú Ba, nghỉ hưu), `free` (thả rông), `herd` (chạng vạng, con lạc, rải thóc), `predator` (kẻ săn mồi), `cat` (mèo), `dog-guard` (một bộ luật chó cho trộm NPC và khách), `thief` (trộm NPC mới, phạt), `duck` (vịt), `coutquest` (nhiệm vụ Cô Út), `todo`/`notify` (mục vật nuôi).
+Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `dogtrick` (vòng đời chó, dạy lệnh, 6 lệnh), `notify`, `todo`, `perf`, `tutorial`, `online-save` (trường online, `checkSaveJump`), `presence` (người khác cùng bản đồ: tên mờ khi đông, nội suy), `visit` (luật khách), `help` (thao tác giúp của khách, giới hạn mỗi ngày, mã thao tác), `steal` (luật trộm: 25% mỗi ô, một lần mỗi người, trần 30% mỗi ngày, bảo vệ người mới, giỏ đầy, thể lực, trộm NPC nhường). Phase 2: `pens` (chuồng 3 cấp, cách ly), `breed` (đực cái, sinh sản, phả hệ), `dirty` (dơ, tắm), `bond` (độ thân), `trade` (bán cho Chú Ba, nghỉ hưu), `free` (thả rông), `herd` (chạng vạng, con lạc, rải thóc), `predator` (kẻ săn mồi), `cat` (mèo), `dog-guard` (một bộ luật chó cho trộm NPC và khách), `thief` (trộm NPC mới, phạt), `duck` (vịt), `coutquest` (nhiệm vụ Cô Út), `todo`/`notify` (mục vật nuôi). Hotfix: `online-shop` (mua online, người giao hàng, chạy bù, của cải), seam 3 `server-order` (chống gian lận nhận đơn lớn, server chạy bù giao hàng).
 Luật có ngẫu nhiên (kẻ săn mồi, bệnh, con lạc...) thì test phải **tất định**: hoặc dọn sạch nguồn ngẫu nhiên không liên quan (vd `s.preds = []` mỗi bước), hoặc thay `Math.random` bằng bộ sinh số có hạt giống cố định (mulberry32, mẫu ở `tests/cat.test.mjs` `seeded`, `tests/duck.test.mjs` đặt lại hạt giống đầu mỗi test). Không thống kê "thường thì đúng" bằng `Math.random` thật.
 
 **Seam 2: trình duyệt thật qua Playwright**, chỉ cho những gì seam 1 không thấy (kéo thả, đi qua cửa, chạm để tự đi tới, giao diện 360px):

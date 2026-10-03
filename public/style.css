@@ -254,6 +254,7 @@ kbd {
 .chips-line .mini { padding: 3px 10px; border-radius: 999px; background: var(--paper); border: 2px solid var(--line); opacity: 1; font-weight: 800; }
 
 .sell-all { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; margin-bottom: 10px; border-radius: 15px; background: #ffe6a8; border: 2px solid var(--orange); font-size: 15px; font-weight: 800; }
+.order-total .btn { flex: none; white-space: nowrap; }   /* nút "Đặt hàng" không xuống dòng ở 360px */
 
 .order { padding: 10px 12px; border-radius: 15px; background: var(--paper); border: 2px solid var(--line); box-shadow: 0 2px 0 var(--line); }
 .order.ready { background: #eaf7d8; border-color: #8cc65a; box-shadow: 0 2px 0 #8cc65a; }

@@ -5,7 +5,7 @@ import {
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
-  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST,
+  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, DELIVERY,
 } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
@@ -227,6 +227,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     today: { day: '', helps: 0, steals: 0, stolen: 0, robs: 0 },
     guests: [],
     coUtQuest: null,   // nhiệm vụ làm quen của Cô Út (issue 48): { step } sau khi mua con heo đầu tiên
+    deliveries: [], courier: null,   // mua online: đơn chờ giao, người giao hàng đang đi (stepDeliveries)
   };
   const m = mapOf(s);
   Object.assign(s.player, m.spawn);
@@ -314,6 +315,9 @@ export function loadGame(raw) {
   s.guests = Array.isArray(s.guests) ? s.guests : [];
   s.dog.chained = !!s.dog.chained;
   s.coUtQuest ??= null;   // bản lưu cũ chưa có nhiệm vụ làm quen của Cô Út (issue 48)
+  // mua online (hotfix): bản lưu cũ chưa có đơn chờ giao, chưa có người giao hàng
+  s.deliveries = Array.isArray(s.deliveries) ? s.deliveries.filter(o => o && o.items && Number.isFinite(o.due)) : [];
+  if (!s.courier || !Array.isArray(s.courier.ids) || !s.courier.at) s.courier = null;
   // trộm NPC (issue 46): bản lưu cũ chưa có thì bắt đầu từ con số không
   s.teoCaught = Math.max(0, Math.floor(s.teoCaught) || 0);
   s.choreWeek = Number.isFinite(s.choreWeek) ? s.choreWeek : -1;
@@ -379,6 +383,8 @@ export function awaySummary(events, frozenMs = 0) {
   if (guard) out.push(`Chó đã đuổi quạ và trộm ${guard} lần`);
   const coins = events.reduce((a, e) => a + (e.type === 'shipped' ? e.coins : 0), 0);
   if (coins) out.push(`Lái buôn trả ${coins} xu`);
+  const parcels = events.reduce((a, e) => a + (e.type === 'delivered' ? e.orders : 0), 0);
+  if (parcels) out.push(`Người giao hàng đã giao ${parcels} đơn hàng online tới kho 📦`);
   // thành tựu mở trong lúc chạy bù (vd chó đuổi đủ 20 kẻ trộm lúc chủ vắng, issue 32): không có huy hiệu nên ghi vào đây
   for (const e of events) if (e.type === 'achievement') out.push(`Thành tựu mới "${e.name}", thưởng ${e.coins} xu`);
   if (frozenMs >= MIN) out.push(`Vườn đã đóng băng ${spanText(frozenMs)}`);
@@ -386,7 +392,7 @@ export function awaySummary(events, frozenMs = 0) {
 }
 
 // ---------- Chống gian lận nhẹ (ADR 0002): server dùng để từ chối bản lưu online vô lý ----------
-// Của cải = xu + đồ (nông sản, sản phẩm theo giá bán; đồ khác theo giá mua). Mua bán gần như không làm tăng của cải,
+// Của cải = xu + đồ (nông sản, sản phẩm theo giá bán; đồ khác theo giá mua; tính cả hàng mua online đang chờ giao). Mua bán gần như không làm tăng của cải,
 // chỉ thu hoạch, đơn hàng, thưởng mới tăng: nên bán cả kho một lúc vẫn hợp lý, còn sửa xu/đồ thì không.
 export const SAVE_JUMP = {
   simSlack: DAY_MS / 2 + MIN,   // ngủ một đêm chạy thẳng tới sáng (tối đa nửa ngày game) + sai số
@@ -396,7 +402,7 @@ export const SAVE_JUMP = {
 };
 export function wealthOf(s) {
   let w = s.coins || 0;
-  for (const o of [s.inv, s.basket, s.shipbin?.items]) for (const [k, n] of Object.entries(o ?? {})) w += (Number(n) || 0) * (sellPrice(k) || ITEMS[k]?.price || 0);
+  for (const o of [s.inv, s.basket, s.shipbin?.items, ...(s.deliveries ?? []).map(d => d.items)]) for (const [k, n] of Object.entries(o ?? {})) w += (Number(n) || 0) * (sellPrice(k) || ITEMS[k]?.price || 0);
   return w;
 }
 // Con vật có ở bản trước mà không còn ở bản sau (bán cho Chú Ba, issue 40) đã thành xu: cho tăng thêm chừng giá trần của
@@ -579,6 +585,7 @@ function step(s, d) {
   stepCats(s, d);
   if (catchUp) stepRaidAway(s); else stepThreats(s, d);
   stepOrders(s);
+  stepDeliveries(s);
   checkAch(s);
 }
 
@@ -2713,7 +2720,7 @@ export function startVisit(me, raw, owner) {
   for (const k of VISIT_LIVE) Object.defineProperty(v, k, { get: () => me[k], set: x => { me[k] = x; }, enumerable: true });
   for (const k of VISIT_WORLD) v[k] = h[k];
   // kẻ săn mồi và trộm NPC là chuyện của chủ vườn; chó của chủ ở lại vườn, thôi lệnh đi theo / lùa (issue 45)
-  v.preds = []; v.raid = null; v.caught = null; v.chore = null;
+  v.preds = []; v.raid = null; v.caught = null; v.chore = null; v.courier = null;
   v.dog = { ...h.dog, scene: 'farm', cmd: ['follow', 'herd'].includes(h.dog.cmd?.id) ? null : h.dog.cmd };
   const a = sceneMap(v).exit;
   v.player = { x: a.x, y: a.y, dir: a.dir ?? 0 };
@@ -3143,6 +3150,84 @@ export function buyAnimal(s, type, sex = 'm') {
   mkAnimal(s, type, 'non', p.x, p.y, { pen: pen.id, sex });
   if (firstPig) { s.coUtQuest = { step: 0 }; log(s, 'Cô Út: Heo đầu tiên à? Để tôi chỉ bạn tắm, chữa bệnh và tiêm vắc-xin cho heo nhé!'); }
   return R(true, `Đã mua ${def.baby.toLowerCase()} ${sex === 'm' ? 'đực' : 'cái'}`, { price });
+}
+
+// ---------- Mua online: đặt hàng chợ Bà Tư và trạm thú y Cô Út, người giao hàng mang tới kho ----------
+// s.deliveries = [{ id, items: { món: số }, cost, fee, at, due }] (giờ vườn s.time). Trả tiền lúc đặt; tới due mà chợ đang mở
+// thì người giao hàng (s.courier) đi từ cổng tới nhà kho, tới nơi thì hàng vào kho (s.inv). Luật chạy trong step nên trình duyệt
+// và server chạy bù cho cùng kết quả. Vật nuôi, quần áo vẫn phải ra làng mua.
+export const canOrder = id => { const it = ITEMS[id]; return !!it && it.price > 0 && ['seed', 'supply', 'feed', 'deco'].includes(it.kind); };
+export const deliveryFee = cost => (cost > 0 ? Math.max(DELIVERY.feeMin, Math.ceil(cost * DELIVERY.feePct)) : 0);
+// Tính tiền giỏ hàng: { ok, msg?, items, cost, fee, total }. Hàm thuần, bảng đặt hàng dùng để hiện tổng.
+export function orderQuote(s, cart) {
+  const items = {};
+  for (const [id, q] of Object.entries(cart ?? {})) {
+    const n = Math.floor(q);
+    if (!(n > 0)) continue;
+    if (!canOrder(id)) return R(false, 'Món này không đặt online được', { items: {}, cost: 0, fee: 0, total: 0 });
+    if (level(s) < ITEMS[id].lv) return R(false, `Cần cấp ${ITEMS[id].lv} mới mua được ${ITEMS[id].name.toLowerCase()}`, { items: {}, cost: 0, fee: 0, total: 0 });
+    items[id] = Math.min(DELIVERY.maxQty, n);
+  }
+  const cost = Object.entries(items).reduce((a, [id, n]) => a + ITEMS[id].price * n, 0), fee = deliveryFee(cost);
+  if (!cost) return R(false, 'Giỏ hàng đang trống', { items, cost, fee, total: 0 });
+  return R(true, undefined, { items, cost, fee, total: cost + fee });
+}
+export function orderOnline(s, cart) {
+  if (s.visit) return R(false, 'Về vườn nhà rồi hẵng đặt hàng nhé', { reason: 'visit' });
+  const q = orderQuote(s, cart);
+  if (!q.ok) return q;
+  if ((s.deliveries ??= []).length >= DELIVERY.maxPending) return R(false, `Đang chờ giao ${DELIVERY.maxPending} đơn rồi, đợi hàng tới đã nhé`, { reason: 'pending' });
+  if (s.coins < q.total) return R(false, 'Chưa đủ xu, cố lên nhé', { reason: 'coins' });
+  s.coins -= q.total;
+  const o = { id: s.nextId++, items: q.items, cost: q.cost, fee: q.fee, at: s.time, due: s.time + DELIVERY.waitMs };
+  s.deliveries.push(o);
+  if (Object.keys(q.items).some(id => ITEMS[id].kind === 'seed')) { s.stats.bought++; advanceTutorial(s); }
+  return R(true, `Đã đặt hàng (${q.total} xu), người giao hàng sẽ mang tới kho`, { order: o });
+}
+// Thời gian đi từ cổng tới nhà kho (giờ vườn): quãng thẳng / tốc độ đi × hệ số đường vòng
+function courierPath(s) {
+  const m = mapOf(s), from = m.gateIn ?? m.spawn, shed = m.buildings.find(b => b.kind === 'shed'), to = shed?.at ?? m.spawn;
+  return { from, to, ms: Math.round(Math.max(DELIVERY.walkMin, Math.hypot(to.x - from.x, to.y - from.y) / DELIVERY.speed * 1000 * DELIVERY.walkMul)) };
+}
+// Còn bao lâu (giờ vườn) đơn o tới kho: đang trên đường thì theo người giao hàng; chưa đi thì đợi đủ waitMs, rơi vào lúc chợ
+// đóng thì đợi tới 6h sáng (đầu ngày), cộng thêm quãng đi bộ
+export function deliveryEta(s, o) {
+  const c = s.courier;
+  if (c?.state === 'coming' && c.ids.includes(o.id)) return Math.max(0, c.arriveAt - s.time);
+  let w = Math.max(0, o.due - s.time);
+  const f = (dayFrac(s) + w / DAY_MS) % 1, closeAt = (MARKET.close - MARKET.open) / 24;
+  if (f >= closeAt) w += Math.round((1 - f) * DAY_MS);
+  return w + courierPath(s).ms;
+}
+// Đơn đang chờ giao, kèm thời gian dự kiến và cờ đang trên đường
+export const pendingDeliveries = s => (s.deliveries ?? []).map(o => ({
+  ...o, total: o.cost + o.fee, eta: deliveryEta(s, o), onWay: s.courier?.state === 'coming' && s.courier.ids.includes(o.id),
+}));
+// Mỗi bước: người giao hàng tới nơi thì giao, đi ra hết thì biến mất; rảnh mà có đơn tới hạn lúc chợ mở thì lên đường
+function stepDeliveries(s) {
+  if (s.visit) return;   // đang ở vườn bạn: đơn của mình chờ về nhà
+  const c = s.courier;
+  if (c) {
+    if (c.state === 'coming' && s.time >= c.arriveAt) dropParcel(s, c);
+    else if (c.state === 'leaving' && s.time - c.since >= DELIVERY.leaveMs) s.courier = null;
+    return;
+  }
+  const due = (s.deliveries ?? []).filter(o => s.time >= o.due);
+  if (!due.length || !marketOpen(s)) return;
+  const p = courierPath(s);
+  s.courier = { id: s.nextId++, ids: due.map(o => o.id), state: 'coming', from: p.from, at: p.to, since: s.time, arriveAt: s.time + p.ms };
+}
+function dropParcel(s, c) {
+  const got = {};
+  for (const o of s.deliveries.filter(o => c.ids.includes(o.id))) for (const [id, n] of Object.entries(o.items)) got[id] = (got[id] || 0) + n;
+  s.deliveries = s.deliveries.filter(o => !c.ids.includes(o.id));
+  for (const [id, n] of Object.entries(got)) s.inv[id] = (s.inv[id] || 0) + n;
+  c.state = 'leaving'; c.since = s.time;
+  const what = Object.entries(got).map(([id, n]) => `${n} ${itemName(id).toLowerCase()}`).join(', ');
+  emit({ type: 'delivered', orders: c.ids.length, items: got });
+  fxEv(c.at.x, c.at.y - 20, 'Hàng tới rồi 📦', COL.good);
+  log(s, `Người giao hàng đã giao tới kho: ${what}`);
+  snd('pop');
 }
 
 // ---------- Nhiệm vụ làm quen của Cô Út: tắm → chữa bệnh → vắc-xin (issue 48) ----------

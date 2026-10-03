@@ -4,6 +4,10 @@ const MIN = 60_000;
 export const DAY_MS = 20 * MIN;           // 1 ngày trong game = 20 phút ở tốc độ x1
 export const NIGHT_FROM = 0.75;           // từ 3/4 ngày trở đi là ban đêm (tới hết ngày)
 export const MARKET = { open: 6, close: 18 }; // chợ Bà Tư mở từ 6h tới 18h (giờ trong game; ngày bắt đầu lúc 6h)
+// Mua online: đặt lúc nào cũng được, hàng đi sau waitMs nếu chợ đang mở (chợ đóng thì sáng hôm sau 6h), người giao hàng
+// đi bộ từ cổng tới nhà kho. Phí giao feePct tiền hàng (ít nhất feeMin xu) · tối đa maxPending đơn chờ · maxQty mỗi món một đơn
+// · leaveMs: giao xong còn đi ra cổng chừng này lâu · speed: px/s lúc đi (world.js) · walkMul: thời gian đi = quãng thẳng / tốc độ đi × hệ số (đường vòng)
+export const DELIVERY = { waitMs: 2 * MIN, feePct: 0.1, feeMin: 5, maxPending: 5, maxQty: 99, leaveMs: 15_000, speed: 44, walkMul: 1.8, walkMin: 6000 };
 // Thể lực: cost = điểm trừ mỗi lần làm (dọn bụi, đập đá chưa có hành động, để sẵn); hết thể lực thì đi và làm chậm ×slow.
 // morningRegen: tự hồi mỗi sáng 6h · benchPerMin: ngồi ghế đá hồi mỗi phút · sleepHour: từ giờ này mới ngủ được
 export const STAMINA = {
@@ -556,6 +560,7 @@ export const NOTIFY_CATS = {
   guard: 'Chó canh khách lạ', visit: 'Bạn bè ghé',
   old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài', ill: 'Con vật mệt',
   pest: 'Chuột ăn cám, trộm trứng', birth: 'Vật nuôi sinh con',
+  parcel: 'Hàng đặt online đã tới',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -618,6 +623,7 @@ export const EVENT_LEVEL = {
   vaccinated: { level: 'info', group: e => 'vaccinated:' + e.id, label: 'Đã tiêm vắc-xin' },
   mucked:    { level: 'info', group: e => 'mucked:' + e.pen, label: 'Đã xúc phân chuồng' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },
+  delivered: { level: 'important', cat: 'parcel', group: () => 'delivered', label: 'Hàng đặt online tới kho', text: n => (n > 1 ? `Hàng đã giao tới kho (${n} chuyến) 📦` : 'Hàng đã giao tới kho 📦') },
   log:       { level: 'info', group: () => 'log', label: 'Nhật ký' },
   toast:     { level: 'direct', group: e => 'toast:' + e.text, label: 'Thông báo của luật chơi' },
   achievement: { level: 'direct', group: e => 'achievement:' + e.id, label: 'Thành tựu' },

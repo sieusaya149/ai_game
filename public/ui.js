@@ -11,6 +11,7 @@ import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
 import * as net from './net.js';
 import { hdOf, charFrames } from './hd.js';
+import { COURIER_ART } from './artcourier.js';
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -205,7 +206,7 @@ function canvasIco(src, cls = 'ico') {
   c.getContext('2d').drawImage(src, 0, 0);
   return c;
 }
-const TOAST_ICON = { gift: () => SPR2?.giftIcon };   // sprite riêng cho vài loại thông báo
+const TOAST_ICON = { gift: () => SPR2?.giftIcon, delivered: () => COURIER_ART?.box };   // sprite riêng cho vài loại thông báo
 // 🟡 toast nhỏ, tự gộp cùng khóa; loại nào tắt trong cài đặt (s.notify) thì bỏ qua
 const notifier = createNotifier({ show: (id, text, e) => pushToast(text, '', 'n' + id, TOAST_ICON[e.type]?.() ?? null), on: cat => !cat || S.notifyOn(st(), cat) });
 // Tin từ server (quà, lời nhắn ở cổng): đi qua cùng đường gộp toast như event của luật chơi
@@ -448,6 +449,11 @@ export function renderHUD(s) {
   updateTutorial(s);
   updateCoUtQuest(s);
   if (panel === 'market' && S.marketOpen(s) !== marketWasOpen) refreshPanel();   // chợ vừa đóng/mở cửa khi đang xem
+  if (panel === 'order') {   // đơn vừa lên đường / vừa tới kho thì vẽ lại bảng; còn không thì chỉ đổi giờ dự kiến
+    const pend = S.pendingDeliveries(s);
+    if (orderKey !== JSON.stringify(pend.map(d => [d.id, d.onWay]))) refreshPanel();
+    else for (const d of pend) { const e = document.querySelector(`[data-eta="${d.id}"]`); if (e) e.textContent = etaText(d); }
+  }
 }
 
 // ---------- Hướng dẫn nhanh ----------
@@ -808,6 +814,7 @@ PANELS.vet = {
 PANELS.phone = {
   title: '📞 Điện thoại',
   render(body, s) {
+    body.append(orderOpenBtn());
     body.append(h('div', { class: 'note' }, `Gọi bác sĩ thú y tới tận vườn: ${D.SICK.vetPrice} xu một lần, cứu được cả con bệnh nặng lẫn nguy kịch.`));
     const ill = sickOnes(s).filter(a => a.sick >= 2), list = h('div', { class: 'list' });
     body.append(list);
@@ -822,6 +829,74 @@ PANELS.phone = {
   },
 };
 
+// ---------- Đặt hàng online: chợ Bà Tư + trạm thú y Cô Út, người giao hàng mang tới kho ----------
+// Phiếu đặt hàng (món → số) chỉ nằm ở giao diện; bấm "Đặt hàng" mới trừ xu (S.orderOnline).
+let orderCart = {};
+let orderKey = '';
+const ORDER_TABS = [['seed', '🌱 Hạt giống'], ['supply', '🧴 Vật tư'], ['feed', '🌾 Thức ăn'], ['deco', '🪴 Trang trí'], ['vet', '💊 Thú y']];
+tabs.order = 'seed';
+const boxIco = () => (COURIER_ART?.box ? canvasIco(COURIER_ART.box, 'ico big') : h('span', { class: 'ico emo big' }, '📦'));
+const itemsText = items => Object.entries(items).map(([k, n]) => `${itemLabel(k)} ×${n}`).join(', ');
+const etaText = d => (d.onWay ? `🚚 Đang trên đường, còn ${S.mmss(d.eta)}` : `Dự kiến tới kho sau ${S.mmss(d.eta)}`);
+const orderOpenBtn = () => h('button', { class: 'guide-open', id: 'open-order', type: 'button', on: { click: () => openPanel('order') } },
+  boxIco(), h('b', {}, 'Đặt hàng online'), h('small', {}, 'Giao tận nhà kho'));
+PANELS.order = {
+  title: '🛒 Đặt hàng online',
+  render(body, s) {
+    const lv = level(s), pend = S.pendingDeliveries(s);
+    orderKey = JSON.stringify(pend.map(d => [d.id, d.onWay]));
+    body.append(h('div', { class: 'note' }, `Đặt hàng chợ Bà Tư và trạm thú y Cô Út lúc nào cũng được, người giao hàng mang tới tận nhà kho. Phí giao ${Math.round(D.DELIVERY.feePct * 100)}% tiền hàng (ít nhất ${D.DELIVERY.feeMin} xu). Chợ đóng cửa (${D.MARKET.close}h–${D.MARKET.open}h) thì sáng mai mới giao. Vật nuôi và quần áo vẫn phải ra làng mua.`));
+    // đơn đang chờ giao
+    body.append(section(`🚚 Đang chờ giao (${pend.length}/${D.DELIVERY.maxPending})`));
+    const pl = h('div', { class: 'list', id: 'order-pending' });
+    body.append(pl);
+    if (!pend.length) pl.append(empty('Chưa có đơn nào đang chờ giao.'));
+    for (const d of pend) {
+      pl.append(row({
+        icon: boxIco(), name: itemsText(d.items), cls: 'parcel', data: { order: d.id },
+        desc: [h('span', { class: 'eta', 'data-eta': d.id }, etaText(d)), ` · đã trả ${fmt(d.total)} xu`],
+      }));
+    }
+    // phiếu đặt hàng
+    const q = S.orderQuote(s, orderCart), picked = Object.keys(q.items);
+    body.append(section('🧾 Phiếu đặt hàng'));
+    const cl = h('div', { class: 'list', id: 'order-cart' });
+    body.append(cl);
+    if (!picked.length) cl.append(empty('Chọn món ở dưới để thêm vào phiếu.'));
+    for (const k of picked) {
+      cl.append(row({
+        icon: ico(k), name: `${itemLabel(k)} ×${q.items[k]}`, desc: `${fmt(D.ITEMS[k].price * q.items[k])} xu`,
+        right: h('div', { class: 'qtys' },
+          btn('−1', () => { orderCart[k] = q.items[k] - 1; if (orderCart[k] <= 0) delete orderCart[k]; sound.play('click'); refreshPanel(); }, 'plain sm nosound'),
+          btn('✕', () => { delete orderCart[k]; sound.play('click'); refreshPanel(); }, 'plain sm nosound', { title: 'Bỏ món này' })),
+      }));
+    }
+    if (picked.length) {
+      const full = pend.length >= D.DELIVERY.maxPending, poor = s.coins < q.total;
+      body.append(h('div', { class: 'sell-all order-total', id: 'order-total' },
+        h('div', {}, `Tiền hàng ${fmt(q.cost)} + phí giao ${fmt(q.fee)} = `, h('b', {}, fmt(q.total) + ' xu')),
+        btn('Đặt hàng', () => { const r = res(S.orderOnline(st(), orderCart), 'coin'); if (r?.ok) { orderCart = {}; refreshPanel(); } }, 'green', { disabled: full || poor, id: 'order-buy' })));
+      if (full) body.append(h('div', { class: 'note closed' }, `Đang chờ giao ${D.DELIVERY.maxPending} đơn rồi, đợi hàng tới đã nhé!`));
+      else if (poor) body.append(h('div', { class: 'note closed' }, 'Chưa đủ xu cho phiếu này.'));
+    }
+    // các món đặt được
+    body.append(tabBar(ORDER_TABS, 'order'));
+    const t = tabs.order, list = h('div', { class: 'list' });
+    body.append(list);
+    const ids = t === 'vet' ? D.VET_ITEMS : Object.keys(D.ITEMS).filter(id => D.ITEMS[id].kind === t && !D.VET_ITEMS.includes(id));
+    for (const id of ids.filter(S.canOrder).sort((a, b) => D.ITEMS[a].lv - D.ITEMS[b].lv)) {
+      const it = D.ITEMS[id], locked = it.lv > lv, inCart = orderCart[id] || 0;
+      const add = n => { orderCart[id] = Math.min(D.DELIVERY.maxQty, inCart + n); sound.play('click'); refreshPanel(); };
+      list.append(row({
+        icon: ico(id), name: it.name, locked, data: { item: id },
+        desc: [`Đang có: ${have(s, id)}`, inCart ? ` · trong phiếu: ${inCart}` : ''],
+        right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + it.lv)
+          : [coinTag(it.price), h('div', { class: 'qtys' }, btn('+1', () => add(1), 'green sm nosound'), btn('+5', () => add(5), 'green sm nosound'))],
+      }));
+    }
+  },
+};
+
 // ---------- Túi đồ ----------
 PANELS.bag = {
   title: '🎒 Túi đồ',
@@ -831,6 +906,7 @@ PANELS.bag = {
       h('span', { class: 'mini' }, `🧺 Giỏ ${S.basketCount(s)}/${S.basketCap(s)}`),
       h('span', { class: 'mini' }, `🪙 ${fmt(s.coins)} xu`)));
     body.append(h('button', { class: 'guide-open', type: 'button', on: { click: () => openPanel('guide') } }, guideIcon(), h('b', {}, 'Sổ tay hướng dẫn'), h('small', {}, 'Thể lực, công cụ, xây dựng, thùng giao hàng, chợ...')));
+    body.append(orderOpenBtn());   // mua online từ bất cứ đâu
     body.append(section('Công cụ'));
     const tl = h('div', { class: 'grid' });
     for (const k of Object.keys(D.TOOLS)) {

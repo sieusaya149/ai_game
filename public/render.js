@@ -5,6 +5,7 @@ import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
+import { COURIER_ART } from './artcourier.js';
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
@@ -318,6 +319,7 @@ export function crowImg(face, frame) {
 }
 // Thằng Tèo: nhân vật dựng bằng art.character (world.js vẽ cùng bảng khung hình với người chơi)
 export const TEO_LOOK = { skin: 1, hair: 0, hairColor: 4, shirt: 4, pants: 2, hat: 2, acc: 1 };
+const COURIER_LOOK = { skin: 0, hair: 0, hairColor: 1, shirt: 2, pants: 0, hat: 1, acc: 0 };   // chỉ dùng khi thiếu art người giao hàng
 // Tí Sún: đi / rón rén / bị bắt — mỗi tư thế một bộ sprite riêng (issue 46)
 export function tisunImg(pose, face = 'left', frame = 0, dir = 0) {
   if (pose === 'caught') return SPR3?.npcTiSunCaught ?? null;
@@ -696,6 +698,8 @@ export function render(ctx, f) {
   const cats = catsIn(state, here);
   for (const c of cats) if (c.x != null && vis(c.x, c.y)) shadow(c.x, c.y, Math.round(5 * (small[c.stage] ?? 1)));
   for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
+  const courier = farm && !state.visit ? state.courier : null;   // người giao hàng (mua online)
+  if (courier?.x != null && vis(courier.x, courier.y, 40)) shadow(courier.x, courier.y, 6);
   for (const p of preds) if (p.x != null && vis(p.x, p.y, 40) && p.kind !== 'hawk') shadow(p.x, p.y, p.kind === 'rat' ? 4 : 6);
 
   // 3) các vật nhô lên, sắp theo y chân
@@ -1009,6 +1013,16 @@ export function render(ctx, f) {
       blit(bb, Math.round(t.x - bb.width / 2), Math.round(t.y - (t.kind === 'civet' ? 14 : 28) - bb.height));
       ctx.globalAlpha = 1;
     });
+  }
+  // người giao hàng: ôm thùng hàng đi vào, giao xong để thùng trước cửa kho rồi đi tay không ra cổng
+  if (courier) {
+    const box = COURIER_ART?.box, c = courier;
+    if (c.state === 'leaving' && box) add(c.at.y - 1, () => blit(box, Math.round(c.at.x + 7 - box.width / 2), Math.round(c.at.y - box.height + 1)));
+    if (c.x != null && vis(c.x, c.y, 40)) {
+      const rt = wd.rt.get('courier') ?? {}, dir = rt.dir ?? 3, fr = rt.walking ? [1, 0, 2, 0][Math.floor((rt.anim ?? 0) * 8) % 4] : 0;
+      const set = COURIER_ART?.[c.state === 'leaving' ? 'empty' : 'carry'], im = set?.[dir]?.[fr] ?? charFrames(COURIER_LOOK)[dir][fr];
+      add(c.y, () => blit(im, Math.round(c.x - 8), Math.round(c.y - 23)));
+    }
   }
   // kẻ săn mồi: chuột lon ton dưới đất, chồn men theo đất, diều hâu bay có bóng riêng in trên mặt đất
   for (const p of preds) {

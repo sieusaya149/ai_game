@@ -48,6 +48,10 @@ for (const [i, m] of mods) {
   }
 }
 
+// Người giao hàng và thùng hàng (mua online): bộ thường COURIER_ART và bộ 2x COURIER_ART_HD cùng nằm trong artcourier.js
+const courierArt = await import('./artcourier.js').catch(() => null);
+if (courierArt?.COURIER_ART) { stats.files.push('artcourier.js'); link(courierArt.COURIER_ART, courierArt.COURIER_ART_HD, 'COURIER_ART'); }
+
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);
 // Ghi cặp ảnh dẫn xuất (lật, tô màu...) làm từ ảnh cũ và ảnh 2x bằng cùng một phép
