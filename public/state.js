@@ -2423,8 +2423,10 @@ function stepWater(s, d) {
     w.power += d / HOUR * TANK.power.pump;
   }
   if (elecOn(s)) w.power += d / HOUR * TANK.power.booster * waterNet(s, true).filter(n => n.e.kind === 'booster').length;
-  const take = () => (w.level >= 1 ? (w.level--, true) : false);
+  const take = () => (w.level >= 1 ? (w.level--, true) : false), before = w.level;
   for (const k of WATER_ORDER) WATER_USE[k](s, take);
+  // báo "sắp cạn" khi vừa tụt dưới ngưỡng (bồn mới xây còn trống thì không báo)
+  if (before >= TANK.low && w.level < TANK.low) emit({ type: 'tankLow', level: Math.floor(w.level) });
 }
 
 // ---------- Hố ủ phân (issue 61) ----------
@@ -2588,7 +2590,7 @@ function billPower(s) {
   }
   w.bill = (w.bill || 0) + cost;
   log(s, `Không đủ ${fmtXu(w.bill)} xu trả tiền điện: máy bơm, máy phun ngừng tới khi đủ xu`);
-  toast(`Không đủ xu trả tiền điện, máy bơm và máy phun tạm ngừng ⚡`);
+  emit({ type: 'billCut', bill: fmtXu(w.bill) });   // một lần: máy ngừng nên không tính điện tiếp tới khi trả đủ
 }
 // Tiền điện còn treo: lúc nào đủ xu thì tự trả, máy chạy lại (không bao giờ trừ thành âm)
 function settlePower(s) {

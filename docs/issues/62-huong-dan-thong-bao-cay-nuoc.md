@@ -19,12 +19,12 @@ Nối các hệ thống mới vào ba chỗ người chơi đã quen: thông bá
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): mọi loại sự kiện mới đều có mức và khóa gộp (test đi qua hết danh sách loại sự kiện đã có sẵn).
-- [ ] Unit test: `todoList` trả loại "bồn cạn" khi bồn dưới ngưỡng và "hố ủ xong" khi hố có phân lấy được, kèm vị trí để mũi tên và bản đồ nhỏ dùng.
-- [ ] Unit test: hết xu trả điện thì phát đúng một thông báo gộp, không lặp mỗi tick.
-- [ ] E2E (desktop + 360px): dựng bản lưu cây ngay ngưỡng lên cấp → thu hoạch → thấy thông báo lên cấp và, với trái khổng lồ, thông báo riêng.
-- [ ] E2E: dựng bản lưu bồn gần cạn và hố ủ đã xong → bảng Việc cần làm hiện hai dòng mới, chạm dòng thì nhân vật đi tới đúng chỗ.
-- [ ] E2E: mở Sổ tay thấy các trang mới, tắt loại thông báo "thành thạo" trong cài đặt thì không còn thấy thông báo đó.
+- [x] Unit test (seam 1): mọi loại sự kiện mới đều có mức và khóa gộp (test đi qua hết danh sách loại sự kiện đã có sẵn).
+- [x] Unit test: `todoList` trả loại "bồn cạn" khi bồn dưới ngưỡng và "hố ủ xong" khi hố có phân lấy được, kèm vị trí để mũi tên và bản đồ nhỏ dùng.
+- [x] Unit test: hết xu trả điện thì phát đúng một thông báo gộp, không lặp mỗi tick.
+- [x] E2E (desktop + 360px): dựng bản lưu cây ngay ngưỡng lên cấp → thu hoạch → thấy thông báo lên cấp và, với trái khổng lồ, thông báo riêng.
+- [x] E2E: dựng bản lưu bồn gần cạn và hố ủ đã xong → bảng Việc cần làm hiện hai dòng mới, chạm dòng thì nhân vật đi tới đúng chỗ.
+- [x] E2E: mở Sổ tay thấy các trang mới, tắt loại thông báo "thành thạo" trong cài đặt thì không còn thấy thông báo đó.
 
 ## Blocked by
 

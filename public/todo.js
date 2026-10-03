@@ -1,7 +1,7 @@
 // Việc cần làm: đọc state, liệt kê việc trong vườn theo loại, mức gấp, số lượng và chỗ gần người chơi nhất. Thuần JS, không DOM.
 // Bảng 📋, bản đồ nhỏ và mũi tên chỉ hướng đều lấy vị trí từ đây.
-import { mapOf, dirtyAnimals, dirtyPens, predWarning, strays, hiddenEggs } from './state.js';
-import { ANIMALS, HUSBANDRY, GUARD, GUEST } from './data.js';
+import { mapOf, dirtyAnimals, dirtyPens, predWarning, strays, hiddenEggs, tankInfo, compostInfo } from './state.js';
+import { ANIMALS, HUSBANDRY, GUARD, GUEST, TANK } from './data.js';
 import { now } from './clock.js';
 import { TS } from './layout.js';
 
@@ -32,9 +32,16 @@ const KINDS = [
   { kind: 'egg', level: 'normal', icon: '🥚', label: n => `${n} trứng dưới đất`, spots: s => (s.eggs ?? []).filter(e => !e.tile).map(e => ({ id: e.id, x: e.x, y: e.y, target: { kind: 'egg', id: e.id } })) },
   { kind: 'bushEgg', level: 'normal', icon: '🌿', label: n => `${n} trứng trong bụi`, spots: s => hiddenEggs(s).map(e => ({ id: e.id, x: e.x, y: e.y, target: { kind: 'egg', id: e.id } })) },
   { kind: 'trough', level: 'normal', icon: '🥣', label: n => `${n} máng hết cám`, spots: s => troughs(s) },
+  { kind: 'tank', level: 'normal', icon: '💧', label: () => 'Bồn nước sắp cạn', spots: s => tankLow(s) },   // issue 62
+  { kind: 'compost', level: 'normal', icon: '🧺', label: () => 'Hố ủ phân đã xong', spots: s => compostReady(s) },
   { kind: 'poop', level: 'normal', icon: '💩', label: n => `${n} đống phân chó`, spots: s => (s.poops ?? []).map(o => ({ id: o.id, x: o.x, y: o.y, target: { kind: 'poop', id: o.id } })) },
 ];
 
+// Bồn cạn (issue 62): bồn chứa dưới TANK.low lần nước; đứng ở chỗ chạm bồn (xem mực nước, vì sao bơm ngừng)
+const tankLow = s => (tankInfo(s).has && tankInfo(s).level < TANK.low ? atBuilding(s, 'tank') : []);
+// Hố ủ đã xong (issue 61, 62): có phân bón lấy được
+const compostReady = s => (compostInfo(s)?.state === 'ready' ? atBuilding(s, 'compost') : []);
+const atBuilding = (s, id) => { const b = mapOf(s).building(id); return b?.at ? [{ id, x: b.at.x, y: b.at.y, target: { kind: 'building', id } }] : []; };
 // Chó vừa sủa báo có khách lạ (issue 31): một chỗ duy nhất, tắt sau GUARD.barkShowMs
 const barking = s => (s.dog?.barkAt && now() - s.dog.barkAt < GUARD.barkShowMs
   ? [{ id: 'dog', x: s.dog.barkX, y: s.dog.barkY, target: { kind: 'dog' } }] : []);

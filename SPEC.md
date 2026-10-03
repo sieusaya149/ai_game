@@ -45,6 +45,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/art.js`, `public/art2.js`, `public/art3.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...; Phase 1 thêm hộp quà và sổ lưu bút ở cổng, đồ phụ của chó canh khách `barkBubble`, `dogChain`, `stunStars`, `barkArrow`, `sausage`/`sausageGround`; xem `public/_sprites2.html`); `art3.js` export `SPR3` (Phase 2: `SPR3.animal[loài][non|nho|truong|gia] = { left, right }` với loài `ga gaTrong vit vitDuc heo bo boDuc cuu cuuXoan cho meo`, `sleepBy[loài][giai đoạn]`, `angel`, chuồng, kẻ săn mồi, dáng lệnh của chó `dogSitBy/dogBegBy/dogHerdBy/dogBarkBy[giai đoạn]`...; xem `_sprites3.html`). `render.animalImg(a, face, frame, sleep)` chọn hình theo `a.type/stage/sex` (đực: `gaTrong`, `vitDuc`, `boDuc`), thiếu art thì dùng sprite cũ. Thêm sprite mới thì giữ nguyên mọi export cũ |
 | `public/art52.js` | Art chất lượng ★ (issue 52), hình mới nên tự mang cả hai bản: `SPR52_OLD` (bản thường: `starBadge[2|3]` 7x7, `starSpark` 3x3, `plotStars[0..2]` 13x5) và `SPR52` (bản 2x cùng khóa, đúng gấp đôi); `hd.js` nối hai bản qua `SPR52_OLD` (file art nào xuất `SPRn_OLD` thì khóa đó nối với bản thường của chính nó). `starIcon(img, sao, k)` dựng icon nông sản có sao. Trang xem: `public/_hd52.html` |
 | `public/art53.js` | Art trái khổng lồ (issue 53), hình mới nên tự mang cả hai bản: `SPR53_OLD` (bản thường: `giant[cây]` 24x24 cho 16 cây, đáy chạm đất, giữa ô; `giantIcon[cây]` 16x16; `giantSpark[0..2]` 5x5 lấp lánh) và `SPR53` (bản 2x cùng khóa, đúng gấp đôi); `hd.js` nối qua `SPR53_OLD`. Mỗi cây một hình riêng. Trang xem: `public/_hd53.html` |
+| `public/art62.js` | Biểu tượng thông báo, Việc cần làm, Sổ tay cho cây và nước (issue 62): `ART62` (bản thường 16x16) và `ART62_HD` (bản 2x, đúng gấp đôi, `hd.js` nối cùng cây khóa; bí danh `SPR62_OLD`, `SPR62`) với khóa `masteryUp`, `tankLow`, `powerOut`, `compostReady`, `weather`, `season`. Xuất `null` khi không có `document` (Node). `ui.js` nạp bằng `import()` động, thiếu file thì đọc `ART62?.<khóa> ?? sprite cũ / emoji` |
 | `public/art61.js` | Art hố ủ phân (issue 61), hình mới nên tự mang cả hai bản như art52: `SPR61_OLD` (bản thường) và `SPR61` (bản 2x cùng khóa, đúng gấp đôi; `hd.js` nối qua `SPR61_OLD`): `compost[0..3]` 32x24 (rỗng, đang bỏ đồ, đang ủ có chiếu rơm, đã xong có mầm), `compostSteam[0..2]` 16x14 (hơi bốc lên), `compostDone` 12x14 (bao phân bón nhún trên hố đã xong), `items.cay_heo/cay_chet/phan_cho` 14x14. Trang xem: `public/_hd61.html` |
 | `public/render.js`, `public/world.js`, `public/main.js` | Vẽ (theo khung nhìn, nền chia mảng 16x16 ô), di chuyển/tìm đường/AI/chế độ xây dựng/camera, vòng lặp, chuyển cảnh mờ dần, input. **Không tự quyết luật**, chỉ gọi `state.js` |
 | `public/index.html`, `public/style.css`, `public/ui.js`, `public/sound.js` | HUD, nút hành động, các bảng, tạo nhân vật, thông báo, âm thanh |
@@ -938,7 +939,7 @@ giantKey(id, sao = 1)             // 'giant_<cây>' (+ '@2' / '@3'); giantOf(key
 
 ### Thông báo, Việc cần làm, cài đặt
 ```js
-notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, help, gate, guard, visit, old, stray, ill, pest, birth)
+notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, help, gate, guard, visit, old, stray, ill, pest, birth, weather, mastery, giant, water, compost)
 urgentSpots(state)                // → [{ key, kind, x, y, text }] chỗ đang có chuyện gấp, tính từ trạng thái (không cần event).
                                   //   kind: crow/thief (đang ăn), sick, bark (chó sủa), rob (bạn vừa trộm, issue 32), kẻ săn mồi sắp ra tay (rat/hawk/...), hurt (con non bị chuột cắn)
 // notify.js
@@ -949,7 +950,11 @@ arrowTargets(state, items)  arrowFor(point, box, margin)
 todoList(state)                   // → [{ kind, level: 'urgent'|'normal', count, scene: 'farm', x, y, target, spots: [{ key, x, y, target }], icon, label }]
                                   //   xếp theo mức gấp rồi số lượng; (x, y, target) là chỗ gần người chơi nhất
 ```
-Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ săn mồi sắp ra tay), `hurt` (con non bị chuột cắn), `sick` (con Bệnh nặng trở lên — gấp); `tired` (con mệt), `hungry`, `dry`, `bugs`, `weeds`, `ripe`, `egg`, `trough`, `poop` (thường). Bảng Việc cần làm, bản đồ nhỏ và mũi tên đều đọc từ danh sách này (chạm một dòng thì `main.api.todoGo(kind)` cho nhân vật tự đi tới, kể cả khi đang ở bản đồ khác: ra cửa về vườn rồi đi tiếp).
+Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ săn mồi sắp ra tay), `hurt` (con non bị chuột cắn), `sick` (con Bệnh nặng trở lên — gấp); `tired` (con mệt), `hungry`, `dry`, `bugs`, `weeds`, `ripe`, `egg`, `trough`, `poop`, và (issue 62) `tank` (💧 bồn nước sắp cạn: bồn có mức nước dưới `TANK.low` = 20 lần), `compost` (🧺 hố ủ phân đã xong, `compostInfo(s).state === 'ready'`) (thường). Hai việc mới có `target` `{ kind: 'building', id: 'tank' | 'compost' }` và chỗ tới là `mapOf(s).building(id).at`, nên mũi tên và bản đồ nhỏ đọc đúng chỗ. Bảng Việc cần làm, bản đồ nhỏ và mũi tên đều đọc từ danh sách này (chạm một dòng thì `main.api.todoGo(kind)` cho nhân vật tự đi tới, kể cả khi đang ở bản đồ khác: ra cửa về vườn rồi đi tiếp).
+
+**Cài đặt thông báo cho cây và nước (issue 62):** `NOTIFY_CATS` thêm `mastery` (Cây lên cấp thành thạo), `giant` (Thu được trái khổng lồ), `water` (Bồn nước sắp cạn, hết tiền điện), `compost` (Hố ủ phân xong); `mastery`, `giant` trước đây dùng chung `levelup`, `compost` dùng chung `ripe`. Bảng Cài đặt lấy danh sách từ `NOTIFY_CATS` nên tự có công tắc; mức 🔴 vẫn không có công tắc. Toast mới có biểu tượng riêng (`ui.js` `TOAST_ICON`): `masteryUp`, `tankLow`, `powerOut`, `compostReady` từ `ART62`, trái khổng lồ dùng `SPR53_OLD.giantIcon[cây]`; thiếu `art62.js` thì toast chỉ có chữ.
+
+**Sổ tay (issue 62):** `ui.js` `GUIDE` thêm 8 trang, mở theo cấp (`lv`): Bốn mùa (`SEASON.minLevel`), Chất lượng ★ (3), Thành thạo cây (4, gồm trái khổng lồ), Thời tiết (`WEATHER.minLevel`), Nhà kính (`GLASS.lv`), Nước: giếng, bồn, tầm nước (5), Tự động hóa khối ruộng (8), Hố ủ phân (2). Hình minh họa dùng sprite của từng hệ thống (SPR2.season, starIcon, WX.icon, GH, WELLS, TANK_ART, AUTO_ART, SPR61_OLD) cộng `ART62.season`, `weather`, `masteryUp`, `tankLow`, `powerOut`, `compostReady`.
 
 **Mức và khóa gộp của event** (`EVENT_LEVEL` trong `data.js`): mỗi event có `level`, `group(e)` (khóa gộp), `label`; mức `important` có thêm `cat` (loại tắt được) và `text(n, e)` (chữ đã gộp, ví dụ "5 ô cà chua đã chín"). Mức: `urgent` 🔴 (băng rôn đỏ, âm thanh, rung, mũi tên; không tắt được) · `important` 🟡 (toast nhỏ, tự gộp) · `info` ⚪ (chỉ ghi nhật ký) · `direct` (hiện ngay không gộp) · `none` (hiệu ứng/âm thanh, không thông báo). **Thêm event mới thì khai báo trong `EVENT_LEVEL`**, thiếu thì `eventMeta` trả `null`.
 
@@ -994,7 +999,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `vaccinated` | `animal`, `id` | info — vừa tiêm vắc-xin |
 | `bathed` | `animal`, `id` | info — vừa tắm xong |
 | `mucked` | `pen`, `qty` | info — vừa xúc phân chuồng |
-| `compost` | `qty` (phân bón lấy được) | important (`ripe`), khóa gộp `compost` — lô ủ trong hố ủ phân vừa xong (issue 61) |
+| `compost` | `qty` (phân bón lấy được) | important (`compost`), khóa gộp `compost` — lô ủ trong hố ủ phân vừa xong (issue 61) |
 | `wallow` | `id` | none — heo, bò lăn bùn (dơ ngay, không mất vui) |
 | `born` | `kind`, `animal`, `id`, `x`, `y` | important (`birth`), gộp theo loài — con mới sinh hoặc nở |
 | `cockcrow` | `id` (gà trống) | none — 6h sáng gà trống gáy (render vẽ bong bóng) |
@@ -1018,7 +1023,10 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `tisun` | `n` (số trứng bị lấy) | important (`loss`) |
 | `civet` | `animal` (tên loài bị tha đi) | important (`loss`) |
 | `levelup` | `level` | important (`levelup`) |
-| `giant` | `crop`, `item` (khóa trái khổng lồ) | important (`levelup`) — thu được trái khổng lồ (issue 53) |
+| `giant` | `crop`, `item` (khóa trái khổng lồ) | important (`giant`), khóa gộp `giant:<cây>` — thu được trái khổng lồ (issue 53, 62) |
+| `mastery` | `crop`, `lv` | important (`mastery`), khóa gộp `mastery:<cây>` — cây lên cấp thành thạo (issue 51, 62); ui.js còn mở màn chúc mừng |
+| `tankLow` | `level` (lần nước còn lại) | important (`water`), khóa gộp `tankLow` — mực nước bồn vừa tụt từ trên xuống dưới `TANK.low` trong một bước tick (bồn mới xây còn trống không báo; không lưu cờ trong bản lưu) (issue 62) |
+| `billCut` | `bill` (xu thiếu, đã định dạng) | important (`water`), khóa gộp `billCut` — 6h sáng không đủ xu trả tiền điện nên máy bơm, máy phun ngừng. Đúng một lần mỗi hóa đơn treo (máy ngừng thì không tính điện tiếp), thay toast trực tiếp cũ (issue 62) |
 | `order` | — | important (`order`) |
 | `helped` | `by` (tên khách), `act` ('water'/'weed'/'catch'/'shoo'), `at` | important (`help`) |
 | `stolen` | `by` (tên kẻ trộm), `item`, `qty`, `at` (giờ ngoài đời) | urgent |

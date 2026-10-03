@@ -62,6 +62,10 @@ if (showerArt?.SHOWER_ART) { stats.files.push('art59.js'); link(showerArt.SHOWER
 const autoArt = await import('./art58.js').catch(() => null);
 if (autoArt?.AUTO_ART) { stats.files.push('art58.js'); link(autoArt.AUTO_ART, autoArt.AUTO_ART_HD, 'AUTO_ART'); }
 
+// Biểu tượng thông báo, Việc cần làm, Sổ tay cho cây và nước (issue 62): cùng cây khóa trong art62.js
+const iconArt = await import('./art62.js').catch(() => null);
+if (iconArt?.ART62) { stats.files.push('art62.js'); link(iconArt.ART62, iconArt.ART62_HD, 'ART62'); }
+
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);
 // Ghi cặp ảnh dẫn xuất (lật, tô màu...) làm từ ảnh cũ và ảnh 2x bằng cùng một phép

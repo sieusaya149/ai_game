@@ -32,7 +32,8 @@ export const WELL = [
 // Bồn chứa và mạng nước (issue 57, ADR 0015): bồn là một con số "lần nước". cap: bồn chính chứa · extra: mỗi bồn phụ thêm ·
 // perHour: máy bơm (giếng cấp 4) bơm vào bồn mỗi giờ vườn chạy, hạn hán × drought · range: tầm nước (ô) quanh bồn, trạm bơm phụ ·
 // power: số điện mỗi giờ chạy (máy bơm khi đang bơm, mỗi trạm bơm phụ khi có điện), issue 58 tính tiền điện từ đây.
-export const TANK = { cap: 200, extra: 150, perHour: 20, drought: 0.5, range: 8, power: { pump: 1, booster: 0.5 } };
+// low: mực nước bồn dưới mức này thì báo "sắp cạn" (thông báo 🟡 một lần khi vừa tụt xuống) và có việc "bồn cạn" (issue 62)
+export const TANK = { cap: 200, extra: 150, perHour: 20, drought: 0.5, range: 8, power: { pump: 1, booster: 0.5 }, low: 20 };
 // Nâng cấp theo khối ruộng 3×3 (issue 58): mua cho cả khối, dời khối thì đi theo. ups: tên, biểu tượng, giá, mô tả.
 // dripAt: tưới nhỏ giọt khi nước trong đất dưới mức này (trước khi khô hẳn, để máy giữ được "chăm kỹ") · sprayMs: có sâu bấy lâu
 // (giờ vườn) thì máy phun · richWeed: đất màu mỡ nhân xác suất mọc cỏ · richYield: +sản lượng (cộng vào hệ số như bón phân) ·
@@ -697,6 +698,7 @@ export const NOTIFY_CATS = {
   old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài', ill: 'Con vật mệt',
   pest: 'Chuột ăn cám, trộm trứng', birth: 'Vật nuôi sinh con',
   weather: 'Báo thời tiết xấu ngày mai',
+  mastery: 'Cây lên cấp thành thạo', giant: 'Thu được trái khổng lồ', water: 'Bồn nước sắp cạn, hết tiền điện', compost: 'Hố ủ phân xong',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -718,9 +720,12 @@ export const EVENT_LEVEL = {
   tisun:     { level: 'important', cat: 'loss', group: () => 'loss:tisun', label: 'Tí Sún trộm trứng', text: (n, e) => `Tí Sún lấy trộm mất ${e.n ?? n} quả trứng 😢` },
   civet:     { level: 'important', cat: 'loss', group: () => 'loss:civet', label: 'Chồn hương bắt con vật', text: (n, e) => `Chồn hương tha mất ${n} con ${animalN(e.animal)} 😿` },
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
-  giant:     { level: 'important', cat: 'levelup', group: e => 'giant:' + e.crop, label: 'Thu được trái khổng lồ', text: (n, e) => n > 1 ? `Thu được ${n} ${cropN(e.crop)} khổng lồ! ✨` : `Thu được ${cropN(e.crop)} khổng lồ! ✨` },
-  compost:   { level: 'important', cat: 'ripe', group: () => 'compost', label: 'Hố ủ phân xong', text: (n, e) => `Hố ủ phân xong rồi, lấy ${e.qty} phân bón nhé 🌿` },
-  mastery:   { level: 'important', cat: 'levelup', group: e => 'mastery:' + e.crop, label: 'Thành thạo cây', text: (n, e) => `Thành thạo ${cropN(e.crop)} lên cấp ${e.lv}! 🟡` },
+  giant:     { level: 'important', cat: 'giant', group: e => 'giant:' + e.crop, label: 'Thu được trái khổng lồ', text: (n, e) => n > 1 ? `Thu được ${n} ${cropN(e.crop)} khổng lồ! ✨` : `Thu được ${cropN(e.crop)} khổng lồ! ✨` },
+  compost:   { level: 'important', cat: 'compost', group: () => 'compost', label: 'Hố ủ phân xong', text: (n, e) => `Hố ủ phân xong rồi, lấy ${e.qty} phân bón nhé 🌿` },
+  mastery:   { level: 'important', cat: 'mastery', group: e => 'mastery:' + e.crop, label: 'Thành thạo cây', text: (n, e) => `Thành thạo ${cropN(e.crop)} lên cấp ${e.lv}! 🟡` },
+  // bồn nước (issue 57, 58, 62): vừa tụt dưới TANK.low thì báo một lần; hết xu trả tiền điện làm máy ngừng thì báo một lần
+  tankLow:   { level: 'important', cat: 'water', group: () => 'tankLow', label: 'Bồn nước sắp cạn', text: (n, e) => `Bồn nước sắp cạn, còn ${e.level} lần nước 💧` },
+  billCut:   { level: 'important', cat: 'water', group: () => 'billCut', label: 'Hết xu trả tiền điện', text: (n, e) => `Không đủ ${e.bill} xu trả tiền điện, máy bơm và máy phun tạm ngừng ⚡` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   helped:    { level: 'important', cat: 'help', group: e => `helped:${e.by}:${e.act}`, label: 'Khách giúp vườn', text: (n, e) => `${e.by} đã ${helpN(e.act)} ${n} ${HELP_JOBS[e.act]?.unit ?? 'việc'} giúp bạn 🙏` },
   stolen:    { level: 'urgent', group: e => `stolen:${e.by}:${e.item}`, label: 'Có người sang trộm', text: (n, e) => `${e.by} đã trộm ${e.qty * n} ${itemName(e.item).toLowerCase()} lúc ${hourText(e.at)} 😤` },

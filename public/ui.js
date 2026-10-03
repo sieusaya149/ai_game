@@ -12,13 +12,19 @@ import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
 import * as net from './net.js';
 import { hdOf, charFrames } from './hd.js';
-import { starIcon } from './art52.js';
+import { starIcon, SPR52_OLD } from './art52.js';
 import { WX, PAPER_BOX } from './artw.js';
 import { TANK_ART } from './arttank.js';
 import { SPR53_OLD } from './art53.js';   // biểu tượng trái khổng lồ (issue 53)
 import { GH } from './art60.js';   // nhà kính (issue 60)
 import { SPR61_OLD } from './art61.js';   // hố ủ phân (issue 61): icon cây héo, cây chết, phân chó, hố ủ
 import { AUTO_ART } from './art58.js';
+import { WELLS } from './artwell.js';
+
+// Biểu tượng thông báo, Việc cần làm, Sổ tay cho cây và nước (issue 62): art62.js xuất ART62 { masteryUp, tankLow, powerOut, compostReady, weather, season }.
+// Nạp động: file chưa có hay lỗi thì ART62 = null, chỗ dùng tự rơi về sprite cũ hoặc emoji.
+const ART62 = (await import('./art62.js').catch(() => null))?.ART62 ?? null;
+const a62 = k => { const v = ART62?.[k]; return (Array.isArray(v) ? v[0] : v) || null; };
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -279,9 +285,9 @@ function canvasIco(src, cls = 'ico') {
   c.getContext('2d').drawImage(src, 0, 0);
   return c;
 }
-const TOAST_ICON = { gift: () => SPR2?.giftIcon };   // sprite riêng cho vài loại thông báo
+const TOAST_ICON = { gift: () => SPR2?.giftIcon, mastery: () => a62('masteryUp'), giant: e => SPR53_OLD.giantIcon?.[e.crop], tankLow: () => a62('tankLow'), billCut: () => a62('powerOut'), compost: () => a62('compostReady') };   // sprite riêng cho vài loại thông báo
 // 🟡 toast nhỏ, tự gộp cùng khóa; loại nào tắt trong cài đặt (s.notify) thì bỏ qua
-const notifier = createNotifier({ show: (id, text, e) => pushToast(text, '', 'n' + id, TOAST_ICON[e.type]?.() ?? null), on: cat => !cat || S.notifyOn(st(), cat) });
+const notifier = createNotifier({ show: (id, text, e) => pushToast(text, '', 'n' + id, TOAST_ICON[e.type]?.(e) ?? null), on: cat => !cat || S.notifyOn(st(), cat) });
 // Tin từ server (quà, lời nhắn ở cổng): đi qua cùng đường gộp toast như event của luật chơi
 export const netEvent = e => notifier(e, Date.now());
 export function toast(text) { pushToast(text); }
@@ -1073,10 +1079,49 @@ const GUIDE = [
     text: [`Từ cấp ${D.PREDATOR.minLevel}: chuột ăn cám, trộm trứng và cắn con non; diều hâu cắp gà vịt con đang thả rông ban ngày; chồn bắt con ngủ ngoài chuồng lúc nửa đêm.`,
       `Đang chơi thì luôn được báo trước khoảng ${D.PREDATOR.warnMs / 1000} giây trước khi nó ra tay — chạm vào để đuổi là kịp, không ai bị hại.`,
       'Phòng chuột bằng bẫy chuột; phòng diều hâu bằng mái che sân; phòng chồn bằng đèn lồng hoặc lùa đàn vào chuồng trước khi ngủ. Chó canh nhà cũng đuổi được cả ba.'] },
+
+  // Phase 3: cây và nước (issue 62). Hình dùng sprite có sẵn của từng hệ thống, thêm biểu tượng ART62 nếu có.
+  { title: 'Bốn mùa', lv: D.SEASON.minLevel, art: () => [a62('season'), spr().season?.xuan, spr().season?.ha, spr().season?.thu, spr().season?.dong, spr().seasonTag],
+    text: ['Một mùa kéo dài 7 ngày game, lần lượt Xuân, Hạ, Thu, Đông rồi lại Xuân. Xem mùa hiện tại ở góc màn hình.',
+      `Mỗi mùa có 4 loại cây hợp: cây trồng đúng mùa lớn bình thường, trồng trái mùa thì lớn chậm còn ${Math.round(D.SEASON.slow * 100)}% tốc độ. Hạt giống đúng mùa có nhãn "Đúng mùa" trong chợ.`,
+      `Đúng mùa còn có ${Math.round(D.SEASON.bonusChance * 100)}% thu thêm ${D.SEASON.bonusQty} nông sản. Nhà kính giúp trồng trái mùa mà không chậm.`] },
+  { title: 'Chất lượng ★', lv: 3, art: () => [1, 2, 3].map(starSample),
+    text: ['Nông sản có 3 mức chất lượng: thường, ★★ viền bạc và ★★★ viền vàng. Sao càng cao thì bán càng được giá (×' + D.STARS.mul[1] + ' và ×' + D.STARS.mul[2] + ').',
+      'Chăm kỹ thì lên sao: đất không bao giờ khô hẳn, sâu không để quá lâu, có bón phân thì ★★; thêm ít nhất một lần tự tay chăm thì ★★★. Lỡ một điều là về mức thường.',
+      `Máy tưới, khách giúp hay trời mưa không tính là chăm tay. Từ cấp ${D.STARS.orderLv} có đơn hàng đòi nông sản ★★ hoặc ★★★, thưởng cao hơn.`] },
+  { title: 'Thành thạo cây', lv: 4, art: () => [a62('masteryUp') ?? SPR52_OLD?.starSpark, art.SPR?.ripe?.cai, SPR53_OLD?.giantIcon?.dau],
+    text: ['Thu hoạch một loại cây nhiều lần thì bạn thành thạo loại đó, có 3 cấp. Cây vụ ngắn lên cấp nhanh nhất, cây vụ dài cần nhiều vụ hơn.',
+      'Cấp 2: +1 sản lượng mỗi vụ và 10% ra trái khổng lồ. Cấp 3: +2 sản lượng, 20% trái khổng lồ, ít sâu hơn, 30% được lại 1 hạt giống. Mỗi lần lên cấp có thưởng EXP.',
+      `Trái khổng lồ là món riêng của từng cây, bán giá ${D.GIANT.priceMul} lần, chiếm ${D.GIANT.slots} chỗ trong giỏ. Vụ ★★★ ở cấp 3 dễ ra trái khổng lồ nhất. Thỉnh thoảng có đơn hàng đặc biệt đòi trái khổng lồ.`] },
+  { title: 'Thời tiết', lv: D.WEATHER.minLevel, art: () => [a62('weather'), ...['sun', 'rain', 'storm', 'drought', 'frost'].map(k => WX.icon?.[k])],
+    text: ['Mỗi sáng 6h trời đổi theo mùa: nắng, mây, mưa, và thỉnh thoảng thời tiết xấu. Hôm nay xem ở góc màn hình, ngày mai nghe đài trong nhà hoặc bảng tin làng; mỗi sáng cũng có thông báo báo trước.',
+      'Bão: lùa con vật vào chuồng, bão quật đổ bù nhìn, có thể mất điện nửa ngày và làm vỡ kính nhà kính. Hạn hán: đất khô nhanh gấp đôi, giếng hồi nước chậm, máy bơm bơm chậm. Sương muối: cây mới gieo và cây mầm ngừng lớn cả ngày.',
+      'Phủ rơm lên ô ruộng giữ ẩm và chống sương muối. Sau mưa có thể có cầu vồng, con vật vui hẳn lên. Dưới cấp ' + D.WEATHER.minLevel + ' chưa có thời tiết xấu.'] },
+  { title: 'Nhà kính', lv: D.GLASS.lv, art: () => [GH?.house, GH?.icon?.ripe, WX.icon?.frost],
+    text: [`Mở ở cấp ${D.GLASS.lv}: phủ nhà kính lên một khối ruộng 3×3 (giá ${fmt(D.GLASS.price)} xu, tối đa ${D.GLASS.max} cái). Xây ở 🔨 Xây dựng, nhà kính đi theo khối khi dời.`,
+      'Ô trong nhà kính bỏ qua mùa (trồng gì cũng lớn đủ tốc độ), không bị sương muối, bão, quạ; trộm vẫn vào qua cửa.',
+      `Mùa Đông sưởi tốn ${D.GLASS.heat} xu mỗi nhà kính lúc 6h sáng; không đủ xu thì ngừng sưởi tới khi đủ, không bị nợ. Bão có thể làm vỡ kính, sửa tốn ${D.GLASS.fix} xu ở cửa nhà kính.`] },
+  { title: 'Nước: giếng, bồn, tầm nước', lv: 5, art: () => [WELLS?.[0], WELLS?.[3], TANK_ART?.tank?.[4], TANK_ART?.tank?.[0], TANK_ART?.tank2?.[4], a62('tankLow')],
+    text: [`Giếng có 4 cấp: ${D.WELL.map(w => w.name).join(' → ')}. Nâng giếng thì bình tưới chứa nhiều hơn và múc lại nhanh hơn. Giếng cấp cuối có máy bơm tự bơm nước vào bồn chứa.`,
+      `Bồn chứa (${fmt(D.WATER_BUILD.tank.price)} xu) phải đặt trong ${D.TANK.range} ô quanh giếng, chứa ${D.TANK.cap} lần nước; mỗi bồn phụ (tối đa ${D.WATER_BUILD.tank2.max} cái) thêm ${D.TANK.extra} lần. Máy bơm bơm khoảng ${D.TANK.perHour} lần nước mỗi giờ vườn chạy, hạn hán thì chậm một nửa.`,
+      `Tầm nước là ${D.TANK.range} ô quanh bồn: công trình dùng nước phải nằm trong tầm (vùng xanh khi đặt). Trạm bơm phụ nối tiếp tầm nước đi xa hơn. Bồn dưới ${D.TANK.low} lần nước thì có thông báo và việc "bồn cạn"; bồn cạn thì máy ngừng, không ai bị phạt.`] },
+  { title: 'Tự động hóa khối ruộng', lv: 8, art: () => [AUTO_ART?.drip?.on?.[0], AUTO_ART?.sprayer?.on?.[0], AUTO_ART?.rich, a62('powerOut')],
+    text: ['Mua nâng cấp cho cả khối ruộng 3×3 trong 🔨 Xây dựng: ' + Object.values(D.AUTO.ups).map(u => u.name.toLowerCase() + ' ' + fmt(u.price) + ' xu').join(', ') + '. Dời khối thì nâng cấp đi theo.',
+      'Tưới nhỏ giọt lấy 1 lần nước bồn cho mỗi ô, khối phải trong tầm nước. Phun thuốc tự động trừ thuốc trừ sâu trong kho. Đất màu mỡ giảm cỏ và thêm sản lượng.',
+      `Máy bơm và máy phun tốn điện, trừ ${D.AUTO.price} xu mỗi số điện lúc 6h sáng. Không đủ xu thì máy ngừng (không bị nợ âm), đủ xu là tự trả và chạy lại. Bão mất điện nửa ngày cũng làm máy ngừng. Máy tưới không tính là chăm tay nên chỉ giữ tối đa ★★.`] },
+  { title: 'Hố ủ phân', lv: 2, art: () => [0, 1, 2, 3].map(i => SPR61_OLD?.compost?.[i]).concat([a62('compostReady')]),
+    text: [`Xây hố ủ ở 🔨 Xây dựng (${D.BUILD_PRICES.compost} xu), mỗi vườn một hố. Bỏ vào hố cây héo, cây chết, phân chuồng, phân chó, tối đa ${D.COMPOST.cap} món.`,
+      `Đậy hố để ủ: cứ ${D.COMPOST.per} món ra 1 phân bón, ủ mất 2 ngày game (chạy theo giờ vườn, đóng băng thì đứng yên). Đang ủ thì không bỏ thêm được.`,
+      'Xong thì có thông báo và việc "hố ủ đã xong" trong bảng Việc cần làm; chạm hố để lấy phân bón. Phân bón làm cây lớn nhanh, thêm sản lượng và giúp lên ★★.'] },
 ];
 let guidePage = 0;
 // Hệ thống mới chỉ hiện trang sổ tay khi người chơi tới cấp tương ứng (page.lv, thiếu = luôn hiện); không dội cả loạt lên người mới
 const guidePages = s => GUIDE.filter(p => !p.lv || level(s) >= p.lv);
+// Nông sản mẫu có n sao cho trang sổ tay (n = 1: icon thường)
+function starSample(n) {
+  const src = art.SPR?.ripe?.dau, big = src && hdOf(src);
+  return !src ? null : n > 1 ? starIcon(big ?? src, n, big ? 2 : 1) : src;
+}
 function guideIcon() {
   const c = h('canvas', { class: 'guide-ico', width: 12, height: 12 });
   const gb = hd(spr().guidebook);
@@ -1448,10 +1493,11 @@ PANELS.todo = {
     const items = todoList(s);
     if (!items.length) return body.append(empty('Hết việc rồi, nghỉ ngơi chút nhé 😌'));
     if (s.scene && s.scene !== 'farm') body.append(h('div', { class: 'note' }, 'Bạn đang ở ngoài vườn: chạm một việc để đi về vườn rồi tới đúng chỗ.'));
+    const TODO_ART = { tank: 'tankLow', compost: 'compostReady' };   // việc mới (issue 62) có biểu tượng riêng, thiếu thì dùng emoji ở nhãn
     body.append(...items.map(it => h('button', {
       class: 'row todo-row nosound' + (it.level === 'urgent' ? ' urgent' : ''), type: 'button', 'data-kind': it.kind,
       on: { click: () => { sound.play('click'); closePanel(); api.todoGo(it.kind); } },
-    }, h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, it.label)),
+    }, h('div', { class: 'row-main' }, h('div', { class: 'row-name' }, a62(TODO_ART[it.kind]) ? [canvasIco(a62(TODO_ART[it.kind]), 'todo-ico'), ' ', it.label.slice(it.icon.length).trim()] : it.label)),
     it.level === 'urgent' && h('span', { class: 'todo-tag' }, 'Gấp'), h('span', { class: 'todo-go' }, '›'))));
   },
 };
