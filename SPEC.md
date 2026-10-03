@@ -55,7 +55,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 - Ngày: `DAY_MS` = 20 phút. `dayFraction = (time % DAY_MS) / DAY_MS`. Ban đêm khi `dayFraction >= NIGHT_FROM` (0.75 = 0h, lúc màn hình tối nhất). Giờ hiển thị: `6:00 + dayFraction × 24h`. Ngày 1 bắt đầu lúc 6:00 sáng.
 - **Chạng vạng** `isDusk(state)`: `dayFraction >= FREE.duskAt` (0.5 = **18h**). Mốc gà vịt thôi thả rông mà về chuồng (issue 42); đừng nhầm với `isNight` (nửa đêm).
 - Thời tiết đổi mỗi ngày mới: `sun` 45% · `cloud` 30% · `rain` 25%. Mưa: mọi ô luôn đủ nước. Nắng: đất khô nhanh gấp 1.5 lần.
-- **Mùa** (chỉ hiển thị ở Phase 0): mỗi mùa 7 ngày game, Xuân, Hạ, Thu, Đông. `seasonOf(state)`.
+- **Mùa** (Phase 0 chỉ hiển thị, từ issue 54 có tác dụng lên cây, xem mục Mùa có tác dụng lên cây): mỗi mùa 7 ngày game, Xuân, Hạ, Thu, Đông. `seasonOf(state)`.
 - **Hai lịch (ADR 0003):** lịch game (ngày đêm, mùa, thời tiết) theo `state.time`; lịch ngoài đời (`realDay()` chơi đơn, `serverDay()` online) dành cho nhiệm vụ hằng ngày.
 - **Lịch làng (online, issue 23):** khi vào làng, `sync.js` `syncClock()` đo lệch giờ qua `GET /api/health` (lấy lần khứ hồi ngắn nhất trong 3 lần, đo lại mỗi 5 phút) rồi `useServerTime(offset)`. Với vườn `mode: 'online'` thì ngày, mùa, ngày/đêm, giờ chợ, ngủ đều tính từ `villageCal(now())` (`VILLAGE_EPOCH` = 0h UTC ngày 2026-01-01 = 6:00 sáng ngày 1; `dayOf`, `dayFraction`, `seasonOf`, `clockText` đọc từ đó), nên cả làng cùng ngày/mùa/ban đêm và lịch không dừng khi vườn đóng băng. `state.time`/`state.day` vẫn là giờ vườn cho cây, con vật, thời tiết, bộ đếm. Rời làng thì `useServerTime(null)`.
 - **Chạy bù khi mở lại game:** tối đa `MAX_CATCHUP_MS` = 8 giờ ở tốc độ x1, chia bước ≤ 1000ms; lúc chạy bù không sinh quạ/trộm và (ADR 0004) không có gì làm con vật chết. Phần vắng vượt 8 giờ **không chạy** (đóng băng): ghi vào `frozenMs`, cộng dồn `frozenTotal`. Với vườn online, **giờ làng trong lúc chạy bù trôi theo bước đang mô phỏng** (`loadGame` đặt mốc `catchBase` = giờ ngoài đời lúc bắt đầu phần chạy bù; `dayOf`/`dayFraction` đọc `catchBase + simMs` thay cho `now()`), nên 8 giờ vắng là 24 ngày làng có ngày có đêm (chạng vạng, mèo ra vào, chồn nửa đêm...), không phải cả 8 giờ đứng yên ở giờ lúc mở lại (issue 49 sửa: trước đó server chạy bù lúc làng đang đêm thì mèo ngủ suốt 8 giờ, không bắt được con chuột nào).
@@ -265,6 +265,24 @@ seasonOf(state)                   // → { key: 'xuan'|'ha'|'thu'|'dong', name, 
 farmHours(state)                  // giờ vườn đã chạy (simMs / 1 giờ)
 marketOpen(state)                 // chợ Bà Tư mở 6h–18h (MARKET)
 ```
+
+### Mùa có tác dụng lên cây (issue 54)
+
+```js
+seasonActive(state)               // → bool: đã đủ cấp SEASON.minLevel (5); dưới cấp đó mùa không ảnh hưởng gì (bảo hộ người mới)
+seasonFit(state, cropId)          // → 'in' | 'off': cây hợp mùa (CROPS[id].season === seasonOf(state).key) hay trái mùa. Thuần theo lịch, KHÔNG tính bảo hộ (dùng cho nhãn "đúng mùa")
+seasonGrowMul(state, cropId)      // → 1 | SEASON.slow (0.6): hệ số tốc độ lớn; 0.6 chỉ khi seasonActive và trái mùa. Dùng chung cho tick, UI dấu "lớn chậm", và issue 55/60 (nhà kính trả 1 ở đây)
+cropOffSeason(crop)               // → bool: cây từng lớn lúc trái mùa (đã tính bảo hộ), cờ `crop.offSeason`. Issue 52 đọc để chặn ★3
+seasonQuestInfo(state)            // → null | { coins, exp }: nhiệm vụ Bà Tư giải thích mùa đang mở
+claimSeasonQuest(state)           // nhận thưởng một lần → R; skipSeasonQuest(state) bỏ qua → R. State: s.seasonQuest = null | 'done' | 'skipped' (bản lưu cũ → null)
+```
+
+- **Luật (bảng `SEASON` ở `data.js`):** trái mùa lớn chậm ×`slow` = 0.6 (chỉ phần tiến độ cộng thêm mỗi bước; tiến độ đã có giữ nguyên, nên đổi mùa giữa vụ chỉ đổi tốc độ, cây không chết, không mất gì); trái mùa không ra ★3 (`crop.offSeason` bật ngay lần cây lớn lúc trái mùa); đúng mùa: mỗi lần thu hoạch `bonusChance` = 10% được thêm `bonusQty` = 1 (chỉ khi giỏ còn chỗ, thông báo "(đúng mùa +1)"). Cây chín rồi bỏ đó vẫn già đi và héo như cũ (mùa không đổi).
+- **Mùa theo lịch nào:** lịch game (ADR 0003) qua `seasonOf`. Online: lịch làng (giờ server), kể cả lúc `loadGame` / server chạy bù (giờ làng của từng bước mô phỏng); chơi đơn: `state.day`, đóng băng không làm đổi mùa. Mỗi bước mô phỏng 1 giây tính theo mùa lúc kết thúc bước, nên chạy bù qua ranh giới mùa lệch tối đa 1 giây so với lý tưởng. ADR 0004: mùa chỉ làm chậm, không gây chết.
+- **Nhiệm vụ Bà Tư:** mở khi `dayOf(s) >= SEASON.questFromDay` (8, đầu mùa thứ 2) và đã đủ cấp 5, chưa xong/bỏ qua; thưởng `questCoins` xu + `questExp` EXP một lần. UI: khung `#seasonquest` (nút Nhận thưởng + ✕ bỏ qua).
+- **UI:** hạt ở chợ (tab Hạt giống) và màn chọn hạt có nhãn `.season-tag` "Đúng mùa" ở cây hợp mùa hiện tại (hiện cả dưới cấp 5); ô trái mùa đang lớn vẽ dấu lớn chậm. **Art chưa có (dùng tạm, chờ agent Opus):** nhãn là chữ + emoji 🌿, dấu lớn chậm là emoji 🐌 vẽ bằng `fillText` ở `render.js`.
+- Test: `tests/season.test.mjs` (seam 1 + seam 3 chạy bù server qua ranh giới mùa), `e2e/season.spec.mjs`.
+
 
 ### Đực/cái, sinh sản, tên, phả hệ (issue 36)
 

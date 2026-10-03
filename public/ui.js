@@ -452,6 +452,7 @@ export function renderHUD(s) {
 
   updateTutorial(s);
   updateCoUtQuest(s);
+  updateSeasonQuest(s);
   if (panel === 'market' && S.marketOpen(s) !== marketWasOpen) refreshPanel();   // chợ vừa đóng/mở cửa khi đang xem
 }
 
@@ -520,6 +521,23 @@ function updateCoUtQuest(s) {
     h('div', { class: 'tut-step' }, `Cô Út: bước ${q.step + 1}/${q.total}`),
     h('div', { class: 'tut-text' }, COUT_TEXT[q.id]),
     h('button', { class: 'tut-x', type: 'button', title: 'Bỏ qua bước này', on: { click: () => { S.skipCoUtQuest(st()); commit(); } } }, '✕'));
+  box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
+}
+
+// ---------- Nhiệm vụ làm quen của Bà Tư: giải thích mùa, đầu mùa thứ 2 (issue 54) ----------
+let sqOpen = false;
+function updateSeasonQuest(s) {
+  const box = $('seasonquest');
+  if (!box) return;
+  const q = S.seasonQuestInfo(s);
+  if (!q) { if (sqOpen || !box.hidden) { box.hidden = true; sqOpen = false; } return; }
+  if (sqOpen && !box.hidden) return;
+  sqOpen = true; box.hidden = false;
+  box.replaceChildren(
+    h('div', { class: 'tut-step' }, 'Bà Tư: chuyện mùa vụ'),
+    h('div', { class: 'tut-text' }, 'Mùa mới rồi! Cây đúng mùa lớn bình thường, thỉnh thoảng được thêm hàng; cây trái mùa vẫn trồng được nhưng lớn chậm hơn và không đạt ★3. Hạt có nhãn "Đúng mùa" ở chợ là hợp mùa này.'),
+    h('button', { class: 'btn green sm', type: 'button', on: { click: () => { const r = S.claimSeasonQuest(st()); if (r.ok) { pushToast(r.msg); sound.play('coin'); } commit(); } } }, `Nhận thưởng ${q.coins} xu`),
+    h('button', { class: 'tut-x', type: 'button', title: 'Bỏ qua', on: { click: () => { S.skipSeasonQuest(st()); commit(); } } }, '✕'));
   box.classList.remove('pop'); void box.offsetWidth; box.classList.add('pop');
 }
 
@@ -686,8 +704,9 @@ PANELS.market = {
       const locked = it.lv > lv;
       const c = it.crop && D.CROPS[it.crop];
       const desc = c ? `Lớn sau ${c.grow / MIN} phút · thu ${c.yield} · bán ${c.price} xu/quả` : it.desc;
+      const inSeason = c && S.seasonFit(s, it.crop) === 'in';   // nhãn đúng mùa (issue 54)
       list.append(row({
-        icon: ico(id), name: it.name, locked,
+        icon: ico(id), name: inSeason ? [it.name, ' ', h('span', { class: 'season-tag' }, '🌿 Đúng mùa')] : it.name, locked,
         desc: [desc, h('br'), `Đang có: ${have(s, id)}`],
         right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + it.lv)
           : [coinTag(it.price), h('div', { class: 'qtys' },
@@ -1120,7 +1139,7 @@ PANELS.seeds = {
         const c = D.CROPS[D.ITEMS[k].crop];
         const on = s.selectedSeed === D.ITEMS[k].crop;
         list.append(h('button', { class: 'cell pick nosound' + (on ? ' on' : ''), type: 'button', on: { click: () => { S.selectSeed(st(), D.ITEMS[k].crop); sound.play('pop'); commit(); closePanel(); } } },
-          ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + s.inv[k]), h('div', { class: 'cell-name' }, c.name), h('div', { class: 'cell-sub' }, `${c.grow / MIN} phút`)));
+          ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + s.inv[k]), h('div', { class: 'cell-name' }, c.name), h('div', { class: 'cell-sub' }, `${c.grow / MIN} phút`), S.seasonFit(s, D.ITEMS[k].crop) === 'in' && h('div', { class: 'season-tag' }, '🌿 Đúng mùa')));
       }
       body.append(list);
     }

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
-import { CROPS, CROP_GROUPS, ITEMS, levelInfo } from '../public/data.js';
+import { CROPS, CROP_GROUPS, ITEMS, levelInfo, DAY_MS } from '../public/data.js';
 
 globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 const MIN = 60_000;
@@ -78,6 +78,7 @@ test('cây mới trồng, lớn, thu hoạch và bán như cây cũ', () => {
     const s = shopper(CROPS[id].lv), at = { kind: 'plot', idx: 0 };
     G.buy(s, `seed_${id}`, 1);
     assert.equal(G.selectSeed(s, id), true);
+    s.day = 1 + 7 * ['xuan', 'ha', 'thu', 'dong'].indexOf(CROPS[id].season); s.time = (s.day - 1) * DAY_MS;   // đúng mùa của cây (trái mùa thì lớn chậm, issue 54)
     quiet(() => { G.perform(s, at, 'till'); G.perform(s, at, 'plant'); });
     assert.equal(s.plots[0].crop.id, id);
     s.weather = 'rain';

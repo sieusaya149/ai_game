@@ -113,13 +113,16 @@ kbd {
 @keyframes bump { 40% { transform: scale(1.18); } }
 @keyframes blink { 50% { opacity: 0.6; } }
 
-#tutorial, #coutquest {
+#tutorial, #coutquest, #seasonquest {
   position: relative; max-width: 330px; min-height: 44px; padding: 6px 40px 7px 12px; border-radius: 14px;
   background: #fff8dc; border: 3px solid var(--orange); box-shadow: 0 3px 0 var(--orange-d), 0 6px 10px rgba(0, 0, 0, 0.22);
   pointer-events: none;
 }
 #coutquest { background: #ffeef7; border-color: #d9609a; box-shadow: 0 3px 0 #a84576, 0 6px 10px rgba(0, 0, 0, 0.22); }
-#tutorial.pop, #coutquest.pop { animation: pop 0.35s; }
+#seasonquest { background: #eaf8e0; border-color: #5aa83c; box-shadow: 0 3px 0 #3c7a28, 0 6px 10px rgba(0, 0, 0, 0.22); }
+#seasonquest .btn { pointer-events: auto; margin-top: 4px; }
+.season-tag { display: inline-block; padding: 0 6px; border-radius: 8px; background: #d8f2c4; color: #2f6b1c; font-size: 11px; font-weight: 900; white-space: nowrap; }
+#tutorial.pop, #coutquest.pop, #seasonquest.pop { animation: pop 0.35s; }
 .tut-step { font-size: 10.5px; font-weight: 900; color: var(--orange-d); text-transform: uppercase; letter-spacing: 0.05em; }
 .tut-text { font-size: 13.5px; font-weight: 800; line-height: 1.25; }
 .tut-x { position: absolute; top: 0; right: 0; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: #a07a45; font-size: 15px; cursor: pointer; pointer-events: auto; }
