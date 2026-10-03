@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
+import { penIdOf } from './helpers/troughs.mjs';
 import { PREDATOR as P, DAY_MS, ANIMALS, ITEMS, MAX_CATCHUP_MS, FREE } from '../public/data.js';
 import { mapOf } from '../public/farm.js';
 
@@ -86,10 +87,10 @@ test('chuột không quá 8 con dù chạy rất lâu, và sinh thêm khi bị b
 
 test('chuột ăn cám trong máng', () => {
   const s = newGame();
-  s.troughs.chicken = 10;
+  s.troughs[penIdOf(G, s, 'chicken')] = 10;
   const rat = putRat(s, ...tileNear(s), 1000);
   seeded(3, () => run(s, 2000, 500));
-  assert.equal(s.troughs.chicken, 9);
+  assert.equal(s.troughs[penIdOf(G, s, 'chicken')], 9);
   assert.ok(s.preds.includes(rat), 'ăn xong chuột vẫn ở lại');
 });
 
@@ -227,7 +228,7 @@ test('mọi tấn công đều báo 🔴 trước khoảng 10 giây, đuổi k�
 
 test('chuột cũng báo trước 10 giây mỗi lần ra tay; đuổi chuột thì hết hại', () => {
   const s = newGame();
-  s.troughs.chicken = 10;
+  s.troughs[penIdOf(G, s, 'chicken')] = 10;
   const rat = putRat(s, ...tileNear(s), P.rat.actMs);
   seeded(18, () => run(s, P.rat.actMs - P.warnMs - 2000, 1000));
   assert.equal(G.urgentSpots(s).some(x => x.key === 'pred:' + rat.id), false, 'còn xa thì chưa báo');
@@ -237,7 +238,7 @@ test('chuột cũng báo trước 10 giây mỗi lần ra tay; đuổi chuột t
   const r = G.perform(s, { kind: 'pred', id: rat.id }, 'shoo');
   assert.equal(r.ok, true, r.msg);
   seeded(20, () => run(s, MIN, 1000));
-  assert.equal(s.troughs.chicken, 10, 'đuổi kịp thì không mất cám');
+  assert.equal(s.troughs[penIdOf(G, s, 'chicken')], 10, 'đuổi kịp thì không mất cám');
 });
 
 test('bảo hộ người mới: dưới cấp 5 không có chuột, diều hâu, chồn', () => {
@@ -282,7 +283,7 @@ test('bẫy chuột: mua ở chợ, đặt trong trại, bắt con chuột đi q
 test('ADR 0004: chạy bù offline nhiều giờ có chuột, diều hâu, chồn thì không con nào chết', () => {
   const s = newGame();
   s.time = DAY_MS * 0.05;
-  s.troughs.chicken = 20; s.troughs.pig = 20; s.troughs.pasture = 20;
+  s.troughs[penIdOf(G, s, 'chicken')] = 20; s.troughs[penIdOf(G, s, 'pig')] = 20; s.troughs[penIdOf(G, s, 'pasture')] = 20;
   for (let i = 0; i < 6; i++) bird(s, 'non');
   for (let i = 0; i < 4; i++) bird(s, 'truong', { nextProduct: 0 });
   for (let i = 0; i < 5; i++) s.eggs.push({ id: s.nextId++, sp: 'ga', x: s.animals[0].x, y: s.animals[0].y, laidAt: 0, fertile: false, mom: null, dad: null });
@@ -291,14 +292,14 @@ test('ADR 0004: chạy bù offline nhiều giờ có chuột, diều hâu, chồ
   putPred(s, 'hawk', s.animals[0]);
   putPred(s, 'weasel', s.animals[1]);
   s.animals[1].tile = { c: s.farm.owned.c + 8, r: s.farm.owned.r + 8 }; s.animals[1].stray = true;
-  const ids = s.animals.map(a => a.id), feed0 = s.troughs.chicken + s.troughs.pig + s.troughs.pasture, eggs0 = s.eggs.length;
+  const ids = s.animals.map(a => a.id), feed0 = s.troughs[penIdOf(G, s, 'chicken')] + s.troughs[penIdOf(G, s, 'pig')] + s.troughs[penIdOf(G, s, 'pasture')], eggs0 = s.eggs.length;
   s.savedAt = Date.now() - 8 * HOUR;
   store[G.SAVE_KEY] = JSON.stringify(s);
   const l = seeded(24, () => G.loadGame());
   for (const id of ids) assert.ok(l.animals.some(a => a.id === id), `con ${id} vẫn còn sống sau khi chạy bù`);
   assert.equal(l.animals.filter(a => a.hurt).length, 0, 'chạy bù không có con nào bị cắn');
   assert.equal(l.preds.some(p => p.kind !== 'rat'), false, 'diều hâu, chồn bỏ đi tay không');
-  const feed1 = l.troughs.chicken + l.troughs.pig + l.troughs.pasture;
+  const feed1 = l.troughs[penIdOf(G, l, 'chicken')] + l.troughs[penIdOf(G, l, 'pig')] + l.troughs[penIdOf(G, l, 'pasture')];
   assert.ok(feed1 < feed0 || l.eggs.length < eggs0 + 10, `cám và trứng có hao: cám ${feed0}→${feed1}`);
   assert.ok(l.preds.filter(p => p.kind === 'rat').length <= P.rat.max, 'chạy bù không sinh chuột quá 8');
   assert.ok(MAX_CATCHUP_MS >= 8 * HOUR);
@@ -308,7 +309,7 @@ test('ADR 0004: con non đang mang vết chuột cắn không chết khi chạy 
   const s = newGame();
   const chick = bird(s, 'non');
   chick.hurt = true; chick.hurtMs = P.rat.hurtDeadMs - MIN;
-  s.troughs.chicken = 20;
+  s.troughs[penIdOf(G, s, 'chicken')] = 20;
   s.savedAt = Date.now() - 6 * HOUR;
   store[G.SAVE_KEY] = JSON.stringify(s);
   const l = seeded(25, () => G.loadGame());
@@ -320,7 +321,7 @@ test('ADR 0004: con non đang mang vết chuột cắn không chết khi chạy 
 
 test('chạy bù không sinh chuột vượt 8 con dù vắng rất lâu', () => {
   const s = newGame();
-  s.troughs.chicken = 20;
+  s.troughs[penIdOf(G, s, 'chicken')] = 20;
   s.savedAt = Date.now() - MAX_CATCHUP_MS;
   store[G.SAVE_KEY] = JSON.stringify(s);
   const l = seeded(26, () => G.loadGame());

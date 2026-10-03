@@ -226,7 +226,7 @@ function updateAnimals(state, w, dt0, out) {
       if (rt.timer <= 0 && !near) {
         rt.nap = false;
         const inMud = a.type === 'heo' && inMudSpot(a);
-        const trough = pen.trough ? state.troughs?.[ANIMALS[a.type].pen] ?? 0 : 0;   // chuồng cách ly không có máng
+        const trough = pen.trough ? state.troughs?.[pen.id] ?? 0 : 0;   // chuồng cách ly không có máng
         const hen = henOf(state, a);
         if (hen && a.type === 'vit' && Math.random() < 0.9) {   // vịt con đi hàng theo vịt mẹ
           const r = duckRow(state, w, a, hen);

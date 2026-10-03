@@ -295,7 +295,7 @@ test('cho mèo ăn và vuốt ve: no, vui và thân hơn; mèo không có hành 
 test('ADR 0004: chạy bù offline có mèo và chuột thì chuột ít đi, không con nào chết', () => {
   const s = newGame();
   s.time = DAY_MS * 0.05;
-  s.troughs.chicken = 20;
+  s.troughs[G.mapOf(s).pens.chicken.id] = 20;
   const cat = addCat(s, 'truong', { hunger: 50 });
   s.inv.vaccine = 1;
   assert.equal(G.vaccinate(s, cat.id).ok, true, 'tiêm vắc-xin cho mèo được, nó khỏe suốt lúc mình vắng');

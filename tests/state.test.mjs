@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
+import { penIdOf } from './helpers/troughs.mjs';
 import { CROPS, FARMING, HUSBANDRY, DOG, THREATS, DAY_MS, FREE } from '../public/data.js';
 
 const MIN = 60_000;
@@ -199,7 +200,7 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
   s.animals = [];
   s.exp = 1e4; s.coins = 5000;
   assert.ok(G.placeEntity(s, { kind: 'pen', pen: 'pig' }, 34, 18).ok);   // chuồng heo (sức chứa cấp 1: 3 con)
-  const troughOk = () => { s.troughs.pig = 20; };
+  const troughOk = () => { s.troughs[penIdOf(G, s, 'pig')] = 20; };
   for (let i = 0; i < 2; i++) {
     const a = { id: s.nextId++, type: 'heo', stage: 'truong', age: G.stageStart('heo', 'truong'), hunger: 100, happy: 100, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 330, y: 320, name: 'Heo', sex: i ? 'f' : 'm' };
     s.animals.push(a);
@@ -220,7 +221,7 @@ test('heo trưởng thành sinh sản: mang bầu rồi đẻ 1-3 heo con', () =
 test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () => {
   const s = newGame(); FREE.types = [];   // ở yên trong chuồng (thả rông có test riêng: free.test.mjs)
   const hen = s.animals.find(a => a.type === 'ga' && a.stage === 'truong');
-  hen.x = 100; hen.y = 320; s.troughs.chicken = 20;
+  hen.x = 100; hen.y = 320; s.troughs[penIdOf(G, s, 'chicken')] = 20;
   const ev = noBugs(() => run(s, 3 * MIN));
   assert.ok(s.eggs.length >= 1);
   assert.ok(ev.some(e => e.type === 'spawn' && e.what === 'egg'));
@@ -239,7 +240,7 @@ test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () 
   assert.ok(G.perform(s, nest, 'incubate').ok);
   assert.equal(s.nest.egg, true);
   const n0 = s.animals.length;
-  s.troughs.chicken = 20;
+  s.troughs[penIdOf(G, s, 'chicken')] = 20;
   noBugs(() => run(s, HUSBANDRY.nestHatchMs + 1000));
   assert.equal(s.nest.egg, false);
   assert.equal(s.animals.length, n0 + 1);
@@ -262,7 +263,7 @@ test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
   s.exp = 1e6;
   s.animals = [];
   s.animals.push({ id: 50, type: 'bo', stage: 'truong', age: G.stageStart('bo', 'truong'), hunger: 100, happy: 60, sick: 0, starvingSince: 0, nextProduct: 0, ready: false, pregnant: false, dueAt: 0, x: 440, y: 320, name: 'Bò' });
-  s.troughs.pasture = 20;
+  s.troughs[penIdOf(G, s, 'pasture')] = 20;
   noBugs(() => run(s, 1000));
   assert.equal(s.animals[0].ready, true);
   assert.equal(G.actionsFor(s, { kind: 'animal', id: 50 })[0].id, 'milk');
@@ -279,9 +280,9 @@ test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
 test('vật nuôi: tự ăn ở máng, đói -> bệnh -> thuốc thú y', () => {
   const s = newGame();
   const hen = s.animals[0];
-  s.troughs.chicken = 1;
+  s.troughs[penIdOf(G, s, 'chicken')] = 1;
   noBugs(() => run(s, 4 * MIN));
-  assert.equal(s.troughs.chicken, 0);
+  assert.equal(s.troughs[penIdOf(G, s, 'chicken')], 0);
   // đói lả
   noBugs(() => run(s, 10 * MIN));
   assert.equal(hen.sick, 1);   // mức Mệt
@@ -435,7 +436,7 @@ test('máng ăn và cho chó ăn', () => {
   const s = newGame();
   const tr = { kind: 'trough', pen: 'chicken' };
   assert.ok(G.perform(s, tr, 'fill').ok);
-  assert.equal(s.troughs.chicken, 5);
+  assert.equal(s.troughs[penIdOf(G, s, 'chicken')], 5);
   s.dog.hunger = 10;
   assert.equal(G.actionsFor(s, { kind: 'dog' })[0].id, 'feed');
   assert.ok(G.perform(s, { kind: 'dog' }, 'feed').ok);
