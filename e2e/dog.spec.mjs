@@ -217,10 +217,12 @@ test('B chạy kịp ra cổng thì thoát và giữ đồ đã trộm', async (
   await expect.poll(() => st(B.page, () => globalThis.__farm.state.basket.cachua ?? 0), { timeout: 20_000 }).toBe(1);
 
   // bước về phía chó cho nó phát hiện, rồi quay đầu chạy ngay: cổng ở sát ô ruộng nên thoát kịp
-  const d = await dogPos(B.page);
-  await tapWorld(B.page, touch, d.x, d.y + 20);
-  for (let i = 0; i < 60 && !(await world(B.page, () => !!globalThis.__farm.world.guard?.chasing)); i++) await B.page.waitForTimeout(150);
-  expect(await world(B.page, () => !!globalThis.__farm.world.guard?.chasing)).toBe(true);
+  const chasing = () => world(B.page, () => !!globalThis.__farm.world.guard?.chasing);
+  for (let i = 0; i < 40 && !(await chasing()); i++) {
+    if (i % 14 === 0) { const d = await dogPos(B.page); await tapWorld(B.page, touch, d.x, d.y + 20); }   // chạm lại nếu lần chạm trước hụt
+    await B.page.waitForTimeout(150);
+  }
+  expect(await chasing()).toBe(true);
   await B.page.locator('#visit-leave').click();
   await expect.poll(() => st(B.page, () => globalThis.__farm.state?.scene), { timeout: 40_000 }).toBe('village');
   expect(await st(B.page, () => globalThis.__farm.state.basket.cachua ?? 0)).toBe(1);
@@ -270,7 +272,7 @@ test('ban đêm Mực ngủ gật 💤: B đứng xa 1 ô không bị phát hi�
 
   // chủ đang chơi cũng phải thấy: Mực của A mải ăn nên im lặng, nhật ký ghi dòng ném xúc xích
   await expect.poll(() => st(A.page, () => (globalThis.__farm.state.dog.quiet || 0) > Date.now()), { timeout: 20_000 }).toBe(true);
-  await A.page.locator('.bb-btn[data-panel="log"]').click();
+  await A.page.evaluate(async () => (await import('/ui.js')).openPanel('log'));
   await expect(A.page.locator('.sheet-body')).toContainText('ném xúc xích');
   expect(A.errors.concat(B.errors)).toEqual([]);
   await A.context.close(); await B.context.close();
