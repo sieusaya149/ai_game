@@ -87,7 +87,12 @@ test('chat tự gõ: gõ WASD/phím tắt không làm nhân vật đi, Enter g�
   const input = B.page.locator('#live-chat-in');
   const x0 = (await peers(A.page))[0].x;
   await input.click();
+  if (testInfo.project.use.hasTouch) {   // điện thoại: đang gõ thì khung chat lên đầu màn hình, bàn phím ảo không che
+    const box = await B.page.locator('#live-says').boundingBox();
+    expect(box.y).toBeLessThan(B.page.viewportSize().height / 3);
+  }
   await input.pressSequentially('wasd e 1 dm xin chao');
+  if (process.env.SHOT) await B.page.screenshot({ path: process.env.SHOT });
   await B.page.waitForTimeout(400);
   expect((await peers(A.page))[0].x).toBe(x0);   // phím di chuyển không chạy khi đang gõ
   await expect(B.page.locator('#live-chat-n')).toHaveText('6/20 từ');

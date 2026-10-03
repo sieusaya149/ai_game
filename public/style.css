@@ -616,6 +616,9 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 #live-says .live-type .btn { min-height: 40px; flex: none; padding: 4px 10px; }
 #live-chat-n { font-size: 11px; color: var(--wood-d); text-align: right; padding-right: 2px; }
 #live-chat-n.bad { color: #c0392b; font-weight: 700; }
+/* điện thoại đang gõ chat: khung nhập dời lên đầu màn hình (bàn phím ảo che nửa dưới), ẩn câu chat nhanh cho gọn */
+body.chat-typing #live-says { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); left: 8px; right: 8px; bottom: auto; width: auto; max-width: none; min-width: 0; z-index: 60; }
+body.chat-typing #live-says > .btn { display: none; }
 
 /* bạn bè và cổng vườn (issue 26) */
 .fr-add { display: flex; gap: 8px; align-items: center; }

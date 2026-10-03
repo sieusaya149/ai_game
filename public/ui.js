@@ -2391,7 +2391,13 @@ export function initUI(a) {
     if (e.key === 'Enter') { e.preventDefault(); chatSend(); }
     else if (e.key === 'Escape') { chatIn.blur(); says.hidden = true; }
   });
-  says.append(h('div', { class: 'live-type' }, chatIn, btn('Gửi', chatSend, 'green nosound', { id: 'live-chat-send' })), chatCount);
+  // điện thoại: đang gõ thì đưa ô nhập lên đầu màn hình cho bàn phím ảo không che (body.chat-typing, style.css)
+  const touch = matchMedia('(pointer: coarse)').matches;
+  chatIn.addEventListener('focus', () => { if (touch) document.body.classList.add('chat-typing'); });
+  chatIn.addEventListener('blur', () => document.body.classList.remove('chat-typing'));
+  const chatBtn = btn('Gửi', chatSend, 'green nosound', { id: 'live-chat-send' });
+  chatBtn.addEventListener('pointerdown', e => e.preventDefault());   // giữ focus ô nhập: bấm Gửi không làm khung nhảy chỗ trước khi nhận cú bấm
+  says.append(h('div', { class: 'live-type' }, chatIn, chatBtn), chatCount);
   $('live-chat').addEventListener('click', () => { says.hidden = !says.hidden; });
   $('live-people').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('online'); });
   $('live-friends').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('friends'); });
