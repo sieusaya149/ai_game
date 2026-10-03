@@ -40,6 +40,14 @@ test('heo bán theo số ký × giá chợ hôm đó', () => {
   assert.equal(r.ok, true); assert.equal(s.coins, coins + 80 * p3);
 });
 
+test('nuôi heo con lên 100 kg rồi bán thì lời, ngày giá thấp nhất cũng vậy', () => {
+  const s = newGame(), pig = put(s, 'heo', 'truong', { bond: 2, weight: WEIGHT.heo[1] });
+  for (let day = 0; day < 7; day++) {
+    s.day = day;
+    assert.ok(G.sellQuote(s, pig).price > ANIMALS.heo.price + 60, `ngày ${day}: ${G.sellQuote(s, pig).price} xu`);
+  }
+});
+
 test('heo ăn no, ít vận động tăng cân nhanh hơn heo hay vận động', () => {
   const s = newGame(), lazy = put(s, 'heo', 'nho', { weight: 20, hunger: 100 }), busy = put(s, 'heo', 'nho', { weight: 20, hunger: 100 });
   s.troughs[penIdOf(G, s, 'pig')] = 20;

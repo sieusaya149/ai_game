@@ -3056,8 +3056,8 @@ function predActs(s, t) {
 export function sellQuote(s, a) {
   const pig = a.type === 'heo', kg = pig ? Math.round((a.weight || WEIGHT.heo[0]) * 10) / 10 : null;
   const mul = TRADE.bondMul[(a.bond || 2) - 1] * (a.sick ? TRADE.sickMul : 1) * ((a.dirty || 0) >= BOND.dirtyAbove ? TRADE.dirtyMul : 1);
-  const base = pig ? kg * pigKgPrice(s.day) : ANIMALS[a.type].sell * TRADE.stageMul[a.stage];
-  return { price: Math.floor(base * mul), kg, unit: pig ? pigKgPrice(s.day) : null, need: a.bond >= TRADE.confirmBond ? TRADE.confirms : 0 };
+  const base = pig ? kg * pigKgPrice(dayOf(s)) : ANIMALS[a.type].sell * TRADE.stageMul[a.stage];
+  return { price: Math.floor(base * mul), kg, unit: pig ? pigKgPrice(dayOf(s)) : null, need: a.bond >= TRADE.confirmBond ? TRADE.confirms : 0 };
 }
 // Bán con `id`: `confirms` = số lần người chơi đã xác nhận (con ❤️4+ cần 2). → R { coins, kg, sold } (sold: để vẽ cảnh Chú Ba dắt đi)
 export function sellAnimal(s, id, confirms = 0) {

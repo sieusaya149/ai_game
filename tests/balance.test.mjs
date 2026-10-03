@@ -252,21 +252,20 @@ test('chuồng bẩn, con dơ lâu vẫn là nguy cơ bệnh riêng (không thu�
   assert.ok(hen.sick > 0, 'chuồng bẩn lâu thì dễ bệnh');
 });
 
+// Heo không có sản phẩm, bán thịt là nguồn thu của nó nên được lời (trade.test.mjs); các loài cho sản phẩm thì không
 test('giá mua luôn cao hơn giá bán lại: mua con non nuôi lớn rồi bán không bao giờ có lời, ở mọi giai đoạn, kể cả độ thân ❤️5', () => {
   const s = G.createGame({ name: 'Chú Ba' });
-  for (const type of ['ga', 'vit', 'heo', 'bo', 'cuu']) {
+  for (const type of ['ga', 'vit', 'bo', 'cuu']) {
     for (const sex of ['m', 'f']) {
       const price = animalPrice(type, sex);
       for (const stage of ['non', 'nho', 'truong', 'gia']) for (const day of [1, 2, 3, 4, 5, 6, 7]) {
         s.day = day;
-        const a = { type, stage, sex, bond: 5, sick: 0, dirty: 0, weight: type === 'heo' ? weightAt('heo', stage) : undefined };
+        const a = { type, stage, sex, bond: 5, sick: 0, dirty: 0 };
         const sold = G.sellQuote(s, a).price;
         assert.ok(sold < price, `${type} ${sex} ${stage} ngày ${day}: bán ${sold} ≥ mua ${price}`);
       }
     }
   }
-  // heo to hơn mức trưởng thành (nái ăn khỏe) vẫn rẻ hơn giá mua
-  s.day = 5; assert.ok(G.sellQuote(s, { type: 'heo', stage: 'truong', bond: 5, weight: WEIGHT.heo[1], sick: 0, dirty: 0 }).price < animalPrice('heo', 'm'));
 });
 
 test('thức ăn đáng tiền nhưng không miễn phí: chi phí mỗi giờ khoảng 5–20% giá trị sản phẩm mỗi giờ', () => {

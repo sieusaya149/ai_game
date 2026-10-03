@@ -342,7 +342,7 @@ export const TRADE = {
   bondMul: [0.85, 1, 1.15, 1.3, 1.5],   // ❤️1..5
   sickMul: 0.6, dirtyMul: 0.8,
   confirmBond: 4, confirms: 2,
-  pigKg: [1, 2, 2, 1, 2, 2, 1],         // lịch giá heo hơi (xu/kg) theo ngày game, lặp mỗi 7 ngày: heo 100 kg bán 100–200 xu (rẻ hơn giá mua heo)
+  pigKg: [5, 6, 7, 5, 8, 6, 5],         // lịch giá heo hơi (xu/kg) theo ngày làng, lặp mỗi 7 ngày: heo 100 kg bán 500–800 xu (thịt là nguồn thu duy nhất của heo, chốt 03/10)
   walkPx: 16,                           // px/giây heo đi hết ga; ít đi hơn thì coi là ít vận động
   gainActive: 0.6, gainLazy: 1.5,       // hệ số tăng cân khi hay vận động / nằm ườn
   gainFull: 1.25, fullAt: 90,           // ăn no (đói ≥ fullAt) tăng thêm
