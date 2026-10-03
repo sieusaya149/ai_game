@@ -99,9 +99,15 @@ export const HUSBANDRY = {
   growNeedsHunger: 30,        // phải no trên 30 mới lớn và mới đẻ
   happyDecayPerMin: 4,
   petHappy: 25,
-  sickAfterStarving: 3 * MIN, // đói lả (0) quá 3 phút thì bệnh
-  sickChancePerMin: 0.004,    // chỉ áp dụng khi bị bỏ bê: đói (dưới hungryBelow), dơ, chuồng bẩn hoặc già. No, sạch thì không tự bệnh
-  hungryBelow: 40,            // đói hơn mức này là "đang đói" (cùng mốc hiện nút Cho ăn)
+  // Quên cho ăn một lượt KHÔNG gây bệnh. Từ no: 3 phút tới "đang đói" (<40, báo + việc cần làm), 5 phút tới đói lả (0);
+  // con đói thì ngừng sinh sản/lớn (growNeedsHunger) nhưng chưa bệnh. Chỉ bỏ đói lả RẤT LÂU mới có nguy cơ bệnh:
+  // từ lúc hunger = 0 phải qua sickRiskAfterStarving (30 phút, ~6 chu kỳ ăn) mới bắt đầu có xác suất, rồi xác suất
+  // tăng dần tuyến tính từ 0 tới sickStarveMaxPerMin sau sickStarveRampMs. Không có mốc "chắc chắn bệnh". Chỉnh lại cân bằng thì sửa 3 số này.
+  sickRiskAfterStarving: 30 * MIN,
+  sickStarveRampMs: 60 * MIN,
+  sickStarveMaxPerMin: 0.08,  // xác suất/phút khi đã đói lả hết thời gian tăng dần
+  sickChancePerMin: 0.004,    // xác suất/phút: áp dụng khi bị bỏ bê (đói lả lâu, dơ, chuồng bẩn hoặc già). No, sạch thì không tự bệnh
+  hungryBelow: 40,            // đói hơn mức này là "đang đói": báo đói, vào việc cần làm, hiện nút Cho ăn (CHƯA có nguy cơ bệnh)
   eggHatchChance: 0.2,        // trứng bỏ quên quá 10 phút có 20% tự nở thành gà con
   eggForgetMs: 10 * MIN,
   nestHatchMs: 3 * MIN,       // đặt trứng vào ổ ấp: 3 phút nở gà con
@@ -600,7 +606,7 @@ export const EVENT_LEVEL = {
   ripe:      { level: 'important', cat: 'ripe', group: e => 'ripe:' + e.crop, label: 'Cây chín', text: (n, e) => `${n} ô ${cropN(e.crop)} đã chín 🌾` },
   rotten:    { level: 'important', cat: 'spoil', group: e => 'rotten:' + e.crop, label: 'Cây héo', text: (n, e) => `${n} ô ${cropN(e.crop)} đã héo 🥀` },
   dead:      { level: 'important', cat: 'spoil', group: e => 'dead:' + e.crop, label: 'Cây chết', text: (n, e) => `${n} ô ${cropN(e.crop)} đã chết 💀` },
-  hungry:    { level: 'important', cat: 'hungry', group: e => 'hungry:' + e.animal, label: 'Con vật đói', text: (n, e) => `${n} con ${animalN(e.animal)} đói lả` },
+  hungry:    { level: 'important', cat: 'hungry', group: e => 'hungry:' + e.animal, label: 'Con vật đói', text: (n, e) => `${n} con ${animalN(e.animal)} đang đói` },
   crow:      { level: 'important', cat: 'loss', group: () => 'loss:crow', label: 'Quạ ăn mất cây', text: (n, e) => n > 1 ? `Quạ đã ăn mất ${n} cây 😢` : `Quạ đã ăn mất ${(e.name ?? 'cây').toLowerCase()} 😢` },
   thief:     { level: 'important', cat: 'loss', group: () => 'loss:thief', label: 'Trộm hái mất cây', text: (n, e) => n > 1 ? `Thằng Tèo đã hái trộm ${n} cây 😢` : `Thằng Tèo đã hái trộm ${(e.name ?? 'cây').toLowerCase()} 😢` },
   tisun:     { level: 'important', cat: 'loss', group: () => 'loss:tisun', label: 'Tí Sún trộm trứng', text: (n, e) => `Tí Sún lấy trộm mất ${e.n ?? n} quả trứng 😢` },
