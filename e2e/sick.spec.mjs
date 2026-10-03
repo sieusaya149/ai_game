@@ -1,6 +1,6 @@
 // Bệnh 4 giai đoạn, trạm thú y Cô Út, chuồng cách ly, bác sĩ qua điện thoại, ngôi mộ (issue 38).
 import { test, expect } from '@playwright/test';
-import { makeSave, seedSave } from './helpers.mjs';
+import { makeSave, seedSave, noCatchUp } from './helpers.mjs';
 import { mapOf, placeEntity, canPlace, buyAnimal } from '../public/state.js';
 import { SICK } from '../public/data.js';
 
@@ -42,7 +42,12 @@ const screenOf = (page, x, y) => page.evaluate(([x, y]) => {
 }, [x, y]);
 async function tap(page, touch, x, y) {
   await page.waitForTimeout(350);
-  const p = await screenOf(page, x, y);
+  let p = await screenOf(page, x, y);
+  // joystick ảo (điện thoại) nằm đè lên trạm thú y gần mép trái: lùi sang điểm khác trên công trình mà không bị che
+  for (const [dx, dy] of [[0, 0], [20, -10], [22, -26], [14, -34], [0, -34], [-14, -34]]) {
+    const q = await screenOf(page, x + dx, y + dy);
+    if (await page.evaluate(([qx, qy]) => document.elementFromPoint(qx, qy)?.id === 'game-canvas', [q.x, q.y])) { p = q; break; }
+  }
   if (touch) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
 }
 // Chạm một chỗ trong thế giới; chỗ nào ngoài màn hình thì chạm về phía đó cho nhân vật đi tới, camera theo sau.
@@ -244,13 +249,14 @@ test('con vừa mất: thiên thần bay lên, để lại ngôi mộ, đặt ho
   page.on('pageerror', e => errors.push(e.message));
   await seedSave(context, base(s => {
     buyAnimal(s, 'heo');
-    Object.assign(s.animals[0], { sick: 3, sickMs: SICK.deadAt - 1500 });
+    Object.assign(s.animals[0], { sick: 3, sickMs: SICK.deadAt - 3000 });
     s.inv.deco_flower = 1;
   }));
+  await noCatchUp(context);   // trang tải chậm hơn 3 giây thì game chạy bù, bệnh bị kẹp ở Bệnh nặng và con vật không chết
   await page.goto('/');
   await ready(page);
   // đồng hồ chạy tới lúc con vật ra đi: thiên thần hiện lên rồi còn lại ngôi mộ
-  await expect.poll(async () => (await look(page)).angels, { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect.poll(async () => (await look(page)).angels, { timeout: 20_000, intervals: [50] }).toBeGreaterThan(0);
   await page.screenshot({ path: testInfo.outputPath('thien-than.png') });
   await expect.poll(async () => (await look(page)).graves.length, { timeout: 10_000 }).toBe(1);
   expect((await look(page)).animals).toHaveLength(0);

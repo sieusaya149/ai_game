@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { makeSave, seedSave, installWarp } from './helpers.mjs';
+import { makeSave, seedSave, installWarp, closeAway } from './helpers.mjs';
 import { stageStart, mapOf } from '../public/state.js';
 
 const open = async (page, context, save) => {
   await seedSave(context, save);
   await page.goto('/');
   await page.waitForFunction(() => globalThis.__farm?.state);
+  await closeAway(page);   // máy chậm: màn "vắng nhà" chắn nút
 };
 const press = (page, touch, p) => (touch ? page.touchscreen.tap(p.x, p.y) : page.mouse.click(p.x, p.y));
 const screenOf = (page, x, y) => page.evaluate(([x, y]) => {

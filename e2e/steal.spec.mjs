@@ -143,7 +143,7 @@ test('A mở nhật ký thấy dòng B đã trộm, bấm "Sang trộm lại" th
   // A đăng nhập lại: nhật ký có dòng "B đã trộm 1 cà chua lúc ..."
   await A.open();
   await closeAway(A.page);
-  await A.page.locator('.bb-btn[data-panel="log"]').click();
+  await A.page.evaluate(async () => (await import('/ui.js')).openPanel('log'));
   const row = A.page.locator(`.guest-row[data-by="${B.name}"]`);
   await expect(row).toContainText(`${B.name} đã trộm 1 cà chua lúc`);
   await A.page.screenshot({ path: `test-results/steal-log-${testInfo.project.name}.png` });

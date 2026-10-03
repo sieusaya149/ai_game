@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { E2E_DB } from '../playwright.config.mjs';
 import { runAdmin } from '../tests/helpers/server.mjs';
-import { makeSave, seedSave, plantedCrop, closeAway } from './helpers.mjs';
+import { makeSave, seedSave, plantedCrop, closeAway, noCatchUp } from './helpers.mjs';
 import { mapOf, roamOf, createGame, stageStart, sceneMap } from '../public/state.js';
 import { DAY_MS, TRICKS } from '../public/data.js';
 
@@ -165,6 +165,7 @@ for (const size of SIZES) {
     ];
     for (const [label, save] of scenes) test(`khung chính: ${label}`, async ({ page, context }) => {
       await seedSave(context, save);
+      if (label === 'alert') await noCatchUp(context);   // con quạ ghi sẵn bị xóa nếu trang tải chậm và game chạy bù
       await page.goto('/'); await ready(page);
       await page.waitForTimeout(700);
       await audit(page, label, size, true);
@@ -350,6 +351,7 @@ for (const size of SIZES) {
         plantedCrop(s, 0, 1); s.scene = 'village'; s.weather = 'rain';
         s.threats = [{ id: 901, kind: 'crow', plot: 0, x: 600, y: 248, arriveAt: 0, state: 'eating', since: s.time + 40_000 }];
       }));
+      await noCatchUp(context);
       await page.goto('/'); await ready(page);
       await expect(page.locator('#alert-banner')).toBeVisible();
       await expect(page.locator('#alert-home')).toBeVisible();
@@ -411,8 +413,8 @@ for (const size of SIZES) {
         s.preds.push({ id: s.nextId++, kind: 'weasel', state: 'hunt', since: s.time, warned: false, strikeAt: s.time + 9000, tile: null, x: a.x, y: a.y, tx: a.x, ty: a.y, target: a.id });
         Object.assign(s.player, mapOf(s).spawn);
       });
-      s.savedAt = Date.now();
       await seedSave(context, s);
+      await noCatchUp(context);
       await page.goto('/'); await ready(page);
       // giữ con chồn ở pha rình (đã báo, chưa ra tay) suốt lúc đo
       await page.evaluate(() => setInterval(() => { const s = globalThis.__farm.state; for (const p of s.preds) if (p.kind === 'weasel') p.strikeAt = s.time + 8000; }, 300));

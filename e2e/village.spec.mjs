@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { makeSave, seedSave, tapPlot } from './helpers.mjs';
+import { makeSave, seedSave, tapPlot, closeAway } from './helpers.mjs';
 import { mapOf } from '../public/state.js';
 import { DAY_MS, THREATS } from '../public/data.js';
 
@@ -19,6 +19,7 @@ const st = page => page.evaluate(() => { const s = globalThis.__farm.state; retu
 async function ready(page) {
   await page.waitForFunction(() => globalThis.__farm?.state);
   await page.keyboard.press('Shift');
+  await closeAway(page);   // máy chậm: màn "vắng nhà" chắn đường
 }
 const screenOf = (page, x, y) => page.evaluate(([x, y]) => {
   const f = globalThis.__farm, rc = document.getElementById('game-canvas').getBoundingClientRect();

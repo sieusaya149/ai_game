@@ -72,7 +72,7 @@ function guardGarden(s, opt = {}) {
   for (const d of [far, far + 1, far - 1, far + 2]) for (const [dc, dr] of [[0, -d], [d, -d], [-d, -d], [d, 0], [-d, 0], [d, d], [-d, d], [0, d]])
     if (!placed && moveEntity(s, id('doghouse'), f0.c + dc, f0.r + dr).ok) placed = true;
   expect(placed, 'đặt được chuồng chó').toBe(true);
-  Object.assign(s.dog, mapOf(s).dogHome, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false, cmd: { id: 'sit' } }, opt.dog ?? {});
+  Object.assign(s.dog, mapOf(s).dogHome, { stage: 'truong', age: stageStart('cho', 'truong'), hunger: 100, happy: 100, chained: false }, opt.dog ?? {});
   const p = s.plots[0];
   p.soil = 'tilled'; p.water = 100; p.weeds = false;
   p.crop = { id: 'cachua', progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
@@ -139,7 +139,7 @@ async function reachDog(page, touch) {
     await tapWorld(page, touch, d.x, d.y - 5);
     await page.waitForTimeout(500);
   }
-  await expect(page.locator('#target-name')).toContainText('Mực');
+  await expect(page.locator('#target-name')).toHaveText('Mực');
 }
 // Đi về phía chó cho tới khi nó phát hiện (hay hết lượt thử)
 async function approachDog(page, touch, tries = 14) {
@@ -162,7 +162,8 @@ const stealHere = async page => {
 test('B trộm ô chín rồi bén mảng tới chó: Mực sủa "GÂU GÂU!" và đuổi, B đứng hình, rơi đồ vừa trộm và nộp phạt', async ({ browser, baseURL }, testInfo) => {
   test.setTimeout(180_000);
   const touch = !!testInfo.project.use.hasTouch;
-  const A = await player(browser, opts(testInfo, baseURL), guardGarden);
+  // chó thả rông thì đi theo chủ đang chơi (hotfix T), không đứng ở chuồng; xích lại để nó ở yên trong 3 ô quanh chuồng, cách ô chín 8 ô
+  const A = await player(browser, opts(testInfo, baseURL), s => guardGarden(s, { dog: { chained: true } }));
   const B = await player(browser, opts(testInfo, baseURL), guestAt(GATE_AT.x, GATE_AT.y));
   await A.open();   // chủ đang chơi: thao tác của khách đẩy thẳng sang trình duyệt chủ
   await B.open();
@@ -196,7 +197,7 @@ test('B trộm ô chín rồi bén mảng tới chó: Mực sủa "GÂU GÂU!" v
 
   // nhật ký khách của A có dòng chó đớp, chủ nhận tiền phạt và đếm được số người đã đuổi
   await expect.poll(() => st(A.page, () => globalThis.__farm.state.stats.chased ?? 0), { timeout: 20_000 }).toBe(1);
-  await A.page.locator('.bb-btn[data-panel="log"]').click();
+  await A.page.evaluate(async () => (await import('/ui.js')).openPanel('log'));   // điện thoại: Nhật ký nằm trong nút "Thêm"
   await expect(A.page.locator(`.guest-row[data-by="${B.name}"]`).first()).toContainText(new RegExp(`bị Mực đớp`));
   await expect(A.page.locator('.sheet-body')).toContainText('sủa vang');
   await A.page.screenshot({ path: `test-results/dog-log-${testInfo.project.name}.png` });
@@ -216,10 +217,12 @@ test('B chạy kịp ra cổng thì thoát và giữ đồ đã trộm', async (
   await expect.poll(() => st(B.page, () => globalThis.__farm.state.basket.cachua ?? 0), { timeout: 20_000 }).toBe(1);
 
   // bước về phía chó cho nó phát hiện, rồi quay đầu chạy ngay: cổng ở sát ô ruộng nên thoát kịp
-  const d = await dogPos(B.page);
-  await tapWorld(B.page, touch, d.x, d.y + 20);
-  for (let i = 0; i < 60 && !(await world(B.page, () => !!globalThis.__farm.world.guard?.chasing)); i++) { await B.page.waitForTimeout(150); if (i % 10 === 9) await tapWorld(B.page, touch, d.x, d.y + 20); }   // chạm lại: Phase 3 có thể làm bước đầu dừng sớm
-  expect(await world(B.page, () => !!globalThis.__farm.world.guard?.chasing)).toBe(true);
+  const chasing = () => world(B.page, () => !!globalThis.__farm.world.guard?.chasing);
+  for (let i = 0; i < 40 && !(await chasing()); i++) {
+    if (i % 14 === 0) { const d = await dogPos(B.page); await tapWorld(B.page, touch, d.x, d.y + 20); }   // chạm lại nếu lần chạm trước hụt
+    await B.page.waitForTimeout(150);
+  }
+  expect(await chasing()).toBe(true);
   await B.page.locator('#visit-leave').click();
   await expect.poll(() => st(B.page, () => globalThis.__farm.state?.scene), { timeout: 40_000 }).toBe('village');
   expect(await st(B.page, () => globalThis.__farm.state.basket.cachua ?? 0)).toBe(1);
@@ -235,7 +238,7 @@ test('ban đêm Mực ngủ gật 💤: B đứng xa 1 ô không bị phát hi�
   // bản lưu ghi sẵn: giờ làng ban đêm, Mực đang ngủ một giấc dài, bụng lưng lửng (dưới 50 là chắc chắn ăn xúc xích)
   const night = s => {
     s.time = Math.ceil(NIGHT_FROM * DAY_MS) + 1000;
-    guardGarden(s, { far: 4, dog: { cmd: null, hunger: 40, nap: s.time + 30 * 60_000, napCheck: s.time + 30 * 60_000 } });
+    guardGarden(s, { far: 4, dog: { hunger: 40, nap: s.time + 30 * 60_000, napCheck: s.time + 30 * 60_000 } });
   };
   const A = await player(browser, opts(testInfo, baseURL), night, true);
   const B = await player(browser, opts(testInfo, baseURL), s => { guestAt(GATE_AT.x, GATE_AT.y)(s); s.inv.sausage = 2; }, true);
@@ -269,7 +272,7 @@ test('ban đêm Mực ngủ gật 💤: B đứng xa 1 ô không bị phát hi�
 
   // chủ đang chơi cũng phải thấy: Mực của A mải ăn nên im lặng, nhật ký ghi dòng ném xúc xích
   await expect.poll(() => st(A.page, () => (globalThis.__farm.state.dog.quiet || 0) > Date.now()), { timeout: 20_000 }).toBe(true);
-  await A.page.locator('.bb-btn[data-panel="log"]').click();
+  await A.page.evaluate(async () => (await import('/ui.js')).openPanel('log'));
   await expect(A.page.locator('.sheet-body')).toContainText('ném xúc xích');
   expect(A.errors.concat(B.errors)).toEqual([]);
   await A.context.close(); await B.context.close();

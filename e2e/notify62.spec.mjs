@@ -1,6 +1,6 @@
 // Thông báo, Việc cần làm và Sổ tay cho cây và nước (issue 62). Dựng tình huống bằng bản lưu ghi sẵn (ADR 0008).
 import { test, expect } from '@playwright/test';
-import { makeSave, seedSave, tapPlot } from './helpers.mjs';
+import { makeSave, seedSave, tapPlot, closeAway } from './helpers.mjs';
 import { placeEntity, canPlace, mapOf, enterScene, compostAdd, compostStart, footprint } from '../public/state.js';
 import { TANK } from '../public/data.js';
 
@@ -8,6 +8,7 @@ const NOPREF = ctx => ctx.addInitScript(() => { try { localStorage.setItem('nong
 async function ready(page) {
   await page.waitForFunction(() => globalThis.__farm?.state);
   await page.keyboard.press('Shift');
+  await closeAway(page);   // máy chậm: bản lưu ghi sẵn đã cũ > 3 giây nên game chạy bù và hiện màn "vắng nhà"
 }
 // Dâu tây chín ★3 có trái khổng lồ, ở ngưỡng thành thạo: thu hoạch thì lên cấp 3
 const dau = () => ({ id: 'dau', progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: true, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: true }, giant: true });
