@@ -47,6 +47,15 @@ test('mở bản lưu v2 cũ: đủ con vật; tua giờ vườn qua mốc thì 
   // chạm vào con gà: thấy giới tính và giai đoạn trong tên mục tiêu (gà trong chuồng chạy lung tung nên trúng con nào cũng được)
   const touch = test.info().project.name === 'mobile';
   await expect(async () => {
+    // gà chạy lung tung, có thể ra khỏi khung nhìn hoặc xa tầm: đặt người chơi lại sát nó rồi đợi máy quay đứng yên mới tính điểm chạm
+    // (máy quay còn trượt thì tọa độ màn hình đổi từng khung, chạm hụt; chạm khi chưa trong tầm thì người chơi đi tới rồi trứng gần hơn giành mất mục tiêu)
+    await page.evaluate(id => new Promise(done => {
+      const f = globalThis.__farm, a = f.state.animals.find(x => x.id === id);
+      Object.assign(f.state.player, { x: a.x, y: a.y + 14 });
+      let cx = NaN, cy = NaN, n = 0;
+      const tick = () => { const v = f.view; n = Math.abs(v.camX - cx) < 0.5 && Math.abs(v.camY - cy) < 0.5 ? n + 1 : 0; cx = v.camX; cy = v.camY; n >= 4 ? done() : requestAnimationFrame(tick); };
+      tick();
+    }), chick);
     const pt = await page.evaluate(id => {
       const f = globalThis.__farm, a = f.state.animals.find(x => x.id === id), r = document.getElementById('game-canvas').getBoundingClientRect();
       return { x: (a.x * f.scale - f.view.camX) / f.dpr + r.left, y: ((a.y - 4) * f.scale - f.view.camY) / f.dpr + r.top };
