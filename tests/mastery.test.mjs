@@ -29,7 +29,7 @@ test('mới chơi: mọi cây ở cấp 1, 0 lần', () => {
   for (const id of Object.keys(CROPS)) assert.deepEqual(G.masteryOf(s, id), { lv: 1, n: 0, next: MASTERY.thresholds[CROPS[id].group][0] });
 });
 
-for (const [group, id] of [['short', 'cai'], ['mid', 'lua'], ['long', 'dau']]) {
+for (const [group, id] of [['short', 'cai'], ['mid', 'cachua'], ['long', 'dau']]) {
   test(`nhóm ${group} (${id}): lên cấp 2 và 3 đúng ngưỡng, không sớm hơn một lần; thưởng sản lượng +1, +2`, () => {
     const [t2, t3] = MASTERY.thresholds[group], base = CROPS[id].yield;
     assert.deepEqual([t2, t3], { short: [20, 60], mid: [12, 35], long: [8, 25] }[group]);
@@ -72,8 +72,8 @@ test('cấp 3 kháng sâu: cùng số ngẫu nhiên cố định, cấp 1 dính 
     s.inv.seed_lua = 1; G.selectSeed(s, 'lua');
     quiet(() => { G.perform(s, at, 'till'); G.perform(s, at, 'plant'); });
     s.plots[0].water = 100; s.weather = 'rain';
-    // pMin = 0.07 → xác suất mỗi giây ≈ 0.00121; số ngẫu nhiên 0.0009 nằm giữa mức đầy đủ và mức giảm một nửa
-    withRand(0.0009, () => G.tick(s, 1000));
+    // pMin = 0.005 → xác suất mỗi giây ≈ 8,3e-5; số ngẫu nhiên 6e-5 nằm giữa mức đầy đủ và mức giảm một nửa (4,2e-5)
+    withRand(6e-5, () => G.tick(s, 1000));
     return !!s.plots[0].crop.bugs;
   };
   assert.equal(bugsAfter(1), true);

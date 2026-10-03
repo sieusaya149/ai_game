@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
-import { ANIMALS, SICK, EVENT_LEVEL, levelInfo, stageStart } from '../public/data.js';
+import { ANIMALS, SICK, HUSBANDRY, EVENT_LEVEL, levelInfo, stageStart } from '../public/data.js';
 
 const MIN = 60_000, HOUR = 60 * MIN;
 const store = {};
@@ -58,8 +58,10 @@ test('bệnh đi Mệt → Bệnh nặng → Nguy kịch → Mất đúng mốc 
 test('đói lả lâu thì mắc bệnh; chuồng bẩn và tuổi già dễ bệnh hơn', () => {
   const s = game();
   const a = put(s, 'ga', { hunger: 0, starvingSince: 0 });
-  for (let t = 0; t < 5 * MIN; t += MIN) { a.hunger = 0; withRandom(0.99, () => G.tick(s, MIN)); }
-  assert.equal(a.sick, 1, 'đói lả quá 3 phút là bệnh');
+  for (let t = 0; t < HUSBANDRY.sickAfterStarving - 5 * MIN; t += MIN) { a.hunger = 0; withRandom(0.99, () => G.tick(s, MIN)); }
+  assert.equal(a.sick, 0, 'đói lả chưa tới chốt chặn thì chưa chắc bệnh (xúi quẩy mới bệnh)');
+  for (let t = 0; t < 10 * MIN; t += MIN) { a.hunger = 0; withRandom(0.99, () => G.tick(s, MIN)); }
+  assert.equal(a.sick, 1, 'đói lả liên tục quá sickAfterStarving là bệnh chắc chắn');
   assert.ok(SICK.dirtyPenMul > 1 && SICK.oldChanceMul > 1);
 });
 
@@ -308,7 +310,8 @@ test('hotfix: con vật no, sạch, chuồng sạch thì không bao giờ tự b
     return s.animals.some(x => x.id === a.id && x.sick);
   };
   assert.equal(tryIt('ga', {}), false, 'no, sạch: không bệnh dù xúi quẩy');
-  assert.equal(tryIt('ga', { hunger: 30 }), true, 'đói (dưới 40) thì có nguy cơ');
+  assert.equal(tryIt('ga', { hunger: 30 }), false, 'mới đói (dưới 40): chưa có nguy cơ, dù xúi quẩy');
+  assert.equal(tryIt('ga', { hunger: 30, hungrySince: 12 * HOUR - HUSBANDRY.hungrySafeMs - HUSBANDRY.hungryRampMs }), true, 'đói kéo dài thì có nguy cơ');
   assert.equal(tryIt('ga', { dirty: 100 }), true, 'dơ thì có nguy cơ');
   assert.equal(tryIt('ga', { stage: 'gia', age: G.stageStart('ga', 'gia') }), true, 'già thì có nguy cơ');
   // chuồng bẩn (phân chưa dọn) cũng có nguy cơ
@@ -320,7 +323,7 @@ test('hotfix: con vật no, sạch, chuồng sạch thì không bao giờ tự b
   const v = game(8); const b = put(v, 'ga', { hunger: 30, vaccUntil: 1e12 }); for (const k of Object.keys(v.troughs)) v.troughs[k] = 0;
   unlucky(() => { for (let i = 0; i < 5; i++) { b.hunger = 30; G.tick(v, MIN); } });
   assert.equal(b.sick, 0);
-  const h = game(8); const c = put(h, 'ga', { hunger: 0 });
+  const h = game(8); const c = put(h, 'ga', { hunger: 0, starvingSince: h.time - HUSBANDRY.sickAfterStarving });
   for (let i = 0; i < 5; i++) { c.hunger = 0; withRandom(0.99, () => G.tick(h, MIN)); }
-  assert.ok(c.sick > 0, 'đói lả hơn 3 phút là bệnh');
+  assert.ok(c.sick > 0, 'đói lả liên tục quá sickAfterStarving là bệnh');
 });

@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { makeSave, seedSave, closeAway } from './helpers.mjs';
 import { DAY_MS as DAY, ITEMS } from '../public/data.js';
+import { deliveryFee } from '../public/state.js';
 
 async function ready(page) {
   await page.waitForFunction(() => globalThis.__farm?.state);
@@ -28,7 +29,7 @@ test('đặt cám gà ở Túi đồ: trừ xu ngay, đơn chờ có giờ dự 
   await openOrder(page);
   await page.getByRole('button', { name: '🌾 Thức ăn' }).click();
   await page.locator('[data-item="feed_ga"]').getByRole('button', { name: '+5' }).click();
-  const total = ITEMS.feed_ga.price * 5 + 5;   // phí giao tối thiểu 5 xu
+  const total = ITEMS.feed_ga.price * 5 + deliveryFee(ITEMS.feed_ga.price * 5);   // phí giao 10% tiền hàng, ít nhất 5 xu
   await expect(page.locator('#order-total')).toContainText(`= ${total} xu`);
   // phiếu chưa trừ xu
   expect(await st(page, () => globalThis.__farm.state.coins)).toBe(500);
@@ -72,5 +73,5 @@ test('đặt lúc chợ đóng (tối): vẫn đặt được, đơn chờ ghi g
   const eta = await page.locator('#order-pending .eta').first().textContent();
   const [m] = /(\d+):\d\d/.exec(eta).slice(1).map(Number);
   expect(m).toBeGreaterThanOrEqual(8);
-  expect(await st(page, () => globalThis.__farm.state.coins)).toBe(500 - ITEMS.vaccine.price - 6);
+  expect(await st(page, () => globalThis.__farm.state.coins)).toBe(500 - ITEMS.vaccine.price - deliveryFee(ITEMS.vaccine.price));
 });

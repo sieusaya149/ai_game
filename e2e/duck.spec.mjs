@@ -33,7 +33,7 @@ test('chợ: mua vịt cái → vào chuồng gia cầm; vịt con đi theo vị
   await page.evaluate(async () => {
     const S = globalThis.__farm.state, M = (await import('/state.js')).mapOf(S), a = M.pens.chicken.area;
     const mom = S.animals.find(x => x.type === 'vit');
-    Object.assign(mom, { stage: 'truong', age: 20 * 60_000, hunger: 100, nextProduct: S.time + 1e12, tile: null, stray: false, x: a.x + a.w / 2, y: a.y + a.h / 2 });
+    Object.assign(mom, { stage: 'truong', age: (await import('/state.js')).stageStart('vit', 'truong'), hunger: 100, nextProduct: S.time + 1e12, tile: null, stray: false, x: a.x + a.w / 2, y: a.y + a.h / 2 });
     for (let i = 0; i < 3; i++) S.animals.push({ ...structuredClone(mom), id: S.nextId++, stage: 'non', age: 0, sex: 'm', tile: null, stray: false, x: a.x + 8, y: a.y + 8 });
     S.time = 0.9 * 20 * 60_000;
   });

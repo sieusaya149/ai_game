@@ -52,10 +52,11 @@ test('mỗi loài qua đúng từng mốc của bảng tuổi thọ', () => {
     const L = LIFE[type];
     assert.equal(G.lifeEnd(type), L.non + L.nho + L.truong + L.gia);
   }
-  assert.deepEqual([G.stageStart('ga', 'nho'), G.stageStart('ga', 'truong')], [5 * MIN, 15 * MIN]);
-  assert.deepEqual([G.stageStart('heo', 'nho'), G.stageStart('heo', 'truong')], [10 * MIN, 30 * MIN]);
-  assert.deepEqual([G.stageStart('bo', 'nho'), G.stageStart('cuu', 'truong')], [15 * MIN, 45 * MIN]);
-  assert.equal(LIFE.ga.truong, 20 * HOUR); assert.equal(LIFE.heo.gia, 6 * HOUR); assert.equal(LIFE.bo.truong, 45 * HOUR);
+  // cân bằng thời gian thật: gà lớn sau 1 giờ, heo 4 giờ, bò và cừu 5 giờ; sống nhiều ngày thật
+  assert.deepEqual([G.stageStart('ga', 'nho'), G.stageStart('ga', 'truong')], [20 * MIN, HOUR]);
+  assert.deepEqual([G.stageStart('heo', 'nho'), G.stageStart('heo', 'truong')], [90 * MIN, 4 * HOUR]);
+  assert.deepEqual([G.stageStart('bo', 'nho'), G.stageStart('cuu', 'truong')], [2 * HOUR, 5 * HOUR]);
+  for (const type of ['ga', 'vit', 'heo', 'bo', 'cuu']) assert.ok(G.lifeEnd(type) >= 4 * 24 * HOUR, `${type} sống ít nhất 4 ngày thật`);
 });
 
 test('chó lớn theo giờ vườn, có tuổi già nhưng không bao giờ chết vì già', () => {
@@ -92,7 +93,7 @@ test('con non không đẻ, không cho sữa, không cho lông; trưởng thành
 test('cừu nhỡ lông ngắn chưa xén được; bò tơ kéo cày được, bê con và bò già thì không', () => {
   const s = newGame();
   const sheep = put(s, 'cuu', 'nho');
-  run(s, ANIMALS.cuu.every + MIN);
+  run(s, 10 * MIN);
   assert.equal(sheep.stage, 'nho');
   assert.equal(sheep.ready, false);
   assert.ok(!G.actionsFor(s, { kind: 'animal', id: sheep.id }).some(x => x.id === 'shear'));
@@ -108,9 +109,9 @@ test('con già cho sản phẩm thưa hơn con trưởng thành', () => {
   const s = newGame(); FREE.types = [];   // gà ở yên trong chuồng (không thả rông) để trứng rơi đúng chỗ
   const young = put(s, 'ga', 'truong'), old = put(s, 'ga', 'gia');
   young.x = 10; old.x = 20;
-  run(s, 20 * MIN);
+  run(s, 100 * MIN);
   const by = x => s.eggs.filter(e => e.x === x).length;
-  assert.ok(by(10) >= 7, `gà trưởng thành đẻ ${by(10)}`);
+  assert.ok(by(10) >= 9, `gà trưởng thành đẻ ${by(10)}`);   // mỗi 10 phút một quả
   assert.ok(by(20) <= Math.ceil(by(10) / AGING.oldEvery), `gà già đẻ ${by(20)}`);
   FREE.types = ['ga'];
   // bò già cho ít sữa hơn: vắt xong phải chờ lâu gấp đôi

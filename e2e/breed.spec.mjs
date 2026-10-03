@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { makeSave, seedSave, installWarp, timeWarp } from './helpers.mjs';
-import { CLUTTER } from '../public/data.js';
+import { CLUTTER, HUSBANDRY, animalPrice } from '../public/data.js';
 import { bumpLayout } from '../public/farm.js';
 import { stageStart, buyStrip, placeEntity, canPlace, mapOf } from '../public/state.js';
 
@@ -50,8 +50,8 @@ test('soi trứng thấy có phôi → nhặt → bỏ vào ổ ấp → gà con
   await expect(page.locator('#target-name')).toHaveText(/Ổ ấp/, { timeout: 8000 });
   await page.locator('#main-action').click();
   await expect.poll(() => page.evaluate(() => globalThis.__farm.state.nest.egg), { timeout: 10_000 }).toBe(true);
-  // tua 4 phút: trứng nở
-  await timeWarp(page, 4 * MIN);
+  // tua tới hết thời gian ấp (30 phút): trứng nở
+  await timeWarp(page, HUSBANDRY.nestHatchMs + MIN);
   const chick = await page.evaluate(() => globalThis.__farm.state.animals.find(a => a.stage === 'non' || a.stage === 'nho'));
   expect(chick.name).toBe('Bông con');
   expect(chick.mom.name).toBe('Bông'); expect(chick.dad.name).toBe('Cu');
@@ -114,8 +114,8 @@ test('chợ: mua vật nuôi chọn đực hay cái, con cái đắt hơn 30%', 
   await page.locator('.tab', { hasText: 'Vật nuôi' }).click();
   const first = page.locator('.row').first();
   await expect(first.locator('.sexopt')).toHaveCount(2);
-  await expect(first.locator('.sexopt').nth(0)).toContainText('40');
-  await expect(first.locator('.sexopt').nth(1)).toContainText('52');
+  await expect(first.locator('.sexopt').nth(0)).toContainText(String(animalPrice('ga', 'm')));
+  await expect(first.locator('.sexopt').nth(1)).toContainText(String(animalPrice('ga', 'f')));
   await expect(first.locator('[data-sex="m"]')).toContainText('đực');
   await expect(first.locator('[data-sex="f"]')).toContainText('cái');
 });

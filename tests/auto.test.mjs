@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
-import { TANK, AUTO, DAY_MS, MAX_CATCHUP_MS, CROPS, starKey } from '../public/data.js';
+import { TANK, AUTO, FARMING, DAY_MS, MAX_CATCHUP_MS, CROPS, starKey } from '../public/data.js';
 import { setClock } from '../public/clock.js';
 
 const store = {};
@@ -106,23 +106,25 @@ test('tưới nhỏ giọt: ô khô tự được tưới, bồn giảm đúng 1
   assert.match(G.autoInfo(e, g).why.drip, /cạn/);
 });
 
-test('tưới nhỏ giọt tưới trước khi đất khô hẳn: cả vụ không lần nào khô, hạn hán tưới nhiều hơn', () => {
-  // bắp cải lớn 18 phút; giếng hạ về cấp 3 sau khi xây bồn để máy bơm không bơm thêm (đếm nước dùng cho gọn)
-  const used = weather => {
+test('tưới nhỏ giọt tưới trước khi đất khô hẳn: cả vụ không lần nào khô, hạn hán tưới sớm hơn', () => {
+  // bắp cải lớn 4 giờ; giếng hạ về cấp 3 sau khi xây bồn để máy bơm không bơm thêm (đếm nước dùng cho gọn).
+  // Đất bắt đầu ở 20%, mỗi phút tụt 1% (hạn hán 3%): đo phút đầu tiên máy tưới, trong vòng một ngày game (20 phút) để trời không đổi
+  const first = weather => {
     const s = withTank(200), f = fieldOf(s);
     buy(s, f, 'drip');
     ent(s, 'well').lv = 3;
     sowField(s, f, 'bapcai', 0);
-    for (const i of f.plots) s.plots[i].water = 100;
-    s.weather = weather;
-    run(s, 10 * MIN);
-    assert.ok(f.plots.every(i => !s.plots[i].crop.q.dry), 'máy giữ ẩm, không lỡ chăm kỹ');
-    assert.ok(f.plots.every(i => s.plots[i].water > 0));
-    return 200 - s.water.level;
+    for (const i of f.plots) s.plots[i].water = 20;
+    for (let t = 1; t < 19; t++) {
+      s.weather = weather; run(s, MIN);
+      assert.ok(f.plots.every(i => !s.plots[i].crop.q.dry), 'máy giữ ẩm, không lỡ chăm kỹ');
+      if (f.plots.every(i => s.plots[i].water > 90)) { assert.equal(200 - s.water.level, 9, 'mỗi ô một lần nước'); return t; }
+    }
+    return Infinity;
   };
-  const cloud = used('cloud'), dry = used('drought');
-  assert.ok(cloud >= 9, `trời mây cũng có tưới: ${cloud}`);
-  assert.ok(dry > cloud * 1.5, `hạn hán tốn nước hơn: ${dry} so với ${cloud}`);
+  const cloud = first('cloud'), dry = first('drought');
+  assert.ok(cloud < Infinity, 'trời mây cũng có tưới');
+  assert.ok(dry < cloud, `hạn hán tưới sớm hơn: phút ${dry} so với ${cloud}`);
 });
 
 // ---------- phun thuốc tự động ----------
@@ -181,7 +183,7 @@ test('đất màu mỡ: cỏ mọc chậm hơn khối thường', () => {
   const g = s.farm.ents.filter(e => e.kind === 'field').at(-1);
   for (const x of [f, g]) for (const i of x.plots) Object.assign(s.plots[i], { unlocked: true, soil: 'tilled', weeds: false, crop: null });
   // xác suất mỗi giây của khối thường lớn hơn số ngẫu nhiên, của khối màu mỡ thì nhỏ hơn
-  const perSec = 1 - Math.pow(1 - 0.06, 1 / 60);
+  const perSec = 1 - Math.pow(1 - FARMING.weedChancePerMin, 1 / 60);
   Math.random = () => perSec * (1 + AUTO.richWeed) / 2;
   try { G.tick(s, SEC); } finally { Math.random = rnd; }
   assert.ok(g.plots.every(i => s.plots[i].weeds), 'khối thường mọc cỏ');
@@ -201,7 +203,7 @@ test('đất màu mỡ: thêm sản lượng so với khối không nâng, tính
     Object.assign(s.plots[i], { unlocked: true, soil: 'tilled', water: 100, weeds: false, crop: null });
     assert.ok(G.perform(s, P(i), 'plant').ok);
   }
-  for (let t = 0; t < 3 * MIN && !(s.plots[a].crop.progress >= 1 && s.plots[b].crop.progress >= 1); t += 5 * SEC) {
+  for (let t = 0; t < CROPS.cai.grow + MIN && !(s.plots[a].crop.progress >= 1 && s.plots[b].crop.progress >= 1); t += 5 * SEC) {
     for (const i of [a, b]) s.plots[i].water = 100;
     run(s, 5 * SEC);
   }
@@ -264,8 +266,9 @@ test('tiền điện: trừ lúc 6h sáng, ghi nhật ký; tính theo máy bơm 
   run(s, 2 * SEC);
   const paid = c0 - s.coins;
   assert.ok(paid > 0 && Math.abs(paid - units * AUTO.price) <= 1, `đã trả ${paid}`);
-  assert.match(s.log[0].text, /tiền điện/i);
-  assert.match(s.log[0].text, new RegExp(String(paid)));
+  const bill = s.log.find(e => /tiền điện/i.test(e.text));
+  assert.ok(bill, 'có dòng nhật ký tiền điện');
+  assert.match(bill.text, new RegExp(String(paid)));
   // không có máy thì không tính
   const n = newGame(), n0 = n.coins;
   toDawn(n, 0); run(n, SEC);
@@ -284,7 +287,7 @@ test('tiền điện: không đủ xu thì máy ngừng (không nợ âm), đủ
   run(s, 2 * SEC);
   assert.equal(s.coins, 3, 'không trừ thành âm');
   assert.ok(G.powerInfo(s).bill > 3);
-  assert.match(s.log[0].text, /tiền điện/i);
+  assert.ok(s.log.some(e => /tiền điện/i.test(e.text)));
   // máy bơm ngừng, máy phun ngừng, không tốn thêm điện
   const lv = s.water.level, pw = s.water.power;
   const c = s.plots[f.plots[0]].crop;

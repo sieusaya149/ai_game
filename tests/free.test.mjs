@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
-import { FREE, ANIMALS, DAY_MS, MAX_CATCHUP_MS, ITEMS } from '../public/data.js';
+import { FREE, ANIMALS, HUSBANDRY, DAY_MS, MAX_CATCHUP_MS, ITEMS } from '../public/data.js';
 import { GROUND } from '../public/layout.js';
 import { mapOf } from '../public/farm.js';
 
@@ -158,7 +158,16 @@ test('thả rông vẫn theo luật đực/cái (lát 36): gà trống không đ
   assert.ok(eggs.every(e => e.mom && e.mom.id !== roo.id && s.animals.find(a => a.id === e.mom.id)?.sex !== 'm'), 'không trứng nào của gà trống (gà con nở ra lớn lên cũng chỉ mái mới đẻ)');
   const male = id => id === roo.id || s.animals.find(a => a.id === id)?.sex === 'm';
   assert.ok(eggs.every(e => !e.fertile || male(e.dad?.id)), 'trứng có phôi thì cha là gà trống');
-  assert.ok(s.animals.some(a => a.mom?.id === h.id && a.dad?.id === roo.id), 'trứng có phôi trong bụi bỏ quên nở ra gà con có đủ mẹ, cha');
+});
+
+test('trứng có phôi bỏ quên quá eggForgetMs nở ra gà con ghi đủ mẹ, cha', () => {
+  const s = newGame();
+  s.eggs.push({ id: 700, sp: 'ga', x: 60, y: 300, laidAt: s.time, fertile: true, mom: { id: 71, name: 'Mái' }, dad: { id: 72, name: 'Trống' } });
+  const r = Math.random; Math.random = () => 0.0001;   // trúng mọi xác suất
+  try { G.tick(s, HUSBANDRY.eggForgetMs + 2000); } finally { Math.random = r; }
+  assert.equal(s.eggs.length, 0);
+  const chick = s.animals.find(a => a.mom?.id === 71);
+  assert.ok(chick && chick.dad?.id === 72, 'gà con có đủ mẹ, cha');
 });
 
 test('gà ở chuồng (đêm) vẫn đẻ trứng trong chuồng như cũ', () => {
@@ -178,7 +187,7 @@ test('chạy bù nhiều giờ: có trứng trong bụi, không con nào chết'
   const l = seeded(9, () => G.loadGame());
   for (const id of ids) assert.ok(l.animals.some(a => a.id === id), 'không con nào chết');
   assert.ok(G.hiddenEggs(l).length >= 1, 'có trứng trong bụi');
-  assert.ok(l.eggs.length <= 30);
+  assert.ok(l.eggs.length <= HUSBANDRY.eggMax);
   assert.ok(MAX_CATCHUP_MS >= 6 * HOUR);
 });
 

@@ -1,12 +1,12 @@
 // Seam 1: chất lượng nông sản ★1–3 (issue 52). Luật "chăm kỹ" theo dõi từng ô trong vụ: không lúc nào khô hẳn,
-// không để sâu quá 30 giây, có bón phân → ★2; thêm một lần chăm tay → ★3; lỡ một điều → ★1 (mặc định).
+// không để sâu quá STARS.bugMs (10 phút), có bón phân → ★2; thêm một lần chăm tay → ★3; lỡ một điều → ★1 (mặc định).
 // Máy móc (không chăm tay lần nào) chỉ tới ★2. Nông sản tách theo sao ở mọi nơi.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
 import { migrate } from '../public/migrate.js';
-import { CROPS, STARS, DAY_MS, starKey, sellPrice, shipValue } from '../public/data.js';
+import { CROPS, FARMING, STARS, DAY_MS, starKey, sellPrice, shipValue } from '../public/data.js';
 import { setClock } from '../public/clock.js';
 
 globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
@@ -16,6 +16,7 @@ const rnd = Math.random;
 const quiet = fn => { Math.random = () => 0.99; try { return fn(); } finally { Math.random = rnd; } };
 const lucky = fn => { Math.random = () => 0.1; try { return fn(); } finally { Math.random = rnd; } };   // bắt sâu bằng tay trúng
 const P = idx => ({ kind: 'plot', idx });
+const Y = CROPS.cai.yield, Yf = Math.round(Y * (1 + FARMING.fertYield));   // sản lượng cải thường / có bón phân
 
 // Vườn mới, trời nhiều mây (không mưa tự tưới), đủ hạt, phân, thuốc; chợ đang mở (6h sáng ngày 1)
 function farm() {
@@ -48,15 +49,15 @@ test('chăm đủ (tưới tay, bón phân, không khô, không sâu) thì ra �
   ripen(s, i);
   assert.equal(G.cropStar(s.plots[i].crop), 3);
   const r = harvest(s, i);
-  assert.deepEqual(s.basket, { [starKey('cai', 3)]: 6 });   // bón phân +50%: 4 → 6
+  assert.deepEqual(s.basket, { [starKey('cai', 3)]: Yf });   // bón phân +50%: &
   assert.match(r.msg, /Cải xanh ★3/);
 });
 
 test('ô khô hẳn một lần thì không ra sao cao, tưới lại cũng không lấy lại được', () => {
   const s = farm(), [i] = plots(s);
-  s.exp = 200;        // đủ cấp gieo lúa
-  sow(s, i, 'lua');   // lúa lớn 5 phút (bón phân ~4,2 phút), một lần tưới chỉ giữ ẩm 4 phút
+  sow(s, i);          // cải lớn 3 phút (bón phân ~2,5 phút)
   act(s, i, 'water'); act(s, i, 'fertilize');
+  s.plots[i].water = 1;   // bản lưu ghi sẵn: đất sắp khô (đất tụt 1%/phút nên chờ cả trăm phút là vô ích)
   for (let t = 0; t < 5 * MIN && s.plots[i].water > 0; t += 5 * SEC) quiet(() => G.tick(s, 5 * SEC));
   assert.equal(s.plots[i].water, 0, 'đất khô hẳn');
   assert.ok(s.plots[i].crop.progress < 1, 'khô lúc cây còn đang lớn');
@@ -65,7 +66,7 @@ test('ô khô hẳn một lần thì không ra sao cao, tưới lại cũng khô
   ripen(s, i);
   assert.equal(G.cropStar(s.plots[i].crop), 1);
   harvest(s, i);
-  assert.deepEqual(s.basket, { lua: 8 });
+  assert.deepEqual(s.basket, { cai: Yf });
 });
 
 test('gieo xuống đất khô rồi mới tưới không tính là khô hẳn (cây chưa lớn chút nào)', () => {
@@ -77,24 +78,24 @@ test('gieo xuống đất khô rồi mới tưới không tính là khô hẳn (
   assert.equal(G.cropStar(s.plots[i].crop), 3);
 });
 
-test('sâu quá 30 giây thì mất sao; bắt kịp trong 30 giây thì vẫn giữ ★3', () => {
+test('sâu quá STARS.bugMs thì mất sao; bắt kịp trước đó thì vẫn giữ ★3', () => {
   const s = farm(), [a, b] = plots(s);
   for (const i of [a, b]) { sow(s, i); act(s, i, 'water'); act(s, i, 'fertilize'); }
   quiet(() => G.tick(s, 10 * SEC));
   // cả hai ô có sâu cùng lúc (bản lưu ghi sẵn: sâu vừa bò lên)
   for (const i of [a, b]) Object.assign(s.plots[i].crop, { bugs: true, bugSince: s.time });
-  quiet(() => G.tick(s, 20 * SEC));
+  quiet(() => G.tick(s, STARS.bugMs * 2 / 3));
   lucky(() => act(s, a, 'catch'));
   assert.equal(s.plots[a].crop.bugs, false);
-  assert.equal(G.cropStar(s.plots[a].crop), 3, 'bắt sâu sau 20 giây: còn ★3');
-  assert.equal(G.cropStar(s.plots[b].crop), 3, 'sâu mới 20 giây: chưa mất sao');
-  quiet(() => G.tick(s, 12 * SEC));
-  assert.equal(G.cropStar(s.plots[b].crop), 1, 'sâu 32 giây: mất sao ngay cả khi chưa bắt');
+  assert.equal(G.cropStar(s.plots[a].crop), 3, 'bắt sâu khi chưa tới ngưỡng: còn ★3');
+  assert.equal(G.cropStar(s.plots[b].crop), 3, 'sâu chưa tới ngưỡng: chưa mất sao');
+  quiet(() => G.tick(s, STARS.bugMs * 0.4));
+  assert.equal(G.cropStar(s.plots[b].crop), 1, 'sâu quá ngưỡng: mất sao ngay cả khi chưa bắt');
   act(s, b, 'spray');
   for (const i of [a, b]) ripen(s, i);
   assert.equal(G.cropStar(s.plots[b].crop), 1, 'phun thuốc xong cũng không lấy lại sao');
   harvest(s, a); harvest(s, b);
-  assert.deepEqual(s.basket, { [starKey('cai', 3)]: 6, cai: 6 });
+  assert.deepEqual(s.basket, { [starKey('cai', 3)]: Yf, cai: Yf });
 });
 
 test('không bón phân thì không ra ★3 (không có sao cao nào: ★1); bón phân giữa vụ thì lên lại', () => {
@@ -105,7 +106,7 @@ test('không bón phân thì không ra ★3 (không có sao cao nào: ★1); bó
   act(s, j, 'fertilize');
   assert.equal(G.cropStar(s.plots[j].crop), 3, 'bón phân lúc cây đang lớn vẫn kịp');
   for (const k of [i, j]) { ripen(s, k); harvest(s, k); }
-  assert.deepEqual(s.basket, { cai: 4, [starKey('cai', 3)]: 6 });
+  assert.deepEqual(s.basket, { cai: Y, [starKey('cai', 3)]: Yf });
 });
 
 test('máy tưới và phun tự động cả vụ, không chăm tay lần nào: tối đa ★2; thêm một lần chăm tay thì ra ★3', () => {
@@ -146,7 +147,7 @@ test('cây trái mùa (crop.offSeason, issue 54) chăm kỹ cả bằng tay cũn
   ripen(s, i);
   assert.equal(G.cropStar(s.plots[i].crop), 2);
   harvest(s, i);
-  assert.deepEqual(s.basket, { [starKey('cai', 2)]: 6 });
+  assert.deepEqual(s.basket, { [starKey('cai', 2)]: Yf });
 });
 
 test('giá bán ★2 = ×1.5, ★3 = ×2 cho mọi cây; chợ trả đúng giá theo sao', () => {
@@ -156,11 +157,11 @@ test('giá bán ★2 = ×1.5, ★3 = ×2 cho mọi cây; chợ trả đúng giá
     assert.equal(sellPrice(starKey(id, 3)), d.price * 2, id);
   }
   const s = farm();
-  s.basket = { duahau: 2, [starKey('duahau', 2)]: 2, [starKey('duahau', 3)]: 2 };
+  s.basket = { bapcai: 2, [starKey('bapcai', 2)]: 2, [starKey('bapcai', 3)]: 2 };
   const coins = s.coins;
-  assert.equal(G.sell(s, starKey('duahau', 3), 2).coins, 320);
-  assert.equal(G.sell(s, starKey('duahau', 2), 2).coins, 240);
-  assert.equal(G.sell(s, 'duahau', 2).coins, 160);
+  assert.equal(G.sell(s, starKey('bapcai', 3), 2).coins, 320);
+  assert.equal(G.sell(s, starKey('bapcai', 2), 2).coins, 240);
+  assert.equal(G.sell(s, 'bapcai', 2).coins, 160);
   assert.equal(s.coins, coins + 720);
 });
 
@@ -171,19 +172,19 @@ test('thu hoạch ba mức sao: giỏ, kho, thùng giao hàng tách ba dòng, kh
   s.plots[b].water = 100; s.plots[b].crop.fert = true;   // ★2: bón phân sẵn, nước trời, không chăm tay (bản lưu ghi sẵn)
   act(s, c, 'water'); act(s, c, 'fertilize');            // ★3
   for (const i of [a, b, c]) { ripen(s, i); harvest(s, i); }
-  assert.deepEqual(s.basket, { cai: 4, [starKey('cai', 2)]: 6, [starKey('cai', 3)]: 6 });
+  assert.deepEqual(s.basket, { cai: Y, [starKey('cai', 2)]: Yf, [starKey('cai', 3)]: Yf });
   assert.equal(G.stashAll(s).ok, true);
-  assert.deepEqual(s.inv.cai, 4);
-  assert.deepEqual([s.inv[starKey('cai', 2)], s.inv[starKey('cai', 3)]], [6, 6]);
+  assert.deepEqual(s.inv.cai, Y);
+  assert.deepEqual([s.inv[starKey('cai', 2)], s.inv[starKey('cai', 3)]], [Yf, Yf]);
   for (const k of ['cai', starKey('cai', 2), starKey('cai', 3)]) assert.equal(G.shipAdd(s, k, 'all').ok, true);
-  assert.deepEqual(s.shipbin.items, { cai: 4, [starKey('cai', 2)]: 6, [starKey('cai', 3)]: 6 });
-  assert.equal(G.shipPreview(s), Math.floor((4 * 5 + 6 * 8 + 6 * 10) * 0.8));
+  assert.deepEqual(s.shipbin.items, { cai: Y, [starKey('cai', 2)]: Yf, [starKey('cai', 3)]: Yf });
+  assert.equal(G.shipPreview(s), Math.floor((Y * sellPrice('cai') + Yf * sellPrice(starKey('cai', 2)) + Yf * sellPrice(starKey('cai', 3))) * 0.8));
   // lấy lại đúng mức sao
   assert.equal(G.shipTake(s, starKey('cai', 2), 1).ok, true);
   assert.deepEqual(s.basket, { [starKey('cai', 2)]: 1 });
   const coins = s.coins;
   quiet(() => G.tick(s, DAY_MS));   // qua 6h sáng: lái buôn trả đúng theo sao
-  assert.equal(s.coins, coins + shipValue({ cai: 4, [starKey('cai', 2)]: 5, [starKey('cai', 3)]: 6 }));
+  assert.equal(s.coins, coins + shipValue({ cai: Y, [starKey('cai', 2)]: Yf - 1, [starKey('cai', 3)]: Yf }));
 });
 
 test('đơn hàng đọc sao: món ★2 không nhận hàng ★1; đơn nhận hàng từ sao đó trở lên, lấy sao thấp trước', () => {
@@ -241,7 +242,7 @@ test('trộm cây chín có sao: khách được đúng món có sao, giá trị
     const s = farm(), [i] = plots(s);
     s.exp = 1e6;
     sow(s, i); act(s, i, 'water'); act(s, i, 'fertilize'); ripen(s, i);
-    assert.equal(G.ripeValue(s), 6 * sellPrice(starKey('cai', 3)) + (s.eggs?.length ?? 0) * sellPrice('trung'));
+    assert.equal(G.ripeValue(s), Yf * sellPrice(starKey('cai', 3)) + (s.eggs?.length ?? 0) * sellPrice('trung'));
     const r = G.guestOpApply(s, { name: 'Tèo', level: 9, room: 99 }, { id: 'st1', kind: 'steal', act: 'crop', idx: i });
     assert.equal(r.ok, true, r.msg);
     assert.deepEqual(Object.keys(r.reward.items), [starKey('cai', 3)]);
@@ -253,14 +254,14 @@ test('checkSaveJump: thu hoạch cả ruộng ★3 một lúc là hợp lý; đ�
   prev.mode = 'online';
   prev.basket = {};
   for (const i of plots(prev)) Object.assign(prev.plots[i], { soil: 'tilled', water: 100 });
-  for (const i of plots(prev)) prev.plots[i].crop = { id: 'duahau', progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: true, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: true } };
+  for (const i of plots(prev)) prev.plots[i].crop = { id: 'bapcai', progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: true, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: true } };
   const next = structuredClone(prev);
   next.simMs += 10 * SEC;
   for (const i of plots(next)) {
-    next.mastery.duahau = { lv: 1, n: 0 };   // giữ thành thạo cấp 1: thưởng sản lượng của issue 51 không lẫn vào phần đếm
+    next.mastery.bapcai = { lv: 1, n: 0 };   // giữ thành thạo cấp 1: thưởng sản lượng của issue 51 không lẫn vào phần đếm
     harvest(next, i); G.stashAll(next);   // giỏ đầy thì cất kho rồi hái tiếp
   }
-  assert.equal(next.inv[starKey('duahau', 3)], 9 * plots(prev).length);
+  assert.equal(next.inv[starKey('bapcai', 3)], Math.round(CROPS.bapcai.yield * (1 + FARMING.fertYield)) * plots(prev).length);
   assert.ok(G.wealthOf(next) - G.wealthOf(prev) > G.SAVE_JUMP.wealth * 2, 'thu hoạch được nhiều hơn mức cho sẵn');
   assert.equal(G.checkSaveJump(prev, next, 10 * SEC).ok, true);
   // ruộng không có gì chín mà giỏ tự dưng đầy dưa hấu ★3

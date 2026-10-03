@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as G from '../public/state.js';
 import { penIdOf } from './helpers/troughs.mjs';
-import { CROPS, FARMING, HUSBANDRY, DOG, THREATS, DAY_MS, FREE } from '../public/data.js';
+import { CROPS, ANIMALS, FARMING, HUSBANDRY, DOG, THREATS, DAY_MS, FREE } from '../public/data.js';
 
 const MIN = 60_000;
 // localStorage giả cho Node
@@ -49,7 +49,7 @@ test('cuốc -> gieo -> tưới -> chín -> thu hoạch -> bán', () => {
   assert.equal(a[0].id, 'harvest');
   const h = G.perform(s, T(0), 'harvest');
   assert.ok(h.ok);
-  assert.equal(s.basket.cai, 4);   // thu hoạch vào giỏ
+  assert.equal(s.basket.cai, CROPS.cai.yield);   // thu hoạch vào giỏ
   assert.equal(s.plots[0].soil, 'untilled');
   assert.equal(s.plots[0].crop, null);
   const before = s.coins, n = G.haveItem(s, 'cai');
@@ -110,10 +110,12 @@ test('chín quá thì héo', () => {
   assert.equal(s.plots[0].crop.rotten, true);
 });
 
-test('cửa sổ chín tới héo: cây ngắn ngày được sàn 10 phút game, cây dài ngày giữ nửa thời gian lớn', () => {
+test('cửa sổ chín tới héo = max(thời gian lớn, 10 phút): cây ngắn ngày được sàn 10 phút, cây dài ngày giữ đúng thời gian lớn', () => {
+  assert.equal(G.ripeWindow('raumuong'), 10 * MIN);   // lớn 2 phút, vẫn có 10 phút để hái
   assert.equal(G.ripeWindow('cai'), 10 * MIN);
-  assert.equal(G.ripeWindow('lua'), 10 * MIN);
-  assert.equal(G.ripeWindow('duahau'), CROPS.duahau.grow / 2);
+  assert.equal(G.ripeWindow('dualeo'), 10 * MIN);
+  assert.equal(G.ripeWindow('bap'), CROPS.bap.grow);
+  assert.equal(G.ripeWindow('lua'), CROPS.lua.grow);
 });
 
 test('cải chín chưa tới 10 phút thì chưa héo, quá 10 phút mới héo', () => {
@@ -222,7 +224,7 @@ test('gà mái đẻ trứng xuống đất, nhặt trứng, ổ ấp nở', () 
   const s = newGame(); FREE.types = [];   // ở yên trong chuồng (thả rông có test riêng: free.test.mjs)
   const hen = s.animals.find(a => a.type === 'ga' && a.stage === 'truong');
   hen.x = 100; hen.y = 320; s.troughs[penIdOf(G, s, 'chicken')] = 20;
-  const ev = noBugs(() => run(s, 3 * MIN));
+  const ev = noBugs(() => run(s, ANIMALS.ga.every + MIN));
   assert.ok(s.eggs.length >= 1);
   assert.ok(ev.some(e => e.type === 'spawn' && e.what === 'egg'));
   assert.equal(s.eggs[0].x, 100);
@@ -270,10 +272,10 @@ test('bò có sữa, vắt sữa; bán con trưởng thành', () => {
   withRandom(0.99, () => G.perform(s, { kind: 'animal', id: 50 }, 'milk'));   // không ra sữa ngon ⭐ (tỉ lệ ngẫu nhiên, lát 39)
   assert.equal(s.basket.sua, 1);
   const sellAct = G.actionsFor(s, { kind: 'animal', id: 50 }).find(a => a.id === 'sell');
-  assert.match(sellAct.label, /Bán bò cho Chú Ba \(700 xu\)/);
+  assert.match(sellAct.label, new RegExp(`Bán bò cho Chú Ba \\(${ANIMALS.bo.sell} xu\\)`));
   const c = s.coins;
   G.perform(s, { kind: 'animal', id: 50 }, 'sell');
-  assert.equal(s.coins, c + 700);
+  assert.equal(s.coins, c + ANIMALS.bo.sell);
   assert.equal(s.animals.length, 0);
 });
 
@@ -281,10 +283,12 @@ test('vật nuôi: tự ăn ở máng, đói -> bệnh -> thuốc thú y', () =>
   const s = newGame();
   const hen = s.animals[0];
   s.troughs[penIdOf(G, s, 'chicken')] = 1;
-  noBugs(() => run(s, 4 * MIN));
+  noBugs(() => run(s, 70 * MIN));   // hết no còn ~40%: gà ra máng ăn phần duy nhất
   assert.equal(s.troughs[penIdOf(G, s, 'chicken')], 0);
-  // đói lả
-  noBugs(() => run(s, 10 * MIN));
+  // đói lả: không bệnh ngay, phải đói liên tục tới sickAfterStarving mới chắc chắn bệnh
+  noBugs(() => run(s, HUSBANDRY.hungerMs));
+  assert.equal(hen.sick, 0);
+  noBugs(() => run(s, HUSBANDRY.sickAfterStarving + 2 * MIN));
   assert.equal(hen.sick, 1);   // mức Mệt
   s.inv.medicine = 1;
   assert.equal(G.actionsFor(s, { kind: 'animal', id: hen.id })[0].id, 'medicine');
@@ -411,7 +415,7 @@ test('lên cấp có thưởng; thành tựu', () => {
   s.inv.cai = 1; s.inv.trung = 1;
   const ev = [];
   G.perform(s, { kind: 'poop', id: 1 }, 'slip'); // không sao
-  s.plots[0].soil = 'tilled'; s.plots[0].crop = { id: 'duahau', progress: 1.2, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
+  s.plots[0].soil = 'tilled'; s.plots[0].crop = { id: 'bapcai', progress: 1.2, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0 };
   const c = s.coins;
   G.perform(s, T(0), 'harvest');
   ev.push(...run(s, 10));
