@@ -17,12 +17,20 @@ Cây héo, cây chết và phân thừa không còn là đồ bỏ: bỏ vào h�
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): bỏ cây héo, cây chết, phân chuồng, phân chó vào được; bỏ đồ không hợp lệ (ví dụ nông sản chín) bị từ chối; quá sức chứa bị từ chối.
-- [ ] Unit test: sau đúng số ngày game đã chốt thì lấy ra được đúng lượng phân bón; chưa đủ ngày thì chưa lấy được; đóng băng không làm hố chạy.
-- [ ] Unit test: ô bón bằng phân từ hố ủ tính là "có bón phân" cho ★3.
-- [ ] Unit test: hố ủ lưu và nạp giữ nguyên đồ đang ủ và thời gian còn lại.
-- [ ] E2E (desktop + 360px): dựng bản lưu có cây chết → nhổ và bỏ vào hố ủ → tua vài ngày game → lấy được phân bón → bón vào ô được.
+- [x] Unit test (seam 1): bỏ cây héo, cây chết, phân chuồng, phân chó vào được; bỏ đồ không hợp lệ (ví dụ nông sản chín) bị từ chối; quá sức chứa bị từ chối.
+- [x] Unit test: sau đúng số ngày game đã chốt thì lấy ra được đúng lượng phân bón; chưa đủ ngày thì chưa lấy được; đóng băng không làm hố chạy.
+- [x] Unit test: ô bón bằng phân từ hố ủ tính là "có bón phân" cho ★3.
+- [x] Unit test: hố ủ lưu và nạp giữ nguyên đồ đang ủ và thời gian còn lại.
+- [x] E2E (desktop + 360px): dựng bản lưu có cây chết → nhổ và bỏ vào hố ủ → tua vài ngày game → lấy được phân bón → bón vào ô được.
 
 ## Blocked by
 
 - [52](52-chat-luong-sao.md)
+
+## Báo cáo (issue 61)
+
+- **Số liệu chốt** (`COMPOST`, `BUILD_PRICES`, `PEN_TABLE.compost` trong `data.js`): hố giá 250 xu, mở ở cấp 2, mỗi vườn một hố, không nâng cấp; một lô tối đa 12 món; 2 món ra 1 phân bón (món lẻ trả lại túi lúc đậy hố); ủ 2 ngày game (40 phút ở x1) theo giờ vườn `simMs`.
+- **Đầu vào mới:** dọn ô cây héo được `cay_heo`, ô cây chết được `cay_chet`; xúc phân chó không ra phân bón thì được `phan_cho` (trước đây không được gì). Phân chuồng `manure` có sẵn.
+- **Theo lô:** bỏ đồ vào (bỏ hết một lần), rồi **đậy hố** để bắt đầu ủ; đang ủ thì không bỏ thêm. Không tự đậy khi đầy (để "quá sức chứa bị từ chối" rõ ràng).
+- **Báo xong:** event `compost` (🟡, loại "Cây chín") và dòng trong màn vắng nhà; bảng Việc cần làm để issue 62.
+- API, hình, test: SPEC.md mục "Hố ủ phân". Art: `public/art61.js` (bản thường + 2x), xem `public/_hd61.html`.

@@ -487,7 +487,10 @@ export const ITEMS = {
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
   straw:      { name: 'Rơm phủ luống',     kind: 'supply', price: 5,  lv: 1, desc: 'Phủ lên ô ruộng: đất giữ ẩm lâu gấp đôi (đỡ khổ lúc hạn hán), cây non không sợ sương muối. Thu hoạch hay dọn ô thì rơm mất.' },
   soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
-  manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Hố ủ phân sẽ dùng sau.' },
+  manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
+  phan_cho:   { name: 'Phân chó',          kind: 'material', price: 0, lv: 0, desc: 'Xúc bãi phân của chó. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
+  cay_heo:    { name: 'Cây héo',           kind: 'material', price: 0, lv: 0, desc: 'Dọn ô cây chín quá héo thì được. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
+  cay_chet:   { name: 'Cây chết',          kind: 'material', price: 0, lv: 0, desc: 'Dọn ô cây bệnh chết thì được. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
   feed_ga:    { name: 'Cám gà',           kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
   feed_heo:   { name: 'Cám heo',           kind: 'feed',   price: 10, lv: 3, desc: 'Thức ăn cho heo.' },
   hay:        { name: 'Cỏ khô',            kind: 'feed',   price: 8,  lv: 5, desc: 'Thức ăn cho bò và cừu.' },
@@ -593,9 +596,17 @@ export const PEN_TABLE = {
   quarantine: { cap: [1, 2, 3],   lv: 3, limit: [[3, 1], [7, 2]],         up: [500, 1200],  upLv: [5, 7], extra3: [] },
   doghouse:   { cap: [1, 1, 1],   lv: 1, limit: [[1, 1]],                 up: [150, 400],   upLv: [2, 4], extra3: ['bed', 'toy'] },
   cathouse:   { cap: [1, 2, 3],   lv: 4, limit: [[4, 1], [9, 2]],         up: [250, 600],   upLv: [5, 7], extra3: ['bed', 'toy'] },
+  compost:    { cap: [1],         lv: 2, limit: [[2, 1]],                 up: [],           upLv: [],     extra3: [] },   // hố ủ phân (issue 61): một hố, không nâng cấp
 };
-// Công trình đặt được ở chế độ xây dựng mà không phải chuồng có rào (nhà mèo): giá xây
-export const BUILD_PRICES = { cathouse: 350 };
+// Công trình đặt được ở chế độ xây dựng mà không phải chuồng có rào (nhà mèo, hố ủ phân): giá xây
+export const BUILD_PRICES = { cathouse: 350, compost: 250 };
+// Hố ủ phân (issue 61): bỏ đầu vào (tối đa cap món một lô), đậy hố thì ủ ms giờ vườn; mỗi per món ra 1 phân bón, món lẻ trả lại túi.
+// Đầy hố thì tự đậy. Chạy theo giờ vườn (simMs): đóng băng thì đứng yên, chạy bù thì chạy.
+export const COMPOST = {
+  cap: 12, per: 2,
+  ms: 2 * DAY_MS,                                       // 2 ngày game (40 phút ở x1)
+  inputs: ['cay_heo', 'cay_chet', 'manure', 'phan_cho'],   // thứ tự lấy khi "bỏ hết"
+};
 export const PEN_LEVELS = 3;
 export const expNeed = level => Math.floor(25 * level ** 1.5);
 export function levelInfo(exp) {
@@ -688,6 +699,7 @@ export const EVENT_LEVEL = {
   civet:     { level: 'important', cat: 'loss', group: () => 'loss:civet', label: 'Chồn hương bắt con vật', text: (n, e) => `Chồn hương tha mất ${n} con ${animalN(e.animal)} 😿` },
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
   giant:     { level: 'important', cat: 'levelup', group: e => 'giant:' + e.crop, label: 'Thu được trái khổng lồ', text: (n, e) => n > 1 ? `Thu được ${n} ${cropN(e.crop)} khổng lồ! ✨` : `Thu được ${cropN(e.crop)} khổng lồ! ✨` },
+  compost:   { level: 'important', cat: 'ripe', group: () => 'compost', label: 'Hố ủ phân xong', text: (n, e) => `Hố ủ phân xong rồi, lấy ${e.qty} phân bón nhé 🌿` },
   mastery:   { level: 'important', cat: 'levelup', group: e => 'mastery:' + e.crop, label: 'Thành thạo cây', text: (n, e) => `Thành thạo ${cropN(e.crop)} lên cấp ${e.lv}! 🟡` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   helped:    { level: 'important', cat: 'help', group: e => `helped:${e.by}:${e.act}`, label: 'Khách giúp vườn', text: (n, e) => `${e.by} đã ${helpN(e.act)} ${n} ${HELP_JOBS[e.act]?.unit ?? 'việc'} giúp bạn 🙏` },

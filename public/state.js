@@ -11,6 +11,7 @@ import { WELL, TANK, WATER_BUILD } from './data.js';
 import { GLASS } from './data.js';   // nhà kính (issue 60)
 import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng ★ (issue 52)
 import { GIANT, giantKey, giantOf, itemSlots } from './data.js';   // trái khổng lồ (issue 53)
+import { COMPOST } from './data.js';   // hố ủ phân (issue 61)
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
@@ -409,6 +410,7 @@ export function awaySummary(events, frozenMs = 0) {
   for (const [name, n] of count(events, 'oldSoon')) out.push(`${n} con ${lc(name)} sắp già 👵`);
   for (const [name, n] of count(events, 'passed')) out.push(`${n} con ${lc(name)} đã già và ra đi thanh thản 😇`);
   const n = type => events.filter(e => e.type === type).length;
+  if (n('compost')) out.push('Hố ủ phân đã xong, ra lấy phân bón nhé 🌿');
   if (n('crow')) out.push(`Quạ đã ăn mất ${n('crow')} cây`);
   if (n('thief')) out.push(`Thằng Tèo đã hái trộm ${n('thief')} cây`);
   if (n('ratFeed')) out.push(`Chuột đã ăn mất ${n('ratFeed')} phần cám`);
@@ -748,6 +750,7 @@ function step(s, d) {
   stepDog(s, d);
   stepPreds(s, d);
   stepCats(s, d);
+  stepCompost(s, d);
   if (catchUp) stepRaidAway(s); else stepThreats(s, d);
   stepOrders(s);
   checkAch(s);
@@ -2412,6 +2415,81 @@ function stepWater(s, d) {
   const take = () => (w.level >= 1 ? (w.level--, true) : false);
   for (const k of WATER_ORDER) WATER_USE[k](s, take);
 }
+
+// ---------- Hố ủ phân (issue 61) ----------
+// Thực thể kind 'compost' (mỗi vườn một hố): pile { món: n } = đồ đang nằm trong hố, readyAt = mốc simMs lô ủ xong (0 = chưa đậy).
+// Chạy theo giờ vườn (simMs) nên đóng băng thì đứng yên, chạy bù thì chạy.
+const compostEnt = s => s.farm?.ents.find(e => e.kind === 'compost') ?? null;
+const pileN = e => Object.values(e.pile ?? {}).reduce((a, n) => a + n, 0);
+// → null (chưa có hố) | { state: 'empty'|'filling'|'composting'|'ready', n (món trong hố), cap, out (phân bón sẽ ra), left (ms giờ vườn còn lại), pile }
+export function compostInfo(s) {
+  const e = compostEnt(s);
+  if (!e) return null;
+  const n = pileN(e), on = e.readyAt > 0, left = on ? Math.max(0, e.readyAt - (s.simMs || 0)) : 0;
+  return { state: !on ? (n ? 'filling' : 'empty') : left > 0 ? 'composting' : 'ready', n, cap: COMPOST.cap, out: Math.floor(n / COMPOST.per), left, pile: { ...e.pile } };
+}
+const compostBusy = (s, e) => R(false, compostInfo(s).state === 'ready' ? 'Hố ủ xong rồi, lấy phân bón ra trước đã' : 'Hố đang ủ, chờ xong rồi bỏ tiếp nhé', { reason: 'busy' });
+// Bỏ đồ vào hố: item + qty (mặc định 1), hoặc không truyền item = bỏ hết đầu vào hợp lệ trong túi tới khi đầy hố.
+// reason: missing (chưa có hố) busy (đang ủ / chưa lấy phân) invalid (món không ủ được) full (quá sức chứa) no_item
+export function compostAdd(s, item, qty = 1) {
+  const e = compostEnt(s);
+  if (!e) return R(false, 'Vườn chưa có hố ủ phân', { reason: 'missing' });
+  if (e.readyAt > 0) return compostBusy(s, e);
+  const room = COMPOST.cap - pileN(e), put = (k, n) => { take(s, k, n); e.pile[k] = (e.pile[k] || 0) + n; };
+  let moved = 0;
+  if (item != null) {
+    if (!COMPOST.inputs.includes(item)) return R(false, `Hố ủ không nhận ${itemName(item).toLowerCase()}, chỉ nhận cây héo, cây chết, phân chuồng, phân chó`, { reason: 'invalid' });
+    if (qty > room) return R(false, room ? `Hố chỉ còn chỗ cho ${room} món` : 'Hố đầy rồi', { reason: 'full' });
+    if (have(s, item) < qty) return R(false, `Không đủ ${itemName(item).toLowerCase()}`, { reason: 'no_item' });
+    put(item, qty); moved = qty;
+  } else {
+    if (room <= 0) return R(false, 'Hố đầy rồi', { reason: 'full' });
+    for (const k of COMPOST.inputs) { const n = Math.min(have(s, k), room - moved); if (n > 0) { put(k, n); moved += n; } }
+    if (!moved) return R(false, 'Chưa có cây héo, cây chết, phân chuồng hay phân chó', { reason: 'no_item' });
+  }
+  return R(true, `Đã bỏ ${moved} món vào hố ủ (${pileN(e)}/${COMPOST.cap})`, { moved });
+}
+// Đậy hố, bắt đầu ủ lô đang có: mỗi COMPOST.per món ra 1 phân bón, món lẻ trả lại túi. reason: missing busy empty too_few
+export function compostStart(s) {
+  const e = compostEnt(s);
+  if (!e) return R(false, 'Vườn chưa có hố ủ phân', { reason: 'missing' });
+  if (e.readyAt > 0) return compostBusy(s, e);
+  const n = pileN(e);
+  if (!n) return R(false, 'Hố còn trống, bỏ đồ vào trước đã', { reason: 'empty' });
+  if (n < COMPOST.per) return R(false, `Cần ít nhất ${COMPOST.per} món mới ra được 1 phân bón`, { reason: 'too_few' });
+  let back = n % COMPOST.per;
+  for (const k of [...COMPOST.inputs].reverse()) while (back > 0 && e.pile[k] > 0) { drop(e.pile, k, 1); give(s, k); back--; }
+  e.readyAt = (s.simMs || 0) + COMPOST.ms;
+  const out = Math.floor(pileN(e) / COMPOST.per);
+  log(s, `Đậy hố ủ phân: ${pileN(e)} món, ${COMPOST.ms / DAY_MS} ngày nữa được ${out} phân bón`);
+  return R(true, `Đã đậy hố, ${COMPOST.ms / DAY_MS} ngày nữa được ${out} phân bón`, { out, back: n % COMPOST.per });
+}
+// Lấy phân bón ra khi lô đã ủ xong; hố trống lại. reason: missing not_ready
+export function compostTake(s) {
+  const e = compostEnt(s), i = e && compostInfo(s);
+  if (!e) return R(false, 'Vườn chưa có hố ủ phân', { reason: 'missing' });
+  if (i.state !== 'ready') return R(false, i.state === 'composting' ? `Chưa ủ xong, còn ${mmss(i.left)}` : 'Hố chưa ủ gì cả', { reason: 'not_ready' });
+  give(s, 'fertilizer', i.out);
+  e.pile = {}; e.readyAt = 0;
+  log(s, `Lấy ${i.out} phân bón từ hố ủ`);
+  return R(true, `Lấy được ${i.out} phân bón`, { qty: i.out });
+}
+// Lô ủ vừa xong trong bước này (cả lúc chạy bù): báo một lần
+function stepCompost(s, d) {
+  const e = compostEnt(s);
+  if (e?.readyAt > 0 && s.simMs >= e.readyAt && s.simMs - d < e.readyAt) emit({ type: 'compost', qty: Math.floor(pileN(e) / COMPOST.per) });
+}
+function compostActs(s) {
+  const i = compostInfo(s);
+  if (!i) return [];
+  if (i.state === 'ready') return [mk('compostTake', 'fertilizer', `Lấy ${i.out} phân bón`)];
+  if (i.state === 'composting') return [mk('wait', '⏳', `Đang ủ ${i.n} món → ${i.out} phân bón (còn ${mmss(i.left)})`, 'Chờ ủ xong nhé')];
+  const can = COMPOST.inputs.reduce((a, k) => a + have(s, k), 0);
+  const add = mk('compostAdd', '🍂', `Bỏ đồ vào hố (${i.n}/${i.cap})`, i.n >= i.cap ? 'Hố đầy rồi, đậy hố lại ủ thôi' : !can ? 'Chưa có cây héo, cây chết, phân chuồng hay phân chó' : null);
+  if (!i.n) return [add];
+  const start = mk('compostStart', '🪵', `Đậy hố, bắt đầu ủ (${i.n} món → ${i.out} phân bón)`, i.n < COMPOST.per ? `Cần ít nhất ${COMPOST.per} món mới ra được phân bón` : null);
+  return add.disabled && !start.disabled ? [start, add] : [add, start];
+}
 function finishUpgrade(s) {
   const k = s.smith.tool;
   s.smith = null;
@@ -2642,6 +2720,7 @@ function buildingActs(s, t) {
     const k = tankInfo(s);
     return [mk('tank', '💧', `Bồn ${k.level}/${k.cap} lần nước`, k.pumping ? `Máy bơm đang bơm khoảng ${k.perHour} lần nước mỗi giờ` : k.why)];
   }
+  if (b.id === 'compost') return compostActs(s);
   if (b.id === 'well') {   // múc nước luôn là hành động chính; chưa cấp 4 thì thêm nút nâng giếng có giá (issue 56)
     const w = wellInfo(s), A = [mk('refill', '🪣', `Múc nước (bình ${s.can}/${canMax(s)})`, toolAway(s, 'can') ? awayMsg('can') : s.can >= canMax(s) ? 'Bình đầy rồi' : null)];
     if (w.next) A.push(mk('upgradeWell', '⬆️', `Nâng lên ${w.next.name}: bình ${w.next.can} lần (${fmtXu(w.next.price)} xu)`, w.next.error));
@@ -2802,7 +2881,11 @@ const DO = {
         p.crop = null; p.soil = 'untilled'; p.mulch = false;
         return res(true, `Thu hoạch ${qty} ${nm}${bonus ? ` (đúng mùa +${bonus})` : ''}${gk ? ` + 1 ${itemName(gk)}` : ''}`, [say(at, `+${qty} ${nm}`, starOf(key) > 2 ? COL.coin : COL.good), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp), ...fx], 'harvest');
       }
-      case 'clear': p.crop = null; p.soil = 'untilled'; p.mulch = false; return res(true, 'Đã dọn sạch ô đất', [say(at, '🧹')], 'dig');
+      case 'clear': {   // cây chết, cây héo nhổ lên thì được món tương ứng, bỏ vào hố ủ phân được (issue 61)
+        const k = c.dead ? 'cay_chet' : 'cay_heo';
+        give(s, k); p.crop = null; p.soil = 'untilled'; p.mulch = false;
+        return res(true, `Đã dọn sạch ô đất, được 1 ${itemName(k).toLowerCase()}`, [say(at, `🧹 +1 ${itemName(k)}`)], 'dig');
+      }
     }
   },
 
@@ -2868,8 +2951,8 @@ const DO = {
     s.poops.splice(s.poops.findIndex(p => p.id === t.id), 1);
     s.stats.poops++; addExp(s, 2);
     const fert = Math.random() < DOG.poopFertChance;
-    if (fert) give(s, 'fertilizer');
-    return res(true, fert ? 'Xúc được 1 phân bón' : 'Đã dọn sạch bãi phân', [say(at, fert ? '+1 Phân bón' : '✨ Sạch rồi')], 'dig');
+    give(s, fert ? 'fertilizer' : 'phan_cho');   // không thành phân bón ngay thì được phân chó, bỏ vào hố ủ (issue 61)
+    return res(true, fert ? 'Xúc được 1 phân bón' : 'Xúc được 1 phân chó', [say(at, fert ? '+1 Phân bón' : '+1 Phân chó')], 'dig');
   },
 
   scale(s, t, id, at) {   // cân heo: báo số ký từng con trong chuồng có cân này (t.id = id chuồng)
@@ -2969,6 +3052,12 @@ const DO = {
     if (id === 'upgradeWell') {
       const r = upgradeWell(s);
       return res(r.ok, r.msg, r.ok ? [say(at, `${WELL[r.lv - 1].name}! ⬆️`)] : [], r.ok ? 'coin' : 'error');
+    }
+    if (id === 'compostAdd' || id === 'compostStart' || id === 'compostTake') {   // hố ủ phân (issue 61)
+      const r = { compostAdd, compostStart, compostTake }[id](s);
+      if (!r.ok) return bad(r.msg, at);
+      const fx = id === 'compostAdd' ? `+${r.moved} món 🍂` : id === 'compostStart' ? 'Đậy hố, ủ thôi! 🪵' : `+${r.qty} Phân bón`;
+      return res(true, r.msg, [say(at, fx)], id === 'compostTake' ? 'harvest' : 'dig');
     }
     if (id === 'enter') return res(true, '', [], 'click', { go: BUILDING_DEFS[t.id].door.to });
     if (id === 'talk') return res(true, TALK[t.id].msg, [], 'click');
@@ -3889,7 +3978,7 @@ export function moveAnimal(s, animalId, penId) {
 const upKey = e => (e?.kind === 'pen' ? e.pen : e?.kind);
 export function upgradeInfo(s, id) {   // → { lv: cấp sau khi nâng, price, need: cấp người chơi cần, error?: lý do chưa nâng được } | null (đã tối đa / không nâng được)
   const e = s.farm.ents.find(x => x.id === id), t = PEN_TABLE[upKey(e)];
-  if (!t || penLv(e) >= PEN_LEVELS) return null;
+  if (!t?.up.length || penLv(e) >= PEN_LEVELS) return null;   // hố ủ phân không nâng cấp
   const i = penLv(e) - 1, price = t.up[i], need = t.upLv[i];
   const error = level(s) < need ? `Cần cấp ${need} mới nâng cấp được` : s.coins < price ? 'Chưa đủ xu, cố lên nhé' : null;
   return { lv: penLv(e) + 1, price, need, ...(error ? { error } : {}) };
@@ -3947,6 +4036,7 @@ export function placeEntity(s, what, c, r) {
   if (what.kind === 'deco') { take(s, what.item); e.item = what.item; }
   else s.coins -= placeCost(s, what);
   if (what.kind === 'pen') e.pen = what.pen;
+  if (what.kind === 'compost') Object.assign(e, { pile: {}, readyAt: 0 });   // hố ủ phân mới: rỗng
   if (what.kind === 'field') {
     e.up = fieldUpgrades();
     e.plots = [];

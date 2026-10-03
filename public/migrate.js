@@ -110,6 +110,7 @@ export function fillSave(s) {
     if (e.kind === 'well') e.lv ??= 1;
     if (e.kind === 'field') e.up = { ...fieldUpgrades(), ...e.up };
     if (e.up?.glass) e.up.glass = { broken: false, unpaid: false, ...e.up.glass };   // nhà kính (issue 60)
+    if (e.kind === 'compost') { e.pile = isObj(e.pile) ? e.pile : {}; e.readyAt = Number.isFinite(e.readyAt) ? e.readyAt : 0; }   // hố ủ phân (issue 61)
   }
   for (const p of s.plots ?? []) {
     p.mulch ??= false;

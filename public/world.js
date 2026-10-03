@@ -660,6 +660,10 @@ export function nameOf(state, t) {
     case 'building': {
       if (t.id === 'tank') { const k = ST.tankInfo(state); return `Bồn chứa · ${k.level}/${k.cap} lần nước`; }   // issue 57
       if (t.id === 'well' && (state.scene ?? 'farm') === 'farm') { const w = ST.wellInfo(state); return `${w.name} · cấp ${w.lv} · bình ${w.can} lần`; }   // giếng 4 cấp (issue 56)
+      if (t.id === 'compost') {   // hố ủ phân (issue 61): đang có bao nhiêu, còn bao lâu
+        const c = ST.compostInfo(state);
+        if (c) return 'Hố ủ phân · ' + { empty: 'còn trống', filling: `${c.n}/${c.cap} món`, composting: `đang ủ ${c.n} món · còn ${ST.mmss(c.left)}`, ready: `xong, ${c.out} phân bón` }[c.state];
+      }
       return M.buildings.find(b => b.id === t.id)?.name ?? '';
     }
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';

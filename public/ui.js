@@ -17,6 +17,7 @@ import { WX, PAPER_BOX } from './artw.js';
 import { TANK_ART } from './arttank.js';
 import { SPR53_OLD } from './art53.js';   // biểu tượng trái khổng lồ (issue 53)
 import { GH } from './art60.js';   // nhà kính (issue 60)
+import { SPR61_OLD } from './art61.js';   // hố ủ phân (issue 61): icon cây héo, cây chết, phân chó, hố ủ
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -54,7 +55,7 @@ const EMOJI = {
   trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴', catfood: '🐟',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧', deco_rattrap: '🪤', deco_canopy: '⛱️',
-  wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩',
+  wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩', phan_cho: '💩', cay_heo: '🥀', cay_chet: '🪵', compost: '🧺',
   ga: '🐔', vit: '🦆', heo: '🐖', bo: '🐄', cuu: '🐑', dog: '🐕', meo: '🐈', cathouse: '🏠',
 };
 const ITEM3 = { soap: 'soapBar', manure: 'manure', medicine: 'medicine', vaccine: 'vaccine', treat: 'treat', deco_rattrap: 'ratTrap', catfood: 'catfood' };
@@ -66,6 +67,7 @@ function iconUrl(key) {
   if (!u) try { u = ({ trung_phoi: SPR3?.eggFertile, trung_vit_phoi: SPR3?.eggDuckFertile, trung_vit: SPR3?.eggDuck, vit: SPR3?.animal?.vit?.non?.left?.[0], meo: SPR3?.animal?.meo?.truong?.left?.[0], cathouse: SPR3?.cathouse?.[0] }[key] ?? SPR2?.[key]); u = hd(u)?.toDataURL?.() || null; } catch { u = null; }   // vật phẩm chỉ có icon trong art2 (gỗ, đá), trứng có phôi ở art3
   if (!u) try { u = hd(SPR3?.items?.[ITEM3[key]])?.toDataURL?.() || null; } catch { u = null; }   // xà phòng, phân chuồng vẽ ở art3
   if (!u) try { u = hd(SPR4?.produce?.[key])?.toDataURL?.() || null; } catch { u = null; }   // nông sản 8 cây mới (Phase 3) vẽ ở art4
+  if (!u) try { u = hd(key === 'compost' ? SPR61_OLD.compost?.[3] : SPR61_OLD.items?.[key])?.toDataURL?.() || null; } catch { u = null; }   // hố ủ phân (issue 61)
   iconCache.set(key, u);
   return u;
 }
@@ -163,6 +165,7 @@ export function buildTray(s, b) {
     const g = S.greenhouses(s).length, glow = level(s) < D.GLASS.lv, gfull = !glow && g >= D.GLASS.max;
     cards.push(card({ kind: 'greenhouse' }, h('img', { class: 'ico', src: hd(GH.card).toDataURL(), alt: '', draggable: false }), glow ? 'Nhà kính' : `Nhà kính ${g}/${D.GLASS.max}`,
       glow ? `Cần cấp ${D.GLASS.lv}` : gfull ? 'Đã tối đa' : `🪙 ${fmt(D.GLASS.price)}`, glow || gfull));
+    for (const kind of Object.keys(D.BUILD_PRICES).filter(k => BUILD_TAB[k] === 'field')) cards.push(buildCard(s, kind, card));
   } else if (trayTab === 'pen') {
     for (const pen of Object.keys(D.PEN_PRICES)) {
       const lv = S.penLevel(pen), low = level(s) < lv, n = s.farm.ents.filter(e => e.kind === 'pen' && e.pen === pen).length, max = S.penLimit(s, pen), nx = S.penNextLevel(s, pen);
@@ -170,13 +173,8 @@ export function buildTray(s, b) {
       cards.push(card({ kind: 'pen', pen }, penIco(pen), low ? PEN_NAME2[pen] : `${PEN_NAME2[pen]} ${n}/${max}`,
         low ? `Cần cấp ${lv}` : full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : `🪙 ${fmt(D.PEN_PRICES[pen])}`, low || full));
     }
-    // nhà mèo (issue 44): không phải chuồng có rào nhưng xây ở cùng khay
-    for (const kind of Object.keys(D.BUILD_PRICES)) {
-      const lv = S.penLevel(kind), low = level(s) < lv, n = s.farm.ents.filter(e => e.kind === kind).length, max = S.penLimit(s, kind), nx = S.penNextLevel(s, kind);
-      const full = !low && n >= max;
-      cards.push(card({ kind }, ico(kind), low ? PEN_NAME2[kind] : `${PEN_NAME2[kind]} ${n}/${max}`,
-        low ? `Cần cấp ${lv}` : full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : `🪙 ${fmt(D.BUILD_PRICES[kind])}`, low || full));
-    }
+    // nhà mèo (issue 44): không phải chuồng có rào nhưng xây ở cùng khay; hố ủ phân nằm ở khay Ruộng
+    for (const kind of Object.keys(D.BUILD_PRICES).filter(k => BUILD_TAB[k] !== 'field')) cards.push(buildCard(s, kind, card));
   } else if (trayTab === 'water') {
     // mạng nước (issue 57): bồn chứa cần giếng máy bơm; bồn phụ, trạm bơm phụ cần có bồn và phải đặt trong vùng phủ xanh
     const lv4 = S.wellLv(s) >= D.WELL.length, has = s.farm.ents.some(e => e.kind === 'tank');
@@ -208,7 +206,15 @@ export function buildWater(s) {
   el.hidden = !k?.has;
   if (k?.has) el.textContent = `💧 Bồn ${fmt(k.level)}/${fmt(k.cap)} lần nước${k.pumping ? '' : ' · ' + k.why}`;
 }
-const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu', quarantine: 'Chuồng cách ly', cathouse: 'Nhà mèo' };
+const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu', quarantine: 'Chuồng cách ly', cathouse: 'Nhà mèo', compost: 'Hố ủ phân' };
+const BUILD_TAB = { compost: 'field' };   // công trình BUILD_PRICES nằm ở khay nào (mặc định khay Chuồng)
+// Thẻ công trình BUILD_PRICES (nhà mèo, hố ủ phân): cấp, số cái/tối đa, giá
+function buildCard(s, kind, card) {
+  const lv = S.penLevel(kind), low = level(s) < lv, n = s.farm.ents.filter(e => e.kind === kind).length, max = S.penLimit(s, kind), nx = S.penNextLevel(s, kind);
+  const full = !low && n >= max;
+  return card({ kind }, ico(kind), low ? PEN_NAME2[kind] : `${PEN_NAME2[kind]} ${n}/${max}`,
+    low ? `Cần cấp ${lv}` : full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : `🪙 ${fmt(D.BUILD_PRICES[kind])}`, low || full);
+}
 const penIco = pen => (pen === 'quarantine' ? h('span', { class: 'ico emo' }, '🏥') : ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]));
 // Nút Cất cho món đang chạm (label = tên món, null = ẩn)
 export function buildSel(label, up) {   // label: món cất được (nút Cất); up: S.upgradeInfo của chuồng đang chọn (nút Nâng cấp)
