@@ -576,7 +576,7 @@ function step(s, d) {
     s.day = day;
     const r = Math.random();
     s.weather = r < 0.45 ? 'sun' : r < 0.75 ? 'cloud' : 'rain';
-    s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.morningRegen);   // mỗi sáng 6h tự hồi một ít
+    if (!catchUp) s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.morningRegen);   // mỗi sáng 6h tự hồi một ít; chạy bù lúc vắng nhà (nhiều ngày game) thì không, khỏi vào lại là đầy
     settleShip(s);
     if (s.chore?.day === s.day) doChore(s);   // trộm bị phạt sang làm thợ không công (issue 46)
     if (!catchUp) cockCrow(s);
