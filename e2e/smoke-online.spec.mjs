@@ -1,5 +1,6 @@
 // Smoke live chơi online: hai trình duyệt A và B trên bản đã deploy (mặc định https://game.huninna.com).
 // Chạy theo playwright.smoke.config.mjs (không bật server local). Không có mã mời thì bỏ qua.
+// Tài khoản smoke (tên zzsmoke...) chơi ở làng thử riêng trên server, người chơi thật không thấy và không bị thấy.
 //
 // Cách chạy sau mỗi lần deploy:
 //   1. Trên VPS, tạo 2 mã mời:

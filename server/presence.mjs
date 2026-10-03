@@ -11,6 +11,9 @@ import { playOf } from './farms.mjs';
 
 const GAP = 1000 / LIVE.hz;
 const MAPS = ['village', 'farm', 'house'];
+// Tài khoản smoke live (e2e/smoke-online.spec.mjs) có tên bắt đầu bằng tiền tố này: chơi ở làng thử riêng, người thật không thấy và ngược lại
+export const SMOKE_PREFIX = 'zzsmoke';
+const VILLAGE_TEST = 'village:test';   // mã bản đồ nội bộ của làng thử (vẫn là làng, không phải vườn nào)
 const num = (v, lo, hi) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : null);
 
 // Ngoại hình (số nguyên theo từng ô) và cấp lấy từ vườn đã lưu trên server; chưa có vườn thì từ tin `join`, cấp 1
@@ -31,7 +34,7 @@ export function createPresence(ctx, send) {
   // số khách đang đứng trong vườn của `host` (không tính chính chủ) và báo cho chủ
   const guestsIn = host => [...(maps.get(`farm:${host}`)?.values() ?? [])].filter(o => o.id !== host);
   const watch = host => ctx.live?.sendTo(host, { t: 'watch', n: guestsIn(host).length });
-  const hostOf = p => { const [kind, id] = p.map.split(':'); return kind === 'farm' && Number(id) !== p.id ? Number(id) : null; };
+  const hostOf = p => { const [kind, id] = p.map.split(':'); return kind === 'farm' && Number(id) !== p.id ? Number(id) : null; };   // 'village:test' có kind 'village' nên không bị coi là vườn
 
   // rời bản đồ đang đứng (đổi bản đồ, đóng kết nối, tài khoản vào lại bằng kết nối khác)
   function leave(sock) {
@@ -69,7 +72,7 @@ export function createPresence(ctx, send) {
         if (!host) return send(sock, { t: 'error', code: 'no_farm' });
       }
       leave(sock);
-      const map = m.map === 'village' ? 'village' : `${m.map}:${host}`;
+      const map = m.map === 'village' ? (a.name.toLowerCase().startsWith(SMOKE_PREFIX) ? VILLAGE_TEST : 'village') : `${m.map}:${host}`;
       const old = maps.get(map)?.get(a.id);
       if (old) leave(old.sock);   // cùng tài khoản ở kết nối cũ (máy cũ, kết nối chưa kịp đóng): thay luôn
       const room = maps.get(map) ?? maps.set(map, new Map()).get(map);
