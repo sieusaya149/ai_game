@@ -10,11 +10,12 @@ export const MARKET = { open: 6, close: 18 }; // chợ Bà Tư mở từ 6h tớ
 // · leaveMs: giao xong còn đi ra cổng chừng này lâu · speed: px/s lúc đi (world.js) · walkMul: thời gian đi = quãng thẳng / tốc độ đi × hệ số (đường vòng)
 // Ba kiểu giao (modes): ms = tổng thời gian tới khi hàng vào kho (đã gồm quãng người giao hàng đi bộ), fee = phí theo tiền hàng; ms 0 = vào kho ngay
 export const DELIVERY = { modes: [{ id: 'now', ms: 0, fee: 0.3 }, { id: 'm1', ms: MIN, fee: 0.2 }, { id: 'm2', ms: 2 * MIN, fee: 0.1 }], feeMin: 5, maxPending: 5, maxQty: 99, leaveMs: 15_000, speed: 44, walkMul: 1.8, walkMin: 6000 };
-// Thể lực: cost = điểm trừ mỗi lần làm (dọn bụi, đập đá chưa có hành động, để sẵn); hết thể lực thì đi và làm chậm ×slow.
+// Thể lực: cost = điểm trừ mỗi lần làm (ruộng, dọn bụi, đập đá, chặt cây, trộm); hết thể lực thì không làm được việc tốn sức, đi chậm ×slow.
 // morningRegen: tự hồi mỗi sáng 6h · benchPerMin: ngồi ghế đá hồi mỗi phút · sleepHour: từ giờ này mới ngủ được
 // sleepPerDay: online, ngủ hồi dần thể lực, tính trên một ngày làng (DAY_MS); 200 = từ 18h tới 6h sáng (nửa ngày) vừa đủ từ 0 lên đầy 100
 export const STAMINA = {
   max: 100, slow: 2, morningRegen: 30, benchPerMin: 15, sleepHour: 18, sleepPerDay: 200,
+  tonicHeal: 40, tonicDay: 5,   // thuốc bổ: mỗi lần uống hồi bấy nhiêu, tối đa bấy lần mỗi ngày game
   cost: { till: 1, water: 1, plant: 1, harvest: 1, clearBush: 2, breakRock: 3, chopTree: 4, steal: 2 },
 };
 // Công cụ 3 cấp (sắt/đồng/vàng). area: vùng tác động theo cấp (one = 1 ô · row = hàng 3 ô theo hướng nhìn · block = 3×3 tâm ô mục tiêu)
@@ -554,7 +555,8 @@ export const ITEMS = {
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 120, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
   straw:      { name: 'Rơm phủ luống',     kind: 'supply', price: 8,  lv: 1, desc: 'Phủ lên ô ruộng: đất giữ ẩm lâu gấp đôi (đỡ khổ lúc hạn hán), cây non không sợ sương muối. Thu hoạch hay dọn ô thì rơm mất.' },
   barrow:     { name: 'Xe rùa',           kind: 'supply', price: 2500, lv: 3, once: true, desc: 'Tài sản dùng mãi mãi, mua một lần. Chạm con vật chọn "Chở bằng xe rùa", đẩy tới chuồng cùng loại còn chỗ rồi chạm máng ăn để thả nó xuống.' },
-  soap:       { name: 'Xà phòng',         kind: 'supply', price: 15, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
+  tonic:      { name: 'Thuốc bổ',         kind: 'supply', price: 80, lv: 1, desc: 'Uống hồi 40 thể lực. Tối đa 5 lần mỗi ngày.' },
+  soap:       { name: 'Xà phòng',        kind: 'supply', price: 15, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
   manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
   phan_cho:   { name: 'Phân chó',          kind: 'material', price: 0, lv: 0, desc: 'Xúc bãi phân của chó. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },
   cay_heo:    { name: 'Cây héo',           kind: 'material', price: 0, lv: 0, desc: 'Dọn ô cây chín quá héo thì được. Bỏ vào hố ủ phân, vài ngày sau thành phân bón.' },

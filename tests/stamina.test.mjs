@@ -79,6 +79,35 @@ test('hết thể lực: không dọn bụi, đập đá, chặt cây; đủ th�
   assert.equal(s.stamina, 20 - STAMINA.cost.clearBush - STAMINA.cost.breakRock - STAMINA.cost.chopTree);
 });
 
+test('thuốc bổ: mua ở chợ, uống hồi 40 không vượt tối đa, trừ 1 món', () => {
+  const s = atHour(newGame(), 9);
+  s.coins = 500;
+  assert.ok(G.canOrder('tonic'));
+  assert.ok(G.buy(s, 'tonic', 1).ok);
+  assert.equal(s.coins, 420);
+  s.stamina = 10;
+  assert.ok(G.drinkTonic(s).ok);
+  assert.equal(s.stamina, 10 + STAMINA.tonicHeal);
+  assert.equal(s.inv.tonic ?? 0, 0);
+  assert.equal(G.drinkTonic(s).ok, false, 'hết thuốc');
+  s.inv.tonic = 1; s.stamina = 90;
+  assert.ok(G.drinkTonic(s).ok);
+  assert.equal(s.stamina, STAMINA.max);
+});
+
+test('thuốc bổ: tối đa 5 lần mỗi ngày game, sang ngày mới uống tiếp', () => {
+  const s = atHour(newGame(), 9);
+  s.inv.tonic = 10; s.stamina = 0;
+  for (let i = 0; i < STAMINA.tonicDay; i++) { s.stamina = 0; assert.ok(G.drinkTonic(s).ok, 'lần ' + i); }
+  s.stamina = 0;
+  const r = G.drinkTonic(s);
+  assert.equal(r.ok, false);
+  assert.match(r.msg, /Uống nhiều quá/);
+  assert.equal(s.inv.tonic, 10 - STAMINA.tonicDay);
+  s.day += 1;
+  assert.ok(G.drinkTonic(s).ok);
+});
+
 test('ngồi ghế đá: nhân vật được đặt đúng mặt ghế, đứng dậy thì về chỗ cũ', () => {
   const s = atHour(newGame(), 9);
   s.inv.deco_bench = 1;

@@ -369,6 +369,7 @@ export function loadGame(raw) {
   if (!hasScene(s.scene)) s.scene = 'farm';   // bản lưu cũ chưa có scene
   if (!Number.isFinite(s.stamina)) s.stamina = STAMINA.max;   // bản lưu cũ chưa có thể lực: đầy
   s.stamina = clamp(s.stamina, 0, STAMINA.max); standUp(s);   // lưu lúc đang ngồi: đứng dậy về chỗ cũ
+  s.tonic = { day: Number(s.tonic?.day) || 0, n: clamp(Math.floor(s.tonic?.n) || 0, 0, STAMINA.tonicDay) };
   // bản lưu cũ: mọi công cụ cấp 1, bình tưới giữ số nước đang có (tối đa sức chứa)
   s.tools = Object.fromEntries(Object.keys(TOOLS).map(k => [k, { lv: clamp(Math.floor(s.tools?.[k]?.lv) || 1, 1, TOOL_MAX) }]));
   if (!(s.smith?.tool in TOOLS) || !Number.isFinite(s.smith.doneAt)) s.smith = null;
@@ -711,6 +712,19 @@ export function seatOf(s, t) {
   if (t.kind === 'deco') { const d = mapOf(s).decos.find(x => x.id === t.id); return d ? { x: d.x, y: d.y + 0.5 } : null; }
   const f = sceneMap(s).building(t.id)?.foot;
   return f ? { x: (f.c + f.w / 2) * TS, y: (f.r + f.h) * TS + 0.5 } : null;
+}
+// Thuốc bổ: uống từ túi đồ, hồi STAMINA.tonicHeal (không vượt tối đa), tối đa STAMINA.tonicDay lần mỗi ngày game
+export function drinkTonic(s) {
+  if (isAsleep(s)) return R(false, 'Bạn đang ngủ, bấm Dậy trước nhé', { reason: 'asleep' });
+  if (have(s, 'tonic') <= 0) return R(false, noItem('tonic'), { reason: 'none' });
+  if (s.stamina >= STAMINA.max) return R(false, 'Bạn còn khỏe lắm, chưa cần uống', { reason: 'full' });
+  const day = dayOf(s);
+  if (s.tonic?.day !== day) s.tonic = { day, n: 0 };
+  if (s.tonic.n >= STAMINA.tonicDay) return R(false, 'Uống nhiều quá không tốt đâu, mai uống tiếp nhé', { reason: 'limit' });
+  s.tonic.n++;
+  take(s, 'tonic', 1);
+  s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.tonicHeal);
+  return R(true, `Uống thuốc bổ, thể lực +${STAMINA.tonicHeal} 💪`);
 }
 export const canSleep = s => dayFrac(s) >= (STAMINA.sleepHour - 6) / 24;
 const SLEEP_EARLY = `Để dành cho tối nay, ${STAMINA.sleepHour} giờ chiều mới ngủ được`;

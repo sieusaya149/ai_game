@@ -61,7 +61,7 @@ const btn = (label, onClick, cls = '', extra = {}) => h('button', { class: 'btn 
 const EMOJI = {
   cai: '🥬', carot: '🥕', lua: '🌾', cachua: '🍅', bap: '🌽', dau: '🍓', bingo: '🎃', duahau: '🍉',
   hanhla: '🧅', dauphong: '🥜', raumuong: '🥬', dualeo: '🥒', khoailang: '🍠', ot: '🌶️', suhao: '🥬', bapcai: '🥬',
-  barrow: '🛒', trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊',
+  barrow: '🛒', trung: '🥚', trung_phoi: '🐣', trung_vit: '🥚', trung_vit_phoi: '🐣', sua: '🥛', len: '🧶', sua_ngon: '🥛', len_xoan: '🧶', pesticide: '🧴', growth: '🧪', fertilizer: '🌿', medicine: '💊', vaccine: '💉', vitamin: '💊', tonic: '🧃',
   feed_ga: '🌽', feed_heo: '🥣', hay: '🌾', dogfood: '🦴', catfood: '🐟',
   deco_scarecrow: '🧑‍🌾', deco_flower: '🌸', deco_lamp: '🏮', deco_bench: '🪑', deco_lowfence: '🚧', deco_rattrap: '🪤', deco_canopy: '⛱️',
   wood: '🪵', stone: '🪨', soap: '🧼', manure: '💩', phan_cho: '💩', cay_heo: '🥀', cay_chet: '🪵', compost: '🧺',
@@ -1135,6 +1135,7 @@ PANELS.bag = {
       for (const k of keys) {
         const it = D.ITEMS[k];
         const act = it?.kind === 'seed' ? btn(s.selectedSeed === it.crop ? 'Đang chọn' : 'Chọn gieo', () => { S.selectSeed(st(), it.crop); sound.play('pop'); commit(); }, 'plain sm', { disabled: s.selectedSeed === it.crop })
+          : k === 'tonic' ? btn('Uống', () => res(S.drinkTonic(st()), 'pop'), 'green sm')
           : it?.kind === 'deco' ? btn('Đặt ở 🔨', () => { closePanel(); api.buildStart(); }, 'green sm')
           : inShed && src === s.inv && isProduce(k) ? btn('Lấy ra', () => res(S.withdraw(st(), k, 'all'), 'pop'), 'plain sm', { disabled: S.basketCap(s) - S.basketCount(s) < D.itemSlots(k) }) : null;
         const big = D.giantOf(k) ? h('div', { class: 'cell-sub giant-slots' }, `🧺 ${D.itemSlots(k)} chỗ`) : null;   // trái khổng lồ chiếm 5 chỗ giỏ (issue 53)
@@ -1153,7 +1154,7 @@ const HOUR = 60 * MIN;
 const GUIDE = [
   { title: 'Thể lực', art: () => [spr().stamina, spr().staminaTired, spr().bed],
     text: [`Mỗi việc ở ruộng đều tốn thể lực (thanh ⚡ cạnh tên bạn). Hết thể lực thì đi và làm chậm gấp ${D.STAMINA.slow} lần.`,
-      `Cách hồi: ngồi ghế đá (hồi ${D.STAMINA.benchPerMin} mỗi phút), ngủ (từ ${D.STAMINA.sleepHour}h), hoặc đợi 6h sáng tự hồi ${D.STAMINA.morningRegen}.`,
+      `Cách hồi: ngồi ghế đá (hồi ${D.STAMINA.benchPerMin} mỗi phút), ngủ (từ ${D.STAMINA.sleepHour}h), uống 🧃 thuốc bổ (+${D.STAMINA.tonicHeal}, tối đa ${D.STAMINA.tonicDay} lần mỗi ngày, mua ở chợ mục Vật tư), hoặc đợi 6h sáng tự hồi ${D.STAMINA.morningRegen}.`,
       'Chơi online thì ngủ không tua thời gian: bạn nằm giường tới 6h sáng của làng, thể lực hồi dần (18h tới 6h là đầy), cây và vật nuôi vẫn lớn như thường. Bấm Dậy nếu muốn thức sớm, giữ phần thể lực đã hồi.'] },
   { title: 'Công cụ', art: () => [spr().tools?.hoe[0], spr().tools?.hoe[1], spr().tools?.hoe[2], spr().tools?.can[2], spr().tools?.sickle[2], spr().smithy],
     text: ['Cuốc, bình tưới, liềm và giỏ có 3 cấp: sắt, đồng, vàng.',
