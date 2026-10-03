@@ -712,7 +712,7 @@ export function findTarget(state, w) {
     else if (idx === ST.nextLockedPlot(state)) consider({ kind: 'lockedPlot', idx });
   }
   if (atFarm()) {
-    for (const a of state.animals) consider({ kind: 'animal', id: a.id });
+    for (const a of state.animals) if (a.id !== state.carry?.animalId || state.visit) consider({ kind: 'animal', id: a.id });
     for (const e of state.eggs ?? []) consider({ kind: 'egg', id: e.id });
     for (const o of state.poops ?? []) consider({ kind: 'poop', id: o.id });
     for (const t of state.threats ?? []) consider({ kind: 'threat', id: t.id });
@@ -827,6 +827,7 @@ export function hitTest(state, wx, wy) {
   for (const { pen, id } of M.troughs) { const tb = troughBox(M.penById[id].trough); if (hitRect(tb.x, tb.y, tb.w, tb.h, wx, wy)) return { kind: 'trough', pen, id }; }
   if (atFarm()) {
     for (const a of [...state.animals].sort((u, v) => v.y - u.y)) {
+      if (a.id === state.carry?.animalId && !state.visit) continue;   // đang nằm trên xe rùa
       const im = animalImg(a, 'left', 0);
       if (im && hitRect(a.x - im.width / 2, a.y - im.height, im.width, im.height, wx, wy)) return { kind: 'animal', id: a.id };
     }

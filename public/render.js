@@ -926,7 +926,8 @@ export function render(ctx, f) {
 
   // 2) bóng dưới chân
   shadow(state.player.x, state.player.y, 6);
-  const animals = farm ? state.animals : [], threats = farm ? state.threats ?? [] : [], preds = farm ? state.preds ?? [] : [];
+  const carry = farm && !state.visit ? state.carry?.animalId : null;   // con đang nằm trên xe rùa: không vẽ ở chuồng
+  const animals = farm ? state.animals.filter(a => a.id !== carry) : [], threats = farm ? state.threats ?? [] : [], preds = farm ? state.preds ?? [] : [];
   const small = { non: 0.6, nho: 0.8 };
   for (const a of animals) if (a.x != null && vis(a.x, a.y)) shadow(a.x, a.y, Math.round((a.type === 'bo' ? 11 : a.type === 'cuu' ? 8 : 6) * (small[a.stage] ?? 1)));
   if (farm && state.dog.x != null && vis(state.dog.x, state.dog.y)) shadow(state.dog.x, state.dog.y, 6);
@@ -1350,8 +1351,20 @@ export function render(ctx, f) {
     const fr = wd.moving ? [1, 0, 2, 0][Math.floor(wd.walkT * 8) % 4] : 0;
     const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
     const shake = wd.stun > 0 ? (Math.floor(now / 60) % 2 ? 1 : -1) : 0;
-    const bw = farm && !state.visit && haveItem(state, 'barrow') > 0 ? BARROW?.barrow?.[dir === 1 ? 'left' : 'right']?.[wd.moving ? Math.floor(now / 160) % 2 : 0] : null;
-    if (bw && !wd.sleeping) add(p.y - 0.1, () => blit(bw, p.x + (dir === 1 ? -bw.width - 3 : 3), p.y - bw.height + 2));   // xe rùa dắt bên người
+    const load = carry != null ? state.animals.find(a => a.id === carry) : null;   // chỉ đẩy xe khi đang chở con vật
+    const bs = load ? (BARROW?.barrowLoaded ?? BARROW?.barrow) : null;
+    const bw = bs?.[dir === 1 ? 'left' : 'right']?.[wd.moving ? Math.floor(now / 160) % 2 : 0] ?? null;
+    if (bw && !wd.sleeping) {
+      const bx = p.x + (dir === 1 ? -bw.width - 3 : 3), by = p.y - bw.height + 2;
+      add(p.y - 0.1, () => {
+        blit(bw, bx, by);   // xe rùa đẩy bên người
+        const im = animalImg(load, dir === 1 ? 'left' : 'right', 0, false), k = Math.min(1, 11 / Math.max(im?.width ?? 1, 1), 9 / Math.max(im?.height ?? 1, 1));
+        if (im) {   // con vật thu nhỏ nằm trong thùng xe
+          const w = Math.max(1, Math.round(im.width * k)), h = Math.max(1, Math.round(im.height * k));
+          ctx.drawImage((HD && hdOf(im)) || im, Math.round(bx + (bw.width - w) / 2), Math.round(by + 8 - h + 1), w, h);
+        }
+      });
+    }
     if (!wd.sleeping) add(p.y, () => {
       if (state.sit && !wd.moving) {   // ngồi ghế đá: hạ thân xuống, cắt phần chân (chưa có sprite ngồi riêng)
         ctx.save(); ctx.beginPath(); ctx.rect(p.x - 12, p.y - 36, 24, 37); ctx.clip();
