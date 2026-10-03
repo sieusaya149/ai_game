@@ -151,7 +151,7 @@ test('gà mái thả rông đẻ trứng ở ô cỏ trong vùng đi lại, nh�
 
 test('thả rông vẫn theo luật đực/cái (lát 36): gà trống không đẻ; trứng trong bụi của gà mái có trống thì có thể có phôi, ghi mẹ/cha', () => {
   const s = newGame(), roo = hen(s, 'truong', { sex: 'm', name: 'Trống', nextProduct: 0 }), h = hen(s, 'truong', { name: 'Mái', nextProduct: 0 });
-  seeded(11, () => run(s, 40 * MIN));
+  seeded(12, () => run(s, 40 * MIN));
   const eggs = G.hiddenEggs(s);
   assert.ok(eggs.length >= 2, 'có trứng trong bụi');
   assert.ok(eggs.some(e => e.mom?.id === h.id), 'gà mái đẻ trong bụi');

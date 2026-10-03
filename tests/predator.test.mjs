@@ -20,7 +20,7 @@ const MIDNIGHT = DAY_MS * 0.75;   // 0h: khung giờ chồn
 // Vườn cấp đủ cao (hết bảo hộ người mới), không đơn hàng, không con vật sẵn
 const newGame = () => {
   const s = G.createGame({ name: 'Hùng' });
-  s.orders = []; s.nextOrderAt = 1e15; s.animals = []; s.time = NOON; s.coins = 1e6; s.exp = 5000;
+  s.orders = []; s.nextOrderAt = 1e15; s.animals = []; s.time = NOON; s.coins = 1e6; s.exp = 5000; s.wseed = 7;   // hạt giống thời tiết cố định (createGame bốc ngẫu nhiên): hai lần chơi cùng hạt giống phải ra y nhau
   assert.ok(G.levelInfo(s.exp).level >= P.minLevel, 'đủ cấp để có kẻ săn mồi');
   return s;
 };

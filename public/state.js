@@ -3510,11 +3510,11 @@ export function visitWorld(h) {
 // Tên các trường của tin `world` (server chỉ chuyển tiếp đúng các trường này)
 export const VISIT_KEYS = [...VISIT_WORLD, 'threats', 'level'];
 const PENDING_MS = 15_000;   // việc khách vừa làm: giữ trên máy khách chừng này chờ tin chủ có nó
-const near = (a, b) => b && Number.isFinite(b.x) && Number.isFinite(b.y) && Math.hypot((a.x ?? 1e9) - b.x, (a.y ?? 1e9) - b.y) < 64;
+const nearBy = (a, b) => b && Number.isFinite(b.x) && Number.isFinite(b.y) && Math.hypot((a.x ?? 1e9) - b.x, (a.y ?? 1e9) - b.y) < 64;
 // Con nào còn (cùng id) và chưa bị chủ dời đi xa thì giữ chỗ đứng trên máy khách: world.js đang cho nó đi lại
 function keepPlaces(list, old) {
   const by = new Map((old ?? []).map(o => [o.id, o]));
-  for (const o of list) { const p = by.get(o.id); if (p && near(o, p)) { o.x = p.x; o.y = p.y; } }
+  for (const o of list) { const p = by.get(o.id); if (p && nearBy(o, p)) { o.x = p.x; o.y = p.y; } }
   return list;
 }
 // Áp phần vườn chủ `w` (tin `world`) lên bản đi dạo `v`. Trả false nếu tin hỏng hoặc `v` không phải bản đi dạo.
@@ -3536,7 +3536,7 @@ export function visitSync(v, w) {
   keepPlaces(v.threats, old.threats);
   const d = v.dog = guestDog(w.dog), od = old.dog;
   if (od) {
-    if (near(d, od)) { d.x = od.x; d.y = od.y; }
+    if (nearBy(d, od)) { d.x = od.x; d.y = od.y; }
     if ((od.barkAt || 0) > (d.barkAt || 0)) { d.barkAt = od.barkAt; d.barkX = od.barkX; d.barkY = od.barkY; }
     d.quiet = Math.max(d.quiet || 0, od.quiet || 0);
   }
