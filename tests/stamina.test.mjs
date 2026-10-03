@@ -49,15 +49,34 @@ test('hành động không tốn sức: vuốt ve, cho ăn tận tay, nhặt tr�
   assert.equal(s.stamina, STAMINA.max);
 });
 
-test('hết thể lực vẫn làm được nhưng hệ số chậm là 2, không bao giờ âm', () => {
+test('hết thể lực: mọi việc tốn sức bị từ chối, nút báo lý do, hệ số chậm là 2, thể lực không âm', () => {
   const s = newGame();
   s.stamina = 1;
   const r = G.perform(s, plot(s), 'till');
   assert.ok(r.ok);
   assert.equal(s.stamina, 0);
   assert.equal(G.slowFactor(s), 2);
-  assert.ok(G.perform(s, plot(s), 'plant').ok, 'hết sức vẫn gieo được');
+  assert.ok(G.actionsFor(s, plot(s))[0].disabled, 'nút gieo bị khóa');
+  const r2 = G.perform(s, plot(s), 'plant');
+  assert.equal(r2.ok, false);
+  assert.match(r2.msg, /thuốc bổ/);
+  assert.equal(s.plots[0].crop, null, 'không gieo được');
   assert.equal(s.stamina, 0);
+});
+
+test('hết thể lực: không dọn bụi, đập đá, chặt cây; đủ thể lực thì được', () => {
+  const s = newGame();
+  s.farm.ents.push({ id: 901, kind: 'bush', c: 40, r: 40 }, { id: 902, kind: 'rock', c: 42, r: 40 }, { id: 903, kind: 'tree', c: 44, r: 40 });
+  s.stamina = 0;
+  for (const id of [901, 902, 903]) {
+    const t = { kind: 'clutter', id };
+    assert.ok(G.actionsFor(s, t)[0].disabled, 'nút khóa ' + id);
+    assert.equal(G.perform(s, t, 'clear').ok, false);
+    assert.ok(s.farm.ents.some(e => e.id === id), 'vẫn còn ' + id);
+  }
+  s.stamina = 20;
+  for (const id of [901, 902, 903]) assert.ok(G.perform(s, { kind: 'clutter', id }, 'clear').ok);
+  assert.equal(s.stamina, 20 - STAMINA.cost.clearBush - STAMINA.cost.breakRock - STAMINA.cost.chopTree);
 });
 
 test('ngồi ghế đá: nhân vật được đặt đúng mặt ghế, đứng dậy thì về chỗ cũ', () => {

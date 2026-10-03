@@ -2893,7 +2893,18 @@ export const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return 
 const FEED_OF_PEN = { chicken: 'feed_ga', pig: 'feed_heo', pasture: 'hay' };
 const noItem = k => `Hết ${itemName(k).toLowerCase()}, mua ở ${VET_ITEMS.includes(k) ? 'trạm thú y Cô Út' : 'chợ'} nhé`;
 
+// Việc tốn thể lực (ruộng, dọn bụi / đá / cây, trộm): hết thể lực thì nút khóa kèm lý do
+const TIRED = 'Hết sức rồi, ngủ hoặc uống thuốc bổ nhé';
+function costOf(s, t, id) {
+  if (t.kind === 'clutter') return STAMINA.cost[clutterDef(s.farm.ents.find(x => x.id === t.id))?.cost] ?? 0;
+  return t.kind === 'plot' || id === 'steal' ? STAMINA.cost[id] ?? 0 : 0;
+}
 export function actionsFor(s, t) {
+  const A = actionsRaw(s, t);
+  if (s.stamina > 0 || !t) return A;
+  return A.map(a => (!a.disabled && costOf(s, t, a.id) > 0 ? { ...a, disabled: TIRED } : a));
+}
+function actionsRaw(s, t) {
   if (!t) return [];
   if (s.scene === 'visit') return guestActs(s, t);
   const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: eggActs,
@@ -3220,7 +3231,7 @@ export function perform(s, t, id) {
 function spend(s, n) {
   const was = s.stamina;
   s.stamina = Math.max(0, s.stamina - n);
-  if (was > 0 && s.stamina <= 0) toast('Hết sức rồi, đi và làm sẽ chậm hơn. Ngủ hay ngồi ghế đá cho khỏe lại nhé 😮‍💨');
+  if (was > 0 && s.stamina <= 0) toast('Hết sức rồi, đi sẽ chậm hơn. Ngủ, ngồi ghế đá hay uống thuốc bổ cho khỏe lại nhé 😮‍💨');
 }
 
 const say = (at, text, color = COL.good) => ({ text, color, x: at.x, y: at.y });

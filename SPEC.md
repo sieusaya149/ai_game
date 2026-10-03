@@ -821,7 +821,7 @@ wake(state)                       // → R { reason: 'awake', woke } nút Dậy 
 standUp(state)                    // đứng dậy khỏi ghế: về chỗ đứng cạnh ghế (state.sitFrom)
 seatOf(state, target)             // chỗ ngồi trên mặt ghế đá { x, y } (target deco hoặc building benchN); ngồi thì player được đặt đúng đó, quay mặt ra trước (dir 0)
 ```
-Chi phí: `STAMINA.cost` {cuốc, tưới, gieo, thu hoạch = 1; dọn bụi 2; đập đá 3}, làm n ô một lần = `cost × GROUP_COST[n]`. Vuốt ve, cho ăn tận tay, nhặt trứng, mua bán không tốn. Hồi: sáng 6h `+morningRegen` (30; chỉ khi đang chơi, chạy bù lúc vắng nhà không hồi), ngồi ghế đá `benchPerMin` mỗi phút.
+Chi phí: `STAMINA.cost` {cuốc, tưới, gieo, thu hoạch = 1; dọn bụi 2; đập đá 3; chặt cây 4; trộm 2}, làm n ô một lần = `cost × GROUP_COST[n]`. Vuốt ve, cho ăn tận tay, nhặt trứng, mua bán không tốn. Hồi: sáng 6h `+morningRegen` (30; chỉ khi đang chơi, chạy bù lúc vắng nhà không hồi), ngồi ghế đá `benchPerMin` mỗi phút.
 
 Ngủ online (hotfix): giờ làng chung và chạy thật nên không tua. Ngủ = nằm giường trong nhà tới 6h sáng làng; trong lúc đó vườn, cây, vật nuôi chạy bình thường, thể lực hồi `STAMINA.sleepPerDay * dt / DAY_MS` (200/ngày làng: ngủ 18h→6h từ 0 lên đầy). Tới 6h tự dậy (toast "Chào buổi sáng! ☀️") hoặc bấm Dậy; `stats.slept` và bước hướng dẫn tính lúc dậy. Khi ngủ `perform`/`enterScene` bị từ chối (`reason: 'asleep'`), màn Zzz + nút Dậy che game. `sleepUntil` nằm trong bản lưu: tải lại giữa đêm vẫn ngủ, vào lại sau 6h thì dậy với thể lực đã hồi (chạy bù). `simMs` chỉ nhích theo thời gian thật nên `checkSaveJump` không cần đổi và không còn kẽ tua vườn bằng cách ngủ lặp.
 
