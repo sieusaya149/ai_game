@@ -646,7 +646,10 @@ export function nameOf(state, t) {
     case 'gate': { const h = ST.penHome(state, t.id); return `Cửa ${M.penById[t.id]?.name?.toLowerCase() ?? 'chuồng'} (${h.home}/${h.total} đã về)`; }
     case 'scale': return 'Cân heo';
     case 'nest': return 'Ổ ấp trứng';
-    case 'building': return M.buildings.find(b => b.id === t.id)?.name ?? '';
+    case 'building': {
+      if (t.id === 'well' && (state.scene ?? 'farm') === 'farm') { const w = ST.wellInfo(state); return `${w.name} · cấp ${w.lv} · bình ${w.can} lần`; }   // giếng 4 cấp (issue 56)
+      return M.buildings.find(b => b.id === t.id)?.name ?? '';
+    }
     case 'door': return doorOf(t.to)?.name ?? 'Cửa';
     case 'deco': { const d = M.decos.find(o => o.id === t.id); return d ? ST.entName(d.ent) : 'Đồ trang trí'; }
     case 'clutter': return M.clutter.find(o => o.id === t.id) ? ST.entName(M.clutter.find(o => o.id === t.id).ent) : '';

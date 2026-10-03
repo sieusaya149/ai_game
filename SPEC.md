@@ -28,7 +28,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED` (bán kính theo giai đoạn nằm ở `DOG.guardRadius`, dùng chung với trộm NPC); Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC), `BREED`/`animalPrice` (đực cái, sinh sản), `DIRT`/`MANURE` (dơ, phân chuồng), `SICK`/`VET_ITEMS` (bệnh, thú y), `BOND` (độ thân), `TRADE`/`pigKgPrice` (bán cho Chú Ba), `CAT` (mèo), `CO_UT_QUEST`, `BUILD_PRICES` (nhà mèo...); Phase 3: `CROPS` 16 cây có `season`/`group`, `CROP_GROUPS`, nông sản có sao `STARS`/`starKey`/`starOf`/`baseOf`/`isProduce` (mục "Bản lưu v4"). Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED` (bán kính theo giai đoạn nằm ở `DOG.guardRadius`, dùng chung với trộm NPC); Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC), `BREED`/`animalPrice` (đực cái, sinh sản), `DIRT`/`MANURE` (dơ, phân chuồng), `SICK`/`VET_ITEMS` (bệnh, thú y), `BOND` (độ thân), `TRADE`/`pigKgPrice` (bán cho Chú Ba), `CAT` (mèo), `CO_UT_QUEST`, `BUILD_PRICES` (nhà mèo...); Phase 3: `CROPS` 16 cây có `season`/`group`, `CROP_GROUPS`, nông sản có sao `STARS`/`starKey`/`starOf`/`baseOf`/`isProduce` (mục "Bản lưu v4"), giếng 4 cấp `WELL` (mục "Giếng 4 cấp"). Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
 | `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `troughOf(map, {pen, id?})`; bản đồ vườn có `pens` (chuồng đầu tiên mỗi loại), `penList`/`penById` (mọi chuồng: `{ id, type, lv, name, rect, gates, trough|null, area, house, ent }`), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
 | `public/migrate.js` | `SAVE_VERSION` (4), `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`: v1→v2, v2→v3, v3→v4); `animalDefaults`/`fillAnimal`: hình dạng con vật v3 và mặc định của nó; `fillSave`/`cropQuality`/`fieldUpgrades`: chỗ để sẵn của Phase 3 (bản lưu v4) và mặc định của nó. Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
@@ -243,7 +243,7 @@ checkSaveJump(prev, next, dtMs)   // → R { reason: 'time'|'coins'|'exp' }: ch�
                                   // + giá trần của con vật có ở bản trước mà mất ở bản sau (bán cho Chú Ba, Phase 2)
 wealthOf(state), SAVE_JUMP        // wealthOf tính nông sản theo sellPrice của khóa (★2 ×1.5, ★3 ×2): đổi nhãn ★1 thành ★3 là của cải tăng
 resetGame()                       // xóa save hiện tại và đặt mọi cờ "đã chuyển" (không đụng bản v1, v2, v3)
-wellLv(state)                     // → 1..4: cấp giếng (Phase 3, v4; vườn cũ 1)
+wellLv(state)                     // → 1..4: cấp giếng (Phase 3, v4; vườn cũ 1; lv lạ trong bản lưu kẹp về 1..4). Xem mục "Giếng 4 cấp"
 loadProblem()                     // → string | null: vì sao lần loadGame gần nhất không đọc được (bản vẫn được giữ)
 awaySummary(events, frozenMs)     // → string[]: các dòng cho màn "Trong lúc bạn vắng nhà" (cả thành tựu mở lúc chạy bù, issue 32)
 awayGuests(state, gate?)          // issue 32 → [{ kind: 'help'|'steal'|'gift'|'note'|'chase', icon, text }]: phần "Khách ghé vườn"
@@ -670,11 +670,31 @@ Chi phí: `STAMINA.cost` {cuốc, tưới, gieo, thu hoạch = 1; dọn bụi 2;
 ### Công cụ, tiệm rèn
 ```js
 toolLv(state, tool)  toolName(state, tool)  toolAway(state, tool)   // tool: 'hoe'|'can'|'sickle'|'basket'
-canMax(state)                     // sức chứa bình tưới theo cấp (10 → 20 → 40)
+canMax(state)                     // sức chứa bình tưới = canCap(cấp bình, cấp giếng): bình sắt/đồng/vàng 10 → 20 → 40, giếng cộng thêm (mục "Giếng 4 cấp")
 upgradeCost(state, tool)          // xu nâng lên cấp kế; null nếu đã cấp cao nhất
 startUpgrade(state, tool)         // → R { reason: 'unknown'|'busy'|'max'|'coins' }; trừ xu ngay, công cụ vắng mặt 1 ngày game (state.smith), mỗi lúc một cái
 ```
 Vùng tác động theo cấp: cấp 1 một ô, cấp 2 hàng 3 ô theo hướng nhìn, cấp 3 khối 3x3 tâm ở ô mục tiêu. Giỏ không có vùng, chỉ có sức chứa (30 → 60 → 120).
+
+### Giếng 4 cấp (issue 56, DESIGN §3.2)
+Giếng là thực thể `well` có `lv` 1..4 (bản lưu v4), nâng tại chỗ bằng xu: giữ nguyên chỗ, hướng và nước đang có trong bình. Số liệu ở `WELL` (data.js), mỗi phần tử `{ name, can, refillMs, price }`:
+
+| Cấp | Tên | Bình (bình sắt) | Múc một lần | Giá nâng lên |
+|---|---|---|---|---|
+| 1 | Giếng đất | 10 | 900 ms | (có sẵn) |
+| 2 | Giếng xây | 15 | 500 ms | 600 xu |
+| 3 | Bơm tay | 25 | 350 ms | 2.000 xu |
+| 4 | Máy bơm | 40 | 250 ms | 5.000 xu |
+
+Bình đã rèn ở tiệm rèn thì giếng **cộng thêm** phần hơn giếng đất: `canCap(cấp bình, cấp giếng) = TOOLS.can.canMax[bình] + WELL[giếng].can − 10` (bình đồng + bơm tay = 35, bình vàng + máy bơm = 70). Cấp 4 mới chỉ có tên, hình và sức chứa bình; bồn chứa và điện là issue 57 (đọc `wellLv(state) >= 4`).
+```js
+wellLv(state)                     // → 1..4 (giếng đầu tiên trong vườn)
+wellInfo(state)                   // → { lv, name, can (bình chứa ở cấp này), next: { lv, name, can, price, error? } | null (cấp 4) }; error = 'Chưa đủ xu...'
+upgradeWell(state)                // → R { lv } nâng 1 cấp, trừ xu, bumpLayout; reason: scene (không ở vườn) missing (vườn không có giếng) max coins
+canCap(cấpBình, cấpGiếng)         // sức chứa bình, hàm thuần; canMax(state) = canCap(toolLv(state,'can'), wellLv(state))
+refillMs(state)                   // ms một lần múc ở giếng (main.js giữ người chơi đứng múc chừng đó, nhân slowFactor như mọi hành động)
+```
+Chạm giếng: tên đích `"<tên> · cấp n · bình m lần"` (world.nameOf), hành động chính `refill`, chip `upgradeWell` có tên cấp sau, sức chứa và giá (tắt kèm lý do khi thiếu xu; cấp 4 không còn chip). Khách thăm vườn không có hành động ở giếng. Hình: `public/artwell.js` `WELLS[cấp − 1]` (16x24, như `SPR.well`) và `WELLS_HD` (32x48), hd.js nối hai bộ; `render.buildingImg` chọn theo `ent.lv`; xem `public/_hdwell.html`.
 
 ### Giỏ và kho
 ```js
@@ -748,7 +768,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
                                //   Nhà: bed, wardrobe, phone (gọi bác sĩ thú y), (stove, table, plant chỉ để ngắm). Làng: market (Bà Tư), smithy (Ông Sáu),
                                //   vet (trạm thú y Cô Út), houseC (nhà Chú Ba, lái buôn mua vật nuôi đứng trước nhà), friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill` (giếng thêm `upgradeWell`, issue 56).
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 
@@ -820,7 +840,7 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - Ruộng là các **khối 3x3** đặt tự do; vườn mới có 1 khối (9 ô), thêm khối ở chế độ xây dựng theo `FIELD_LIMITS` (cấp → số khối tối đa) và `FIELD_PRICES`.
 - Chu trình: ô mới là `untilled` → **Cuốc đất** → `tilled` → **Gieo hạt** (tốn 1 `seed_<id>`, theo `selectedSeed`).
 - Cây lớn qua 5 giai đoạn (`CROP_STAGES`). Chỉ lớn khi `water > 0`. Có cỏ thì lớn chậm lại (×`weedSlow`), có sâu hoặc bệnh thì dừng lớn.
-- **Tưới** tốn 1 `can`, đặt `water` về 100; hết nước thì ra giếng múc (`refill`). **Nhổ cỏ** tay. **Sâu:** phun thuốc (chắc chắn, tốn 1 `pesticide`) hoặc bắt tay (50%). Sâu để lâu → **bệnh** → **chết**; thuốc trừ sâu chữa bệnh. **Bón phân** (+50% sản lượng) và **thuốc tăng trưởng** là hành động phụ.
+- **Tưới** tốn 1 `can`, đặt `water` về 100; hết nước thì ra giếng múc (`refill`, múc đầy `canMax`; giếng cấp cao bình chứa nhiều hơn và múc nhanh hơn, mục "Giếng 4 cấp"). **Nhổ cỏ** tay. **Sâu:** phun thuốc (chắc chắn, tốn 1 `pesticide`) hoặc bắt tay (50%). Sâu để lâu → **bệnh** → **chết**; thuốc trừ sâu chữa bệnh. **Bón phân** (+50% sản lượng) và **thuốc tăng trưởng** là hành động phụ.
 - **Thu hoạch** khi chín: yield (+50% nếu bón phân), cộng EXP, vào **giỏ**. Chín quá `OVERRIPE` thì **héo**. Cây chết/héo: **Dọn cây**. Thu hoạch xong ô về `untilled`.
 - Dời khối ruộng (kể cả đang có cây) giữ nguyên trạng thái ô. Cất khối chỉ khi chưa có cây.
 - Cuốc/tưới/thu hoạch/nhổ cỏ bằng công cụ cấp cao làm nhiều ô một lần (`tiles`); ô không hợp lệ trong vùng thì bỏ qua. Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô. Công cụ đang nâng cấp thì hành động bị khóa với lý do.

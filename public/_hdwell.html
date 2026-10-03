@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8"><title>Giếng 4 cấp</title>
+<style>
+  body { margin: 0; padding: 10px; background: #4f8a34; font: 12px sans-serif; color: #fff; }
+  h2 { margin: 6px 0; font-size: 14px; }
+  canvas { image-rendering: pixelated; display: block; }
+  #row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 8px; }
+  .cell { background: #5e9a40; border: 1px solid #2f5a1e; padding: 4px; text-align: center; }
+  .pair { display: flex; gap: 4px; align-items: flex-end; }
+  #report { white-space: pre; font: 12px monospace; background: #222; padding: 6px; }
+</style>
+<body>
+<h2>Giếng (issue 56): Cũ = SPR.well (thường | 2x) · Mới = cấp 1–4 (thường | 2x). ?s= phóng to</h2>
+<div id="row"></div>
+<div id="report"></div>
+<script type="module">
+import { SPR } from './art.js';
+import { SPR11 } from './art11.js';
+import { WELLS, WELLS_HD } from './artwell.js';
+const S = +(new URLSearchParams(location.search).get('s') || 4), row = document.getElementById('row'), rep = [];
+function view(im, k) {
+  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  c.style.width = (im.width / k) * S + 'px'; c.style.height = (im.height / k) * S + 'px';
+  c.getContext('2d').drawImage(im, 0, 0);
+  return c;
+}
+function cell(title, a, b) {
+  const d = document.createElement('div'); d.className = 'cell';
+  const p = document.createElement('div'); p.className = 'pair'; p.append(view(a, 1), view(b, 2));
+  d.append(p, title); row.append(d);
+}
+cell('Cũ', SPR.well, SPR11.well);
+const NAMES = ['1 Giếng đất', '2 Giếng xây', '3 Bơm tay', '4 Máy bơm'];
+WELLS.forEach((o, i) => {
+  const n = WELLS_HD[i], ok = n.width === o.width * 2 && n.height === o.height * 2 && o.width === SPR.well.width && o.height === SPR.well.height;
+  cell('Mới ' + NAMES[i], o, n);
+  rep.push(`${NAMES[i]}: ${o.width}x${o.height} → ${n.width}x${n.height} ${ok ? 'OK' : 'SAI'}`);
+});
+document.getElementById('report').textContent = rep.join('\n');
+document.body.dataset.done = '1';
+</script>

@@ -20,6 +20,15 @@ export const TOOLS = {
 };
 export const TOOL_MAX = 3;
 export const TOOL_LEVEL = ['sắt', 'đồng', 'vàng'];
+// Giếng 4 cấp (Phase 3, issue 56, DESIGN §3.2), nâng tại chỗ bằng xu. can: bình tưới (cấp 1) chứa bấy nhiêu lần; bình đã rèn
+// ở tiệm rèn thì cộng thêm phần hơn của giếng (can - 10). refillMs: một lần múc mất bấy nhiêu ms. price: xu nâng LÊN cấp này.
+// Cấp 4 (Máy bơm) có bồn chứa: issue 57.
+export const WELL = [
+  { name: 'Giếng đất', can: 10, refillMs: 900, price: 0 },
+  { name: 'Giếng xây', can: 15, refillMs: 500, price: 600 },
+  { name: 'Bơm tay',   can: 25, refillMs: 350, price: 2000 },
+  { name: 'Máy bơm',   can: 40, refillMs: 250, price: 5000 },
+];
 // Làm n ô một lần tốn thể lực = cost × GROUP_COST[n] (làm nhiều ô một lần nhẹ hơn làm từng ô: 3×3 tốn 5 thay vì 9)
 export const GROUP_COST = [0, 1, 2, 2, 3, 3, 4, 4, 5, 5];
 export const SPEEDS =[1, 5, 20];       // nút tốc độ để review nhanh

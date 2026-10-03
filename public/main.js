@@ -3,6 +3,7 @@ import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
   startVisit, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, commandDog,
 } from './state.js';
+import { refillMs } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
 import { DIR_NAME, LIVE, itemName, ANIMALS } from './data.js';
@@ -17,7 +18,8 @@ import { useServerTime } from './clock.js';
 import { createPeers } from './presence.js';
 
 const ACTION_MS = 350;
-const actionMs = () => ACTION_MS * slowFactor(state);   // hết thể lực thì làm chậm
+// hết thể lực thì làm chậm; múc nước lâu nhanh theo cấp giếng (issue 56)
+const actionMs = () => (busy?.id === 'refill' ? refillMs(state) : ACTION_MS) * slowFactor(state);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // ---------- Canvas ----------
