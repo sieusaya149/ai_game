@@ -17,10 +17,10 @@ Chuồng cấp 3 (Phase 2 để sẵn chỗ vòi sen) nay chạy bằng nước 
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): chuồng cấp 3 trong tầm nước có bồn đủ thì sáng ra mọi con được tắm, bồn giảm đúng số con, mỗi con +5 vui và hết dơ.
-- [ ] Unit test: bồn cạn giữa chừng thì chỉ tắm được số con đủ nước, không phạt; chuồng cấp 1, 2 và chuồng ngoài tầm nước không có vòi sen.
-- [ ] Unit test (seam 3): server chạy bù qua nhiều buổi sáng cho cùng số con đã tắm và cùng mực nước như trình duyệt.
-- [ ] E2E (desktop + 360px): dựng bản lưu chuồng heo cấp 3 có bồn đầy, con dơ → tua tới sáng → cả chuồng sạch, bồn giảm.
+- [x] Unit test (seam 1): chuồng cấp 3 trong tầm nước có bồn đủ thì sáng ra mọi con được tắm, bồn giảm đúng số con, mỗi con +5 vui và hết dơ.
+- [x] Unit test: bồn cạn giữa chừng thì chỉ tắm được số con đủ nước, không phạt; chuồng cấp 1, 2 và chuồng ngoài tầm nước không có vòi sen.
+- [x] Unit test (seam 3): server chạy bù qua nhiều buổi sáng cho cùng số con đã tắm và cùng mực nước như trình duyệt.
+- [x] E2E (desktop + 360px): dựng bản lưu chuồng heo cấp 3 có bồn đầy, con dơ → tua tới sáng → cả chuồng sạch, bồn giảm.
 
 ## Blocked by
 

@@ -779,9 +779,10 @@ export function goToTarget(state, w, t, act = true) {
   w.pending = t; w.pendingAct = act; w.pendingT = 0; w.repathT = 0; w.path = null;
 }
 // Người chơi chạm vào con vật nuôi t (chó, mèo, gia súc hay chạy lăng xăng, đứng cạnh thứ khác): thanh hành động theo
-// t khi nó còn trong tầm (6 giây, tới khi chạm chỗ khác hay đi bằng cần điều khiển). Thứ đứng yên thì chọn theo gần nhất như cũ.
+// t khi nó còn trong tầm (6 giây, tới khi chạm chỗ khác hay đi bằng cần điều khiển). Thứ đứng yên thì chọn theo gần nhất như cũ,
+// trừ máng ăn: heo, bò hay đứng chen quanh máng, chạm máng thì thanh hành động giữ theo chuồng (xem vòi sen, issue 59).
 export const TAP_KEEP_MS = 6000;
-const KEEP_KINDS = new Set(['dog', 'cat', 'animal']);
+const KEEP_KINDS = new Set(['dog', 'cat', 'animal', 'trough']);
 export function pickTarget(w, t) { w.tapKey = KEEP_KINDS.has(t.kind) ? keyOf(t) : null; w.tapUntil = performance.now() + TAP_KEEP_MS; }
 export function faceTo(state, x, y) {
   const p = state.player;

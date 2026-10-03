@@ -55,6 +55,9 @@ if (wellArt) { stats.files.push('artwell.js'); wellArt.WELLS.forEach((o, i) => l
 // Bồn chứa, bồn phụ, trạm bơm phụ, ống nước, vùng phủ, thanh mực nước (issue 57): cùng cây khóa trong arttank.js
 const tankArt = await import('./arttank.js').catch(() => null);
 if (tankArt?.TANK_ART) { stats.files.push('arttank.js'); link(tankArt.TANK_ART, tankArt.TANK_ART_HD, 'TANK_ART'); }
+// Vòi sen chuồng cấp 3 (issue 59): cùng cây khóa trong art59.js
+const showerArt = await import('./art59.js').catch(() => null);
+if (showerArt?.SHOWER_ART) { stats.files.push('art59.js'); link(showerArt.SHOWER_ART, showerArt.SHOWER_ART_HD, 'SHOWER_ART'); }
 
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);

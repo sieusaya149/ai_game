@@ -37,7 +37,7 @@ export const BUILDING_DEFS = {
 
 // Chuồng: kích thước khung rào (ô); các vị trí bên trong tính so với góc trên-trái khung.
 // trough: ô máng (c, r) + điểm vẽ (x, y), không có thì chuồng không có máng; area: vùng con vật đi lang thang (điểm ảnh);
-// house: điểm chân (giữa đáy) của nhà/mái chuồng vẽ theo cấp (SPR3.pen).
+// house: điểm chân (giữa đáy) của nhà/mái chuồng vẽ theo cấp (SPR3.pen); shower: chân cột vòi sen ở cấp 3 (issue 59).
 export const PEN_DEFS = {
   chicken: {
     name: 'Chuồng gà', w: 13, h: 9, gates: [[6, 0], [7, 0]],
@@ -51,10 +51,12 @@ export const PEN_DEFS = {
     scale: { c: 1, r: 1, x: 24, y: 30 },   // cân heo cạnh máng, mỗi chuồng heo một cái (ô c, r + điểm chân x, y)
     ground: { kind: 'MUD', c: 1, r: 1, w: 4, h: 7 },
     mud: { x: 24, y: 84, w: 40, h: 22 }, mudSpot: { x: 44, y: 95, rx: 22, ry: 14, x0: 28, x1: 60, y0: 88, y1: 102 },
+    shower: { x: 10, y: 76 },   // vòi sen cấp 3 (issue 59): chân cột ở mép trong rào trái, cần vươn vào chuồng (chỉ để vẽ)
   },
   pasture: {
     name: 'Đồng cỏ bò cừu', w: 8, h: 9, gates: [[3, 0]],
     trough: { c: 5, r: 1, x: 96, y: 30 }, area: { x: 22, y: 42, w: 84, h: 84 }, house: { x: 100, y: 126, sprite: 'barn' },
+    shower: { x: 10, y: 84 },
   },
   // Chuồng cách ly: nhận mọi loài, mỗi chỗ một con, không có máng
   quarantine: {

@@ -188,6 +188,9 @@ export const DIRT = {
   sandCap: 30,                // gà có ổ cát tự tắm cát: dơ không vượt mức này (trừ khi trời mưa)
   bathHappy: 15, bathBond: 0.2,
 };
+// Vòi sen chuồng cấp 3 (issue 59): buổi sáng (từ 6h tới trước dayFrac `until`, tức 12h trưa) tắm mỗi con một lần bằng nước bồn,
+// mỗi con 1 lần nước, +happy vui (không xà phòng nên ít hơn tắm tay). fxMs: hoạt cảnh phun nước trên vòi sen.
+export const SHOWER = { happy: 5, until: 0.25, fxMs: 3000 };
 // Phân chuồng tích dần theo giờ vườn (0..100); đầy thì chuồng bẩn
 export const MANURE = { fullMs: 2 * 60 * MIN, dirtyAt: 100, perScoop: 25 };   // xúc: nhận 1 phân chuồng mỗi perScoop độ đầy (tối thiểu 1)
 export const HUSBANDRY = {
@@ -588,11 +591,11 @@ export const FIELD_PRICES = [300, 600, 1000, 1500, 2200, 3000, 4000];
 // Giá xây chuồng (mở theo cấp mua được con vật tương ứng trong ANIMALS)
 export const PEN_PRICES = { chicken: 200, pig: 600, pasture: 1500, quarantine: 400 };
 // Bảng chuồng theo (loại, cấp). cap: sức chứa 3 cấp; lv: cấp người chơi để xây; limit: [cấp, số chuồng tối đa] (như FIELD_LIMITS);
-// up: giá nâng lên cấp 2, 3; upLv: cấp người chơi để nâng; extra3: đồ có thêm ở cấp 3 (shower để dành Phase 3, cách ly nhận mọi loài).
+// up: giá nâng lên cấp 2, 3; upLv: cấp người chơi để nâng; extra3: đồ có thêm ở cấp 3 (shower: vòi sen chạy bằng nước bồn, issue 59; cách ly nhận mọi loài).
 export const PEN_TABLE = {
   chicken:    { cap: [6, 12, 18], lv: 1, limit: [[1, 1], [4, 2], [8, 3]],  up: [300, 800],   upLv: [2, 4], extra3: ['autoNest', 'sandbox'] },
   pig:        { cap: [3, 5, 8],   lv: 3, limit: [[3, 1], [6, 2], [10, 3]], up: [800, 2000],  upLv: [4, 6], extra3: ['mudPit', 'shower'] },
-  pasture:    { cap: [3, 6, 9],   lv: 5, limit: [[5, 1], [8, 2], [12, 3]], up: [2000, 4500], upLv: [6, 8], extra3: ['autoGrass'] },
+  pasture:    { cap: [3, 6, 9],   lv: 5, limit: [[5, 1], [8, 2], [12, 3]], up: [2000, 4500], upLv: [6, 8], extra3: ['autoGrass', 'shower'] },
   quarantine: { cap: [1, 2, 3],   lv: 3, limit: [[3, 1], [7, 2]],         up: [500, 1200],  upLv: [5, 7], extra3: [] },
   doghouse:   { cap: [1, 1, 1],   lv: 1, limit: [[1, 1]],                 up: [150, 400],   upLv: [2, 4], extra3: ['bed', 'toy'] },
   cathouse:   { cap: [1, 2, 3],   lv: 4, limit: [[4, 1], [9, 2]],         up: [250, 600],   upLv: [5, 7], extra3: ['bed', 'toy'] },
@@ -738,6 +741,7 @@ export const EVENT_LEVEL = {
   trick:     { level: 'info', group: e => 'trick:' + e.trick, label: 'Chó học xong một lệnh' },
   dogHerd:   { level: 'info', group: () => 'dogHerd', label: 'Chó lùa đàn về chuồng' },
   wallow:    { level: 'none', group: e => 'wallow:' + e.id, label: 'Heo, bò lăn bùn' },
+  shower:    { level: 'none', group: e => 'shower:' + e.pen, label: 'Vòi sen tắm cả chuồng' },   // issue 59: việc thường ngày, chỉ để vẽ nước
   bathed:    { level: 'info', group: e => 'bathed:' + e.id, label: 'Đã tắm cho vật nuôi' },
   vaccinated: { level: 'info', group: e => 'vaccinated:' + e.id, label: 'Đã tiêm vắc-xin' },
   mucked:    { level: 'info', group: e => 'mucked:' + e.pen, label: 'Đã xúc phân chuồng' },
