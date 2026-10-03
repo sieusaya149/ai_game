@@ -549,6 +549,7 @@ export function targetPos(state, t) {
     case 'deco': return M.decos.find(d => d.id === t.id) ?? null;
     case 'clutter': { const c = clutterOf(t.id); return c ? { x: c.x + 8, y: c.y + 8 } : null; }
     case 'strip': return stripEdge(state, t.dir);
+    case 'glass': { const e = glassField(t.id); return e ? ST.glassDoor(e) : null; }
   }
   return null;
 }
@@ -566,7 +567,10 @@ export function exists(state, t) {
 const TAPPABLE_DECO = new Set(['deco_bench', 'grave', 'grave_flower', 'deco_rattrap']);
 // bù nhìn bị bão quật đổ (issue 55) chạm được để dựng lại
 const tappable = d => TAPPABLE_DECO.has(d.kind) || (d.kind === 'deco_scarecrow' && !!d.ent?.down);
-const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, pred: 26, dog: 20, cat: 20, trough: 22, gate: 24, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
+// nhà kính kính vỡ (issue 60): chạm cửa / bảng để sửa
+const glassField = id => M.fields.find(e => e.id === id && e.up?.glass) ?? null;
+const brokenGlass = () => M.fields.filter(e => e.up?.glass?.broken);
+const RANGE = { glass: 24, animal: 20, egg: 20, poop: 20, threat: 20, pred: 26, dog: 20, cat: 20, trough: 22, gate: 24, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -626,6 +630,7 @@ export function findTarget(state, w) {
   for (const p of M.penList) if (p.scale) consider({ kind: 'scale', pen: p.type, id: p.id });
   if (atFarm()) for (const p of M.penList) if (gateOn(state, p.id)) consider({ kind: 'gate', id: p.id });
   for (const d of M.decos) if (tappable(d)) consider({ kind: 'deco', id: d.id });
+  if (atFarm()) for (const e of brokenGlass()) consider({ kind: 'glass', id: e.id });
   for (const b of M.buildings) if (b.at && b.id !== 'coop') consider({ kind: 'building', id: b.id });
   if (!atFarm()) for (const d of M.doors) consider({ kind: 'door', to: d.to });   // ngoài vườn thì sang nhà/làng bằng nút của nhà/cổng
   w.curKey = best ? keyOf(best) : null;
@@ -659,6 +664,7 @@ export function nameOf(state, t) {
     case 'deco': { const d = M.decos.find(o => o.id === t.id); return d ? ST.entName(d.ent) : 'Đồ trang trí'; }
     case 'clutter': return M.clutter.find(o => o.id === t.id) ? ST.entName(M.clutter.find(o => o.id === t.id).ent) : '';
     case 'strip': return `Đất phía ${DIR_NAME[t.dir]}`;
+    case 'glass': return glassField(t.id)?.up.glass.broken ? 'Nhà kính (kính vỡ)' : 'Nhà kính';
   }
   return '';
 }
@@ -688,6 +694,7 @@ export function anchorOf(state, t) {
     case 'deco': return { x: pos.x, top: pos.y - decoSize(pos.kind).h - 1 };
     case 'clutter': return { x: pos.x, top: pos.y - 14 };
     case 'strip': return { x: pos.x, top: pos.y - 16 };
+    case 'glass': return { x: pos.x, top: pos.y - 30 };
   }
   return null;
 }
@@ -731,6 +738,8 @@ export function hitTest(state, wx, wy) {
     if (di && dog.x != null && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
   }
   for (const d of M.decos) if (tappable(d)) { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
+  // nhà kính kính vỡ: chạm bảng trạng thái hay cửa (mép dưới khối) là sửa kính
+  if (atFarm()) for (const e of brokenGlass()) { const p = state.player, inGh = p.x >= e.c * TS && p.x < (e.c + 3) * TS && p.y >= e.r * TS && p.y < (e.r + 3) * TS; if (!inGh && hitRect(e.c * TS, e.r * TS + 15, 3 * TS, 10, wx, wy, 0)) return { kind: 'glass', id: e.id }; }
   if (atFarm()) for (const p of M.penList) { const g = gateOn(state, p.id) && ST.gateOf(state, p.id); if (g && hitRect(g.x - 14, g.y - 16, 28, 22, wx, wy)) return { kind: 'gate', id: p.id }; }
   for (const p of M.penList) if (p.scale && hitRect(p.scale.x - 8, p.scale.y - 14, 16, 16, wx, wy)) return { kind: 'scale', pen: p.type, id: p.id };
   const cp = coop();

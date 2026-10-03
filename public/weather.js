@@ -1,7 +1,7 @@
 // Thời tiết là hàm thuần của ngày game và hạt giống (issue 55, ADR 0014). Không bốc thăm lúc chạy: cùng ngày, cùng hạt giống
 // thì mọi trình duyệt và server cùng thấy một trời, radio báo được ngày mai, chạy bù ra đúng trời đã qua.
 // Hạt giống: của làng khi online (clock.js VILLAGE_SEED), của vườn khi chơi đơn (state.wseed). Bảng tần suất: data.js WEATHER.
-import { WEATHER } from './data.js';
+import { WEATHER, GLASS } from './data.js';
 
 // Băm vài số nguyên thành số 0..1 (trộn kiểu murmur3 fmix32). Thuần, như nhau ở mọi máy.
 const fmix = h => {
@@ -49,3 +49,5 @@ export function weatherOn(seed, day) {
 }
 // Ngày bão này có mất điện nửa ngày đầu không (thuần theo hạt giống)
 export const outageOn = (seed, day) => weatherOn(seed, day) === 'storm' && rand01(seed, day, 3) < WEATHER.outage;
+// Ngày bão này có làm vỡ kính nhà kính trên khối ruộng `id` không (issue 60; thuần theo hạt giống, ngày, khối)
+export const glassBreakOn = (seed, day, id) => weatherOn(seed, day) === 'storm' && rand01(seed, day, 4, id) < GLASS.breakChance;

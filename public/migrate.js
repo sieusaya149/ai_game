@@ -107,6 +107,7 @@ export function fillSave(s) {
   for (const e of s.farm?.ents ?? []) {
     if (e.kind === 'well') e.lv ??= 1;
     if (e.kind === 'field') e.up = { ...fieldUpgrades(), ...e.up };
+    if (e.up?.glass) e.up.glass = { broken: false, unpaid: false, ...e.up.glass };   // nhà kính (issue 60)
   }
   for (const p of s.plots ?? []) {
     p.mulch ??= false;

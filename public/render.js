@@ -1,6 +1,6 @@
 // Vẽ thế giới: lớp nền tĩnh (vẽ một lần) + lớp động mỗi khung hình. Không giữ trạng thái game.
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
-import { TS, GROUND, tileHash } from './layout.js';
+import { TS, GROUND, tileHash, FIELD_SIZE } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
@@ -8,8 +8,9 @@ import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
 import { WELLS } from './artwell.js';
 import { SPR52_OLD } from './art52.js';   // sao trên ô ruộng (issue 52)
 import { WX } from './artw.js';
+import { GH, GH_AT } from './art60.js';   // nhà kính (issue 60)
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, frostHold } from './state.js';
+import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, plotSeasonMul, frostHold, glassStatus } from './state.js';
 import { cropStar } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
@@ -653,6 +654,7 @@ function drawBuild(ctx, state, m, b, now) {
   if (ni) put(ctx, ni, Math.round(g.c * TS + 8 - ni.width / 2), Math.round(g.r * TS + 13 - ni.height));
   const ci = g.what?.kind === 'cathouse' && SPR3?.cathouse?.[0];   // nhà mèo mới xây
   if (ci) put(ctx, ci, g.c * TS - 5, g.r * TS - 8);
+  if (g.what?.kind === 'greenhouse') put(ctx, GH.house, g.c * TS + GH_AT.house.x, g.r * TS + GH_AT.house.y);   // nhà kính mới xây (issue 60)
   ctx.globalAlpha = 1;
 }
 
@@ -701,6 +703,23 @@ function talk(ctx, who, x, y, dpr, now) {
   }
 }
 
+// ---------- Nhà kính (issue 60): "công trình có mái" ----------
+// Người chơi (cả khách đang thăm) đứng trong khối ruộng có nhà kính thì mái mờ dần rồi ẩn, ra ngoài thì hiện lại.
+// Mái hiện thì bảng trạng thái ở cửa đếm ô khô, sâu, chín, héo; có sâu thì bong bóng "!" nhấp nháy trên mái,
+// bong bóng việc của từng ô bên trong ẩn đi.
+const ROOF_FADE_MS = 350;
+const roofs = new Map();   // id khối ruộng → { a: độ đậm mái 0..1, t: lúc vẽ trước }
+let roofInfo = [];
+function roofAlpha(id, inside, now) {
+  let o = roofs.get(id);
+  if (!o) roofs.set(id, o = { a: inside ? 0 : 1, t: now });
+  const dt = Math.max(0, Math.min(200, now - o.t));
+  o.t = now;
+  o.a = Math.max(0, Math.min(1, o.a + (inside ? -1 : 1) * dt / ROOF_FADE_MS));
+  return o.a;
+}
+const inField = (e, o) => o?.x != null && o.x >= e.c * TS && o.x < (e.c + FIELD_SIZE) * TS && o.y >= e.r * TS && o.y < (e.r + FIELD_SIZE) * TS;
+
 export function render(ctx, f) {
   const { state, w: wd, scale, width, height, dpr, now } = f;
   const camX = Math.round(f.cam.x * scale), camY = Math.round(f.cam.y * scale);
@@ -722,6 +741,13 @@ export function render(ctx, f) {
   drawStatic(ctx, m, camX / scale, camY / scale, (camX + width) / scale, (camY + height) / scale);
 
   const blit = (img, x, y) => put(ctx, img, x, y);
+  // nhà kính trên các khối ruộng: độ đậm mái theo chỗ người chơi đứng, số trên bảng trạng thái
+  const glassFields = (m.fields ?? []).filter(e => e.up?.glass);
+  roofInfo = glassFields.map(e => {
+    const inside = inField(e, state.player), st = glassStatus(state, e.id);
+    return { id: e.id, alpha: roofAlpha(e.id, inside, now), inside, broken: !!e.up.glass.broken, board: { dry: st.dry, bugs: st.bugs, ripe: st.ripe, rotten: st.rotten }, urgent: st.urgent };
+  });
+  const roofed = idx => { const e = m.fieldOf?.(idx); return !!e?.up?.glass && (roofInfo.find(r => r.id === e.id)?.alpha ?? 0) > 0.5; };
   // người (người chơi, người khác, thằng Tèo): khung theo ngoại hình, có bản 2x (art5) thì put() tự dùng
   const person = (look, dir, k, wx, wy) => blit(charFrames(look)[dir][k], wx, wy);
   // Biển "đã về" trên cửa chuồng: SPR3.homeBoard nếu có, không thì tấm gỗ vẽ tạm. Còn con chưa về thì chữ đỏ.
@@ -758,6 +784,8 @@ export function render(ctx, f) {
       if (p.mulch) blit(WX.mulch, px, py);   // rơm phủ (issue 55)
     }
   }
+  // khung chân nhà kính nằm trên đất (vẫn thấy khi mái ẩn); kính vỡ thì có mảnh kính rơi
+  for (const e of glassFields) if (vis(e.c * TS + 24, e.r * TS + 24, 40)) blit(e.up.glass.broken ? GH.baseBroken : GH.base, e.c * TS, e.r * TS);
 
   // 2) bóng dưới chân
   shadow(state.player.x, state.player.y, 6);
@@ -857,7 +885,7 @@ export function render(ctx, f) {
         if (p.crop.fert) rect(ctx, '#f7d547', px + 1, py + 14, 2, 1);
         if (frostHold(state, p)) blit(WX.frostBite, px, py);   // sương muối bám cây hạt / mầm: vẽ chồng lên hình riêng của cây
         // trái mùa: lớn chậm (issue 54): ốc sên bò ở góc dưới-phải ô (nửa thò ra mép, không che cây); thiếu sprite thì emoji
-        if (p.crop.progress < 1 && !p.crop.dead && !p.crop.rotten && seasonGrowMul(state, p.crop.id) < 1) {
+        if (p.crop.progress < 1 && !p.crop.dead && !p.crop.rotten && plotSeasonMul(state, p) < 1) {   // trong nhà kính đang chạy thì không chậm
           const sn = SPR2?.slowSnail?.[Math.floor(now / 700 + p.idx) % 2];
           if (sn) blit(sn, px + 11, py + 9);
           else { ctx.font = '6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🐌', px + 13, py + 6); }
@@ -869,7 +897,22 @@ export function render(ctx, f) {
       if (p.weeds) blit(SPR.problem.weed, px + 3, py + 9);
       if (p.crop?.bugs) blit(SPR.problem.bug, px + 4 + Math.round(Math.sin(now / 260 + p.idx) * 2), py + 3 + (Math.floor(now / 300 + p.idx) % 2));
     });
-    if (prob) bub(px + 8, py + 1, problemIcon(prob), 'p' + p.idx);
+    if (prob && !roofed(p.idx)) bub(px + 8, py + 1, problemIcon(prob), 'p' + p.idx);   // dưới mái nhà kính: bảng ở cửa báo thay
+  }
+
+  // mái nhà kính + bảng trạng thái ở cửa + bong bóng việc gấp, mờ theo roofInfo; xếp theo mép dưới khối nên phủ lên cây bên trong
+  for (const r of roofInfo) {
+    const e = glassFields.find(x => x.id === r.id), px = e.c * TS, py = e.r * TS;
+    if (r.alpha <= 0.01 || !vis(px + 24, py + 12, 60)) continue;
+    add((e.r + FIELD_SIZE) * TS - 0.5, () => {
+      ctx.globalAlpha = r.alpha;
+      blit(r.broken ? GH.houseBroken : GH.house, px + GH_AT.house.x, py + GH_AT.house.y);
+      const bx = px + GH_AT.board.x, by = py + GH_AT.board.y;
+      blit(GH.board, bx, by);
+      [r.board.dry, r.board.bugs, r.board.ripe, r.board.rotten].forEach((n, i) => { const d = GH_AT.digit(i); blit(GH.digits[Math.min(9, n)], bx + d.x, by + d.y); });
+      if (r.urgent) blit(GH.alert[Math.floor(now / 400) % 2], px + GH_AT.alert.x, py + GH_AT.alert.y + (Math.floor(now / 400) % 2 ? -1 : 0));
+      ctx.globalAlpha = 1;
+    });
   }
 
   // trứng, phân

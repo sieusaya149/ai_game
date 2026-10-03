@@ -124,6 +124,12 @@ export const WEATHER = {
   },
 };
 
+// Nhà kính (issue 60): phủ đúng một khối ruộng 3×3 (field.up.glass), mở ở cấp lv, mỗi vườn tối đa max cái, giá price.
+// Ô bên trong bỏ qua mùa (★3 quanh năm), không bị sương muối, bão, quạ; trộm vẫn vào qua cửa.
+// Mùa Đông sưởi tốn heat xu mỗi nhà kính lúc 6h sáng (không đủ xu thì ngừng sưởi, mất tác dụng tới khi đủ, không nợ).
+// Mỗi ngày bão, mỗi nhà kính có breakChance bị vỡ kính (hàm thuần theo hạt giống, ngày, khối); sửa tốn fix xu.
+export const GLASS = { lv: 14, max: 2, price: 12000, heat: 60, fix: 800, breakChance: 0.2 };
+
 export const FARMING = {
   waterDrainPerMin: 25,   // đất mất bao nhiêu % nước mỗi phút (trời nắng ×1.5, trời mưa luôn đầy)
   canMax: 10,             // bình tưới cấp 1 chứa 10 lần tưới, ra giếng múc lại (cấp cao hơn: TOOLS.can.canMax)
@@ -704,6 +710,7 @@ export const EVENT_LEVEL = {
   // thời tiết (issue 55): sáng ra mà ngày mai có bão / hạn hán / sương muối thì báo trước 1 ngày
   forecast:  { level: 'important', cat: 'weather', group: e => 'forecast:' + e.kind, label: 'Báo thời tiết xấu ngày mai', text: (n, e) => `Đài báo ngày mai ${WEATHER.kinds[e.kind]?.icon ?? ''} ${(WEATHER.kinds[e.kind]?.name ?? '').toLowerCase()}, chuẩn bị nhé` },
   scarecrow: { level: 'info', group: () => 'scarecrow', label: 'Bão quật đổ bù nhìn' },
+  glassBroken: { level: 'important', cat: 'weather', group: () => 'glassBroken', label: 'Bão làm vỡ kính nhà kính', text: () => 'Bão làm vỡ kính nhà kính, ra cửa nhà kính sửa bằng xu nhé 🔧' },   // issue 60
   log:       { level: 'info', group: () => 'log', label: 'Nhật ký' },
   toast:     { level: 'direct', group: e => 'toast:' + e.text, label: 'Thông báo của luật chơi' },
   achievement: { level: 'direct', group: e => 'achievement:' + e.id, label: 'Thành tựu' },

@@ -14,6 +14,7 @@ import * as net from './net.js';
 import { hdOf, charFrames } from './hd.js';
 import { starIcon } from './art52.js';
 import { WX, PAPER_BOX } from './artw.js';
+import { GH } from './art60.js';   // nhà kính (issue 60)
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -144,6 +145,10 @@ export function buildTray(s, b) {
     const n = S.fieldCount(s), max = S.fieldLimit(s), nx = S.fieldNextLevel(s), full = n >= max;
     cards.push(card({ kind: 'field' }, h('span', { class: 'ico emo' }, '🟫'), `Khối ruộng ${n}/${max}`,
       full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : S.fieldCost(s) ? `🪙 ${fmt(S.fieldCost(s))}` : 'Miễn phí', full));
+    // nhà kính (issue 60): kéo thả lên một khối ruộng có sẵn
+    const g = S.greenhouses(s).length, glow = level(s) < D.GLASS.lv, gfull = !glow && g >= D.GLASS.max;
+    cards.push(card({ kind: 'greenhouse' }, h('img', { class: 'ico', src: hd(GH.card).toDataURL(), alt: '', draggable: false }), glow ? 'Nhà kính' : `Nhà kính ${g}/${D.GLASS.max}`,
+      glow ? `Cần cấp ${D.GLASS.lv}` : gfull ? 'Đã tối đa' : `🪙 ${fmt(D.GLASS.price)}`, glow || gfull));
   } else if (trayTab === 'pen') {
     for (const pen of Object.keys(D.PEN_PRICES)) {
       const lv = S.penLevel(pen), low = level(s) < lv, n = s.farm.ents.filter(e => e.kind === 'pen' && e.pen === pen).length, max = S.penLimit(s, pen), nx = S.penNextLevel(s, pen);

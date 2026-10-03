@@ -1,0 +1,75 @@
+<!doctype html><meta charset="utf-8"><title>HD nhà kính</title>
+<style>
+  body { margin: 0; padding: 8px; background: #3a5a2a; font: 11px sans-serif; color: #fff; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; margin-bottom: 8px; }
+  .pair { display: flex; gap: 3px; align-items: flex-end; background: rgba(0,0,0,0.18); padding: 3px; }
+  .cell { display: flex; flex-direction: column; gap: 1px; }
+  .cell span { font-size: 9px; color: #ffe9a8; }
+  canvas { image-rendering: pixelated; }
+  #bad { color: #ffb0a0; font-weight: bold; }
+  h3 { margin: 4px 0; font-size: 12px; }
+</style>
+<body>
+<div id="bad"></div>
+<h3>Từng sprite: Cũ (bộ thường, ×Z) · Mới (2x, ×Z/2)</h3>
+<div id="root" class="row"></div>
+<h3>Ghép: khung chân + mái + bảng (1x | 2x), đứng ngoài và kính vỡ</h3>
+<div id="combo" class="row"></div>
+<script type="module">
+// Trang xem art nhà kính (issue 60): bộ thường cạnh bản 2x cùng cỡ trên màn hình, và ảnh ghép như trong game
+import { GH, GH_AT, ghPairs } from './art60.js';
+import { hdOf } from './hd.js';
+const Z = Number(new URLSearchParams(location.search).get('z') || 4);
+const isImg = v => v instanceof HTMLCanvasElement;
+const cv = (img, z, bg) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); if (bg) { g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); } g.drawImage(img, 0, 0); c.style.width = img.width * z + 'px'; c.style.height = img.height * z + 'px'; return c; };
+const cell = (img, label, z, bg) => { const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span'); s.textContent = label; d.append(s, cv(img, z, bg)); return d; };
+const bad = [];
+const BG = { base: '#8a6a3c', baseBroken: '#8a6a3c', icon: '#9a6634', digits: '#9a6634' };
+function walk(v, path, bg) {
+  if (isImg(v)) {
+    const h = hdOf(v);
+    if (!h) { bad.push(`${path}: chưa nối bản 2x`); return; }
+    if (h.width !== v.width * 2 || h.height !== v.height * 2) bad.push(`${path}: ${h.width}x${h.height} ≠ 2×${v.width}x${v.height}`);
+    const p = document.createElement('div'); p.className = 'pair';
+    p.append(cell(v, `Cũ ${path} ${v.width}x${v.height}`, Z, bg), cell(h, `Mới ${h.width}x${h.height}`, Z / 2, bg));
+    document.getElementById('root').append(p);
+    return;
+  }
+  for (const k in v) walk(v[k], `${path}.${k}`, bg ?? BG[k]);
+}
+walk(GH, 'GH');
+// ảnh ghép như trong game: đất ruộng, khung chân, mái + vách, ván trạng thái với số, bong bóng
+function combo(k, broken, counts, hot) {
+  const c = document.createElement('canvas'); c.width = 48 * k; c.height = 80 * k + 14 * k;
+  const g = c.getContext('2d'), pick = im => (k === 2 ? hdOf(im) : im), oy = 30;
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = '#4f8a32'; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#7a5530'; g.fillRect(0, oy * k, 48 * k, 48 * k);
+  const put = (im, x, y) => { const i = pick(im); g.drawImage(i, Math.round(x * k), Math.round(y * k)); };
+  put(broken ? GH.baseBroken : GH.base, 0, oy);
+  put(broken ? GH.houseBroken : GH.house, GH_AT.house.x, oy + GH_AT.house.y);
+  put(GH.board, GH_AT.board.x, oy + GH_AT.board.y);
+  counts.forEach((n, i) => { const d = GH_AT.digit(i); put(GH.digits[n], GH_AT.board.x + d.x, oy + GH_AT.board.y + d.y); });
+  if (hot != null) put(GH.alert[hot], GH_AT.alert.x, oy + GH_AT.alert.y);
+  c.style.width = 48 * 4 + 'px'; c.style.height = (c.height / k) * 4 + 'px';
+  const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span');
+  s.textContent = `${k}x ${broken ? 'kính vỡ' : 'lành'}`; d.append(s, c);
+  document.getElementById('combo').append(d);
+}
+for (const k of [1, 2]) { combo(k, false, [2, 1, 3, 0], 0); combo(k, false, [0, 0, 9, 1], 1); combo(k, true, [1, 0, 0, 2], null); }
+// khung chân lúc mái ẩn (đứng trong)
+for (const k of [1, 2]) {
+  const c = document.createElement('canvas'); c.width = 48 * k; c.height = 48 * k;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.fillStyle = '#7a5530'; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(k === 2 ? hdOf(GH.base) : GH.base, 0, 0);
+  c.style.width = '192px'; c.style.height = '192px';
+  const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span'); s.textContent = `${k}x mái ẩn (khung chân)`; d.append(s, c);
+  document.getElementById('combo').append(d);
+}
+const pairs = ghPairs();
+for (const p of pairs) if (p.w2 !== p.w * 2 || p.h2 !== p.h * 2) bad.push(`cặp ${p.w}x${p.h} → ${p.w2}x${p.h2}`);
+document.getElementById('bad').textContent = bad.length ? bad.join(' · ') : `Đủ ${pairs.length} cặp, đều đúng 2×`;
+window.__gh = { pairs: pairs.length, bad };
+window.__ready = true;
+</script>

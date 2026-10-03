@@ -22,12 +22,12 @@ Nhà kính là thực thể phủ đúng footprint của một khối ruộng 3�
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): đặt nhà kính bị từ chối khi dưới cấp 14, khi đã có 2 cái, khi không trùng một khối ruộng; đặt đúng thì ok.
-- [ ] Unit test: ô trong nhà kính bỏ qua trái mùa và được ra ★3 giữa Đông; không bị sương muối dừng cây; bão không đổ gì bên trong; quạ không vào.
-- [ ] Unit test: sưởi mùa Đông có tiền điện; kính vỡ thì mất tác dụng cho tới khi sửa, sửa tốn xu. Trộm vẫn vào được qua cửa.
-- [ ] Unit test: hàm tóm tắt trạng thái trả đúng số ô khô, sâu, chín, héo bên trong.
-- [ ] E2E (desktop + 360px): dựng bản lưu có nhà kính và vài ô khô, sâu, chín → đứng ngoài thấy mái phủ và bảng trạng thái đúng số → bước vào cửa thì mái mờ rồi ẩn → ra ngoài mái hiện lại.
-- [ ] E2E (hai trình duyệt qua server): khách vào vườn thấy nhà kính và bảng trạng thái giống chủ.
+- [x] Unit test (seam 1): đặt nhà kính bị từ chối khi dưới cấp 14, khi đã có 2 cái, khi không trùng một khối ruộng; đặt đúng thì ok.
+- [x] Unit test: ô trong nhà kính bỏ qua trái mùa và được ra ★3 giữa Đông; không bị sương muối dừng cây; bão không đổ gì bên trong; quạ không vào.
+- [x] Unit test: sưởi mùa Đông có tiền điện; kính vỡ thì mất tác dụng cho tới khi sửa, sửa tốn xu. Trộm vẫn vào được qua cửa.
+- [x] Unit test: hàm tóm tắt trạng thái trả đúng số ô khô, sâu, chín, héo bên trong.
+- [x] E2E (desktop + 360px): dựng bản lưu có nhà kính và vài ô khô, sâu, chín → đứng ngoài thấy mái phủ và bảng trạng thái đúng số → bước vào cửa thì mái mờ rồi ẩn → ra ngoài mái hiện lại.
+- [x] E2E (hai trình duyệt qua server): khách vào vườn thấy nhà kính và bảng trạng thái giống chủ.
 
 ## Blocked by
 
