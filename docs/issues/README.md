@@ -98,7 +98,7 @@ Nguồn: [PRD 0004](../prd/0004-phase-3-cay-va-nuoc.md).
 | 59 | [Vòi sen cho chuồng](59-voi-sen-chuong.md) | 57 | ✅ |
 | 60 | [Nhà kính](60-nha-kinh.md) | 54, 55 | ✅ |
 | 61 | [Hố ủ phân](61-ho-u-phan.md) | 52 | ✅ |
-| 62 | [Thông báo và hướng dẫn cây, nước](62-huong-dan-thong-bao-cay-nuoc.md) | 51, 53, 57, 58, 61 | ⬜ |
+| 62 | [Thông báo và hướng dẫn cây, nước](62-huong-dan-thong-bao-cay-nuoc.md) | 51, 53, 57, 58, 61 | ✅ |
 | 63 | [Phát hành Phase 3](63-phat-hanh-phase-3.md) | 50–62 | ⬜ |
 
 **Làm song song được:** sau 50 thì 51, 52, 54, 56; sau 57 thì 58, 59.
