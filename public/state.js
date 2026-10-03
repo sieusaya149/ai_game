@@ -408,7 +408,7 @@ export function awaySummary(events, frozenMs = 0) {
   }
   const eggs = events.filter(e => e.type === 'egg').length;
   if (eggs) out.push(`${eggs} quả trứng mới`);
-  for (const [name, n] of count(events, 'hungry')) out.push(`${n} con ${lc(name)} đói lả`);
+  for (const [name, n] of count(events, 'hungry')) out.push(`${n} con ${lc(name)} đang đói`);
   for (const [name, n] of count(events, 'sick')) out.push(`${n} con ${lc(name)} bị bệnh`);
   for (const [name, n] of count(events, 'oldSoon')) out.push(`${n} con ${lc(name)} sắp già 👵`);
   for (const [name, n] of count(events, 'passed')) out.push(`${n} con ${lc(name)} đã già và ra đi thanh thản 😇`);
@@ -936,6 +936,7 @@ function stepAnimals(s, d) {
     if (was < warnAt && a.age >= warnAt) emit({ type: 'oldSoon', animal: def.name, id: a.id });
     if (!ageUp(s, a, a.type, def)) { passAway(s, a, def); continue; }
     const pigNho = a.type === 'heo' && a.stage === 'nho';   // heo nhỡ ăn khỏe, tăng cân nhanh
+    const hungry0 = a.hunger;
     a.hunger = Math.max(0, a.hunger - 100 * d / HUSBANDRY.hungerMs * (pigNho ? AGING.pigHungry : 1));
     // tự ra máng ăn
     const tk = troughKey(s, a);
@@ -947,11 +948,14 @@ function stepAnimals(s, d) {
     if (joy.has(penKey(a))) a.happy = Math.max(a.happy, TRADE.retireHappy);
     // để đói hay dơ lâu thì bớt thân (heo, bò đầm bùn là tính tự nhiên: dơ bùn chỉ tăng nguy cơ bệnh, không bớt thân)
     if (a.hunger <= BOND.hungerBelow || (a.dirty || 0) >= BOND.dirtyAbove && !DIRT.mud.includes(a.type)) bondShift(a, -BOND.lossPerMin * d / MIN);
-    // đói lả -> bệnh
-    if (a.hunger <= 0) { if (!a.starvingSince) { a.starvingSince = s.time; emit({ type: 'hungry', animal: def.name }); } } else a.starvingSince = 0;
+    // báo đói sớm (khi vừa xuống dưới mốc "đang đói", rất lâu trước khi có nguy cơ bệnh); đói lả lâu mới bệnh
+    if (a.hunger < HUSBANDRY.hungryBelow && hungry0 >= HUSBANDRY.hungryBelow) emit({ type: 'hungry', animal: def.name, id: a.id });
+    if (a.hunger <= 0) { if (!a.starvingSince) a.starvingSince = s.time; } else a.starvingSince = 0;
     // nguyên nhân tự mắc: đói lả lâu, dơ, chuồng bẩn, tuổi già (con ❤️4+ ít bệnh hơn); vắc-xin chặn hết
-    if (!a.sick && !vaccinated(s, a) && ((a.starvingSince && s.time - a.starvingSince >= HUSBANDRY.sickAfterStarving)
-      || (neglected(s, a, def) && chance(HUSBANDRY.sickChancePerMin * sickFactor(a) * (isDirty(a) ? DIRT.sickMul : 1) * (penDirty(s, def.pen) ? SICK.dirtyPenMul : 1) * (a.stage === 'gia' ? SICK.oldChanceMul : 1), d)))) fall(s, a, def);
+    if (!a.sick && !vaccinated(s, a)) {
+      const base = neglected(s, a, def) ? HUSBANDRY.sickChancePerMin * (dirtyNeglect(a) ? DIRT.sickMul : 1) * (penDirty(s, def.pen) ? SICK.dirtyPenMul : 1) * (a.stage === 'gia' ? SICK.oldChanceMul : 1) : 0;
+      if (chance((base + starveRisk(s, a)) * sickFactor(a), d)) fall(s, a, def);
+    }
     if (a.hurt && !stepHurt(s, a, d, def)) continue;   // mất vì vết chuột cắn
     if (a.sick && !stepSick(s, a, d, def)) continue;   // mất vì bệnh
     if (grieving(s)) a.happy = Math.min(a.happy, SICK.griefCap);
@@ -990,8 +994,12 @@ const SICK_FLOOR = [0, 0, SICK.toSevere, SICK.toCritical];   // tiến triển t
 export const SICK_NAME = ['Khỏe', 'Mệt', 'Bệnh nặng', 'Nguy kịch'];
 // Thời gian (giờ vườn, đã tính hệ số) còn lại tới khi mất; chỉ có nghĩa ở Nguy kịch (đồng hồ đếm ngược trên đầu)
 export const sickLeft = a => (a.sick >= 3 ? Math.max(0, SICK.deadAt - a.sickMs) : null);
-// Bị bỏ bê: đói, dơ, chuồng bẩn hoặc già. Chỉ lúc đó mới có nguy cơ tự bệnh (ngoài đói lả lâu, luôn bệnh)
-const neglected = (s, a, def) => a.hunger < HUSBANDRY.hungryBelow || isDirty(a) || penDirty(s, def.pen) || a.stage === 'gia';
+// Bỏ đói lả đủ lâu (từ hunger 0) mới là bỏ bê; đói thường (quên cho ăn một lượt) thì chưa
+// Nguy cơ bệnh/phút do đói lả: 0 tới sickRiskAfterStarving, rồi tăng dần tới sickStarveMaxPerMin
+const starveRisk = (s, a) => a.starvingSince ? HUSBANDRY.sickStarveMaxPerMin * Math.max(0, Math.min(1, (s.time - a.starvingSince - HUSBANDRY.sickRiskAfterStarving) / HUSBANDRY.sickStarveRampMs)) : 0;
+// Bị bỏ bê (dơ, chuồng bẩn hoặc già) thì có nguy cơ nền sickChancePerMin; đói lả rất lâu cộng thêm starveRisk
+const dirtyNeglect = a => isDirty(a) && !DIRT.mud.includes(a.type);   // heo, bò tắm bùn là tính tự nhiên, không phải bỏ bê
+const neglected = (s, a, def) => dirtyNeglect(a) || penDirty(s, def.pen) || a.stage === 'gia';
 // Bắt đầu bệnh (Mệt)
 function fall(s, a, def) {
   a.sick = 1; a.sickSince = s.time; a.sickMs = 0; a.dose = 0; a.spreadAcc = 0;
@@ -1946,10 +1954,11 @@ function stepCats(s, d) {
       if (st === 'gia') { toast(`${c.name} già rồi, lười hơn, chỉ bắt chuột khi đói 👵`); log(s, `${c.name} đã già, chỉ bắt chuột khi đói`); }
     }
     c.hunger = Math.max(0, c.hunger - 100 * d / CAT.hungerMs);
+    if (c.hunger <= 0) c.starvingSince ||= s.time; else c.starvingSince = 0;
     if (c.happy > 50) c.happy = Math.max(50, c.happy - CAT.happyDecayPerMin * d / MIN);
     if (c.hunger <= BOND.hungerBelow) bondShift(c, -BOND.lossPerMin * d / MIN);
     // bệnh: mèo cũng mắc bệnh như vật nuôi, nhưng là thú cưng nên không bao giờ nguy kịch, không chết (stepSick)
-    if (!c.sick && !vaccinated(s, c) && (c.hunger < HUSBANDRY.hungryBelow || c.stage === 'gia') && chance(HUSBANDRY.sickChancePerMin * CAT.sickMul * sickFactor(c) * (c.stage === 'gia' ? SICK.oldChanceMul : 1), d)) fall(s, c, def);
+    if (!c.sick && !vaccinated(s, c) && chance(((c.stage === 'gia' ? HUSBANDRY.sickChancePerMin * SICK.oldChanceMul : 0) + starveRisk(s, c)) * CAT.sickMul * sickFactor(c), d)) fall(s, c, def);
     if (c.sick) stepSick(s, c, d, def);
     if (c.trophy && s.time >= c.trophy.until) c.trophy = null;
     // tối đi về cửa mèo trên nhà, chui qua (sau CAT.doorMs) rồi ngủ trong nhà; sáng chui ra lại vườn

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from '../public/state.js';
-import { ANIMALS, SICK, EVENT_LEVEL, levelInfo, stageStart } from '../public/data.js';
+import { ANIMALS, HUSBANDRY, SICK, EVENT_LEVEL, levelInfo, stageStart } from '../public/data.js';
 
 const MIN = 60_000, HOUR = 60 * MIN;
 const store = {};
@@ -58,8 +58,8 @@ test('bệnh đi Mệt → Bệnh nặng → Nguy kịch → Mất đúng mốc 
 test('đói lả lâu thì mắc bệnh; chuồng bẩn và tuổi già dễ bệnh hơn', () => {
   const s = game();
   const a = put(s, 'ga', { hunger: 0, starvingSince: 0 });
-  for (let t = 0; t < 5 * MIN; t += MIN) { a.hunger = 0; withRandom(0.99, () => G.tick(s, MIN)); }
-  assert.equal(a.sick, 1, 'đói lả quá 3 phút là bệnh');
+  for (let t = 0; t < 5; t++) { a.hunger = 0; a.starvingSince = 1; withRandom(0.000001, () => G.tick(s, MIN)); }
+  assert.equal(a.sick, 1, 'đói lả rất lâu thì có nguy cơ, xúi quẩy là bệnh');
   assert.ok(SICK.dirtyPenMul > 1 && SICK.oldChanceMul > 1);
 });
 
@@ -308,7 +308,8 @@ test('hotfix: con vật no, sạch, chuồng sạch thì không bao giờ tự b
     return s.animals.some(x => x.id === a.id && x.sick);
   };
   assert.equal(tryIt('ga', {}), false, 'no, sạch: không bệnh dù xúi quẩy');
-  assert.equal(tryIt('ga', { hunger: 30 }), true, 'đói (dưới 40) thì có nguy cơ');
+  assert.equal(tryIt('ga', { hunger: 30 }), false, 'chỉ đói (dưới 40) chưa phải bỏ bê');
+  assert.equal(tryIt('ga', { hunger: 0, starvingSince: 1 }), true, 'đói lả lâu thì có nguy cơ');
   assert.equal(tryIt('ga', { dirty: 100 }), true, 'dơ thì có nguy cơ');
   assert.equal(tryIt('ga', { stage: 'gia', age: G.stageStart('ga', 'gia') }), true, 'già thì có nguy cơ');
   // chuồng bẩn (phân chưa dọn) cũng có nguy cơ
@@ -316,11 +317,11 @@ test('hotfix: con vật no, sạch, chuồng sạch thì không bao giờ tự b
   s.manure.chicken = 1e6;
   unlucky(() => { for (let i = 0; i < 5; i++) { a.dirty = 0; G.tick(s, MIN); } });
   assert.ok(a.sick > 0, 'chuồng bẩn thì có nguy cơ');
-  // vắc-xin chặn hết, đói lả lâu vẫn bệnh
+  // vắc-xin chặn hết, đói lả rất lâu vẫn bệnh khi không có vắc-xin
   const v = game(8); const b = put(v, 'ga', { hunger: 30, vaccUntil: 1e12 }); for (const k of Object.keys(v.troughs)) v.troughs[k] = 0;
-  unlucky(() => { for (let i = 0; i < 5; i++) { b.hunger = 30; G.tick(v, MIN); } });
+  unlucky(() => { for (let i = 0; i < 5; i++) { b.hunger = 0; b.starvingSince = 1; G.tick(v, MIN); } });
   assert.equal(b.sick, 0);
   const h = game(8); const c = put(h, 'ga', { hunger: 0 });
-  for (let i = 0; i < 5; i++) { c.hunger = 0; withRandom(0.99, () => G.tick(h, MIN)); }
-  assert.ok(c.sick > 0, 'đói lả hơn 3 phút là bệnh');
+  for (let i = 0; i < 3; i++) { c.hunger = 0; c.starvingSince = 1; unlucky(() => G.tick(h, MIN)); }
+  assert.ok(c.sick > 0, 'đói lả rất lâu thì bệnh');
 });
