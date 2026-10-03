@@ -23,14 +23,14 @@ Thời tiết của một ngày tính bằng một **hàm thuần** từ số ng
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): cùng số ngày và hạt giống cho cùng thời tiết; hạt giống khác cho chuỗi khác. Quét nhiều năm game: tần suất bão, sương muối, hạn hán khớp bảng, hạn hán đúng 1 đợt dài 2–3 ngày mỗi Hạ, không có bão mùa Xuân, Đông.
-- [ ] Unit test: hàm báo trước cho ngày mai đúng bằng thời tiết ngày mai thật.
-- [ ] Unit test: hạn hán làm đất khô gấp 2, rơm làm chậm lại; sương muối dừng cây hạt và mầm đúng 1 ngày, cây lớn hơn không bị dừng, ô phủ rơm thì không bị dừng.
-- [ ] Unit test: bão làm đổ bù nhìn, con vật ngoài trời mất vui, con vật trong chuồng thì không. **Duyệt qua mọi loại thời tiết và nhiều ngày: không cây và không con vật nào chết vì thời tiết.**
-- [ ] Unit test: dưới cấp 5 không có thời tiết xấu.
-- [ ] Unit test (seam 3, giao thức server): server chạy bù và trình duyệt chạy bù cùng bản lưu ra cùng thời tiết và cùng kết quả vườn qua một đợt hạn hán.
-- [ ] E2E (desktop + 360px): dựng bản lưu ngày mai có bão → mở radio trong nhà và bảng tin làng thấy báo bão → tua tới ngày bão thấy hiệu ứng và HUD đổi icon. Bù nhìn đổ dựng lại được bằng xu.
-- [ ] E2E: phủ rơm lên ô trong hạn hán, ô khô chậm hơn ô không phủ.
+- [x] Unit test (seam 1): cùng số ngày và hạt giống cho cùng thời tiết; hạt giống khác cho chuỗi khác. Quét nhiều năm game: tần suất bão, sương muối, hạn hán khớp bảng, hạn hán đúng 1 đợt dài 2–3 ngày mỗi Hạ, không có bão mùa Xuân, Đông.
+- [x] Unit test: hàm báo trước cho ngày mai đúng bằng thời tiết ngày mai thật.
+- [x] Unit test: hạn hán làm đất khô gấp 2, rơm làm chậm lại; sương muối dừng cây hạt và mầm đúng 1 ngày, cây lớn hơn không bị dừng, ô phủ rơm thì không bị dừng.
+- [x] Unit test: bão làm đổ bù nhìn, con vật ngoài trời mất vui, con vật trong chuồng thì không. **Duyệt qua mọi loại thời tiết và nhiều ngày: không cây và không con vật nào chết vì thời tiết.**
+- [x] Unit test: dưới cấp 5 không có thời tiết xấu.
+- [x] Unit test (seam 3, giao thức server): server chạy bù và trình duyệt chạy bù cùng bản lưu ra cùng thời tiết và cùng kết quả vườn qua một đợt hạn hán.
+- [x] E2E (desktop + 360px): dựng bản lưu ngày mai có bão → mở radio trong nhà và bảng tin làng thấy báo bão → tua tới ngày bão thấy hiệu ứng và HUD đổi icon. Bù nhìn đổ dựng lại được bằng xu.
+- [x] E2E: phủ rơm lên ô trong hạn hán, ô khô chậm hơn ô không phủ.
 
 ## Blocked by
 

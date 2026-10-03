@@ -5,8 +5,9 @@ import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
+import { WX } from './artw.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul } from './state.js';
+import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, frostHold } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
@@ -352,7 +353,7 @@ export function gateImg(id, s) {
 const spr3 = key => String(key).split('.').reduce((o, k) => o?.[k], SPR3);   // công trình vẽ ở art3 (trạm thú y)
 const PEN_SHORT = { chicken: 'Gà', pig: 'Heo', pasture: 'Bò cừu', quarantine: 'Cách ly' };
 export function buildingImg(b) {
-  if (b.interior) return spr2(b.sprite) ?? spr3(b.sprite) ?? furnFallback(b.sprite);
+  if (b.interior) return spr2(b.sprite) ?? spr3(b.sprite) ?? WX[b.sprite] ?? furnFallback(b.sprite);   // WX: radio, bảng tin làng (issue 55)
   if (b.sprite === 'well') return wellImg();
   if (b.sprite === 'board') return boardImg();
   if (b.sprite === 'doghouse' && SPR3?.doghouse) return SPR3.doghouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.doghouse[0];   // chuồng chó 3 cấp
@@ -498,6 +499,71 @@ const smooth = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a
 export function nightAmount(state) {
   const f = dayFraction(state);
   return Math.min(smooth(NIGHT_FROM - 0.07, NIGHT_FROM + 0.02, f), 1 - smooth(0.93, 1, f));
+}
+
+// ---------- Thời tiết toàn màn (issue 55) ----------
+// Nhẹ: chỉ vài lớp tô màu và số hạt có giới hạn theo `quality` (FPS tụt thì bớt, tiết kiệm pin = 0 hạt, không chớp sét, không gradient).
+// Ảnh toàn màn (cầu vồng, sét, hơi nóng) phóng nguyên lần; lần chẵn thì dùng bản 2x cho đều điểm.
+function screenImg(ctx, img, x, y, k) {
+  const h = k % 2 === 0 && hdOf(img);
+  ctx.drawImage(h || img, Math.round(x), Math.round(y), img.width * k, img.height * k);
+}
+function drawWeather(ctx, f, night, quality) {
+  const { state, width, height, dpr, now, scale } = f, wx = state.weather;
+  const fill = c => { ctx.fillStyle = c; ctx.fillRect(0, 0, width, height); };
+  if (wx === 'rain' || wx === 'storm') {
+    const storm = wx === 'storm';
+    fill(storm ? 'rgba(18,24,54,0.32)' : 'rgba(40,60,100,0.13)');
+    ctx.strokeStyle = storm ? 'rgba(210,230,255,0.6)' : 'rgba(200,228,255,0.55)'; ctx.lineWidth = Math.max(1, Math.round(dpr));
+    const len = (storm ? 20 : 14) * dpr, sp = (storm ? 1100 : 750) * dpr, slant = storm ? 0.45 : 0.22;
+    const n = Math.round(Math.min(storm ? 240 : 160, Math.round(width * height / ((storm ? 6000 : 9000) * dpr * dpr))) * quality);
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const x0 = hash(i, 7) * (width + 160), y0 = hash(i, 11) * height;
+      const y = (y0 + now * 0.001 * sp * (0.8 + hash(i, 3) * 0.4)) % (height + len) - len;
+      const x = x0 - (y + len) * slant;
+      ctx.moveTo(x, y); ctx.lineTo(x - len * slant, y + len);
+    }
+    ctx.stroke();
+    // bão: thỉnh thoảng chớp sét (nhẹ, không chớp liên hồi; tiết kiệm pin thì thôi)
+    if (storm && !f.battery) {
+      const T = 6500, cyc = Math.floor(now / T), ph = now % T;
+      if (ph < 110 || (ph > 210 && ph < 280)) {
+        fill('rgba(255,255,235,0.2)');
+        const k = Math.max(2, Math.round(height * 0.55 / WX.bolt.height / 2) * 2), bx = 0.15 + hash(cyc, 5) * 0.7;
+        screenImg(ctx, WX.bolt, bx * width, 0, k);
+      }
+    }
+  } else if (wx === 'cloud') fill('rgba(70,80,100,0.07)');
+  else if (wx === 'drought') {   // nắng gắt: trời ngả cam, chói góc trên, hơi nóng bốc lên
+    fill(`rgba(255,128,30,${(0.17 * (1 - night)).toFixed(3)})`);
+    if (!f.battery && night < 0.5) {
+      const g = ctx.createRadialGradient(width * 0.88, 0, 0, width * 0.88, 0, Math.max(width, height) * 0.55);
+      g.addColorStop(0, 'rgba(255,240,180,0.55)'); g.addColorStop(0.35, 'rgba(255,220,140,0.22)'); g.addColorStop(1, 'rgba(255,220,140,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, width, height);
+    }
+    const n = Math.round(14 * quality * (1 - night)), k = Math.max(2, Math.round(scale / 2) * 2);
+    for (let i = 0; i < n; i++) {
+      const life = 3200, t = (now + hash(i, 9) * life) % life / life;
+      ctx.globalAlpha = Math.sin(t * Math.PI) * 0.8;
+      screenImg(ctx, WX.heat, hash(i, 4) * width, height * (0.35 + hash(i, 6) * 0.6) - t * 40 * dpr, k);
+    }
+    ctx.globalAlpha = 1;
+  } else if (wx === 'frost') {   // sương muối: sáng sớm trắng xanh, hạt băng lấp lánh rơi chậm
+    const frac = dayFraction(state), morning = 1 - Math.min(1, Math.max(0, (frac - 0.12) / 0.3));
+    fill(`rgba(200,228,255,${(0.08 + 0.2 * morning).toFixed(3)})`);
+    const n = Math.round(26 * quality), sz = Math.max(2, Math.round(dpr * 2));
+    for (let i = 0; i < n; i++) {
+      const x = (hash(i, 2) * width + Math.sin(now / 1400 + i) * 12 * dpr), y = (hash(i, 8) * height + now * 0.02 * dpr * (0.6 + hash(i, 1))) % height;
+      ctx.fillStyle = i % 3 ? 'rgba(255,255,255,0.75)' : 'rgba(191,227,255,0.85)';
+      ctx.fillRect(Math.round(x), Math.round(y), sz, sz);
+    }
+  } else if (wx === 'rainbow' && night < 0.6) {   // cầu vồng vắt ngang trời
+    const k0 = Math.max(1, Math.ceil(width * 1.05 / WX.rainbow.width)), k = k0 > 1 ? k0 + (k0 % 2) : 1;   // vắt qua cả màn, lần chẵn cho đều điểm
+    ctx.globalAlpha = 0.3 * (1 - night);
+    screenImg(ctx, WX.rainbow, (width - WX.rainbow.width * k) / 2, height * 0.1, k);
+    ctx.globalAlpha = 1;
+  }
 }
 
 // ---------- Ô ruộng ----------
@@ -683,7 +749,11 @@ export function render(ctx, f) {
         rect(ctx, '#3b2412', px + 6, py + 4, 5, 4); rect(ctx, '#b8b8b8', px + 7, py + 5, 3, 3);
         rect(ctx, '#f7d547', px + 6, py + 8, 5, 4); rect(ctx, '#3b2412', px + 8, py + 9, 1, 2);
       }
-    } else blit(soilImg(p), px, py);
+    } else {
+      blit(soilImg(p), px, py);
+      if (p.soil === 'tilled' && p.water <= 0 && state.weather === 'drought') blit(WX.crack, px, py);   // hạn hán: đất khô nứt nẻ
+      if (p.mulch) blit(WX.mulch, px, py);   // rơm phủ (issue 55)
+    }
   }
 
   // 2) bóng dưới chân
@@ -782,6 +852,7 @@ export function render(ctx, f) {
           }
         }
         if (p.crop.fert) rect(ctx, '#f7d547', px + 1, py + 14, 2, 1);
+        if (frostHold(state, p)) blit(WX.frostBite, px, py);   // sương muối bám cây hạt / mầm: vẽ chồng lên hình riêng của cây
         // trái mùa: lớn chậm (issue 54). Chờ art Opus, tạm emoji ốc sên
         if (p.crop.progress < 1 && !p.crop.dead && !p.crop.rotten && seasonGrowMul(state, p.crop.id) < 1) { ctx.font = '6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🐌', px + 13, py + 6); }
       }
@@ -830,7 +901,7 @@ export function render(ctx, f) {
     if (!vis(d.x, d.y)) continue;
     if (d.kind === 'deco_lowfence') { const fe = lowFenceAt(m, d.ent); add(d.y, () => blit(fe, d.ent.c * TS, d.ent.r * TS)); continue; }   // hàng rào thấp: vẽ theo ô, ngang hay dọc tùy hàng xóm
     if (d.kind === 'deco_rattrap') { const tp = trapImg(d.ent); add(d.y, () => blit(tp, d.x - tp.width / 2, d.y - tp.height + 1)); continue; }   // bẫy chuột: gài / đã sập
-    const im = decoImg(d.kind);
+    const im = d.kind === 'deco_scarecrow' && d.ent?.down ? WX.scarecrowDown : decoImg(d.kind);   // bù nhìn bị bão quật đổ (issue 55)
     add(d.y, () => blit(im, d.x - im.width / 2, d.y - im.height + 1));
   }
 
@@ -1145,21 +1216,7 @@ export function render(ctx, f) {
     ctx.globalCompositeOperation = 'source-over';
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (!indoor && state.weather === 'rain') {   // trong nhà: không thấy mưa, mây
-    ctx.fillStyle = 'rgba(40,60,100,0.13)'; ctx.fillRect(0, 0, width, height);
-    ctx.strokeStyle = 'rgba(200,228,255,0.55)'; ctx.lineWidth = Math.max(1, Math.round(dpr));
-    const len = 14 * dpr, sp = 750 * dpr, n = Math.round(Math.min(160, Math.round(width * height / (9000 * dpr * dpr))) * quality);
-    ctx.beginPath();
-    for (let i = 0; i < n; i++) {
-      const x0 = hash(i, 7) * (width + 100), y0 = hash(i, 11) * height;
-      const y = (y0 + now * 0.001 * sp * (0.8 + hash(i, 3) * 0.4)) % (height + len) - len;
-      const x = x0 - (y + len) * 0.22;
-      ctx.moveTo(x, y); ctx.lineTo(x - len * 0.22, y + len);
-    }
-    ctx.stroke();
-  } else if (!indoor && state.weather === 'cloud') {
-    ctx.fillStyle = 'rgba(70,80,100,0.07)'; ctx.fillRect(0, 0, width, height);
-  }
+  if (!indoor) drawWeather(ctx, f, night, quality);   // trong nhà: không thấy trời (issue 55)
 
   // 6) chữ (tọa độ màn hình)
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';

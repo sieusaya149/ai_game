@@ -97,6 +97,7 @@ export const SCENES = {
       { kind: 'table', name: 'Bàn', sprite: 'table', foot: { c: 4, r: 5, w: 2, h: 1 }, spr: { x: 0, y: -4 }, at: null },
       { kind: 'plant', name: 'Chậu cây', sprite: 'pottedPlant', foot: { c: 10, r: 8, w: 1, h: 1 }, spr: { x: 0, y: -8 }, at: null },
       { kind: 'phone', name: 'Điện thoại', sprite: 'phone', foot: { c: 4, r: 2, w: 1, h: 1 }, spr: { x: 0, y: -14 }, at: { x: 8, y: 26 } },
+      { kind: 'radio', name: 'Radio', sprite: 'radio', foot: { c: 8, r: 2, w: 1, h: 1 }, spr: { x: 0, y: -8 }, at: { x: 8, y: 26 } },   // nghe đài báo thời tiết ngày mai (issue 55)
     ],
     props: [
       { sprite: 'window', x: 64, y: 6 }, { sprite: 'window', x: 128, y: 6 },
@@ -131,6 +132,7 @@ export const SCENES = {
         npc: { key: 'npcChuBa', x: 24, y: 52 } },   // lái buôn Chú Ba đứng trước nhà
       { kind: 'friendGate', name: 'Cổng bạn bè', sprite: 'friendGate', foot: { c: 29, r: 21, w: 3, h: 1 }, spr: { x: 4, y: -20 }, at: { x: 24, y: 28 }, sub: 'Đăng nhập để thăm bạn bè' },
       ...[[8, 13], [16, 13], [22, 13], [28, 13], [35, 13]].map(([c, r], i) => ({ kind: 'lamp' + i, name: 'Đèn đường', sprite: 'lampPost', foot: { c, r, w: 1, h: 1 }, spr: { x: 2, y: -14 }, at: null })),
+      { kind: 'newsboard', name: 'Bảng tin làng', sprite: 'newsBoard', foot: { c: 18, r: 13, w: 2, h: 1 }, spr: { x: 0, y: -16 }, at: { x: 16, y: -6 }, label: 'Bảng tin' },   // tờ báo thời tiết ngày mai (issue 55)
       ...[[11, 14], [23, 14]].map(([c, r], i) => ({ kind: 'bench' + i, name: 'Ghế đá', sprite: 'bench', foot: { c, r, w: 2, h: 1 }, spr: { x: 4, y: 2 }, at: { x: 16, y: 26 } })),
     ],
     props: [],

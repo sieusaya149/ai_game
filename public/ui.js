@@ -12,6 +12,7 @@ import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
 import * as net from './net.js';
 import { hdOf, charFrames } from './hd.js';
+import { WX, PAPER_BOX } from './artw.js';
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -381,7 +382,6 @@ function drawAvatar(look) {
     lastAvatar = key;
   } catch { /* chờ art */ }
 }
-const WEATHER = { sun: '☀️', cloud: '⛅', rain: '🌧️' };
 
 export function renderHUD(s) {
   if (!s || !api) return;
@@ -425,7 +425,16 @@ export function renderHUD(s) {
   $('hud-clock').title = `Mùa ${se.name}, ngày ${se.dayIn}/7`;
   let night = false;
   try { night = S.isNight(s); } catch {}
-  setText('hud-weather', (night ? '🌙' : '') + (night && s.weather !== 'rain' ? '' : WEATHER[s.weather] || '☀️'));
+  // thời tiết hôm nay (issue 55): icon pixel riêng từng loại trời; đêm không mưa bão thì trăng
+  const wk = D.WEATHER.kinds[s.weather] ? s.weather : 'sun', moon = night && !S.isWet(wk), wkey = moon ? 'moon' : wk;
+  if (memo.get('hud-wx') !== wkey + night) {
+    memo.set('hud-wx', wkey + night);
+    const wb = $('hud-weather');
+    wb.dataset.kind = wk; wb.title = D.WEATHER.kinds[wk].name;
+    setText('hud-weather-t', (night ? '🌙' : '') + (moon ? '' : D.WEATHER.kinds[wk].icon));
+    const ic = hd(WX.icon[wkey]), cv = $('hud-weather-ico'), cx = cv.getContext('2d');
+    cv.width = ic.width; cv.height = ic.height; cx.drawImage(ic, 0, 0);
+  }
   setText('hud-can', `${s.can}/${S.canMax(s)}`);
   setText('hud-basket-n', `${S.basketCount(s)}/${S.basketCap(s)}`);
   $('hud-basket').classList.toggle('full', S.basketCount(s) >= S.basketCap(s));
@@ -843,6 +852,46 @@ PANELS.phone = {
         right: [coinTag(D.SICK.vetPrice), btn('Gọi bác sĩ', () => res(S.callVet(st(), a.id), 'coin'), 'green', { disabled: s.coins < D.SICK.vetPrice })],
       }));
     }
+  },
+};
+
+// ---------- Thời tiết: radio trong nhà, bảng tin làng (issue 55) ----------
+// Cả hai chỉ gọi luật S.forecast (hàm thuần của lịch game + hạt giống), nên báo đúng trời ngày mai thật.
+function wxIcon(kind, px) {
+  const im = hd(WX.icon[kind] ?? WX.icon.sun), c = h('canvas', { class: 'wx-ico', width: im.width, height: im.height });
+  c.getContext('2d').drawImage(im, 0, 0);
+  c.style.width = c.style.height = px + 'px';
+  return c;
+}
+const wxName = k => D.WEATHER.kinds[k]?.name ?? k;
+function wxLines(body, s) {
+  const today = s.weather, next = S.forecast(s), bad = D.WEATHER.bad.includes(next);
+  body.append(h('div', { class: 'wx-day' + (bad ? ' bad' : ''), id: 'wx-tomorrow', 'data-kind': next },
+    wxIcon(next, 36),
+    h('div', {}, h('b', {}, `Ngày mai (ngày ${S.dayOf(s) + 1}): ${wxName(next)}`), h('small', {}, D.WEATHER.kinds[next]?.tip ?? ''))));
+  body.append(h('div', { class: 'wx-day today', id: 'wx-today', 'data-kind': today }, wxIcon(today, 24), h('div', {}, h('b', {}, `Hôm nay: ${wxName(today)}`))));
+  if (!S.weatherActive(s)) body.append(h('div', { class: 'note' }, `Dưới cấp ${D.WEATHER.minLevel} trời còn hiền: chưa có bão, hạn hán hay sương muối.`));
+  else body.append(h('div', { class: 'note' }, 'Bão quật đổ bù nhìn, con vật ngoài trời mất vui · hạn hán đất khô gấp đôi · sương muối làm cây hạt, cây mầm đứng yên một ngày. Phủ rơm (mua ở chợ) giữ ẩm và chống sương. Thời tiết không bao giờ làm chết cây hay con vật.'));
+}
+PANELS.radio = {
+  title: '📻 Radio',
+  render(body, s) {
+    body.append(h('div', { class: 'note' }, '“Alô alô, đây là đài phát thanh xã, xin đọc bản tin thời tiết…”'));
+    wxLines(body, s);
+  },
+};
+PANELS.newsboard = {
+  title: '📰 Bảng tin làng',
+  render(body, s) {
+    // tờ báo thời tiết dán trên bảng: ô hình vẽ icon trời ngày mai
+    const pp = hd(WX.paper), k = pp.width / WX.paper.width, c = h('canvas', { class: 'wx-paper', width: pp.width, height: pp.height }), g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(pp, 0, 0);
+    const ic = hd(WX.icon[S.forecast(s)] ?? WX.icon.sun), B = PAPER_BOX;
+    g.drawImage(ic, (B.x + (B.w - 12) / 2) * k, (B.y + (B.h - 12) / 2) * k, 12 * k, 12 * k);
+    c.style.width = WX.paper.width * 4 + 'px';
+    body.append(h('div', { class: 'wx-paper-wrap' }, c));
+    wxLines(body, s);
   },
 };
 

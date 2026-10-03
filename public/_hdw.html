@@ -1,0 +1,43 @@
+<!doctype html><meta charset="utf-8"><title>HD thời tiết</title>
+<style>
+  body { margin: 0; padding: 8px; background: #3a5a2a; font: 11px sans-serif; color: #fff; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+  .pair { display: flex; gap: 3px; align-items: flex-end; background: rgba(0,0,0,0.18); padding: 3px; }
+  .cell { display: flex; flex-direction: column; gap: 1px; }
+  .cell span { font-size: 9px; color: #ffe9a8; }
+  .soil { background: #8a6a3c; }
+  canvas { image-rendering: pixelated; }
+  #bad { color: #ffb0a0; font-weight: bold; }
+</style>
+<body>
+<div id="bad"></div>
+<div id="root" class="row"></div>
+<script type="module">
+// Trang xem art thời tiết (issue 55): bộ thường (Cũ, phóng ×Z) cạnh bản 2x (Mới, phóng ×Z/2), cùng cỡ trên màn hình
+import { WX, wxPairs } from './artw.js';
+import { hdOf } from './hd.js';
+const Z = Number(new URLSearchParams(location.search).get('z') || 4);
+const isImg = v => v instanceof HTMLCanvasElement;
+const cv = (img, z, bg) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); if (bg) { g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); } g.drawImage(img, 0, 0); c.style.width = img.width * z + 'px'; c.style.height = img.height * z + 'px'; return c; };
+const cell = (img, label, z, bg) => { const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span'); s.textContent = label; d.append(s, cv(img, z, bg)); return d; };
+const bad = [];
+const BG = { mulch: '#7a5a34', frostBite: '#5d4a30', crack: '#b08a5a', rainbow: '#7fb8e8', bolt: '#2c3044', heat: '#7fb8e8', icon: '#f3ead2' };
+function walk(v, path, bg) {
+  if (isImg(v)) {
+    const h = hdOf(v);
+    if (!h) { bad.push(`${path}: chưa nối bản 2x`); return; }
+    if (h.width !== v.width * 2 || h.height !== v.height * 2) bad.push(`${path}: ${h.width}x${h.height} ≠ 2×${v.width}x${v.height}`);
+    const p = document.createElement('div'); p.className = 'pair';
+    p.append(cell(v, `Cũ ${path} ${v.width}x${v.height}`, Z, bg), cell(h, `Mới ${h.width}x${h.height}`, Z / 2, bg));
+    document.getElementById('root').append(p);
+    return;
+  }
+  for (const k in v) walk(v[k], `${path}.${k}`, bg ?? BG[k]);
+}
+walk(WX, 'WX');
+const pairs = wxPairs();
+for (const p of pairs) if (p.w2 !== p.w * 2 || p.h2 !== p.h * 2) bad.push(`cặp ${p.w}x${p.h} → ${p.w2}x${p.h2}`);
+document.getElementById('bad').textContent = bad.length ? bad.join(' · ') : `Đủ ${pairs.length} cặp, đều đúng 2×`;
+window.__wx = { pairs: pairs.length, bad };
+window.__ready = true;
+</script>

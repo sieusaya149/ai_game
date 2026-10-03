@@ -15,6 +15,9 @@ export function realDay(t = now()) {
 // Online: đo độ lệch giờ máy so với server rồi trỏ now() sang giờ server; chơi đơn không gọi gì.
 export const VILLAGE_EPOCH = Date.UTC(2026, 0, 1);   // mốc chung của cả làng: 0h giờ UTC là 6:00 sáng ngày 1
 export const REAL_TZ_MS = 7 * 3600_000;              // "ngày ngoài đời" tính theo giờ Việt Nam (UTC+7)
+// Hạt giống thời tiết của làng (ADR 0014, issue 55): server và mọi trình duyệt dùng chung module này, nên cả làng cùng một trời.
+// Đổi số này là đổi thời tiết cả quá khứ lẫn tương lai của làng (chỉ ảnh hưởng chạy bù sau lần đổi).
+export const VILLAGE_SEED = 20260101;
 
 // Lịch làng: hàm thuần của giờ server t → { day: ngày game (từ 1), tod: ms trong ngày game, frac: 0..1 }
 export function villageCal(t) {
