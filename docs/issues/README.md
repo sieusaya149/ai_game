@@ -93,7 +93,7 @@ Nguồn: [PRD 0004](../prd/0004-phase-3-cay-va-nuoc.md).
 | 54 | [Mùa có tác dụng](54-mua-co-tac-dung.md) | 50 | ✅ |
 | 55 | [Thời tiết xấu](55-thoi-tiet-xau.md) | 54 | ✅ |
 | 56 | [Giếng 4 cấp](56-gieng-4-cap.md) | 50 | ✅ |
-| 57 | [Bồn và mạng nước](57-bon-va-mang-nuoc.md) | 56 | ⬜ |
+| 57 | [Bồn và mạng nước](57-bon-va-mang-nuoc.md) | 56 | ✅ |
 | 58 | [Tự động hóa theo khối ruộng](58-tu-dong-hoa-khoi-ruong.md) | 57 | ⬜ |
 | 59 | [Vòi sen cho chuồng](59-voi-sen-chuong.md) | 57 | ⬜ |
 | 60 | [Nhà kính](60-nha-kinh.md) | 54, 55 | ⬜ |
