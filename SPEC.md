@@ -53,6 +53,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 - `state.time`: thời gian game (ms), tăng mỗi khung hình thêm `dtReal * state.speed` (speed ∈ `SPEEDS` = 1, 5, 20). Nút tốc độ chỉ có khi chơi một mình; online luôn x1 (`speedOf(state)`; `loadGame` ép `speed = 1`; `checkSaveJump` coi vườn online là x1).
 - Mọi bộ đếm giờ trong luật chơi dùng `state.time`, **không dùng `Date.now()`**. Chỗ cần giờ ngoài đời (`savedAt`, chạy bù) dùng `now()` của `clock.js`.
 - Ngày: `DAY_MS` = 20 phút. `dayFraction = (time % DAY_MS) / DAY_MS`. Ban đêm khi `dayFraction >= NIGHT_FROM` (0.75 = 0h, lúc màn hình tối nhất). Giờ hiển thị: `6:00 + dayFraction × 24h`. Ngày 1 bắt đầu lúc 6:00 sáng.
+- **Độ tối màn hình:** `nightAmount(state)` (state.js, `render.js` dùng lại) đọc cùng `dayFraction` với đồng hồ HUD: 0 ban ngày, tối dần từ 18h (`FREE.duskAt`, chữ "tối") tới tối hẳn lúc 21h, giữ tới 5h rồi sáng dần tới 6h; vườn, làng, trong nhà, đi thăm vườn người khác, online hay chơi đơn đều như nhau. Đèn lồng (`deco_lamp`), đèn đường trong làng và cửa sổ nhà phát sáng (gradient tròn cộng sáng) lên lớp tối này; tắt khi tiết kiệm pin.
 - **Chạng vạng** `isDusk(state)`: `dayFraction >= FREE.duskAt` (0.5 = **18h**). Mốc gà vịt thôi thả rông mà về chuồng (issue 42); đừng nhầm với `isNight` (nửa đêm).
 - Thời tiết đổi mỗi ngày mới: `sun` 45% · `cloud` 30% · `rain` 25%. Mưa: mọi ô luôn đủ nước. Nắng: đất khô nhanh gấp 1.5 lần.
 - **Mùa** (chỉ hiển thị ở Phase 0): mỗi mùa 7 ngày game, Xuân, Hạ, Thu, Đông. `seasonOf(state)`.
