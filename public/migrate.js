@@ -107,6 +107,7 @@ export function fillSave(s) {
   for (const e of s.farm?.ents ?? []) {
     if (e.kind === 'well') e.lv ??= 1;
     if (e.kind === 'field') e.up = { ...fieldUpgrades(), ...e.up };
+    if (e.kind === 'compost') { e.pile = isObj(e.pile) ? e.pile : {}; e.readyAt = Number.isFinite(e.readyAt) ? e.readyAt : 0; }   // hố ủ phân (issue 61)
   }
   for (const p of s.plots ?? []) {
     p.mulch ??= false;

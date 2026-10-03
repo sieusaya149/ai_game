@@ -1,0 +1,59 @@
+<!doctype html><meta charset="utf-8"><title>HD61</title>
+<style>
+  body { margin: 0; padding: 8px; background: #4a7a32; font: 11px sans-serif; color: #fff; width: 1180px; }
+  h2 { margin: 10px 0 4px; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+  .pair { display: flex; gap: 3px; align-items: flex-end; background: rgba(0,0,0,0.18); padding: 3px; }
+  .cell { display: flex; flex-direction: column; gap: 1px; }
+  .cell span { font-size: 9px; color: #ffe9a8; }
+  canvas { image-rendering: pixelated; }
+  #bad { font-weight: bold; }
+</style>
+<body>
+<div id="bad"></div>
+<div id="root"></div>
+<script type="module">
+// Trang xem art issue 61 (hố ủ phân): Cũ = bản thường cạnh Mới = bản 2x cùng cỡ trên màn hình, kiểm cỡ 2× và nối hd.js;
+// thêm hố trên nền cỏ ở cỡ chơi (×3) với hơi bốc lên và dấu "đã xong".
+import { SPR61_OLD, SPR61 } from './art61.js';
+import { hdOf } from './hd.js';
+const isImg = v => v instanceof HTMLCanvasElement;
+const root = document.getElementById('root');
+const cv = (img, z) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); c.style.width = img.width * z + 'px'; c.style.height = img.height * z + 'px'; return c; };
+const cell = (img, label, z) => { const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span'); s.textContent = label; d.append(s, cv(img, z)); return d; };
+const sec = t => { const h = document.createElement('h2'); h.textContent = t; const r = document.createElement('div'); r.className = 'row'; root.append(h, r); return r; };
+const bad = [], ok = [];
+const NAME = { 'compost.0': 'rỗng', 'compost.1': 'đang bỏ đồ', 'compost.2': 'đang ủ', 'compost.3': 'đã xong' };
+const pairs = sec('Cũ = bản thường (×6) · Mới = bản 2x (×3), cùng cỡ trên màn hình');
+(function walk(o, n, path) {
+  if (isImg(o) || isImg(n)) {
+    if (n.width !== o.width * 2 || n.height !== o.height * 2) bad.push(`${path}: ${o.width}x${o.height} → ${n.width}x${n.height}`);
+    else if (hdOf(o) !== n) bad.push(`${path}: hd.js chưa nối`);
+    else ok.push(path);
+    const p = document.createElement('div'); p.className = 'pair';
+    const short = path.replace('SPR61.', '');
+    p.append(cell(o, `Cũ ${short} ${NAME[short] ?? ''} ${o.width}x${o.height}`, 6), cell(n, `Mới ${n.width}x${n.height}`, 3)); pairs.append(p);
+    return;
+  }
+  for (const k of Object.keys(n)) walk(o?.[k], n[k], `${path}.${k}`);
+})(SPR61_OLD, SPR61, 'SPR61');
+document.getElementById('bad').textContent = bad.length ? 'SAI: ' + bad.join(' | ') : `Kiểm cỡ + nối hd.js: ${ok.length} sprite đều đúng 2×`;
+window.__check = { ok: ok.length, bad };
+
+// Hố trên nền cỏ ở cỡ chơi: 4 trạng thái, đang ủ có hơi, đã xong có bao phân nhún (bản thường | bản 2x, ×3)
+const scene = sec('Trong vườn (×3): rỗng · đang bỏ đồ · đang ủ (hơi) · đã xong (dấu) — trái bản thường, phải bản 2x');
+for (const k of [1, 2]) {
+  const S = k === 2 ? SPR61 : SPR61_OLD, c = document.createElement('canvas');
+  c.width = 4 * 40 * k; c.height = 40 * k; c.style.width = 4 * 40 * 3 + 'px'; c.style.height = 40 * 3 + 'px';
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  x.fillStyle = '#5fa83a'; x.fillRect(0, 0, c.width, c.height);
+  for (let i = 0; i < 400; i++) { x.fillStyle = i % 2 ? '#4f9430' : '#73bb4a'; x.fillRect((i * 37) % c.width, (i * 53) % c.height, k, k); }
+  for (let s = 0; s < 4; s++) {
+    const ox = (s * 40 + 4) * k, oy = 12 * k;
+    x.drawImage(S.compost[s], ox, oy);
+    if (s === 2) { x.drawImage(S.compostSteam[0], ox + 6 * k, oy - 9 * k); x.drawImage(S.compostSteam[2], ox + 14 * k, oy - 10 * k); }
+    if (s === 3) x.drawImage(S.compostDone, ox + 10 * k, oy - 13 * k);
+  }
+  scene.append(c);
+}
+</script>

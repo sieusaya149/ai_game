@@ -7,11 +7,12 @@ import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
 import { WELLS } from './artwell.js';
 import { SPR52_OLD } from './art52.js';   // sao trên ô ruộng (issue 52)
+import { SPR61_OLD } from './art61.js';   // hố ủ phân (issue 61)
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul } from './state.js';
-import { cropStar } from './state.js';
+import { cropStar, compostInfo } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
-import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
+import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS, COMPOST } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
 
@@ -360,7 +361,14 @@ export function buildingImg(b) {
   if (b.sprite === 'board') return boardImg();
   if (b.sprite === 'doghouse' && SPR3?.doghouse) return SPR3.doghouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.doghouse[0];   // chuồng chó 3 cấp
   if (b.sprite === 'cathouse' && SPR3?.cathouse) return SPR3.cathouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.cathouse[0];   // nhà mèo 3 cấp
+  if (b.sprite === 'compost') return SPR61_OLD.compost?.[0] ?? null;   // cỡ hố ủ (hình theo trạng thái: compostImg)
   return SPR[b.sprite] ?? SPR2?.[b.sprite] ?? null;
+}
+// Hố ủ phân (issue 61): hình theo trạng thái rỗng / đang bỏ đồ / đang ủ / đã xong
+const COMPOST_IMG = { empty: 0, filling: 1, composting: 2, ready: 3 };
+export function compostImg(s) {
+  const i = compostInfo(s);
+  return SPR61_OLD.compost?.[COMPOST_IMG[i?.state] ?? 0] ?? null;
 }
 export function decoSize(kind) { const i = decoImg(kind); return { w: i.width, h: i.height }; }
 
@@ -587,6 +595,8 @@ function drawBuild(ctx, state, m, b, now) {
   if (ni) put(ctx, ni, Math.round(g.c * TS + 8 - ni.width / 2), Math.round(g.r * TS + 13 - ni.height));
   const ci = g.what?.kind === 'cathouse' && SPR3?.cathouse?.[0];   // nhà mèo mới xây
   if (ci) put(ctx, ci, g.c * TS - 5, g.r * TS - 8);
+  const cp = g.what?.kind === 'compost' && SPR61_OLD.compost?.[0];   // hố ủ phân mới xây
+  if (cp) put(ctx, cp, g.c * TS, g.r * TS - 8);
   ctx.globalAlpha = 1;
 }
 
@@ -721,7 +731,8 @@ export function render(ctx, f) {
   for (const b of m.buildings) {
     // đang ngủ: giường có người nằm; hộp quà / sổ lưu bút ở cổng đổi sprite theo trạng thái
     const img = b.id === 'bed' && wd.sleeping && SPR2?.bedSleep ? SPR2.bedSleep
-      : (b.id === 'giftbox' || b.id === 'guestbook') ? (gateImg(b.id, state) ?? buildingImg(b)) : buildingImg(b);
+      : (b.id === 'giftbox' || b.id === 'guestbook') ? (gateImg(b.id, state) ?? buildingImg(b))
+      : b.id === 'compost' ? compostImg(state) : buildingImg(b);
     if (!img || !vis(b.x + img.width / 2, b.y + img.height / 2, Math.max(img.width, img.height) / 2)) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
     if (b.npc) {   // người đứng cạnh công trình (Bà Tư), thở nhẹ hai nhịp
@@ -729,6 +740,18 @@ export function render(ctx, f) {
       if (im) add(b.npc.y, () => blit(im, b.npc.x - 8, b.npc.y - 24));
     }
     if (b.id === 'market' && SPR2?.marketClosed && !marketOpen(state)) add((b.foot.r + b.foot.h) * TS + 0.5, () => blit(SPR2.marketClosed, b.x + 12, b.y + 22));
+    if (b.id === 'compost') {   // đang ủ: hơi bốc lên + vạch tiến độ; đã xong: bao phân bón nhún nhảy trên hố
+      const ci = compostInfo(state), y0 = (b.foot.r + b.foot.h) * TS + 0.5;
+      if (ci?.state === 'composting') add(y0, () => {
+        const st = SPR61_OLD.compostSteam, k = Math.floor(now / 260) % 3;
+        if (st) { blit(st[k], b.x + 3, b.y - 10); blit(st[(k + 1) % 3], b.x + 13, b.y - 11); }
+        const w = 22, done = Math.max(0, Math.min(1, 1 - ci.left / COMPOST.ms));
+        rect(ctx, '#3b2412', b.x + 5, b.y - 3, w + 2, 3); rect(ctx, '#6b4a2a', b.x + 6, b.y - 2, w, 1);
+        rect(ctx, '#7fc858', b.x + 6, b.y - 2, Math.max(1, Math.round(w * done)), 1);
+      });
+      const dn = ci?.state === 'ready' && SPR61_OLD.compostDone;
+      if (dn) add(y0, () => blit(dn, b.x + 21, b.y - 12 + Math.round(Math.sin(now / 260) * 1.5)));   // lệch phải: mũi tên chọn đích nằm giữa hố
+    }
     if (b.id === 'doghouse' && farm && state.dog?.chained) {   // sợi xích buộc ở chuồng (issue 31)
       const ch = SPR2?.dogChain;
       add((b.foot.r + b.foot.h) * TS + 0.5, () => {
