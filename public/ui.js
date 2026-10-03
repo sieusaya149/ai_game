@@ -1012,7 +1012,7 @@ const GUIDE = [
       'Khay phía dưới có khối ruộng, chuồng và đồ trang trí đã mua.'] },
   { title: 'Mở đất', art: () => [spr().bushes?.[0], spr().rocks?.[0], spr().stump],
     text: ['Dải đất mới mua ở mép vườn có bụi cây và đá. Đứng gần rồi bấm dọn là được gỗ, đá.',
-      `Dọn bụi tốn ${D.STAMINA.cost.clearBush} thể lực, đập đá tốn ${D.STAMINA.cost.breakRock}. Dọn xong đặt ruộng, chuồng ở 🔨 Xây dựng.`] },
+      `Dọn bụi tốn ${D.STAMINA.cost.clearBush} thể lực, đập đá tốn ${D.STAMINA.cost.breakRock}, chặt cây chắn đường tốn ${D.STAMINA.cost.chopTree} (được gỗ). Dọn xong đặt ruộng, chuồng ở 🔨 Xây dựng.`] },
   { title: 'Thùng giao hàng', art: () => [spr().shippingBin],
     text: ['Thùng nằm cạnh nhà kho. Bỏ nông sản và sản phẩm vào thùng cho tiện, không phải ra chợ.',
       `6h sáng lái buôn lấy hết và trả ${Math.round(D.SHIP_RATE * 100)}% giá chợ. Trước giờ đó vẫn lấy lại được.`] },

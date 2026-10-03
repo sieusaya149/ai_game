@@ -158,3 +158,42 @@ test('chuyển từ v1: cả vùng 34x27 cũ là đất đã mua, nằm giữa b
   assert.equal(m.isOwned(o.c + 33, o.r + 26), true);
   assert.equal(m.isOwned(o.c - 1, o.r), false);
 });
+
+// ---------- Chặt cây chắn đường (hotfix) ----------
+const treeOf = s => s.farm.ents.find(e => e.kind === 'tree');
+
+test('chặt cây trong vườn: được gỗ, tốn thể lực, ô hết chắn đường', () => {
+  const s = game(), t = treeOf(s);
+  assert.equal(G.mapOf(s).isSolid(t.c, t.r), true);
+  const acts = G.actionsFor(s, { kind: 'clutter', id: t.id });
+  assert.equal(acts.length, 1);
+  const st = s.stamina, w0 = G.haveItem(s, 'wood');
+  assert.equal(G.perform(s, { kind: 'clutter', id: t.id }, acts[0].id).ok, true);
+  assert.ok(G.haveItem(s, 'wood') > w0);
+  assert.equal(st - s.stamina, STAMINA.cost.chopTree);
+  assert.equal(s.farm.ents.some(e => e.id === t.id), false);
+  assert.equal(G.mapOf(s).isSolid(t.c, t.r), false);
+});
+
+test('cây đã chặt không mọc lại sau khi lưu rồi nạp', () => {
+  const s = game(), t = treeOf(s), n = s.farm.ents.filter(e => e.kind === 'tree').length;
+  G.perform(s, { kind: 'clutter', id: t.id }, 'clear');
+  const back = migrate(JSON.parse(JSON.stringify(s)));
+  assert.equal(back.farm.ents.filter(e => e.kind === 'tree').length, n - 1);
+  assert.equal(G.mapOf(back).isSolid(t.c, t.r), false);
+});
+
+test('đi thăm vườn người khác thì không chặt được cây', () => {
+  const host = game(), me = game();
+  const v = G.startVisit(me, structuredClone(host), 'Chủ');
+  const t = treeOf(v);
+  assert.equal(G.actionsFor(v, { kind: 'clutter', id: t.id }).length, 0);
+  assert.equal(G.guestCheck(v, { kind: 'clutter', id: t.id }, 'clear').ok, false);
+  assert.ok(treeOf(v));
+});
+
+test('cây không dời được, đặt công trình lên cây vẫn báo chồng lên', () => {
+  const s = game(); s.inv.deco_flower = 1;
+  const t = treeOf(s);
+  assert.equal(G.canPlace(s, { kind: 'deco', item: 'deco_flower' }, t.c, t.r).reason, 'overlap');
+});

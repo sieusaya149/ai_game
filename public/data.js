@@ -13,7 +13,7 @@ export const DELIVERY = { modes: [{ id: 'now', ms: 0, fee: 0.3 }, { id: 'm1', ms
 // morningRegen: tự hồi mỗi sáng 6h · benchPerMin: ngồi ghế đá hồi mỗi phút · sleepHour: từ giờ này mới ngủ được
 export const STAMINA = {
   max: 100, slow: 2, morningRegen: 30, benchPerMin: 15, sleepHour: 18,
-  cost: { till: 1, water: 1, plant: 1, harvest: 1, clearBush: 2, breakRock: 3, steal: 2 },
+  cost: { till: 1, water: 1, plant: 1, harvest: 1, clearBush: 2, breakRock: 3, chopTree: 4, steal: 2 },
 };
 // Công cụ 3 cấp (sắt/đồng/vàng). area: vùng tác động theo cấp (one = 1 ô · row = hàng 3 ô theo hướng nhìn · block = 3×3 tâm ô mục tiêu)
 // price: xu nâng lên cấp 2, cấp 3 (mất DAY_MS ở tiệm rèn) · act: hành động ruộng dùng công cụ này · canMax: sức chứa bình tưới theo cấp
@@ -431,6 +431,8 @@ export const LAND_STRIPS = [500, 800, 1200, 1700, 2400, 3300, 4500, 6000, 8000, 
 export const DIR_NAME = { N: 'Bắc', S: 'Nam', E: 'Đông', W: 'Tây' };
 // Bụi, đá rải trên dải mới: xác suất mỗi ô (theo băm toạ độ, không ngẫu nhiên). Dọn tay: tốn thể lực STAMINA.cost[cost], được qty món item.
 export const CLUTTER_RATE = { bush: 0.16, rock: 0.09 };
+// Cây trong vườn (cây nền hoặc cây chắn đường): chặt tay, tốn thể lực, cây biến mất ngay (không để gốc)
+export const CHOP = { name: 'Cây', act: 'Chặt cây', icon: '🪓', item: 'wood', qty: 3, cost: 'chopTree' };
 export const CLUTTER = {
   bush: { name: 'Bụi cây', act: 'Dọn bụi', icon: '🌿', item: 'wood',  qty: 2, cost: 'clearBush' },
   rock: { name: 'Tảng đá', act: 'Đập đá', icon: '⛏️', item: 'stone', qty: 2, cost: 'breakRock' },

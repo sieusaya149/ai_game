@@ -735,7 +735,7 @@ export function render(ctx, f) {
   for (const t of [...m.trees, ...m.border]) if (vis(t.x, t.y, 30)) add(t.y, () => blit(SPR.tree, t.x - 16, t.y - 44));
   for (const b of m.bushes) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
   // bụi, đá chưa dọn trên đất mới mua
-  for (const o of m.clutter ?? []) if (vis(o.x, o.y, 20)) add(o.y + TS, () => {
+  for (const o of m.clutter ?? []) if (o.kind !== 'tree' && vis(o.x, o.y, 20)) add(o.y + TS, () => {
     const im = (o.kind === 'bush' ? SPR2?.bushes : SPR2?.rocks)?.[o.v];
     if (im) blit(im, o.x, o.y);
     else if (o.kind === 'bush') blit(SPR.bush, o.x, o.y + 2);
