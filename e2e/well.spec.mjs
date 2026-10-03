@@ -7,7 +7,7 @@ import { WELL } from '../public/data.js';
 // hình giếng đổi (render.buildingImg theo cấp) và nước trong bình giữ nguyên.
 const CAP = [10, 15, 25, 40];
 const save = () => makeSave(s => {
-  s.coins = 20_000; s.can = 0;
+  s.coins = 30_000; s.can = 0;
   const at = mapOf(s).building('well').at;
   Object.assign(s.player, { x: at.x, y: at.y, dir: 3 });
 });

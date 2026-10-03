@@ -95,9 +95,10 @@ test('trái khổng lồ bán ×3 giá một trái thường, nhân thêm hệ s
   s.time = Math.floor(s.time / 86_400_000) * 86_400_000;
   s.basket = { [giantKey('bingo', 3)]: 1, [giantKey('bingo')]: 1 };
   const coins = s.coins;
-  assert.equal(G.sell(s, giantKey('bingo', 3), 1).coins, 360);
-  assert.equal(G.sell(s, giantKey('bingo'), 1).coins, 180);
-  assert.equal(s.coins, coins + 540);
+  const bingo = CROPS.bingo.price * GIANT.priceMul;
+  assert.equal(G.sell(s, giantKey('bingo', 3), 1).coins, bingo * STARS.mul[2]);
+  assert.equal(G.sell(s, giantKey('bingo'), 1).coins, bingo);
+  assert.equal(s.coins, coins + bingo * (1 + STARS.mul[2]));
 });
 
 test('giỏ không đủ chỗ cho cả sản lượng lẫn 5 chỗ trái khổng lồ thì không hái được (như món thường: "Giỏ đầy")', () => {

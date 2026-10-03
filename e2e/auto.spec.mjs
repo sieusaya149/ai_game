@@ -104,7 +104,9 @@ test('mua tưới nhỏ giọt cho một khối: tua thời gian thì ô tự đ
   expect(f.water.every(w => w > 0), `ô đã tưới: ${f.water}`).toBe(true);
   expect(f.level).toBe(3);
   await page.screenshot({ path: `test-results/auto-watered-${name}.png` });
-  // tua 5 phút: đất khô lại, bồn chỉ đủ vài ô rồi cạn: máy ngừng, phần còn lại khô, bồn không âm
+  // đất tụt 1%/phút (cả trăm phút mới khô) nên đặt sẵn 4% nước: sắp khô (dưới ngưỡng tưới), rồi tua 5 phút: bồn chỉ đủ vài ô rồi cạn:
+  // máy ngừng, phần còn lại khô hẳn, bồn không âm
+  await page.evaluate(() => { const s = globalThis.__farm.state; for (const i of s.farm.ents.find(e => e.kind === 'field').plots) s.plots[i].water = 4; });
   await timeWarp(page, 5 * 60_000);
   f = await farm(page);
   expect(f.level).toBe(0);

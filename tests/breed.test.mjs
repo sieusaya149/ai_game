@@ -56,11 +56,11 @@ test('con cái đắt hơn con đực khoảng 30%; mua đúng giới tính và 
 
 test('gà trống: có trống trưởng thành thì ~40% trứng có phôi, không trống thì 0%', () => {
   const count = withRooster => {
-    const s = game(), hens = [put(s, 'ga', 'f'), put(s, 'ga', 'f'), put(s, 'ga', 'f')];
+    const s = game(), hens = [put(s, 'ga', 'f'), put(s, 'ga', 'f'), put(s, 'ga', 'f'), put(s, 'ga', 'f'), put(s, 'ga', 'f'), put(s, 'ga', 'f')];
     if (withRooster) put(s, 'ga', 'm');
     let eggs = 0, fertile = 0;
     withRandom(seeded(7), () => {
-      for (let i = 0; i < 700; i++) {
+      for (let i = 0; i < 800; i++) {   // gà đẻ mỗi 10 phút: 6 mái × 80 quả
         feed(s); for (const a of s.animals) a.age = G.stageStart('ga', 'truong');   // giữ ở tuổi trưởng thành
         G.tick(s, MIN);
         for (const e of s.eggs) { eggs++; if (e.fertile) fertile++; }
@@ -70,7 +70,7 @@ test('gà trống: có trống trưởng thành thì ~40% trứng có phôi, kh�
     return { eggs, rate: fertile / eggs, hens };
   };
   const a = count(true), b = count(false);
-  assert.ok(a.eggs > 500, `đủ mẫu: ${a.eggs}`);
+  assert.ok(a.eggs > 400, `đủ mẫu: ${a.eggs}`);
   assert.ok(a.rate > 0.34 && a.rate < 0.46, `tỉ lệ có phôi ${a.rate}`);
   assert.equal(b.rate, 0);
 });
@@ -78,15 +78,15 @@ test('gà trống: có trống trưởng thành thì ~40% trứng có phôi, kh�
 test('gà trống con chưa tính; trống không đẻ trứng; trứng ghi mẹ và cha', () => {
   const s = game();
   const hen = put(s, 'ga', 'f'), baby = put(s, 'ga', 'm', 'non'), roo = put(s, 'ga', 'm');
-  run(s, 3 * MIN, 0.99);
+  run(s, ANIMALS.ga.every + MIN, 0.99);
   assert.ok(s.eggs.length >= 1 && s.eggs.every(e => e.mom.id === hen.id), 'chỉ gà mái đẻ');
   s.eggs.length = 0;
   baby.age = G.stageStart('ga', 'non');
-  withRandom(0.0001, () => { feed(s); G.tick(s, 3 * MIN); });
+  withRandom(0.0001, () => { feed(s); G.tick(s, ANIMALS.ga.every + MIN); });
   assert.ok(s.eggs.length >= 1 && s.eggs.every(e => e.fertile && e.dad.id === roo.id && e.mom.id === hen.id));
   s.animals.splice(s.animals.indexOf(roo), 1);
   s.eggs.length = 0; hen.nextProduct = 0;
-  withRandom(0.0001, () => { feed(s); G.tick(s, 3 * MIN); });
+  withRandom(0.0001, () => { feed(s); G.tick(s, ANIMALS.ga.every + MIN); });
   assert.ok(s.eggs.length >= 1 && s.eggs.every(e => !e.fertile), 'còn mỗi gà trống con: không có phôi');
 });
 

@@ -578,7 +578,7 @@ const TUT_TEXT = {
     if (live.some(p => p.crop.progress >= 1)) return 'Cây chín rồi! Bấm Thu hoạch.';
     if (!live.length) return 'Chưa có cây nào đang lớn. Cuốc đất rồi gieo hạt lại nhé.';
     if (live.some(p => p.crop.bugs || p.crop.sick)) return 'Cây có sâu! Bấm Bắt sâu hoặc xịt thuốc trừ sâu cho cây.';
-    if (live.every(p => p.water <= 0)) return 'Cây khô nước rồi, tưới thêm cho cây lớn nhé.';
+    if (live.every(p => p.water <= 0)) return 'Đất khô rồi, cây chỉ lớn chậm một nửa. Tưới thêm cho cây lớn nhanh nhé.';
     return 'Đợi cây lớn. Sốt ruột thì bật x5 trong ⚙️ Cài đặt.';
   },
   ship: () => 'Bỏ nông sản vào thùng giao hàng cạnh nhà kho. 6h sáng mai lái buôn trả xu.',
@@ -804,7 +804,7 @@ PANELS.market = {
         const what = a.pet ? 'thú cưng bắt chuột · không bán' : `${a.product ? 'cho ' + D.itemName(a.product).toLowerCase() : 'biết đẻ con'} · bán ${a.sell} xu`;
         list.append(row({
           icon: ico(type), name: a.baby, locked,
-          desc: [`Trưởng thành sau ${D.stageStart(type, 'truong') / MIN} phút · ${what}`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`, ...(S.breedAdvice(s, type) ? [h('br'), `💡 ${S.breedAdvice(s, type)}`] : []),
+          desc: [`Trưởng thành sau ${spanOf(D.stageStart(type, 'truong'))} · ${what}`, h('br'), `Đang có ${n}/${cap} ở ${PEN_NAME[a.pen]}`, ...(S.breedAdvice(s, type) ? [h('br'), `💡 ${S.breedAdvice(s, type)}`] : []),
             type === 'meo' && !locked && coatPicker('meo', catCoat, k => { catCoat = k; refreshPanel(); })],
           right: locked ? h('span', { class: 'lock' }, '🔒 Cấp ' + a.lv)
             : h('div', { class: 'sexbuy' }, ['m', 'f'].map(sex => h('div', { class: 'sexopt' }, coinTag(D.animalPrice(type, sex)),
@@ -835,7 +835,7 @@ PANELS.market = {
     for (const [id, it] of items) {
       const locked = it.lv > lv;
       const c = it.crop && D.CROPS[it.crop];
-      const desc = c ? `Lớn sau ${c.grow / MIN} phút · thu ${c.yield} · bán ${c.price} xu/quả` : it.desc;
+      const desc = c ? `Lớn sau ${spanOf(c.grow)} · thu ${c.yield} · bán ${c.price} xu/quả` : it.desc;
       const inSeason = c && S.seasonFit(s, it.crop) === 'in';   // nhãn đúng mùa (issue 54)
       list.append(row({
         icon: ico(id), name: inSeason ? [it.name, ' ', seasonTag('span')] : it.name, locked,
@@ -1204,7 +1204,7 @@ const GUIDE = [
       'Chạm vào chuồng chó (hoặc vào chó) để Xích hay Thả chó: xích thì chó chỉ canh 3 ô quanh chuồng và không nhận lệnh gác, lùa, đi theo; thả thì chó chạy rông canh cả vườn. Chó chưa lớn, đói hoặc buồn thì không canh nhà.'] },
   { title: 'Vòng đời', art: () => [SPR3?.animal?.ga?.non?.left?.[0], SPR3?.animal?.ga?.nho?.left?.[0], SPR3?.animal?.ga?.truong?.left?.[0], SPR3?.animal?.ga?.gia?.left?.[0]],
     text: [`Mỗi con vật lớn qua 4 giai đoạn: ${D.STAGE_NAME.non} → ${D.STAGE_NAME.nho} → ${D.STAGE_NAME.truong} → ${D.STAGE_NAME.gia}, mỗi giai đoạn một hình và nết riêng.`,
-      'Tuổi tính theo giờ vườn thật sự chạy (đóng băng thì không già đi). Gà vịt sống nhanh nhất rồi tới heo, bò cừu sống lâu nhất; chó mèo không bao giờ ra đi vì già.',
+      `Tuổi tính theo giờ vườn thật sự chạy (đóng băng thì không già đi). Gà lớn tới trưởng thành sau ${spanOf(D.stageStart('ga', 'truong'))}, vịt ${spanOf(D.stageStart('vit', 'truong'))}, heo ${spanOf(D.stageStart('heo', 'truong'))}, bò và cừu ${spanOf(D.stageStart('bo', 'truong'))}; rồi sống thêm nhiều ngày thật (gà, vịt chừng 5 ngày, bò cừu chừng 8 ngày). Chó mèo không bao giờ ra đi vì già.`,
       `Sắp vào giai đoạn già thì được báo trước khoảng ${D.AGING.warnMs / HOUR} giờ vườn để chuẩn bị hoặc bán đi. Con già đẻ thưa, cho ít sản phẩm hơn và hay ngủ.`] },
   { title: 'Xe rùa', lv: D.ITEMS.barrow.lv, art: () => [barrowArt?.BARROW?.barrowIcon],
     text: [`Mua ${D.ITEMS.barrow.name.toLowerCase()} một lần ở chợ Bà Tư (${D.ITEMS.barrow.price} xu, mục Vật tư). Có xe rồi, chạm vào con vật chọn Chở sang chuồng khác, rồi chọn chuồng cùng loại còn chỗ (hiện số con/sức chứa; chuồng đầy thì khóa).`,
@@ -1217,6 +1217,7 @@ const GUIDE = [
     text: [`Bệnh qua 4 giai đoạn: ${S.SICK_NAME.join(' → ')}.`,
       `Mệt chữa bằng ${D.SICK.doses[1]} liều thuốc thú y, Bệnh nặng cần ${D.SICK.doses[2]} liều, Nguy kịch chỉ bác sĩ thú y mới cứu được (gọi qua điện thoại ở nhà, ${D.SICK.vetPrice} xu).`,
       'Bệnh nặng lây cho một con cùng chuồng; chuồng cách ly không lây và hồi bệnh nhanh hơn. Thuốc, vắc-xin mua ở trạm thú y Cô Út trong làng.',
+      `Đói không làm bệnh ngay: con vật đói thì ngừng đẻ, ngừng lớn. Bỏ đói quá ${spanOf(D.HUSBANDRY.sickRiskAfterStarving)} thì mới bắt đầu có nguy cơ, càng lâu càng cao; lỡ một bữa không sao. Chuồng bẩn, con dơ lâu hay già cũng dễ bệnh. Một lần no kéo dài chừng ${spanOf(D.HUSBANDRY.hungerMs)}.`,
       `Dưới cấp ${D.SICK.minLevel}, con vật không bệnh quá Mệt — người chơi mới được bảo hộ.`] },
   { title: 'Lùa về chuồng', lv: D.ANIMALS.vit.lv, art: () => [SPR3?.homeBoard, SPR3?.strayArrow, SPR3?.dogHerd?.left?.[0], SPR3?.animal?.meo?.truong?.left?.[0]],
     text: [`Chạng vạng (18h) gà vịt thả rông tự về chuồng, trừ ${D.FREE.strayPerDusk[0]}–${D.FREE.strayPerDusk[1]} con lạc 💤 ngủ ngoài tới sáng — không con nào gặp nguy hiểm chỉ vì chuyện này.`,
@@ -1232,11 +1233,11 @@ const GUIDE = [
   // Phase 3: cây và nước (issue 62). Hình dùng sprite có sẵn của từng hệ thống, thêm biểu tượng ART62 nếu có.
   { title: 'Bốn mùa', lv: D.SEASON.minLevel, art: () => [a62('season'), spr().season?.xuan, spr().season?.ha, spr().season?.thu, spr().season?.dong, spr().seasonTag],
     text: ['Một mùa kéo dài 7 ngày game, lần lượt Xuân, Hạ, Thu, Đông rồi lại Xuân. Xem mùa hiện tại ở góc màn hình.',
-      `Mỗi mùa có 4 loại cây hợp: cây trồng đúng mùa lớn bình thường, trồng trái mùa thì lớn chậm còn ${Math.round(D.SEASON.slow * 100)}% tốc độ. Hạt giống đúng mùa có nhãn "Đúng mùa" trong chợ.`,
+      `Mỗi mùa có 4 loại cây hợp: cây trồng đúng mùa lớn bình thường, trồng trái mùa thì lớn chậm còn ${Math.round(D.SEASON.slow * 100)}% tốc độ. Mùa tính lúc gieo: gieo đúng mùa thì cả vụ đúng mùa, dù vụ dài qua mấy mùa. Hạt giống đúng mùa có nhãn "Đúng mùa" trong chợ.`,
       `Đúng mùa còn có ${Math.round(D.SEASON.bonusChance * 100)}% thu thêm ${D.SEASON.bonusQty} nông sản. Nhà kính giúp trồng trái mùa mà không chậm.`] },
   { title: 'Chất lượng ★', lv: 3, art: () => [1, 2, 3].map(starSample),
     text: ['Nông sản có 3 mức chất lượng: thường, ★★ viền bạc và ★★★ viền vàng. Sao càng cao thì bán càng được giá (×' + D.STARS.mul[1] + ' và ×' + D.STARS.mul[2] + ').',
-      'Chăm kỹ thì lên sao: đất không bao giờ khô hẳn, sâu không để quá lâu, có bón phân thì ★★; thêm ít nhất một lần tự tay chăm thì ★★★. Lỡ một điều là về mức thường.',
+      `Chăm kỹ thì lên sao: đất không bao giờ khô hẳn, sâu không để quá ${spanOf(D.STARS.bugMs)}, có bón phân thì ★★; thêm ít nhất một lần tự tay chăm thì ★★★. Lỡ một điều là về mức thường.`,
       `Máy tưới, khách giúp hay trời mưa không tính là chăm tay. Từ cấp ${D.STARS.orderLv} có đơn hàng đòi nông sản ★★ hoặc ★★★, thưởng cao hơn.`] },
   { title: 'Thành thạo cây', lv: 4, art: () => [a62('masteryUp') ?? SPR52_OLD?.starSpark, art.SPR?.ripe?.cai, SPR53_OLD?.giantIcon?.dau],
     text: ['Thu hoạch một loại cây nhiều lần thì bạn thành thạo loại đó, có 3 cấp. Cây vụ ngắn lên cấp nhanh nhất, cây vụ dài cần nhiều vụ hơn.',
@@ -1253,7 +1254,8 @@ const GUIDE = [
   { title: 'Nước: giếng, bồn, tầm nước', lv: 5, art: () => [WELLS?.[0], WELLS?.[3], TANK_ART?.tank?.[4], TANK_ART?.tank?.[0], TANK_ART?.tank2?.[4], a62('tankLow')],
     text: [`Giếng có 4 cấp: ${D.WELL.map(w => w.name).join(' → ')}. Nâng giếng thì bình tưới chứa nhiều hơn và múc lại nhanh hơn. Giếng cấp cuối có máy bơm tự bơm nước vào bồn chứa.`,
       `Bồn chứa (${fmt(D.WATER_BUILD.tank.price)} xu) phải đặt trong ${D.TANK.range} ô quanh giếng, chứa ${D.TANK.cap} lần nước; mỗi bồn phụ (tối đa ${D.WATER_BUILD.tank2.max} cái) thêm ${D.TANK.extra} lần. Máy bơm bơm khoảng ${D.TANK.perHour} lần nước mỗi giờ vườn chạy, hạn hán thì chậm một nửa.`,
-      `Tầm nước là ${D.TANK.range} ô quanh bồn: công trình dùng nước phải nằm trong tầm (vùng xanh khi đặt). Trạm bơm phụ nối tiếp tầm nước đi xa hơn. Bồn dưới ${D.TANK.low} lần nước thì có thông báo và việc "bồn cạn"; bồn cạn thì máy ngừng, không ai bị phạt.`] },
+      `Tầm nước là ${D.TANK.range} ô quanh bồn: công trình dùng nước phải nằm trong tầm (vùng xanh khi đặt). Trạm bơm phụ nối tiếp tầm nước đi xa hơn. Bồn dưới ${D.TANK.low} lần nước thì có thông báo và việc "bồn cạn"; bồn cạn thì máy ngừng, không ai bị phạt.`,
+      `Đất khô dần ${D.FARMING.waterDrainPerMin}% mỗi phút (nắng, hạn hán thì nhanh hơn). Một lần tưới đủ chừng hai giờ. Đất khô hẳn thì cây vẫn lớn nhưng chậm một nửa, không bao giờ chết vì khô, kể cả lúc bạn đi vắng; tưới, mưa, bồn hay máy nhỏ giọt thì lớn đủ tốc độ. Muốn lên ★★ thì đừng để đất khô hẳn.`] },
   { title: 'Tự động hóa khối ruộng', lv: 8, art: () => [AUTO_ART?.drip?.on?.[0], AUTO_ART?.sprayer?.on?.[0], AUTO_ART?.rich, a62('powerOut')],
     text: ['Mua nâng cấp cho cả khối ruộng 3×3 trong 🔨 Xây dựng: ' + Object.values(D.AUTO.ups).map(u => u.name.toLowerCase() + ' ' + fmt(u.price) + ' xu').join(', ') + '. Dời khối thì nâng cấp đi theo.',
       'Tưới nhỏ giọt lấy 1 lần nước bồn cho mỗi ô, khối phải trong tầm nước. Phun thuốc tự động trừ thuốc trừ sâu trong kho. Đất màu mỡ giảm cỏ và thêm sản lượng.',
@@ -1452,7 +1454,7 @@ PANELS.seeds = {
         const c = D.CROPS[D.ITEMS[k].crop];
         const on = s.selectedSeed === D.ITEMS[k].crop, m = S.masteryOf(s, D.ITEMS[k].crop);
         list.append(h('button', { class: 'cell pick nosound' + (on ? ' on' : ''), type: 'button', on: { click: () => { S.selectSeed(st(), D.ITEMS[k].crop); sound.play('pop'); commit(); closePanel(); } } },
-          ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + s.inv[k]), h('div', { class: 'cell-name' }, c.name), h('div', { class: 'cell-sub' }, `${c.grow / MIN} phút`),
+          ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + s.inv[k]), h('div', { class: 'cell-name' }, c.name), h('div', { class: 'cell-sub' }, spanOf(c.grow)),
           h('div', { class: 'cell-sub mastery', 'data-crop': D.ITEMS[k].crop }, `🟡 Cấp ${m.lv}` + (m.next ? ` · ${m.n}/${m.next} lần` : ' · tối đa')),
           S.seasonFit(s, D.ITEMS[k].crop) === 'in' && seasonTag('div')));
       }

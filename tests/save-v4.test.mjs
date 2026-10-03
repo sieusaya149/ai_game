@@ -205,11 +205,11 @@ test('checkSaveJump: bản v3 cũ trên server và bản v4 mới của cùng v�
   assert.equal(G.wealthOf(next), G.wealthOf(prev), 'đồ cũ thành ★1: của cải không đổi');
   assert.equal(G.checkSaveJump(prev, next, 10_000).ok, true);
   // bán hàng ★3 một lúc: của cải không đổi, hợp lý
-  const rich = structuredClone(next); rich.basket = { [starKey('duahau', 3)]: 200 };
-  const sold = structuredClone(rich); sold.basket = {}; sold.coins += 200 * sellPrice(starKey('duahau', 3)); sold.simMs += 1000;
+  const rich = structuredClone(next); rich.basket = { [starKey('bapcai', 3)]: 200 };
+  const sold = structuredClone(rich); sold.basket = {}; sold.coins += 200 * sellPrice(starKey('bapcai', 3)); sold.simMs += 1000;
   assert.equal(G.checkSaveJump(rich, sold, 1000).ok, true);
-  // sửa bản lưu: đổi 200 dưa hấu ★1 thành ★3 trong chốc lát
-  const plain = structuredClone(next); plain.basket = { duahau: 200 };
-  const fake = structuredClone(plain); fake.basket = { [starKey('duahau', 3)]: 200 }; fake.simMs += 1000;
+  // sửa bản lưu: đổi 200 bắp cải ★1 thành ★3 trong chốc lát
+  const plain = structuredClone(next); plain.basket = { bapcai: 200 };
+  const fake = structuredClone(plain); fake.basket = { [starKey('bapcai', 3)]: 200 }; fake.simMs += 1000;
   assert.equal(G.checkSaveJump(plain, fake, 1000).reason, 'coins');
 });

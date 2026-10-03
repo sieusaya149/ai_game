@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
 import { createGame, perform, stashAll } from '../public/state.js';
 import { setClock } from '../public/clock.js';
-import { starKey } from '../public/data.js';
+import { starKey, CROPS, FARMING } from '../public/data.js';
 
 const T = Date.now(), rnd = Math.random;
 async function setup(t) {
@@ -21,13 +21,13 @@ async function setup(t) {
   const play = (await post('/api/play', {})).body.play;
   return { save: s => post('/api/farm', { play, save: s }) };
 }
-// Vườn online có cả ruộng dưa hấu chín, chăm kỹ cả vụ (bón phân, có chăm tay, không khô, không sâu)
+// Vườn online có cả ruộng bắp cải chín (cây giá cao nhất: giới hạn chống gian lận phải còn tác dụng), chăm kỹ cả vụ (bón phân, có chăm tay, không khô, không sâu)
 function ripeFarm() {
   const s = createGame({ name: 'Lan' });
   Object.assign(s, { mode: 'online', account: 'Lan', tutorial: 99, savedAt: T });
   for (const p of s.plots.filter(p => p.unlocked)) {
     Object.assign(p, { soil: 'tilled', water: 100 });
-    p.crop = { id: 'duahau', progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: true, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: true } };
+    p.crop = { id: 'bapcai', progress: 1, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: true, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: true } };
   }
   return s;
 }
@@ -38,16 +38,17 @@ test('hái cả ruộng ★3 trong một nhịp lưu: server nhận; giỏ tự 
   assert.equal((await save(prev)).status, 200);
   const next = structuredClone(prev);
   for (const p of next.plots.filter(p => p.unlocked)) {
-    next.mastery.duahau = { lv: 1, n: 0 };   // giữ thành thạo cấp 1: thưởng sản lượng của issue 51 không lẫn vào phần đếm
+    next.mastery.bapcai = { lv: 1, n: 0 };   // giữ thành thạo cấp 1: thưởng sản lượng của issue 51 không lẫn vào phần đếm
     assert.equal(perform(next, { kind: 'plot', idx: p.idx }, 'harvest').ok, true); stashAll(next);
   }
-  assert.equal(next.inv[starKey('duahau', 3)], 81);
+  const all = 9 * Math.round(CROPS.bapcai.yield * (1 + FARMING.fertYield));   // 9 ô × 6 bắp cải ★3
+  assert.equal(next.inv[starKey('bapcai', 3)], all);
   next.simMs += 10_000; next.savedAt = T + 10_000;
   const r = await save(next);
   assert.equal(r.status, 200, r.body?.error);
-  // bản kế tiếp: ruộng đã trống mà kho lại có thêm 81 dưa hấu ★3
+  // bản kế tiếp: ruộng đã trống mà kho lại có thêm cùng số bắp cải ★3
   const cheat = structuredClone(next);
-  cheat.inv[starKey('duahau', 3)] += 81; cheat.simMs += 10_000; cheat.savedAt = T + 20_000;
+  cheat.inv[starKey('bapcai', 3)] += all; cheat.simMs += 10_000; cheat.savedAt = T + 20_000;
   const bad = await save(cheat);
   assert.equal(bad.status, 422);
   assert.equal(bad.body.reason, 'coins');

@@ -359,10 +359,10 @@ test('hotfix: chó canh nhà đuổi chồn, diều hâu đi thì hiện chữ v
     sd.dog.age = G.stageStart('cho', 'truong'); sd.dog.stage = 'truong'; sd.dog.hunger = 100; sd.dog.happy = 100;
     bird(sd, 'non', { tile: { c: sd.farm.owned.c + 8, r: sd.farm.owned.r + 8 } });
     bird(sd, 'truong', { tile: { c: sd.farm.owned.c + 9, r: sd.farm.owned.r + 8 }, stray: true });
-    const ev = [];   // chó luôn no vui, con non luôn non và ở ngoài chuồng, gà lạc luôn lạc
+    const pets = [...sd.animals], ev = [];   // (chồn hương, chuột lấy mất con nào thì đặt lại) chó luôn no vui, con non luôn non và ở ngoài chuồng, gà lạc luôn lạc
     seeded(30, () => { for (let i = 0; i < 40 * 120; i++) {
       sd.dog.hunger = 100; sd.dog.happy = 100;
-      for (const a of sd.animals) { a.hunger = 100; a.sick = 0; a.age = a.stage === 'non' ? 0 : G.stageStart('ga', 'truong'); a.stage = a.stage === 'non' ? 'non' : 'truong'; a.nextProduct = 1e15; }
+      for (const a of pets) { if (!sd.animals.includes(a)) sd.animals.push(a); a.hunger = 100; a.sick = 0; a.hurt = false; a.age = a.stage === 'non' ? 0 : G.stageStart('ga', 'truong'); a.stage = a.stage === 'non' ? 'non' : 'truong'; a.nextProduct = 1e15; }
       ev.push(...G.tick(sd, 30_000)); } });
     return { sd, ev };
   };

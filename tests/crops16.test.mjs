@@ -8,17 +8,14 @@ globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: 
 const MIN = 60_000;
 const quiet = fn => { const r = Math.random; Math.random = () => 0.99; try { return fn(); } finally { Math.random = r; } };
 const NEW = ['hanhla', 'dauphong', 'raumuong', 'dualeo', 'khoailang', 'ot', 'suhao', 'bapcai'];
-// số liệu 8 cây cũ trước Phase 3: không được đổi
-const OLD = {
-  cai:    { name: 'Cải xanh', lv: 1,  seed: 8,   grow: 1.5 * MIN, yield: 4, price: 5,  exp: 2 },
-  carot:  { name: 'Cà rốt',   lv: 1,  seed: 15,  grow: 3 * MIN,   yield: 4, price: 9,  exp: 4 },
-  lua:    { name: 'Lúa',      lv: 2,  seed: 20,  grow: 5 * MIN,   yield: 5, price: 10, exp: 6 },
-  cachua: { name: 'Cà chua',  lv: 3,  seed: 35,  grow: 8 * MIN,   yield: 5, price: 18, exp: 10 },
-  bap:    { name: 'Bắp',      lv: 4,  seed: 50,  grow: 10 * MIN,  yield: 6, price: 22, exp: 14 },
-  dau:    { name: 'Dâu tây',  lv: 6,  seed: 80,  grow: 12 * MIN,  yield: 6, price: 35, exp: 20 },
-  bingo:  { name: 'Bí ngô',   lv: 8,  seed: 120, grow: 15 * MIN,  yield: 5, price: 60, exp: 28 },
-  duahau: { name: 'Dưa hấu',  lv: 10, seed: 180, grow: 20 * MIN,  yield: 6, price: 80, exp: 40 },
+// Bảng chốt cân bằng thời gian thật (03/10): id → [cấp mở khóa, phút lớn], theo ba nhịp chơi
+const PLAN = {
+  raumuong: [3, 2], cai: [1, 3], hanhla: [2, 5], dualeo: [5, 10],                  // đang chơi (≤ 10 phút)
+  suhao: [4, 15], carot: [1, 20], bap: [4, 30], cachua: [3, 45], duahau: [10, 60],  // quay lại (15–60 phút)
+  ot: [7, 90], dauphong: [9, 120], khoailang: [6, 180], bapcai: [12, 240], bingo: [8, 300], dau: [6, 360], lua: [8, 480],   // gieo rồi đi (1,5–8 giờ)
 };
+// cho cây lớn tới lúc chín (trời mưa luôn giữ đất ẩm: cây dài ngày lớn qua nhiều ngày game, trời đổi mỗi 20 phút)
+const growUp = (s, id) => quiet(() => { for (let t = 0; t < 3 * CROPS[id].grow && s.plots[0].crop.progress < 1; t += MIN) { s.weather = 'rain'; G.tick(s, MIN); } });
 const SEASON = {
   xuan: ['cai', 'hanhla', 'dau', 'dauphong'],
   ha: ['raumuong', 'dualeo', 'bap', 'duahau'],
@@ -30,9 +27,9 @@ const expFor = lv => { let e = 0; while (levelInfo(e).level < lv) e += levelInfo
 // vườn đang giữa buổi sáng (chợ mở), đủ xu
 const shopper = lv => { const s = G.createGame({ name: 'Mua' }); s.tutorial = 99; s.coins = 1e5; s.exp = expFor(lv); return s; };
 
-test('bảng cây: đúng 16 cây, 8 cây cũ giữ id và số liệu, 8 cây mới đủ tên', () => {
-  assert.deepEqual(Object.keys(CROPS).sort(), [...Object.keys(OLD), ...NEW].sort());
-  for (const [id, o] of Object.entries(OLD)) for (const [k, v] of Object.entries(o)) assert.equal(CROPS[id][k], v, `${id}.${k}`);
+test('bảng cây: đúng 16 cây, thời gian lớn theo ba nhịp chơi đã chốt, cấp mở khóa giữ nguyên (trừ lúa), 8 cây mới đủ tên', () => {
+  assert.deepEqual(Object.keys(CROPS).sort(), Object.keys(PLAN).sort());
+  for (const [id, [lv, min]] of Object.entries(PLAN)) assert.deepEqual([CROPS[id].lv, CROPS[id].grow], [lv, min * MIN], id);
   const names = { hanhla: 'Hành lá', dauphong: 'Đậu phộng', raumuong: 'Rau muống', dualeo: 'Dưa leo', khoailang: 'Khoai lang', ot: 'Ớt', suhao: 'Su hào', bapcai: 'Bắp cải' };
   for (const id of NEW) assert.equal(CROPS[id].name, names[id]);
 });
@@ -44,7 +41,7 @@ test('mỗi mùa đúng 4 cây hợp mùa', () => {
 });
 
 test('mọi cây có nhóm thời gian khớp thời gian lớn, cấp mở khóa, giá hạt, giá bán', () => {
-  const fits = { short: g => g <= 3 * MIN, mid: g => g >= 5 * MIN && g <= 10 * MIN, long: g => g >= 12 * MIN };
+  const fits = { short: g => g <= 10 * MIN, mid: g => g >= 15 * MIN && g <= 60 * MIN, long: g => g >= 90 * MIN };
   assert.deepEqual(Object.keys(CROP_GROUPS).sort(), Object.keys(fits).sort());
   for (const [id, c] of Object.entries(CROPS)) {
     assert.ok(c.group in CROP_GROUPS, `${id} có nhóm`);
@@ -81,9 +78,9 @@ test('cây mới trồng, lớn, thu hoạch và bán như cây cũ', () => {
     s.day = 1 + 7 * ['xuan', 'ha', 'thu', 'dong'].indexOf(CROPS[id].season); s.time = (s.day - 1) * DAY_MS;   // đúng mùa của cây (trái mùa thì lớn chậm, issue 54)
     quiet(() => { G.perform(s, at, 'till'); G.perform(s, at, 'plant'); });
     assert.equal(s.plots[0].crop.id, id);
-    s.weather = 'rain';
-    quiet(() => G.tick(s, CROPS[id].grow + 2000));
+    growUp(s, id);
     assert.ok(s.plots[0].crop.progress >= 1, `${id} chín`);
+    assert.equal(s.plots[0].crop.rotten, false, `${id} chưa héo`);
     const r = quiet(() => G.perform(s, at, 'harvest'));
     assert.equal(r.ok, true, r.msg);
     assert.equal(G.haveItem(s, id), CROPS[id].yield);

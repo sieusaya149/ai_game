@@ -32,7 +32,7 @@ test('giá bán theo loài, giai đoạn và độ thân; bệnh hoặc dơ thì
 test('heo bán theo số ký × giá chợ hôm đó', () => {
   const s = newGame(), pig = put(s, 'heo', 'truong', { bond: 2, weight: 80 });
   s.day = 3; const p3 = pigKgPrice(3); s.day = 5;
-  assert.notEqual(pigKgPrice(3), pigKgPrice(4));
+  assert.notEqual(pigKgPrice(3), pigKgPrice(4));   // giá heo hơi đổi theo ngày
   s.day = 3;
   const q = G.sellQuote(s, pig);
   assert.equal(q.kg, 80); assert.equal(q.unit, p3); assert.equal(q.price, 80 * p3);

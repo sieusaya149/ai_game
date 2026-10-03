@@ -348,8 +348,8 @@ test('hotfix: mèo trưởng thành khỏe ở trong trại thì chuột sinh ra
     const s = newGame();
     const c = cat ? addCat(s, cat.stage, cat.extra) : null;
     let n = 0;
-    seeded(5, () => {
-      for (let i = 0; i < 4000; i++) {
+    seeded(6, () => {
+      for (let i = 0; i < 12000; i++) {
         s.preds = []; s.time = NOON;
         if (c) { c.hunger = 100; c.sick = cat.extra?.sick ?? 0; c.stage = cat.stage; c.age = G.stageStart('meo', cat.stage); }
         G.tick(s, MIN);

@@ -23,7 +23,9 @@ const put = (s, type, extra) => {
 };
 const emptyTroughs = s => { for (const k of Object.keys(s.troughs)) s.troughs[k] = 0; };
 // Chạy từng phút không cho ăn, máng rỗng; `rnd` là Math.random (0 = xúi quẩy nhất: mọi lần quay xác suất đều trúng)
-const starve = (s, ms, rnd = 0) => { for (let t = 0; t < ms; t += MIN) { emptyTroughs(s); withRandom(rnd, () => G.tick(s, MIN)); } };
+// Giữ con vật sạch và chuồng không phân để chỉ đo nguy cơ do đói (dơ/chuồng bẩn là nguy cơ riêng)
+const clean = s => { for (const a of s.animals) a.dirty = 0; for (const k of Object.keys(s.manure)) s.manure[k] = 0; };
+const starve = (s, ms, rnd = 0) => { for (let t = 0; t < ms; t += MIN) { emptyTroughs(s); clean(s); withRandom(rnd, () => G.tick(s, MIN)); } };
 
 const RISK = HUSBANDRY.sickRiskAfterStarving, RAMP = HUSBANDRY.sickStarveRampMs, FEED = HUSBANDRY.hungerMs;   // từ no tới đói lả = FEED
 
@@ -31,7 +33,7 @@ test('quên cho ăn một lượt (no -> đói lả rồi 5 phút nữa) không 
   const s = game();
   const pets = [put(s, 'ga'), put(s, 'ga'), put(s, 'heo'), put(s, 'bo'), put(s, 'cuu')];
   starve(s, FEED + 5 * MIN);
-  for (const a of pets) assert.equal(a.sick, 0, `${a.type} không được bệnh sau 10 phút chưa ăn`);
+  for (const a of pets) assert.equal(a.sick, 0, `${a.type} không được bệnh sau khi chưa ăn tới đói lả`);
 });
 
 test('đói lả suốt cả chục chu kỳ ăn mà chưa tới mốc nguy cơ: không con nào bệnh (nhiều hạt giống)', () => {
@@ -56,7 +58,7 @@ test('qua mốc nguy cơ xác suất tăng dần: sớm thì thấp, lâu thì g
     }
     return sick;
   };
-  const early = sickAt(FEED + RISK + 5 * MIN), late = sickAt(FEED + RISK + RAMP + 40 * MIN);
+  const early = sickAt(FEED + RISK + 5 * MIN), late = sickAt(FEED + RISK + RAMP + 120 * MIN);
   assert.ok(early < 40, `5 phút sau mốc nguy cơ: ${early}/100`);
   assert.ok(late > 90, `rất lâu sau mốc: ${late}/100`);
 });
@@ -86,13 +88,13 @@ test('chạy bù offline ngắn (vắng 12 phút, máng rỗng) không làm con 
 test('cảnh báo trước nguy cơ: báo "đói" và vào danh sách việc cần làm khi dưới mốc đói, cách rất xa lúc có nguy cơ bệnh', () => {
   const s = game(); put(s, 'ga'); emptyTroughs(s);
   let warnedAt = null, riskAt = FEED + RISK;
-  for (let t = MIN; t <= 6 * MIN && warnedAt === null; t += MIN) {
-    const ev = withRandom(0.99, () => G.tick(s, MIN));
+  for (let t = MIN; t <= HUSBANDRY.hungerMs && warnedAt === null; t += MIN) {
+    emptyTroughs(s); clean(s); const ev = withRandom(0.99, () => G.tick(s, MIN));
     if (ev.some(e => e.type === 'hungry') && todoList(s).some(i => i.kind === 'hungry')) warnedAt = t;
   }
   assert.ok(warnedAt !== null, 'phải có thông báo đói và việc cần làm');
   assert.ok(warnedAt < HUSBANDRY.hungerMs, `báo lúc ${warnedAt / MIN} phút, trước khi đói lả`);
-  assert.ok(riskAt - warnedAt >= 25 * MIN, 'còn dư thời gian cho người chơi cho ăn trước khi có nguy cơ');
+  assert.ok(riskAt - warnedAt >= 60 * MIN, 'còn dư thời gian cho người chơi cho ăn trước khi có nguy cơ');
 });
 
 test('việc cần làm liệt kê con vật đói ngay khi dưới mốc hungryBelow', () => {

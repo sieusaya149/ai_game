@@ -110,7 +110,7 @@ test('phủ rơm lên ô trong hạn hán: ô phủ khô chậm hơn ô không p
   expect(weatherOn(SEED, DROUGHT)).toBe('drought');
   const save = atDay(DROUGHT, 0.1, s => {
     s.inv.straw = 3; s.inv.fertilizer = 0; s.inv.growth = 0;
-    for (const i of [0, 8]) Object.assign(s.plots[i], { soil: 'tilled', water: 100, weeds: false, crop: crop('bap', 0.2) });
+    for (const i of [0, 8]) Object.assign(s.plots[i], { soil: 'tilled', water: 80, weeds: false, crop: crop('bap', 0.2) });   // dưới 95 để "Tưới" là việc chính, "Phủ rơm" hiện thành nút phụ
     const p = mapOf(s).plotCenter(0);
     Object.assign(s.player, { x: p.x - 15, y: p.y + 2, dir: 2 });   // đứng sát mép trái ô 0 (ngoài khối ruộng)
   });
@@ -125,9 +125,9 @@ test('phủ rơm lên ô trong hạn hán: ô phủ khô chậm hơn ô không p
   await expect.poll(() => page.evaluate(() => globalThis.__farm.state.plots[0].mulch)).toBe(true);
   expect(await page.evaluate(() => globalThis.__farm.state.inv.straw)).toBe(2);
   await page.screenshot({ path: `test-results/weather-mulch-${testInfo.project.name}.png` });
-  // tưới lại đầy cả hai ô rồi vắng 40 giây (vẫn trong ngày hạn)
+  // tưới lại đầy cả hai ô rồi vắng 15 phút (đất tụt 1%/phút, hạn hán ×2, phủ rơm ×0,5; vẫn trong ngày hạn 20 phút)
   await page.evaluate(() => { for (const i of [0, 8]) globalThis.__farm.state.plots[i].water = 100; });
-  await timeWarp(page, 40_000);
+  await timeWarp(page, 15 * 60_000);
   const w = await page.evaluate(() => ({ mulched: globalThis.__farm.state.plots[0].water, bare: globalThis.__farm.state.plots[8].water, weather: globalThis.__farm.state.weather }));
   expect(w.weather).toBe('drought');
   expect(w.mulched).toBeGreaterThan(w.bare + 10);
