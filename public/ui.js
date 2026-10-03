@@ -495,7 +495,7 @@ export function renderHUD(s) {
   }
   let clock = '';
   try { clock = S.clockText(s); } catch { clock = ''; }
-  if (!/Ngày/i.test(clock)) clock = `Ngày ${S.dayNumber(s)} · ${clock}`;
+  if (!/Ngày/i.test(clock)) clock = `${S.seasonDayText(s)} · ${clock}`;   // ngày trong mùa, vd "Ngày 3/7"
   setText('hud-time', clock);
   const se = S.seasonOf(s);
   if (memo.get('hud-season') !== se.key) {
@@ -523,7 +523,7 @@ export function renderHUD(s) {
   if (panel === 'smithy') {   // rèn xong giữa chừng thì vẽ lại bảng; còn không thì chỉ đổi đồng hồ đếm
     if (smithKey !== JSON.stringify([s.smith, s.tools])) refreshPanel(); else if ($('smith-left')) $('smith-left').textContent = smithLeft(s);
   }
-  $('hud-water').classList.toggle('empty', s.can <= 0);
+  $('hud-water').classList.toggle('dry', s.can <= 0);
   setText('hud-speed', `⏩ x${S.speedOf(s)}`);
   $('hud-speed').hidden = s.mode === 'online';   // online luôn x1
 
@@ -643,12 +643,39 @@ function runAction(a) {
   if (a.disabled) { pushToast(String(a.disabled), 'bad'); sound.play('error'); return; }
   api.doAction(cur.target, a.id);
 }
+// Điện thoại (màn hẹp): hành động phụ thành bảng trượt từ đáy, lưới nút icon lớn, nút không dùng được thì ẩn
+const PHONE = matchMedia('(max-width: 600px)');
+const SHORT = { feed: 'Cho ăn', pet: 'Vuốt ve', bath: 'Tắm', medicine: 'Thuốc', vaccinate: 'Tiêm', vaccinatePen: 'Tiêm cả chuồng', isolate: 'Cách ly', unisolate: 'Về chuồng',
+  barrow: 'Chở xe', vitamin: 'Vitamin', rename: 'Đổi tên', retire: 'Nghỉ hưu', unretire: 'Làm lại', milk: 'Vắt sữa', shear: 'Xén lông', fill: 'Đổ cám', muck: 'Xúc phân',
+  shower: 'Vòi sen', weigh: 'Cân heo', till: 'Cuốc đất', growth: 'Tăng trưởng', upgrade: 'Nâng cấp', upgradeWell: 'Nâng cấp' };
+// Nhãn ngắn dưới icon; chữ đầy đủ vẫn nằm trong title/aria-label của nút
+function shortLabel(a) {
+  const full = bareLabel(a);
+  if (SHORT[a.id]) return SHORT[a.id];
+  const price = /^Bán\b.*?(\d[\d.,]*) xu\)/.exec(full);
+  if (price) return `Bán ${price[1]} xu`;
+  return full.replace(/\s*\([^)]*\)/g, '').trim();
+}
+// chip chỉ để xem trạng thái (disabled nhưng có thông tin, vd vòi sen đang bật): điện thoại vẫn hiện
+const INFO_CHIPS = new Set(['shower']);
+let sheetShut = false, sheetKey = '';
+function syncSheet() {
+  const on = PHONE.matches && !sheetShut && $('chips').childElementCount > 0;
+  $('act-sheet').classList.toggle('on', on);
+  document.body.classList.toggle('has-sheet', on);
+  document.documentElement.style.setProperty('--sheet-h', on ? Math.ceil($('act-sheet').getBoundingClientRect().height) + 'px' : '0px');
+}
+export const closeSheet = () => { sheetShut = true; syncSheet(); };   // chạm ra ngoài bản đồ thì đóng
+export const openSheet = () => { sheetShut = false; syncSheet(); };
 export function setTarget(target, actions, name) {
   cur = { target, actions: actions || [], name: name || '' };
+  const k = JSON.stringify(target);
+  if (k !== sheetKey) { sheetKey = k; sheetShut = false; }   // đổi mục tiêu thì bảng mở lại
   const main = $('main-action'), chips = $('chips'), nm = $('target-name');
   if (!target || !cur.actions.length) {
     main.hidden = true; chips.replaceChildren(); nm.hidden = !(target && name);
     if (!nm.hidden) nm.textContent = name;
+    syncSheet();
     return;
   }
   const a = cur.actions[0];
@@ -660,11 +687,14 @@ export function setTarget(target, actions, name) {
   main.querySelector('.ma-icon').replaceChildren(actIcon(a.icon));
   main.querySelector('.ma-label').textContent = bareLabel(a);
   main.title = a.disabled || a.label;
-  chips.replaceChildren(...cur.actions.slice(1, 7).map((c, i) => h('button', {
-    class: 'chip nosound' + (c.disabled ? ' disabled' : ''), type: 'button', title: c.disabled || c.label,
+  const phone = PHONE.matches;
+  chips.replaceChildren(...cur.actions.slice(1, phone ? 9 : 7).map((c, i) => [c, i]).filter(([c]) => !(phone && c.disabled && !INFO_CHIPS.has(c.id))).map(([c, i]) => h('button', {
+    class: 'chip nosound' + (c.disabled ? ' disabled' : ''), type: 'button', title: c.disabled || c.label, 'aria-label': c.label,
     on: { click: () => runAction(c) },
-  }, actIcon(c.icon), h('span', { class: 'chip-lbl' }, bareLabel(c)), h('kbd', {}, String(i + 1)))));
+  }, actIcon(c.icon), h('span', { class: 'chip-lbl' }, phone ? shortLabel(c) : bareLabel(c)), ...(phone ? [h('span', { class: 'sr' }, bareLabel(c))] : []), h('kbd', {}, String(i + 1)))));
+  syncSheet();
 }
+PHONE.addEventListener?.('change', () => setTarget(cur.target, cur.actions, cur.name));
 
 // ---------- Khung bảng ----------
 const PANELS = {};
@@ -2322,19 +2352,20 @@ export function updateAlerts(s, toScreen, nowMs = performance.now(), visiting = 
   if (!urgent.length && !lost.length && !rootBox.firstChild) return;   // không có gì gấp: khỏi đo bố cục mỗi khung hình
   const hud = $('hud').getBoundingClientRect(), bar = $('bottombar').getBoundingClientRect();
   const box = { l: 0, t: hud.bottom + 4, r: innerWidth, b: bar.top - 4 };
-  const live = new Set();
+  const live = new Set(), shown = [];   // nhiều chỗ gấp cùng hướng thì chỉ một mũi tên (không chồng lên nhau)
+  const crowded = a => shown.some(q => Math.hypot(q.x - a.x, q.y - a.y) < 30) || !shown.push(a);
   for (const t of arrowTargets(s, urgent)) {
     const a = arrowFor(toScreen(t.x, t.y), box, 22), el = arrowEl(t.key);
-    el.hidden = !a;
-    if (!a) continue;
+    el.hidden = !a || crowded(a);
+    if (el.hidden) continue;
     live.add(t.key);
     el.style.transform = `translate(${(a.x - 18).toFixed(1)}px, ${(a.y - 18).toFixed(1)}px) rotate(${a.ang.toFixed(4)}rad)`;
     el.dataset.ang = String(Math.round(a.ang * 180 / Math.PI));
   }
   for (const a of lost) {
     const key = 'stray:' + a.id, p = arrowFor(toScreen(a.x, a.y), box, 22), el = arrowEl(key, 'stray');
-    el.hidden = !p;
-    if (!p) continue;
+    el.hidden = !p || crowded(p);
+    if (el.hidden) continue;
     live.add(key);
     el.style.transform = `translate(${(p.x - 18).toFixed(1)}px, ${(p.y - 18).toFixed(1)}px) rotate(${p.ang.toFixed(4)}rad)`;
     el.dataset.ang = String(Math.round(p.ang * 180 / Math.PI));
@@ -2374,7 +2405,12 @@ export function initUI(a) {
   const says = $('live-says');
   $('live-emotes').append(...D.EMOTES.map(e => btn(e, () => { says.hidden = true; api.emote(e); }, 'live-btn nosound', { title: 'Biểu cảm ' + e, 'aria-label': e })));
   says.append(...D.QUICK_CHAT.map(t => btn(t, () => { says.hidden = true; api.say(t); }, 'small')));
-  $('live-chat').addEventListener('click', () => { says.hidden = !says.hidden; });
+  $('sheet-x').addEventListener('click', closeSheet);
+  const live = $('live'), tgl = $('live-emote-toggle');
+  const emotes = on => { live.classList.toggle('emotes-open', on); tgl.setAttribute('aria-expanded', String(on)); if (on) says.hidden = true; };
+  tgl.addEventListener('click', () => emotes(!live.classList.contains('emotes-open')));
+  $('live-emotes').addEventListener('click', () => emotes(false));
+  $('live-chat').addEventListener('click', () => { emotes(false); says.hidden = !says.hidden; });
   $('live-people').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('online'); });
   $('live-friends').addEventListener('click', () => { says.hidden = true; if (!isBlocking()) openPanel('friends'); });
 

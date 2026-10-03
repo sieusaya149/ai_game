@@ -46,8 +46,11 @@
 
     <!-- Hành động: góc dưới phải -->
     <div id="actions">
-      <div id="target-name" hidden></div>
-      <div id="chips"></div>
+      <div id="act-sheet">
+        <div id="target-name" hidden></div>
+        <button id="sheet-x" type="button" title="Đóng bảng hành động" aria-label="Đóng bảng hành động">✕</button>
+        <div id="chips"></div>
+      </div>
       <button id="main-action" class="btn" hidden>
         <span class="ma-icon"></span><span class="ma-label"></span>
       </button>
@@ -58,6 +61,7 @@
       <div id="live-says" class="card" hidden></div>
       <div class="live-row" id="live-emotes"></div>
       <div class="live-row">
+        <button class="live-btn" id="live-emote-toggle" type="button" title="Biểu cảm" aria-label="Biểu cảm" aria-expanded="false">😊</button>
         <button class="live-btn" id="live-chat" type="button" title="Chat nhanh" aria-label="Chat nhanh">💬</button>
         <button class="live-btn" id="live-friends" type="button" title="Bạn bè" aria-label="Bạn bè">👫</button>
         <button class="live-btn wide" id="live-people" type="button" title="Người đang ở đây" aria-label="Người đang ở đây">👥 <b id="live-n">1</b></button>

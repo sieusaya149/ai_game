@@ -23,3 +23,11 @@ test('online: Ngày 1 lúc mở làng, tăng 1 mỗi ngày làng, dayOf nội b�
     assert.equal(G.dayText(s), 'Ngày 41');
   } finally { setClock(null); }
 });
+
+test('HUD: ngày trong mùa 1..7, hết 7 ngày thì sang mùa mới và quay về 1', () => {
+  const s = G.createGame({ name: 'Hùng', look: {} });
+  for (const [day, want] of [[1, 'Ngày 1/7'], [7, 'Ngày 7/7'], [8, 'Ngày 1/7'], [2373, 'Ngày 7/7'], [2376, 'Ngày 3/7']]) {
+    s.day = day;
+    assert.equal(G.seasonDayText(s), want);
+  }
+});

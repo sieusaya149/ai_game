@@ -166,9 +166,12 @@ test('khách vào vườn có trái khổng lồ: trộm được phần dâu th
   await reach(B.page, touch, c0.x - 14, c0.y, 'Dâu tây');
   await expect(B.page.locator('#target-name')).toContainText('khổng lồ');
   const chip = B.page.locator('#chips .chip.disabled', { hasText: 'Trộm dâu tây khổng lồ' });
-  await expect(chip).toBeVisible();
-  await chip.click();
-  await expect(B.page.locator('#toasts')).toContainText('Trái khổng lồ nặng quá');
+  if (B.page.viewportSize().width <= 600) await expect(chip).toHaveCount(0);   // điện thoại: bảng hành động ẩn nút không dùng được
+  else {
+    await expect(chip).toBeVisible();
+    await chip.click();
+    await expect(B.page.locator('#toasts')).toContainText('Trái khổng lồ nặng quá');
+  }
   await B.page.screenshot({ path: `test-results/giant-guest-${testInfo.project.name}.png` });
 
   // khách không có trái khổng lồ; vườn chủ trên server vẫn còn nguyên trái khổng lồ

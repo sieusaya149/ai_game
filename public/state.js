@@ -697,6 +697,8 @@ export function clockText(s) {
 // Số ngày HIỂN THỊ cho người chơi: online tính từ ngày mở làng (Ngày 1); dayOf (nội bộ, cho mùa/thời tiết/hạn mức) không đổi.
 export const dayNumber = s => online(s) ? Math.max(1, dayOf(s) - villageCal(VILLAGE_OPEN).day + 1) : dayOf(s);
 export const dayText = s => `Ngày ${dayNumber(s)}`;
+// HUD: ngày trong mùa (1..7, mùa nào cũng 7 ngày); số ngày cộng dồn tăng quá nhanh nên không đưa lên HUD
+export const seasonDayText = s => `Ngày ${seasonOf(s).dayIn}/7`;
 
 // Chợ Bà Tư mở từ MARKET.open tới MARKET.close (giờ trong game). Mua bán đều qua cổng kiểm tra này.
 const hourOf = s => (6 + dayFrac(s) * 24) % 24;

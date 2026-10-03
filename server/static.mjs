@@ -1,7 +1,7 @@
 // Phục vụ file tĩnh của public/. index.html không cache (deploy mới là thấy ngay);
 // file khác không có hash trong tên nên cho trình duyệt giữ nhưng hỏi lại bằng ETag (304 nếu chưa đổi).
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
 
 const TYPES = {
@@ -35,6 +35,15 @@ export function serveStatic(dir) {
     if (!html) {
       head.etag = tag;
       if (req.headers['if-none-match'] === tag) { res.writeHead(304, head); return res.end(); }
+    }
+    if (html) {   // style.css / main.js kèm ?v=<mtime>: CDN hay Safari giữ bản CSS cũ thì HTML mới vẫn kéo bản mới (từng hiện thẻ nhiệm vụ không nền trên iPhone)
+      let body = await readFile(file, 'utf8');
+      for (const name of ['style.css', 'main.js']) {
+        const s2 = await stat(join(root, name)).catch(() => null);
+        if (s2) body = body.replace(`"${name}"`, `"${name}?v=${Math.floor(s2.mtimeMs).toString(36)}"`);
+      }
+      res.writeHead(200, { ...head, 'content-length': Buffer.byteLength(body) });
+      return res.end(req.method === 'HEAD' ? undefined : body);
     }
     res.writeHead(200, { ...head, 'content-length': st.size });
     if (req.method === 'HEAD') return res.end();
