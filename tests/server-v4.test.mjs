@@ -59,7 +59,7 @@ function kept(f, old) {
   assert.equal(f.farm.ents.find(e => e.kind === 'well').lv, 1);
   assert.deepEqual(f.mastery.cai, { lv: 1, n: 0 });
   assert.equal(Object.keys(f.mastery).length, 16);
-  assert.deepEqual(f.water, { level: 0 });
+  assert.deepEqual(f.water, { level: 0, pump: 0, power: 0 });
   assert.equal(f.stats.harvests, old.stats.harvests);
 }
 

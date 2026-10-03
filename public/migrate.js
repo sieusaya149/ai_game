@@ -103,7 +103,9 @@ export function fillSave(s) {
   s.mastery = isObj(s.mastery) ? s.mastery : {};
   for (const id of Object.keys(CROPS)) s.mastery[id] ??= { lv: 1, n: 0 };   // cây thêm sau cũng có chỗ
   s.water = isObj(s.water) ? s.water : {};
-  s.water.level ??= 0;
+  s.water.level ??= 0;   // lần nước trong bồn (issue 57)
+  s.water.pump ??= 0;    // ms bơm dồn tới lần nước kế
+  s.water.power ??= 0;   // số điện máy bơm, trạm bơm phụ đã dùng (issue 58 tính tiền)
   for (const e of s.farm?.ents ?? []) {
     if (e.kind === 'well') e.lv ??= 1;
     if (e.kind === 'field') e.up = { ...fieldUpgrades(), ...e.up };

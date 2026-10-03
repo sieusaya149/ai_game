@@ -51,6 +51,9 @@ for (const [i, m] of mods) {
 // Giếng 4 cấp (issue 56): bộ thường WELLS và bộ 2x WELLS_HD cùng nằm trong artwell.js
 const wellArt = await import('./artwell.js').catch(() => null);
 if (wellArt) { stats.files.push('artwell.js'); wellArt.WELLS.forEach((o, i) => link(o, wellArt.WELLS_HD[i], `WELLS.${i}`)); }
+// Bồn chứa, bồn phụ, trạm bơm phụ, ống nước, vùng phủ, thanh mực nước (issue 57): cùng cây khóa trong arttank.js
+const tankArt = await import('./arttank.js').catch(() => null);
+if (tankArt?.TANK_ART) { stats.files.push('arttank.js'); link(tankArt.TANK_ART, tankArt.TANK_ART_HD, 'TANK_ART'); }
 
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);

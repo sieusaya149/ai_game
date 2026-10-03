@@ -19,12 +19,12 @@ Mạng nước là **ngân sách nước theo giờ** và vùng phủ theo kho�
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): bồn chứa 200 lần, mỗi bồn phụ +150; giếng bơm 20 lần mỗi giờ, hạn hán còn một nửa; bồn không vượt sức chứa.
-- [ ] Unit test: vùng phủ 8 ô quanh bồn; trạm bơm phụ thêm 8 ô. `canPlace` công trình cần nước trong tầm thì ok, ngoài tầm thì từ chối với lý do "ngoài tầm nước".
-- [ ] Unit test: bồn cạn thì máy ngừng, không trừ âm, không phạt gì. Mất điện do bão thì bơm ngừng.
-- [ ] Unit test: đóng băng sau 8 giờ thì bồn không đầy thêm. Thứ tự trừ nước cố định cho cùng kết quả khi chạy lại cùng bản lưu.
-- [ ] Unit test (seam 3): server chạy bù đoạn dài có bơm bồn cho cùng mực nước như chạy bù trên trình duyệt với cùng bản lưu.
-- [ ] E2E (desktop + 360px): dựng bản lưu giếng cấp 4 → xây bồn → vào chế độ xây dựng thấy vùng phủ xanh và mực nước → đặt công trình cần nước ngoài tầm bị từ chối kèm lý do, trong tầm thì đặt được.
+- [x] Unit test (seam 1): bồn chứa 200 lần, mỗi bồn phụ +150; giếng bơm 20 lần mỗi giờ, hạn hán còn một nửa; bồn không vượt sức chứa.
+- [x] Unit test: vùng phủ 8 ô quanh bồn; trạm bơm phụ thêm 8 ô. `canPlace` công trình cần nước trong tầm thì ok, ngoài tầm thì từ chối với lý do "ngoài tầm nước".
+- [x] Unit test: bồn cạn thì máy ngừng, không trừ âm, không phạt gì. Mất điện do bão thì bơm ngừng.
+- [x] Unit test: đóng băng sau 8 giờ thì bồn không đầy thêm. Thứ tự trừ nước cố định cho cùng kết quả khi chạy lại cùng bản lưu.
+- [x] Unit test (seam 3): server chạy bù đoạn dài có bơm bồn cho cùng mực nước như chạy bù trên trình duyệt với cùng bản lưu.
+- [x] E2E (desktop + 360px): dựng bản lưu giếng cấp 4 → xây bồn → vào chế độ xây dựng thấy vùng phủ xanh và mực nước → đặt công trình cần nước ngoài tầm bị từ chối kèm lý do, trong tầm thì đặt được.
 
 ## Blocked by
 

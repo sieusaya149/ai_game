@@ -12,6 +12,7 @@ import { todoList } from './todo.js';
 import { drawMini } from './minimap.js';
 import * as net from './net.js';
 import { hdOf, charFrames } from './hd.js';
+import { TANK_ART } from './arttank.js';
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -110,6 +111,7 @@ export function showBuild(on) {
   $('buildbar').hidden = !on;
   $('bb-build').classList.toggle('on', on);
   if (on) { buildMsg('Chạm và kéo công trình để dời chỗ', null); buildSel(null); buildTray(st(), null); }
+  buildWater(on ? st() : null);
 }
 // Khay đồ đặt được: tab Khối ruộng / Chuồng / Đồ trang trí. b = world.build (b.place = món đang chọn)
 let trayTab = 'field';
@@ -140,14 +142,36 @@ export function buildTray(s, b) {
       cards.push(card({ kind }, ico(kind), low ? PEN_NAME2[kind] : `${PEN_NAME2[kind]} ${n}/${max}`,
         low ? `Cần cấp ${lv}` : full ? (nx ? `Cấp ${nx} để có thêm` : 'Đã tối đa') : `🪙 ${fmt(D.BUILD_PRICES[kind])}`, low || full));
     }
+  } else if (trayTab === 'water') {
+    // mạng nước (issue 57): bồn chứa cần giếng máy bơm; bồn phụ, trạm bơm phụ cần có bồn và phải đặt trong vùng phủ xanh
+    const lv4 = S.wellLv(s) >= D.WELL.length, has = s.farm.ents.some(e => e.kind === 'tank');
+    for (const [kind, w] of Object.entries(D.WATER_BUILD)) {
+      const n = s.farm.ents.filter(e => e.kind === kind).length, full = n >= w.max;
+      const lock = kind === 'tank' ? (!lv4 && `Cần ${D.WELL.at(-1).name.toLowerCase()}`) : (!has && 'Cần bồn chứa');
+      const name = WATER_NAME[kind] + (w.max > 1 && !lock ? ` ${n}/${w.max}` : '');
+      cards.push(card({ kind }, waterIco(kind), name, lock || (full ? (w.max > 1 ? 'Đã tối đa' : 'Đã có') : `🪙 ${fmt(w.price)}`), !!lock || full));
+    }
   } else {
     for (const k of Object.keys(s.inv || {})) if (s.inv[k] > 0 && D.ITEMS[k]?.kind === 'deco') cards.push(card({ kind: 'deco', item: k }, ico(k), D.ITEMS[k].name, `Có ×${s.inv[k]}`));
     empty = 'Chưa có đồ trang trí. Mua ở Chợ Bà Tư nhé.';
   }
   const tab = (id, label) => h('button', { class: 'bt-tab' + (trayTab === id ? ' on' : ''), type: 'button', on: { click: () => { trayTab = id; api.buildPick(null); } } }, label);
   $('build-tray').replaceChildren(
-    h('div', { class: 'bt-tabs' }, tab('field', 'Ruộng'), tab('pen', 'Chuồng'), tab('deco', 'Trang trí')),
+    h('div', { class: 'bt-tabs' }, tab('field', 'Ruộng'), tab('pen', 'Chuồng'), tab('water', 'Nước'), tab('deco', 'Trang trí')),
     cards.length ? h('div', { class: 'bt-list' }, cards) : h('div', { class: 'bt-empty' }, empty));
+}
+const WATER_NAME = { tank: 'Bồn chứa', tank2: 'Bồn phụ', booster: 'Trạm bơm phụ' };
+const WATER_IMG = { tank: A => A.tank[4], tank2: A => A.tank2[4], booster: A => A.booster.on };
+function waterIco(kind) {
+  let u = null;
+  try { u = hd(WATER_IMG[kind](TANK_ART))?.toDataURL?.() || null; } catch { u = null; }
+  return u ? h('img', { class: 'ico', src: u, alt: '' }) : h('span', { class: 'ico emo' }, kind === 'booster' ? '⚡' : '🛢️');
+}
+// Mực nước trong bồn ở thanh chế độ xây dựng (issue 57): ẩn khi vườn chưa có bồn
+export function buildWater(s) {
+  const el = $('build-water'), k = s && S.tankInfo(s);
+  el.hidden = !k?.has;
+  if (k?.has) el.textContent = `💧 Bồn ${fmt(k.level)}/${fmt(k.cap)} lần nước${k.pumping ? '' : ' · ' + k.why}`;
 }
 const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu', quarantine: 'Chuồng cách ly', cathouse: 'Nhà mèo' };
 const penIco = pen => (pen === 'quarantine' ? h('span', { class: 'ico emo' }, '🏥') : ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]));
@@ -385,6 +409,7 @@ const WEATHER = { sun: '☀️', cloud: '⛅', rain: '🌧️' };
 
 export function renderHUD(s) {
   if (!s || !api) return;
+  if (building) buildWater(s);   // mực nước bồn đổi dần lúc máy bơm chạy
   const li = S.levelInfo(s.exp);
   setText('hud-name', s.name);
   setText('hud-level', 'Cấp ' + li.level);

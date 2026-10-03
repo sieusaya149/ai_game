@@ -1,15 +1,16 @@
 // Vẽ thế giới: lớp nền tĩnh (vẽ một lần) + lớp động mỗi khung hình. Không giữ trạng thái game.
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
-import { TS, GROUND, tileHash } from './layout.js';
+import { TS, GROUND, tileHash, BUILDING_DEFS } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
 import { WELLS } from './artwell.js';
+import { TANK_ART, BAR_IN } from './arttank.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul } from './state.js';
+import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, tankInfo, waterNet, waterOn } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
-import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
+import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS, TANK } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
 
@@ -352,9 +353,20 @@ export function gateImg(id, s) {
 }
 const spr3 = key => String(key).split('.').reduce((o, k) => o?.[k], SPR3);   // công trình vẽ ở art3 (trạm thú y)
 const PEN_SHORT = { chicken: 'Gà', pig: 'Heo', pasture: 'Bò cừu', quarantine: 'Cách ly' };
-export function buildingImg(b) {
+// Hình mức nước của bồn (0 = cạn … 4 = đầy, TANK_FRAC)
+export function tankStage(s) {
+  const k = s ? tankInfo(s) : null;
+  if (!k?.cap || k.level <= 0) return 0;
+  if (k.level >= k.cap) return 4;
+  const f = k.level / k.cap;
+  return f < 0.375 ? 1 : f < 0.625 ? 2 : 3;
+}
+// s (tuỳ chọn): bồn vẽ theo mực nước, trạm bơm phụ theo điện; không có s thì hình mặc định
+export function buildingImg(b, s) {
   if (b.interior) return spr2(b.sprite) ?? spr3(b.sprite) ?? furnFallback(b.sprite);
   if (b.sprite === 'well') return WELLS[(b.ent?.lv ?? 1) - 1] ?? wellImg();   // giếng 4 cấp (issue 56)
+  if (b.sprite === 'tank' || b.sprite === 'tank2') return TANK_ART?.[b.sprite][tankStage(s)] ?? null;   // bồn chứa, bồn phụ (issue 57)
+  if (b.sprite === 'booster') return TANK_ART?.booster[s && !waterOn(s, b.ent) ? 'off' : 'on'] ?? null;
   if (b.sprite === 'board') return boardImg();
   if (b.sprite === 'doghouse' && SPR3?.doghouse) return SPR3.doghouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.doghouse[0];   // chuồng chó 3 cấp
   if (b.sprite === 'cathouse' && SPR3?.cathouse) return SPR3.cathouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.cathouse[0];   // nhà mèo 3 cấp
@@ -553,9 +565,54 @@ export function plotProblem(p) {
 }
 const problemIcon = k => k === 'bug' ? SPR.problem.bug : k === 'weed' ? SPR.problem.weed : k === 'dry' ? SPR.problem.dry : statusIcon('sick');
 
+// ---------- Chế độ xây dựng: mạng nước (issue 57, ADR 0015) ----------
+// Vùng phủ xanh: ô trong đất nhà cách một nút mạng nước (bồn, bồn phụ, trạm bơm phụ đã nối) không quá TANK.range ô, có viền.
+// Đang đặt / kéo bồn chính thì vùng xanh là tầm của giếng (bồn phải nằm trong đó). Ống: từ giếng tới bồn, từ mỗi nút về nút nó nối
+// vào; có nước thì ống xanh, khô (bồn cạn, mất điện, máy bơm không tới) thì ống xám. Thanh mực nước trên đỉnh bồn.
+function drawWater(ctx, state, b) {
+  const A = TANK_ART, f = state.farm;
+  if (!A || !f) return;
+  const g = b.ghost, moving = g && (g.what?.kind === 'tank' || f.ents.find(e => e.id === g.id)?.kind === 'tank');
+  const well = f.ents.find(e => e.kind === 'well'), net = waterNet(state);
+  const src = moving ? (well ? [footprint(well)] : []) : net.map(n => n.ft);
+  if (!src.length) return;
+  const R = TANK.range, o = f.owned, on = new Set(), key = (c, r) => c * 4096 + r;
+  for (const ft of src) for (let r = Math.max(o.r, ft.r - R); r < Math.min(o.r + o.h, ft.r + ft.h + R); r++) for (let c = Math.max(o.c, ft.c - R); c < Math.min(o.c + o.w, ft.c + ft.w + R); c++) on.add(key(c, r));
+  ctx.fillStyle = 'rgba(30,140,190,0.9)';
+  for (const k of on) {
+    const c = Math.floor(k / 4096), r = k % 4096, x = c * TS, y = r * TS;
+    put(ctx, A.cover, x, y);
+    if (!on.has(key(c, r - 1))) ctx.fillRect(x, y, TS, 1);
+    if (!on.has(key(c, r + 1))) ctx.fillRect(x, y + TS - 1, TS, 1);
+    if (!on.has(key(c - 1, r))) ctx.fillRect(x, y, 1, TS);
+    if (!on.has(key(c + 1, r))) ctx.fillRect(x + TS - 1, y, 1, TS);
+  }
+  if (moving || !net.length) return;
+  const k = tankInfo(state), mid = ft => ({ x: (ft.c + ft.w / 2) * TS, y: (ft.r + ft.h / 2) * TS });
+  // ống chữ L: ngang theo hàng của nút gốc rồi dọc xuống nút sau, khớp nối ở góc và hai đầu
+  const pipe = (a, z, wet) => {
+    const P = wet ? A.pipe.wet : A.pipe.dry, x0 = Math.min(a.x, z.x), x1 = Math.max(a.x, z.x), y0 = Math.min(a.y, z.y), y1 = Math.max(a.y, z.y);
+    for (let x = x0; x < x1; x += TS) put(ctx, P.h, Math.min(x, x1 - TS), a.y - 3);
+    for (let y = y0; y < y1; y += TS) put(ctx, P.v, z.x - 3, Math.min(y, y1 - TS));
+    for (const p of [a, { x: z.x, y: a.y }, z]) put(ctx, P.j, p.x - 4, p.y - 4);
+  };
+  if (well) pipe(mid(footprint(well)), mid(net[0].ft), k.pumping);
+  for (const n of net) if (n.from) pipe(mid(footprint(n.from)), mid(n.ft), k.level > 0 && waterOn(state, n.e));
+}
+// Thanh mực nước trên đỉnh bồn chính (chế độ xây dựng)
+function tankBar(ctx, state) {
+  const A = TANK_ART, net = A && state.farm ? waterNet(state) : [];
+  if (!net.length) return;
+  const k = tankInfo(state), t = net[0].ft, bx = t.c * TS + t.w * TS / 2 - A.bar.width / 2, by = t.r * TS + BUILDING_DEFS.tank.spr.y - A.bar.height - 2;
+  put(ctx, A.bar, bx, by);
+  ctx.fillStyle = '#5fb8ff';
+  ctx.fillRect(Math.round(bx) + BAR_IN.x, Math.round(by) + BAR_IN.y, Math.round(BAR_IN.w * Math.min(1, k.level / k.cap)), BAR_IN.h);
+}
+
 // ---------- Chế độ xây dựng: viền các thứ dời được, bóng xanh/đỏ chỗ định đặt ----------
 // b: { ghost: { id, c, r, w, h, ok } | null }
 function drawBuild(ctx, state, m, b, now) {
+  tankBar(ctx, state);
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 2]); ctx.lineDashOffset = -Math.floor(now / 120) % 5;
   ctx.strokeStyle = 'rgba(255,248,225,0.75)';
@@ -585,6 +642,8 @@ function drawBuild(ctx, state, m, b, now) {
   if (ni) put(ctx, ni, Math.round(g.c * TS + 8 - ni.width / 2), Math.round(g.r * TS + 13 - ni.height));
   const ci = g.what?.kind === 'cathouse' && SPR3?.cathouse?.[0];   // nhà mèo mới xây
   if (ci) put(ctx, ci, g.c * TS - 5, g.r * TS - 8);
+  const wd = g.what && TANK_ART && { tank: TANK_ART.tank[0], tank2: TANK_ART.tank2[0], booster: TANK_ART.booster.on }[g.what.kind];   // công trình nước mới xây
+  if (wd) { const o = BUILDING_DEFS[g.what.kind].spr; put(ctx, wd, g.c * TS + o.x, g.r * TS + o.y); }
   ctx.globalAlpha = 1;
 }
 
@@ -699,6 +758,7 @@ export function render(ctx, f) {
   for (const t of threats) if (t.x != null && vis(t.x, t.y, 40)) shadow(t.x, t.y, t.kind === 'crow' ? 4 : 6);
   for (const p of preds) if (p.x != null && vis(p.x, p.y, 40) && p.kind !== 'hawk') shadow(p.x, p.y, p.kind === 'rat' ? 4 : 6);
 
+  if (wd.build && farm) drawWater(ctx, state, wd.build);   // vùng phủ xanh, ống nước nằm dưới các vật (issue 57)
   // 3) các vật nhô lên, sắp theo y chân
   const items = [];
   const add = (y, fn) => items.push({ y, fn });
@@ -719,7 +779,7 @@ export function render(ctx, f) {
   for (const b of m.buildings) {
     // đang ngủ: giường có người nằm; hộp quà / sổ lưu bút ở cổng đổi sprite theo trạng thái
     const img = b.id === 'bed' && wd.sleeping && SPR2?.bedSleep ? SPR2.bedSleep
-      : (b.id === 'giftbox' || b.id === 'guestbook') ? (gateImg(b.id, state) ?? buildingImg(b)) : buildingImg(b);
+      : (b.id === 'giftbox' || b.id === 'guestbook') ? (gateImg(b.id, state) ?? buildingImg(b)) : buildingImg(b, state);
     if (!img || !vis(b.x + img.width / 2, b.y + img.height / 2, Math.max(img.width, img.height) / 2)) continue;
     add((b.foot.r + b.foot.h) * TS, () => blit(img, b.x, b.y));
     if (b.npc) {   // người đứng cạnh công trình (Bà Tư), thở nhẹ hai nhịp
