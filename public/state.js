@@ -2923,7 +2923,8 @@ export function visitSync(v, w) {
 export function guestCheck(s, t, id) {
   if (t?.kind === 'build') return no('build', 'Chỉ chủ vườn mới sửa được vườn này');
   if (id?.startsWith('help_')) {
-    if (helpLeft(s) <= 0) return no('help_full', HELP_FULL);
+    const blocked = helpBlock(s, s.name);
+    if (blocked) return blocked;
     return guestOps(s, t).some(o => o.act === id.slice(5)) ? { ok: true } : no('nothing', NOTHING);
   }
   if (id === 'steal') {
@@ -2944,7 +2945,7 @@ function guestActs(s, t) {
   const why = id => guestCheck(s, t, id).msg ?? null;
   const ops = guestOps(s, t);
   if (ops.length) {   // ô ruộng, trứng, con vật, con quạ: việc giúp và việc trộm làm được ở đây (bị chặn thì mờ kèm lý do)
-    const full = helpLeft(s) <= 0 ? HELP_FULL : null;
+    const full = helpBlock(s, s.name)?.msg ?? null;
     return ops.map(o => (o.kind === 'steal'
       ? mk('steal', '😈', stealLabel(s, o), why('steal'))
       : mk('help_' + o.act, HELP_JOBS[o.act].icon, HELP_JOBS[o.act].label, full)));
@@ -2981,7 +2982,8 @@ function guestDo(s, t, id, at) {
 // Thao tác: { id, kind, act, idx (ô ruộng) | crow (id con quạ) | egg (id quả trứng) | animal (id con vật),
 // at (giờ ngoài đời) }. `who` của việc trộm cần thêm `room` = chỗ trống trong giỏ khách.
 // Đã có kind 'help' (issue 28) và 'steal' (issue 30); các issue sau thêm 'pet', 'sausage' vào KINDS.
-export const HELP_FULL = 'Vườn này hôm nay đã được giúp đủ';
+export const HELP_FULL = `Bạn đã giúp vườn này đủ ${GUEST.helpMax} việc hôm nay, mai (sau 0h giờ Việt Nam) giúp tiếp nhé`;
+export const HELP_HOST_FULL = `Vườn này hôm nay đã nhận đủ ${GUEST.helpHostMax} việc giúp từ mọi khách, mai (sau 0h giờ Việt Nam) quay lại nhé`;
 const NOTHING = 'Ở đây không còn gì để làm';
 const NOTHING_STEAL = 'Ở đây không có gì để trộm';
 const SOUND_OF = { water: 'water', weed: 'pop', catch: 'pop', shoo: 'crow' };
@@ -3069,8 +3071,17 @@ const GUARD_MSG = {
 const KINDS = { help: HELP, steal: STEAL, bark: GUARD_OPS, bite: GUARD_OPS, sausage: GUARD_OPS };
 
 // Số việc giúp vườn này đã nhận hôm nay (ngày ngoài đời) và số lượt còn lại
+// Giới hạn công bằng: mỗi KHÁCH được giúp một vườn tối đa GUEST.helpMax việc/ngày (today.helpBy[tên]), và cả vườn
+// nhận tối đa GUEST.helpHostMax việc/ngày từ mọi khách (today.helps) để không bị lạm dụng.
 export const helpsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.today.helps || 0 : 0);
-export const helpLeft = (s, t = now()) => Math.max(0, GUEST.helpMax - helpsToday(s, t));
+export const helpsBy = (s, name, t = now()) => (s?.today?.day === serverDay(t) ? s.today.helpBy?.[name] || 0 : 0);
+export const helpHostLeft = (s, t = now()) => Math.max(0, GUEST.helpHostMax - helpsToday(s, t));
+export const helpLeftFor = (s, name, t = now()) => Math.min(Math.max(0, GUEST.helpMax - helpsBy(s, name, t)), helpHostLeft(s, t));
+// Trong bản đi dạo: số lượt khách (chính mình) còn giúp được vườn này; ngoài đó: số lượt vườn còn nhận
+export const helpLeft = (s, t = now()) => (s?.visit ? helpLeftFor(s, s.name, t) : helpHostLeft(s, t));
+// Lý do từ chối giúp (null = còn lượt): hết phần của khách này, hay cả vườn đã đủ
+export const helpBlock = (s, name, t = now()) => (helpsBy(s, name, t) >= GUEST.helpMax ? no('help_full', HELP_FULL)
+  : helpHostLeft(s, t) <= 0 ? no('help_host_full', HELP_HOST_FULL) : null);
 // Thống kê trộm hôm nay (ngày ngoài đời): của vườn = số vụ bị trộm (`steals`) và tổng giá trị đã mất (`stolen`);
 // của người chơi = số vụ chính mình đi trộm (`robs`, server dùng để chặn bản lưu khai khống)
 export const stealsToday = (s, t = now()) => (s?.today?.day === serverDay(t) ? s.today.steals || 0 : 0);
@@ -3115,7 +3126,8 @@ export function guestOpCheck(host, who, op) {
   const t = op.at ?? now();
   if (op.kind === 'steal') return stealCheck(host, who, op, job, t);
   if (KINDS[op.kind] === GUARD_OPS) return guardOpCheck(host, who, op, job, t);
-  if (helpLeft(host, t) <= 0) return no('help_full', HELP_FULL);
+  const blocked = helpBlock(host, String(who?.name ?? 'Người lạ'), t);
+  if (blocked) return blocked;
   const target = job.find(host, op);
   return target ? { ok: true, target } : no('nothing', NOTHING);
 }
@@ -3148,7 +3160,7 @@ export function guestOpApply(host, who, op) {
   if (!c.ok) return c;
   const t = op.at ?? now(), day = serverDay(t), by = String(who?.name ?? 'Người lạ');
   KINDS[op.kind][op.act].do(host, c.target, by, c.qty, op);
-  if (host.today?.day !== day) host.today = { day, helps: 0, steals: 0, stolen: 0, robs: 0 };
+  if (host.today?.day !== day) host.today = { day, helps: 0, helpBy: {}, steals: 0, stolen: 0, robs: 0 };
   const entry = { id: op.id, kind: op.kind, act: op.act, by, lv: who?.level ?? 1, at: t, seen: false };
   if (op.kind === 'steal') Object.assign(entry, { item: c.item, qty: c.qty });
   host.guests = [entry, ...(host.guests ?? [])].slice(0, GUEST.logMax);
@@ -3173,6 +3185,7 @@ export function guestOpApply(host, who, op) {
     return { ok: true, ate, msg: GUARD_MSG.sausage(dog, ate), reward: { lose: { sausage: 1 } }, event: { type: 'sausaged', by, dog, ate, at: t } };
   }
   host.today.helps++;
+  (host.today.helpBy ??= {})[by] = (host.today.helpBy[by] || 0) + 1;
   return { ok: true, msg: `Đã ${HELP_JOBS[op.act].verb} giúp`, reward: { coins: GUEST.helpCoins, exp: GUEST.helpExp, help: 1 }, event: { type: 'helped', by, act: op.act, at: t } };
 }
 

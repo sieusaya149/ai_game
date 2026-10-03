@@ -128,11 +128,11 @@ test('B tưới giúp vườn A: B được xu và EXP, A đang online thấy ô
   await A.context.close(); await B.context.close();
 });
 
-test('vườn đã được giúp đủ 10 việc hôm nay: khách thấy lý do và nút giúp mờ, ô vẫn khô', async ({ browser, baseURL }, testInfo) => {
+test('vườn đã nhận đủ việc giúp hôm nay: khách thấy lý do và nút giúp mờ, ô vẫn khô', async ({ browser, baseURL }, testInfo) => {
   test.setTimeout(90_000);
   const touch = !!testInfo.project.use.hasTouch;
   const day = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-  const C = await player(browser, opts(testInfo, baseURL), s => { ownerGarden(s); s.today = { day, helps: GUEST.helpMax, steals: 0, stolen: 0 }; });
+  const C = await player(browser, opts(testInfo, baseURL), s => { ownerGarden(s); s.today = { day, helps: GUEST.helpHostMax, helpBy: {}, steals: 0, stolen: 0 }; });
   const B = await player(browser, opts(testInfo, baseURL), guestAt(GATE_AT.x, GATE_AT.y));
   await B.open();
   await enterGarden(B.page, C.name);
@@ -144,7 +144,7 @@ test('vườn đã được giúp đủ 10 việc hôm nay: khách thấy lý do
   await expect(main).toHaveClass(/disabled/);
   await expect(main).toContainText('Tưới giúp');
   await main.click();
-  await expect(B.page.locator('#toasts')).toContainText('Vườn này hôm nay đã được giúp đủ');
+  await expect(B.page.locator('#toasts')).toContainText('Vườn này hôm nay đã nhận đủ');
   expect(await st(B.page, () => globalThis.__farm.state.plots[0].water)).toBe(0);
   expect(await st(B.page, () => globalThis.__farm.state.coins)).toBe(B.save.coins);
   await B.page.screenshot({ path: `test-results/help-full-${testInfo.project.name}.png` });

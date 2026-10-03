@@ -3,7 +3,7 @@
 // nên server và trình duyệt chủ chạy cùng hàm trên cùng bản lưu thì ra cùng kết quả.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, startVisit, guestCheck, guestOps, guestOpApply, guestReward, actionsFor, perform, helpLeft, takeGuestLog } from '../public/state.js';
+import { createGame, startVisit, guestCheck, guestOps, guestOpApply, guestReward, actionsFor, perform, helpLeft, takeGuestLog, HELP_FULL } from '../public/state.js';
 import { setClock, serverDay } from '../public/clock.js';
 import { GUEST, EVENT_LEVEL } from '../public/data.js';
 import { eventMeta } from '../public/notify.js';
@@ -75,28 +75,55 @@ test('nhổ cỏ, bắt sâu, đuổi quạ kiểm đúng theo trạng thái th�
   assert.equal(guestOpApply(s, guest, { id: 'x2', kind: 'steal', idx: 0 }).reason, 'op_invalid');
 });
 
-test('mỗi vườn mỗi ngày ngoài đời chỉ nhận 10 việc giúp; sang ngày mới thì giúp lại được', () => {
+test('mỗi khách giúp một vườn tối đa 10 việc mỗi ngày; khách khác không bị ảnh hưởng; sang ngày mới giúp lại được', () => {
   const s = host();
-  assert.equal(helpLeft(s), GUEST.helpMax);
+  assert.equal(helpLeft(s), GUEST.helpHostMax);
   for (let i = 0; i < GUEST.helpMax; i++) {
     s.plots[0].water = 0;
     assert.equal(guestOpApply(s, guest, op('water', { idx: 0 })).ok, true, `việc thứ ${i + 1}`);
-    assert.equal(helpLeft(s), GUEST.helpMax - i - 1);
   }
   s.plots[0].water = 0;
   const r = guestOpApply(s, guest, op('water', { idx: 0 }));
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'help_full');
-  assert.equal(r.msg, 'Vườn này hôm nay đã được giúp đủ');
+  assert.match(r.msg, new RegExp(`đủ ${GUEST.helpMax} việc.*mai.*0h`));
   assert.equal(s.plots[0].water, 0);
   assert.equal(s.today.day, serverDay(T0));
   assert.equal(s.today.helps, GUEST.helpMax);
+  // người khác vẫn giúp được dù Bình đã hết lượt (lỗi cũ: một khách dùng hết lượt của cả vườn)
+  assert.equal(guestOpApply(s, { name: 'Chị Tư', level: 9 }, op('water', { idx: 0 })).ok, true);
   // sang ngày ngoài đời mới (nửa đêm giờ Việt Nam): lại được giúp
   clock = T0 + 24 * 3600_000;
-  assert.equal(helpLeft(s), GUEST.helpMax);
+  s.plots[0].water = 0;
   assert.equal(guestOpApply(s, guest, op('water', { idx: 0 })).ok, true);
   assert.equal(s.today.helps, 1);
   assert.equal(s.today.day, serverDay(clock));
+});
+
+test('cả vườn nhận tối đa 30 việc giúp mỗi ngày từ mọi khách, lý do nói rõ vườn đã đủ', () => {
+  const s = host();
+  for (let i = 0; i < GUEST.helpHostMax; i++) {
+    s.plots[0].water = 0;
+    const who = { name: 'Khách' + (i % 3), level: 3 };   // 3 khách, mỗi người đúng 10 việc
+    assert.equal(guestOpApply(s, who, op('water', { idx: 0 })).ok, true, `việc thứ ${i + 1}`);
+  }
+  assert.equal(helpLeft(s), 0);
+  s.plots[0].water = 0;
+  const r = guestOpApply(s, { name: 'Người mới', level: 3 }, op('water', { idx: 0 }));
+  assert.equal(r.reason, 'help_host_full');
+  assert.match(r.msg, new RegExp(`đủ ${GUEST.helpHostMax} việc.*mai`));
+});
+
+test('mỗi thao tác giúp tính đúng một việc, số "Còn N lượt" của khách khớp với luật kiểm', () => {
+  const raw = JSON.parse(JSON.stringify(host()));
+  raw.today = { day: serverDay(T0), helps: 12, helpBy: { Bình: 4, 'Chị Tư': 8 }, steals: 0, stolen: 0 };
+  const me = createGame({ name: 'Bình' }); me.tutorial = 99;
+  const v = startVisit(me, raw, 'Lan');
+  assert.equal(helpLeft(v), GUEST.helpMax - 4);
+  const r = perform(v, { kind: 'plot', idx: 0 }, 'help_water');
+  assert.equal(r.ok, true);
+  assert.equal(v.today.helps, 13);
+  assert.equal(helpLeft(v), GUEST.helpMax - 5);
 });
 
 test('áp dụng hai lần cùng một mã thao tác chỉ tính một lần', () => {
@@ -147,7 +174,7 @@ test('trong vườn khách: ô cần giúp hiện đúng nút, làm xong gửi k
   const raw = JSON.parse(JSON.stringify(host()));
   const me = createGame({ name: 'Bình' }); me.tutorial = 99;
   const v = startVisit(me, raw, 'Lan');
-  assert.equal(helpLeft(v), GUEST.helpMax);
+  assert.equal(helpLeft(v), GUEST.helpMax);   // 10 < 30 nên số hiện ra là phần của khách
   const plot = i => ({ kind: 'plot', idx: i });
   assert.deepEqual(actionsFor(v, plot(0)).map(a => a.id), ['help_water']);
   assert.deepEqual(actionsFor(v, plot(2)).map(a => a.id), ['help_water', 'help_weed']);
@@ -172,15 +199,15 @@ test('trong vườn khách: ô cần giúp hiện đúng nút, làm xong gửi k
 
   // hết lượt: nút vẫn hiện nhưng mờ kèm lý do, bấm vào chỉ báo lý do
   v.plots[2].weeds = true;
-  v.today = { day: serverDay(T0), helps: GUEST.helpMax, steals: 0, stolen: 0 };
+  v.today = { day: serverDay(T0), helps: GUEST.helpMax, helpBy: { Bình: GUEST.helpMax }, steals: 0, stolen: 0 };
   assert.equal(helpLeft(v), 0);
   const acts = actionsFor(v, plot(2));
   assert.ok(acts.length);
-  assert.ok(acts.every(a => a.disabled === 'Vườn này hôm nay đã được giúp đủ'));
+  assert.ok(acts.every(a => a.disabled === HELP_FULL));
   assert.equal(guestCheck(v, plot(2), 'help_weed').reason, 'help_full');
   const bad = perform(v, plot(2), 'help_weed');
   assert.equal(bad.ok, false);
-  assert.equal(bad.msg, 'Vườn này hôm nay đã được giúp đủ');
+  assert.equal(bad.msg, HELP_FULL);
   assert.equal(v.plots[2].weeds, true);
   // khách vẫn không làm được việc của chủ
   assert.equal(guestCheck(v, plot(0), 'harvest').reason, 'guest');

@@ -554,13 +554,13 @@ export const ACHIEVEMENTS = [
 ];
 
 // ---------- Khách giúp vườn và trộm vườn (issue 28, 30, ADR 0012) ----------
-// helpMax: mỗi vườn mỗi ngày ngoài đời nhận tối đa bấy nhiêu việc giúp · helpCoins/helpExp: thưởng cho khách mỗi việc
+// helpMax: mỗi KHÁCH giúp một vườn tối đa bấy nhiêu việc mỗi ngày ngoài đời · helpHostMax: cả vườn nhận tối đa bấy nhiêu việc giúp từ mọi khách · helpCoins/helpExp: thưởng cho khách mỗi việc
 // logMax: nhật ký khách trong bản lưu chủ giữ bấy nhiêu việc gần nhất (cũng là nơi nhớ mã thao tác đã áp dụng)
 // stealLv: cấp tối thiểu để đi trộm, cũng là cấp tối thiểu để vườn bị trộm (bảo vệ người mới)
 // stealPct: mỗi vụ trộm lấy tối đa bấy nhiêu sản lượng còn lại của ô hay con đó (mỗi người một lần mỗi ô hay mỗi con)
 // dayPct: mỗi vườn mỗi ngày ngoài đời mất tối đa bấy nhiêu tổng giá trị đồ chín · thể lực mỗi vụ: STAMINA.cost.steal
 // robShowMs: chỗ vừa bị trộm là chỗ gấp 🔴 (mũi tên chỉ hướng) trong chừng này, giờ ngoài đời (issue 32)
-export const GUEST = { helpMax: 10, helpCoins: 3, helpExp: 2, logMax: 60, stealLv: 5, stealPct: 0.25, dayPct: 0.3, robShowMs: 15_000 };
+export const GUEST = { helpMax: 10, helpHostMax: 30, helpCoins: 3, helpExp: 2, logMax: 60, stealLv: 5, stealPct: 0.25, dayPct: 0.3, robShowMs: 15_000 };
 // Bốn việc giúp: động từ và đơn vị để ghép câu cảm ơn ("Lan đã tưới 3 ô giúp bạn")
 export const HELP_JOBS = {
   water: { verb: 'tưới', unit: 'ô', icon: '💧', label: 'Tưới giúp' },
