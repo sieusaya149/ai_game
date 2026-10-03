@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><title>Bồn và mạng nước</title>
+<style>
+  body { margin: 0; padding: 10px; background: #4f8a34; font: 12px sans-serif; color: #fff; }
+  h2 { margin: 6px 0; font-size: 14px; }
+  canvas { image-rendering: pixelated; display: block; }
+  .row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 8px; flex-wrap: wrap; }
+  .cell { background: #5e9a40; border: 1px solid #2f5a1e; padding: 4px; text-align: center; }
+  .pair { display: flex; gap: 4px; align-items: flex-end; }
+  #report { white-space: pre; font: 12px monospace; background: #222; padding: 6px; }
+</style>
+<body>
+<h2>Bồn và mạng nước (issue 57): mỗi ô = bộ thường | bộ 2x (phóng ×4 cùng cỡ màn hình)</h2>
+<div id="rows"></div>
+<div id="report"></div>
+<script type="module">
+import { TANK_ART as A, TANK_ART_HD as B, TANK_FRAC } from './arttank.js';
+const S = +(new URLSearchParams(location.search).get('s') || 4), rows = document.getElementById('rows'), rep = [];
+function view(im, k) {
+  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  c.style.width = (im.width / k) * S + 'px'; c.style.height = (im.height / k) * S + 'px';
+  c.getContext('2d').drawImage(im, 0, 0);
+  return c;
+}
+let row;
+const newRow = () => { row = document.createElement('div'); row.className = 'row'; rows.append(row); };
+function cell(title, a, b) {
+  const d = document.createElement('div'); d.className = 'cell';
+  const p = document.createElement('div'); p.className = 'pair'; p.append(view(a, 1), view(b, 2));
+  d.append(p, title); row.append(d);
+  const ok = b.width === a.width * 2 && b.height === a.height * 2;
+  rep.push(`${title}: ${a.width}x${a.height} → ${b.width}x${b.height} ${ok ? 'OK' : 'SAI'}`);
+}
+newRow(); A.tank.forEach((im, i) => cell(`Bồn chứa ${Math.round(TANK_FRAC[i] * 100)}%`, im, B.tank[i]));
+newRow(); A.tank2.forEach((im, i) => cell(`Bồn phụ ${Math.round(TANK_FRAC[i] * 100)}%`, im, B.tank2[i]));
+cell('Trạm bơm: có điện', A.booster.on, B.booster.on); cell('Trạm bơm: mất điện', A.booster.off, B.booster.off);
+newRow();
+for (const st of ['wet', 'dry']) for (const k of ['h', 'v', 'j']) cell(`Ống ${st === 'wet' ? 'có nước' : 'khô'} ${k}`, A.pipe[st][k], B.pipe[st][k]);
+cell('Vùng phủ', A.cover, B.cover); cell('Thanh mực nước', A.bar, B.bar);
+document.getElementById('report').textContent = rep.join('\n');
+document.body.dataset.done = '1';
+</script>

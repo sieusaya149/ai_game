@@ -6,7 +6,7 @@ import {
 import { refillMs } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
-import { DIR_NAME, LIVE, itemName, ANIMALS } from './data.js';
+import { DIR_NAME, LIVE, itemName, ANIMALS, WATER_BUILD } from './data.js';
 import * as R from './render.js';
 import * as V from './world.js';
 import { eventMeta } from './notify.js';
@@ -720,8 +720,9 @@ function buildUp(e) {
   ui.handleEvents([{ type: 'sound', name: r.ok ? 'pop' : 'error' }]);
   if (d.place) {
     const w = d.place;   // đặt xong mà không đặt thêm được (hết đồ, đủ khối, đã có chuồng): bỏ chọn
-    if (r.ok && (w.kind === 'pen' || (w.kind === 'deco' && !canAfford(state, w).ok) || (w.kind === 'field' && fieldCount(state) >= fieldLimit(state)))) b.place = null;
+    if (r.ok && (w.kind === 'pen' || WATER_BUILD[w.kind] || (w.kind === 'deco' && !canAfford(state, w).ok) || (w.kind === 'field' && fieldCount(state) >= fieldLimit(state)))) b.place = null;
     ui.buildTray(state, b);
+    ui.buildWater(state);
   }
   changed();
 }

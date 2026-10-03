@@ -28,7 +28,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 
 | File | Vai trò |
 |---|---|
-| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED` (bán kính theo giai đoạn nằm ở `DOG.guardRadius`, dùng chung với trộm NPC); Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC), `BREED`/`animalPrice` (đực cái, sinh sản), `DIRT`/`MANURE` (dơ, phân chuồng), `SICK`/`VET_ITEMS` (bệnh, thú y), `BOND` (độ thân), `TRADE`/`pigKgPrice` (bán cho Chú Ba), `CAT` (mèo), `CO_UT_QUEST`, `BUILD_PRICES` (nhà mèo...); Phase 3: `CROPS` 16 cây có `season`/`group`, `CROP_GROUPS`, nông sản có sao `STARS`/`starKey`/`starOf`/`baseOf`/`isProduce` (mục "Bản lưu v4"), giếng 4 cấp `WELL` (mục "Giếng 4 cấp"), `SEASON` (issue 54), `WEATHER` (thời tiết, issue 55). Thuần dữ liệu và hàm tính từ số liệu |
+| `public/data.js` | Toàn bộ số liệu cân bằng và các bảng: cây, vật nuôi, vật phẩm, chó, quạ/trộm, ngoại hình, thành tựu, và các bảng của Phase 0: `STAMINA`, `TOOLS`/`TOOL_MAX`/`TOOL_LEVEL`/`GROUP_COST`, `MARKET`, `SHIP_RATE`/`shipValue`, `LAND_STRIP`/`LAND_STRIPS`/`DIR_NAME`, `CLUTTER`/`CLUTTER_RATE`, `FIELD_LIMITS`/`FIELD_PRICES`/`PEN_PRICES`, `NOTIFY_WINDOW`/`NOTIFY_CATS`/`EVENT_LEVEL`, `MAX_CATCHUP_MS`, `SPEEDS`, làng real-time `LIVE`/`QUICK_CHAT`/`EMOTES`, khách giúp và trộm vườn `GUEST`/`HELP_JOBS`/`hourText`, quà và sổ lưu bút ở cổng `GIFT`, chó canh khách `GUARD`/`WALK_SPEED` (bán kính theo giai đoạn nằm ở `DOG.guardRadius`, dùng chung với trộm NPC); Phase 2: `PEN_TABLE`/`PEN_LEVELS` (chuồng theo loại và cấp; `PEN_CAP` đã bỏ), `STAGES`/`STAGE_NAME`/`LIFE`/`stageStart`/`stageAt`/`lifeEnd`, `AGING`, `STAGE_CAN`, `WEIGHT`/`weightAt`, `FREE`, `PREDATOR`, `TRICKS`/`TRICK_BASE`/`TRAIN` (6 lệnh của chó và số liệu dạy lệnh), `THREATS`/`RAID` (quạ và trộm NPC), `BREED`/`animalPrice` (đực cái, sinh sản), `DIRT`/`MANURE` (dơ, phân chuồng), `SICK`/`VET_ITEMS` (bệnh, thú y), `BOND` (độ thân), `TRADE`/`pigKgPrice` (bán cho Chú Ba), `CAT` (mèo), `CO_UT_QUEST`, `BUILD_PRICES` (nhà mèo...); Phase 3: `CROPS` 16 cây có `season`/`group`, `CROP_GROUPS`, nông sản có sao `STARS`/`starKey`/`starOf`/`baseOf`/`isProduce` (mục "Bản lưu v4"), giếng 4 cấp `WELL` (mục "Giếng 4 cấp"), bồn và mạng nước `TANK`/`WATER_BUILD` (mục "Bồn chứa và mạng nước"), `SEASON` (issue 54), `WEATHER` (thời tiết, issue 55). Thuần dữ liệu và hàm tính từ số liệu |
 | `public/layout.js` | Thuần dữ liệu bố cục, **không còn là bản đồ duy nhất**: `TS`, `MAP` (64x48), `GROUND`, `FIELD_SIZE`, `tileHash`; định nghĩa công trình `BUILDING_DEFS` (chân đế `foot`, điểm vẽ `spr`, điểm đứng `at`, `fixed`, `door`) và chuồng `PEN_DEFS`; bố cục vườn mới `START_FARM`; bản đồ cố định trong nhà và làng `SCENES`; bố cục bản v1 `V1` (dùng để chuyển bản lưu cũ) |
 | `public/farm.js` | Dựng bản đồ/lưới va chạm từ bản lưu: `mapOf(state)` (vườn, nhớ tạm theo `farm.rev`), `sceneMap(state)` (bản đồ của cảnh đang đứng), `buildMap(farm)` (thử bố cục không nhớ tạm), `troughOf(map, {pen, id?})`; bản đồ vườn có `pens` (chuồng đầu tiên mỗi loại), `penList`/`penById` (mọi chuồng: `{ id, type, lv, name, rect, gates, trough|null, area, house, ent }`), `footprint`, `reachable`, `bumpLayout`, `hasScene`. Thuần JS |
 | `public/migrate.js` | `SAVE_VERSION` (4), `newFarm`, `migrate(raw)`: chuỗi hàm chuyển bản lưu theo phiên bản (`STEPS`: v1→v2, v2→v3, v3→v4); `animalDefaults`/`fillAnimal`: hình dạng con vật v3 và mặc định của nó; `fillSave`/`cropQuality`/`fieldUpgrades`: chỗ để sẵn của Phase 3 (bản lưu v4) và mặc định của nó. Thuần JS, không ngẫu nhiên, không đọc đồng hồ |
@@ -154,7 +154,7 @@ state = {
   //   · quiet = mải ăn xúc xích tới lúc nào (giờ NGOÀI ĐỜI) · barkAt/barkX/barkY = lần sủa gần nhất và chỗ thấy khách lạ
   // Phase 3 (v4, issue 50):
   mastery: { [cropId]: { lv: 1..3, n } },     // thành thạo theo loại cây: cấp và số lần đã thu hoạch loại đó (đủ 16 cây, thiếu thì fillSave bù { lv: 1, n: 0 })
-  water: { level },                           // mực nước chung của mọi bồn (ADR 0015: một con số "lần nước"); sức chứa tính từ giếng cấp 4 và các bồn (issue 57)
+  water: { level, pump, power },              // bồn (issue 57, ADR 0015): level = lần nước chung của mọi bồn (số nguyên); pump = ms máy bơm đã dồn tới lần kế; power = số điện máy bơm, trạm bơm phụ đã dùng (issue 58 tính tiền)
 }
 ```
 Vườn online không bao giờ ghi vào `SAVE_KEY` (`nongtrai-save-v4`): bản chơi đơn và vườn trên làng là hai bản riêng, chỉ chép một lần lúc "Mang vườn này lên làng?".
@@ -172,7 +172,8 @@ Vườn online không bao giờ ghi vào `SAVE_KEY` (`nongtrai-save-v4`): bản 
 | `grave` | `animal` (loài), `name?` (chỉ con ❤️4+), `flower: bool` | ngôi mộ 1 ô, con vật mất để lại (lát 38); đặt/dời qua `canPlace` như mọi công trình |
 | `tree` | không | cây cảnh, không dời được |
 | `bush`, `rock` | không | bụi, đá **chưa dọn** trên dải đất mới; chắn đường, dọn bằng tay (`CLUTTER`) |
-| `tank`, `pump`, `compost` (để dành) | bồn phụ / trạm bơm phụ: không (mực nước nằm ở `state.water`) · hố ủ: `pile: { item: n }`, `readyAt` | chưa có trong game: chỗ đã chốt cho issue 57 (bồn, trạm bơm phụ) và issue 61 (hố ủ). Thêm `kind` mới thì thêm mặc định vào `fillSave` |
+| `tank`, `tank2`, `booster` | không (mực nước nằm ở `state.water`) | bồn chứa (2x2, tối đa 1, cần giếng cấp 4, phải trong tầm giếng), bồn phụ (1x1, tối đa 4), trạm bơm phụ (1x1, tối đa 4) (issue 57, mục "Bồn chứa và mạng nước"); dời được, không cất |
+| `compost` (để dành) | hố ủ: `pile: { item: n }`, `readyAt` | chưa có trong game: chỗ đã chốt cho issue 61 (hố ủ). Thêm `kind` mới thì thêm mặc định vào `fillSave` |
 
 ### Bản lưu v4 (Phase 3)
 
@@ -186,7 +187,7 @@ Lát dọn đường cho cả Phase 3 (issue 50). Người chơi gần như chư
 | nông sản | khóa `starKey(id, sao)`: `'cai'` ★1, `'cai@2'` ★2, `'cai@3'` ★3 | đồ cũ giữ khóa = ★1 | issue 52: giỏ, kho, thùng giao hàng, đơn hàng (`orders[].items`), quà, trộm tách theo sao vì khóa khác nhau. Chỉ nông sản cây trồng có sao; sản phẩm vật nuôi có món "sao" riêng (`sua_ngon`, `len_xoan`) |
 | vườn | `mastery[cropId] = { lv, n }` | `{ lv: 1, n: 0 }` cho cả 16 cây | thành thạo (issue 51): cấp lưu thẳng (cân bằng lại ngưỡng không làm tụt cấp), `n` = số lần thu hoạch loại đó |
 | giếng | `ent.lv` (kind `well`) | `1` | giếng 4 cấp (issue 56); `wellLv(state)` |
-| vườn | `water = { level }` | `{ level: 0 }` | bồn chứa, mạng nước (issue 57, ADR 0015): một con số chung; sức chứa tính từ giếng cấp 4 (200) và số bồn phụ (+150) nên không lưu |
+| vườn | `water = { level, pump, power }` | `{ level: 0, pump: 0, power: 0 }` | bồn chứa, mạng nước (issue 57, ADR 0015): một con số chung; sức chứa tính từ bồn chứa (200) và số bồn phụ đã nối (+150) nên không lưu |
 | khối ruộng | `ent.up = { drip, spray, rich, glass }` (`fieldUpgrades()`) | đều `false` | tưới nhỏ giọt, phun thuốc tự động, đất màu mỡ (issue 58), nhà kính (issue 60). `placeEntity` khối mới cũng có `up` |
 
 **Chuyển v3→v4** (`v3to4`, thuần): chép cả bản lưu, đặt `v: 4` rồi `fillSave`. Cây đang trồng dở giữ nguyên `id`, `progress`, `fert`... và có thêm `q` mặc định; nông sản giữ nguyên khóa nên thành ★1, số lượng không đổi; giếng cấp 1; bồn 0; khối ruộng chưa có nâng cấp. **Thành thạo bắt đầu cấp 1 với `n = 0`**: thống kê v3 chỉ có tổng số lần thu hoạch (`stats.harvests`, giữ nguyên) chứ không chia theo loại cây. Bản v3 hỏng (`plots` không phải mảng, `inv`/`basket` không phải object, cây có `id` lạ) thì ném lỗi, `loadGame` trả `null`, không ghi gì. Fixture: `tests/fixtures/v3-farm.json` (cây ở 4 giai đoạn, một ô bón phân, một ô chín, đồ trong giỏ, kho, thùng, một đơn hàng, đã thu hoạch 2 lần) và `v3-fresh.json`, sinh bằng `make-v3.mjs` chạy bằng code bản v3 trước issue 50. Test: `tests/save-v4.test.mjs`, `tests/server-v4.test.mjs`, `e2e/crops16.spec.mjs`.
@@ -584,7 +585,7 @@ animalPen(state, a)       // → chuồng (trên mapOf(state).penById) con vật
 moveAnimal(state, animalId, penId)   // → R chuyển sang chuồng đúng loài hoặc chuồng cách ly còn chỗ; reason: missing species full
 placeDeco(state, itemId)          // đặt đồ trang trí ngay dưới chân nhân vật (cách đặt cũ, còn dùng được)
 ```
-**Danh sách `reason` của `canPlace`:** `missing` (không thấy công trình), `fixed` (nhà/cổng/cây không dời được), `max_pens` (đủ số chuồng loại đó ở cấp hiện tại, `PEN_TABLE.limit`), `level` (chuồng mới chưa đủ cấp xây), `missing` (loại chuồng lạ), `outside` (ngoài đất đã mua), `uncleared` (còn bụi/đá chưa dọn), `overlap` (chồng lên công trình khác), `max_fields` (vượt số khối ruộng tối đa theo cấp), `blocks_path` (chặn đường từ cổng tới nhà, cửa công trình, cửa chuồng hoặc khối ruộng; kiểm tra bằng tìm đường trên lưới va chạm của bố cục thử). `placeEntity` thêm: `scene` (không ở vườn), `no_item`, `level`, `coins`. `storeEntity`: `missing`, `has_crop`, `last_field`, `fixed`.
+**Danh sách `reason` của `canPlace`:** `missing` (không thấy công trình), `fixed` (nhà/cổng/cây không dời được), `max_pens` (đủ số chuồng loại đó ở cấp hiện tại, `PEN_TABLE.limit`), `level` (chuồng mới chưa đủ cấp xây), `missing` (loại chuồng lạ), `outside` (ngoài đất đã mua), `uncleared` (còn bụi/đá chưa dọn), `overlap` (chồng lên công trình khác), `max_fields` (vượt số khối ruộng tối đa theo cấp), `well` (bồn chứa khi giếng chưa cấp 4), `no_tank` (bồn phụ, trạm bơm phụ khi chưa có bồn chứa), `max` (đủ số công trình nước tối đa, `WATER_BUILD.max`), `no_water` (công trình cần nước ngoài tầm nước, issue 57), `blocks_path` (chặn đường từ cổng tới nhà, cửa công trình, cửa chuồng hoặc khối ruộng; kiểm tra bằng tìm đường trên lưới va chạm của bố cục thử). `placeEntity` thêm: `scene` (không ở vườn), `no_item`, `level`, `coins`. `storeEntity`: `missing`, `has_crop`, `last_field`, `fixed`.
 
 Thêm luật đặt mới thì thêm một bước kiểm tra trong `canPlace` **trước** bước tìm đường, kèm `reason` mới, và một test cho `reason` đó.
 
@@ -750,7 +751,7 @@ Giếng là thực thể `well` có `lv` 1..4 (bản lưu v4), nâng tại chỗ
 | 3 | Bơm tay | 25 | 350 ms | 2.000 xu |
 | 4 | Máy bơm | 40 | 250 ms | 5.000 xu |
 
-Bình đã rèn ở tiệm rèn thì giếng **cộng thêm** phần hơn giếng đất: `canCap(cấp bình, cấp giếng) = TOOLS.can.canMax[bình] + WELL[giếng].can − 10` (bình đồng + bơm tay = 35, bình vàng + máy bơm = 70). Cấp 4 mới chỉ có tên, hình và sức chứa bình; bồn chứa và điện là issue 57 (đọc `wellLv(state) >= 4`).
+Bình đã rèn ở tiệm rèn thì giếng **cộng thêm** phần hơn giếng đất: `canCap(cấp bình, cấp giếng) = TOOLS.can.canMax[bình] + WELL[giếng].can − 10` (bình đồng + bơm tay = 35, bình vàng + máy bơm = 70). Cấp 4 (máy bơm) mở bồn chứa và bơm nước vào bồn (mục "Bồn chứa và mạng nước").
 ```js
 wellLv(state)                     // → 1..4 (giếng đầu tiên trong vườn)
 wellInfo(state)                   // → { lv, name, can (bình chứa ở cấp này), next: { lv, name, can, price, error? } | null (cấp 4) }; error = 'Chưa đủ xu...'
@@ -759,6 +760,37 @@ canCap(cấpBình, cấpGiếng)         // sức chứa bình, hàm thuần; ca
 refillMs(state)                   // ms một lần múc ở giếng (main.js giữ người chơi đứng múc chừng đó, nhân slowFactor như mọi hành động)
 ```
 Chạm giếng: tên đích `"<tên> · cấp n · bình m lần"` (world.nameOf), hành động chính `refill`, chip `upgradeWell` có tên cấp sau, sức chứa và giá (tắt kèm lý do khi thiếu xu; cấp 4 không còn chip). Khách thăm vườn không có hành động ở giếng. Hình: `public/artwell.js` `WELLS[cấp − 1]` (16x24, như `SPR.well`) và `WELLS_HD` (32x48), hd.js nối hai bộ; `render.buildingImg` chọn theo `ent.lv`; xem `public/_hdwell.html`.
+
+### Bồn chứa và mạng nước (issue 57, ADR 0015, DESIGN §3.1b)
+Mạng nước là **ngân sách nước theo giờ** và vùng phủ theo khoảng cách ô, không mô phỏng dòng chảy. Số liệu ở `TANK` và `WATER_BUILD` (data.js):
+
+| Thứ | Số liệu |
+|---|---|
+| Bồn chứa (`tank`, 2x2) | 200 lần nước (`TANK.cap`), 1.500 xu, tối đa 1; cần giếng cấp 4 (máy bơm); phải nằm trong 8 ô quanh giếng |
+| Bồn phụ (`tank2`, 1x1) | +150 lần mỗi bồn đã nối (`TANK.extra`), 800 xu, tối đa 4 |
+| Trạm bơm phụ (`booster`, 1x1) | thêm 8 ô tầm nước quanh trạm, 1.200 xu, tối đa 4; tốn 0,5 số điện mỗi giờ khi có điện |
+| Máy bơm | bơm 20 lần mỗi giờ vườn chạy (`TANK.perHour`), hạn hán × 0,5; tốn 1 số điện mỗi giờ đang bơm |
+
+- **Khoảng cách** giữa hai vùng ô là số ô cách nhau theo hàng hoặc cột lớn hơn (0 = chạm nhau). Trong `TANK.range` = 8 ô thì có nước.
+- **Mạng nước** (`waterNet`): bắt đầu từ bồn chứa, lan sang bồn phụ và trạm bơm phụ nằm trong tầm của một nút đã nối (theo thứ tự trong vườn). Vùng phủ = mọi ô trong tầm của một nút. Lúc đặt công trình, vùng phủ không tính điện; lúc máy chạy (`live`) thì mất điện là trạm bơm phụ không nối (vùng phủ của trạm tạm mất), nước đã có trong bồn vẫn dùng được.
+- **Máy bơm bơm** khi: giếng cấp 4, có bồn chứa trong tầm giếng, có điện, bồn chưa đầy. Bơm dồn theo ms giờ vườn (`water.pump`), đủ `3.600.000 / 20` ms thì thêm 1 lần nước; đầy thì dừng, không bơm vượt sức chứa. Chỉ tính lúc vườn chạy (`step`), nên phần vắng quá 8 giờ (đóng băng) không bơm; chạy bù trình duyệt và server cùng một hàm nên ra cùng mực nước.
+- **Thời tiết** (issue 55 dựng lịch): `drought(state)` = `weather === 'drought'` (bơm một nửa), `powerOut(state)` = `weather === 'storm'` (mất điện cả ngày bão; issue 55 có thể thu lại nửa ngày).
+- **Trừ nước** theo `WATER_ORDER` mỗi lượt `step` (sau khi ô ruộng khô đi): `['drip']`, vòi sen (issue 59) thêm sau. `drip`: khối ruộng `up.drip` đang có nước (`waterOn`), ô có cây đang lớn mà `water <= 0` thì lấy 1 lần nước và đặt `water = 100`, theo thứ tự khối trong vườn rồi ô trong khối. Bồn cạn (`level < 1`) thì máy ngừng: không trừ âm, không phạt gì. (Mua tưới nhỏ giọt, sao, tiền điện: issue 58.)
+- **Đặt công trình** (`canPlace`, ADR 0005): bồn chứa phải trong tầm giếng; bồn phụ, trạm bơm phụ, khối ruộng có tưới nhỏ giọt phải trong vùng phủ của mạng nước (không tính chính nó). Không đạt → `reason: 'no_water'`, `msg` bắt đầu bằng "Ngoài tầm nước". Bước này đứng trước bước tìm đường. Công trình đã có mà sau đó dời nguồn nước đi xa thì chỉ tạm ngừng (không nối, không có nước), không bị xóa.
+```js
+TANK, WATER_BUILD                 // data.js
+tankInfo(state)                   // → { has, level, cap (0 = chưa có bồn), full, pumping, why (lý do không bơm: giếng chưa máy bơm, bồn xa giếng, mất điện, bồn đầy), perHour }
+waterNet(state, live = false)     // → [{ e, ft, from }] các nút mạng nước theo thứ tự nối (from = thực thể nó nối vào, null với bồn chứa)
+waterAt(state, c, r, live = false) // ô có trong vùng phủ không
+waterOn(state, ent)               // công trình đang có nước để chạy không (live): nút mạng nước thì đang nối, thứ khác thì chạm vùng phủ
+drought(state)  powerOut(state)   // thời tiết xấu đọc từ state.weather
+WATER_ORDER                       // ['drip']: thứ tự trừ nước cố định
+```
+Chạm bồn chứa: tên đích `"Bồn chứa · level/cap lần nước"`, hành động `tank` luôn tắt, lý do là trạng thái máy bơm ("Máy bơm đang bơm khoảng 20 lần nước mỗi giờ" hoặc `why`). Khách thăm vườn thấy mực nước của chủ (`water` thuộc `VISIT_WORLD`).
+
+**Chế độ xây dựng:** khay có tab **Nước** (bồn chứa, bồn phụ, trạm bơm phụ; tắt kèm "Cần máy bơm" / "Cần bồn chứa" / "Đã tối đa"), dòng `#build-water` "💧 Bồn level/cap lần nước" (kèm lý do khi máy bơm ngừng). Bản đồ vẽ vùng phủ màu xanh nước có viền, ống nước chữ L từ giếng tới bồn và từ mỗi nút về nút nó nối vào (ống xanh có nước, ống xám khi khô: bồn cạn, mất điện, máy bơm không tới), thanh mực nước trên đỉnh bồn. Đang đặt hay kéo bồn chứa thì vùng xanh là tầm của giếng. Bóng đặt thử ngoài tầm thì đỏ kèm lý do "Ngoài tầm nước...".
+
+Hình: `public/arttank.js` `TANK_ART` (bộ thường) và `TANK_ART_HD` (2x), cùng cây khóa, hd.js nối: `tank[0..4]` 32x48 và `tank2[0..4]` 16x28 theo mức nước (`TANK_FRAC` = cạn, 1/4, 1/2, 3/4, đầy; `render.tankStage`), `booster.on|off` 16x26 (có điện và đang nối / không), `pipe.wet|dry.h|v|j` (16x6, 6x16, 8x8), `cover` 16x16 (ô vùng phủ, trong suốt), `bar` 22x7 (thanh mực nước, lòng `BAR_IN`). `render.buildingImg(b, state)` chọn hình theo mực nước và điện. Xem `public/_hdtank.html`.
 
 ### Giỏ và kho
 ```js
@@ -843,7 +875,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
                                //   Nhà: bed, wardrobe, phone (gọi bác sĩ thú y), (stove, table, plant chỉ để ngắm). Làng: market (Bà Tư), smithy (Ông Sáu),
                                //   vet (trạm thú y Cô Út), houseC (nhà Chú Ba, lái buôn mua vật nuôi đứng trước nhà), friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth mulch harvest clear` (`mulch` phủ rơm, issue 55); ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; bù nhìn bị bão quật đổ (`deco`) `raise`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill` (giếng thêm `upgradeWell`, issue 56).
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth mulch harvest clear` (`mulch` phủ rơm, issue 55); ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; bù nhìn bị bão quật đổ (`deco`) `raise`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill` (giếng thêm `upgradeWell`, issue 56; bồn chứa có `tank` luôn tắt, chỉ để xem trạng thái máy bơm, issue 57).
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 

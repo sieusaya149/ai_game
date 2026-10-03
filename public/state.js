@@ -7,7 +7,7 @@ import {
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
   TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON, WEATHER, MASTERY, masteryLevel,
 } from './data.js';
-import { WELL } from './data.js';
+import { WELL, TANK, WATER_BUILD } from './data.js';
 import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng ★ (issue 52)
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
@@ -664,6 +664,7 @@ function step(s, d) {
   }
   if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
   for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d);
+  stepWater(s, d);   // bơm vào bồn rồi trừ nước theo thứ tự cố định (issue 57)
   stepFree(s, d);
   stepAnimals(s, d);
   stepManure(s, d);
@@ -2227,6 +2228,95 @@ export function upgradeWell(s) {
   log(s, `Nâng giếng lên ${next.name.toLowerCase()} (${fmtXu(next.price)} xu)`);
   return R(true, `Đã nâng giếng lên ${next.name.toLowerCase()}, bình chứa ${next.can} lần nước`, { lv: next.lv, sound: 'coin' });
 }
+
+// ---------- Bồn chứa và mạng nước (issue 57, ADR 0015) ----------
+// Bồn là một con số (s.water.level lần nước), không mô phỏng dòng chảy. Máy bơm (giếng cấp 4) bơm vào bồn theo giờ vườn chạy;
+// máy cần nước trừ vào đó theo WATER_ORDER mỗi lượt. Công trình "có nước" khi cách một nút mạng nước (bồn, bồn phụ,
+// trạm bơm phụ đã nối) không quá TANK.range ô. Bồn cạn thì máy ngừng, không ai bị phạt.
+// Thời tiết xấu (issue 55 dựng lịch thời tiết): hạn hán bơm chậm, bão mất điện (máy bơm, trạm bơm phụ ngừng).
+export const drought = s => s.weather === 'drought';
+const HOUR = 3600_000;
+const WATER_KINDS = ['tank', 'tank2', 'booster'];
+// Khoảng cách theo ô giữa hai vùng (0 = chạm hoặc chồng nhau)
+const gapOf = (a, b) => Math.max(0, a.c - (b.c + b.w - 1), b.c - (a.c + a.w - 1), a.r - (b.r + b.h - 1), b.r - (a.r + a.h - 1));
+const near = (a, b) => gapOf(a, b) <= TANK.range;
+// Mạng nước của một bố cục: từ bồn chính lan ra bồn phụ, trạm bơm phụ nằm trong tầm của nút đã nối (thứ tự trong vườn).
+// live: lúc đang chạy (mất điện thì trạm bơm phụ không nối). → [{ e, ft, from }] (from: nút nó nối vào, để vẽ ống)
+function netOf(s, ents, live) {
+  const tank = ents.find(e => e.kind === 'tank');
+  if (!tank) return [];
+  const out = [{ e: tank, ft: footprint(tank), from: null }], off = live && powerOut(s);
+  const left = ents.filter(e => e.kind === 'tank2' || (e.kind === 'booster' && !off));
+  for (let i = 0; i < out.length; i++) for (let j = 0; j < left.length; j++) {
+    const ft = footprint(left[j]);
+    if (near(ft, out[i].ft)) { out.push({ e: left[j], ft, from: out[i].e }); left.splice(j--, 1); }
+  }
+  return out;
+}
+export const waterNet = (s, live = false) => netOf(s, s.farm?.ents ?? [], live);
+// Ô (c, r) có nước không (vùng phủ xanh). live: tính cả điện lúc này (để máy chạy); bỏ trống: vùng phủ lúc đặt công trình
+export const waterAt = (s, c, r, live = false) => waterNet(s, live).some(n => near({ c, r, w: 1, h: 1 }, n.ft));
+// Công trình e đang có nước để chạy không: nút mạng nước thì phải đang nối; thứ khác thì chạm vùng phủ lúc này
+export function waterOn(s, e) {
+  const net = waterNet(s, true);
+  if (WATER_KINDS.includes(e.kind)) return net.some(n => n.e.id === e.id);
+  const ft = footprint(e);
+  return net.some(n => near(ft, n.ft));
+}
+// Công trình cần nước khi đặt (canPlace lý do "ngoài tầm nước"): bồn phụ, trạm bơm phụ, khối ruộng có tưới nhỏ giọt.
+// Bồn chính thì phải ở trong tầm giếng.
+const needsWater = e => e.kind === 'tank2' || e.kind === 'booster' || (e.kind === 'field' && !!e.up?.drip);
+function waterCheck(s, e, ents) {
+  const ft = footprint(e);
+  if (e.kind === 'tank') return ents.some(x => x.kind === 'well' && near(footprint(x), ft)) ? null : no('no_water', `Ngoài tầm nước: bồn phải trong ${TANK.range} ô quanh giếng`);
+  if (!needsWater(e)) return null;
+  return netOf(s, ents.filter(x => x !== e), false).some(n => near(ft, n.ft)) ? null : no('no_water', `Ngoài tầm nước: phải trong ${TANK.range} ô quanh bồn hoặc trạm bơm phụ`);
+}
+// Máy bơm không bơm vì sao (null = đang bơm)
+function pumpWhy(s, tank, level, cap) {
+  const w = s.farm.ents.find(e => e.kind === 'well');
+  if (wellLv(s) < WELL.length) return `Giếng chưa phải ${WELL[WELL.length - 1].name.toLowerCase()}`;
+  if (!w || !near(footprint(w), footprint(tank))) return 'Bồn ở xa giếng quá, máy bơm không tới';
+  if (powerOut(s)) return 'Bão làm mất điện, máy bơm tạm ngừng';
+  if (level >= cap) return 'Bồn đầy rồi';
+  return null;
+}
+// → { has, level, cap (0 = chưa có bồn), full, pumping, why (lý do không bơm), perHour (tốc độ bơm lúc này) }
+export function tankInfo(s) {
+  const tank = s.farm?.ents.find(e => e.kind === 'tank'), level = Math.max(0, Math.floor(s.water?.level ?? 0));
+  const perHour = TANK.perHour * (drought(s) ? TANK.drought : 1);
+  if (!tank) return { has: false, level, cap: 0, full: false, pumping: false, why: wellLv(s) < WELL.length ? `Cần ${WELL[WELL.length - 1].name.toLowerCase()} mới có bồn chứa` : 'Chưa xây bồn chứa', perHour };
+  const cap = TANK.cap + TANK.extra * waterNet(s).filter(n => n.e.kind === 'tank2').length, why = pumpWhy(s, tank, level, cap);
+  return { has: true, level, cap, full: level >= cap, pumping: !why, why, perHour };
+}
+// Thứ tự trừ nước cố định mỗi lượt (ADR 0015): chạy bù trên trình duyệt và server ra cùng kết quả. Vòi sen (issue 59) đứng sau.
+export const WATER_ORDER = ['drip'];
+const WATER_USE = {
+  // tưới nhỏ giọt: khối ruộng có nước, ô có cây đang lớn mà đất khô thì tưới, mỗi ô 1 lần nước (theo thứ tự khối trong vườn, ô trong khối)
+  drip(s, take) {
+    for (const f of s.farm.ents) {
+      if (f.kind !== 'field' || !f.up?.drip || !waterOn(s, f)) continue;
+      for (const i of f.plots ?? []) {
+        const p = s.plots[i], c = p?.crop;
+        if (p?.unlocked && c && !c.dead && !c.rotten && p.water <= 0 && take()) p.water = 100;
+      }
+    }
+  },
+};
+function stepWater(s, d) {
+  const w = s.water, t = tankInfo(s);
+  if (!w || !t.has) return;
+  if (t.pumping) {
+    const unit = HOUR / TANK.perHour;
+    w.pump += d * (drought(s) ? TANK.drought : 1);
+    while (w.pump >= unit && w.level < t.cap) { w.level++; w.pump -= unit; }
+    if (w.level >= t.cap) w.pump = 0;
+    w.power += d / HOUR * TANK.power.pump;
+  }
+  if (!powerOut(s)) w.power += d / HOUR * TANK.power.booster * waterNet(s, true).filter(n => n.e.kind === 'booster').length;
+  const take = () => (w.level >= 1 ? (w.level--, true) : false);
+  for (const k of WATER_ORDER) WATER_USE[k](s, take);
+}
 function finishUpgrade(s) {
   const k = s.smith.tool;
   s.smith = null;
@@ -2453,6 +2543,10 @@ function buildingActs(s, t) {
   if (b.id === 'guestbook') return [mk('open', '📖', s.visit ? 'Ký sổ lưu bút' : 'Đọc sổ lưu bút')];
   if (b.id === 'bed') return [mk('sleep', '🛏️', 'Ngủ', canSleep(s) ? null : SLEEP_EARLY)];
   if (b.id.startsWith('bench')) return benchActs(s);
+  if (b.id === 'tank') {   // bồn chứa (issue 57): chỉ để xem mực nước và vì sao máy bơm đang ngừng
+    const k = tankInfo(s);
+    return [mk('tank', '💧', `Bồn ${k.level}/${k.cap} lần nước`, k.pumping ? `Máy bơm đang bơm khoảng ${k.perHour} lần nước mỗi giờ` : k.why)];
+  }
   if (b.id === 'well') {   // múc nước luôn là hành động chính; chưa cấp 4 thì thêm nút nâng giếng có giá (issue 56)
     const w = wellInfo(s), A = [mk('refill', '🪣', `Múc nước (bình ${s.can}/${canMax(s)})`, toolAway(s, 'can') ? awayMsg('can') : s.can >= canMax(s) ? 'Bình đầy rồi' : null)];
     if (w.next) A.push(mk('upgradeWell', '⬆️', `Nâng lên ${w.next.name}: bình ${w.next.can} lần (${fmtXu(w.next.price)} xu)`, w.next.error));
@@ -2886,7 +2980,7 @@ export function takeGifts(s, box) {
 // Khách `me` bước vào vườn `owner`: dựng bản đi dạo từ bản lưu chủ `raw` (server đã chạy bù). Đất, cây, con vật, chó...
 // là bản sao của chủ, không bao giờ lưu lại hay gửi đi. Phần của khách (tên, ngoại hình, giỏ, kho, đơn hàng...) dùng chung
 // đối tượng với `me`; xu, kinh nghiệm, thể lực, bình nước đọc ghi thẳng vào `me`. Trả null nếu không đọc được bản lưu chủ.
-const VISIT_WORLD = ['farm', 'plots', 'animals', 'troughs', 'manure', 'eggs', 'clutch', 'nest', 'dog', 'cats', 'poops', 'shipbin', 'time', 'day', 'weather', 'wday', 'simMs', 'nextId', 'today', 'guests'];
+const VISIT_WORLD = ['farm', 'water', 'plots', 'animals', 'troughs', 'manure', 'eggs', 'clutch', 'nest', 'dog', 'cats', 'poops', 'shipbin', 'time', 'day', 'weather', 'wday', 'simMs', 'nextId', 'today', 'guests'];
 const VISIT_LIVE = ['coins', 'exp', 'stamina', 'can', 'selectedSeed'];
 export function startVisit(me, raw, owner) {
   const h = raw && loadGame(structuredClone(raw));
@@ -3561,6 +3655,12 @@ export function canPlace(s, what, c, r) {
       return no('max_pens', nx ? `Đã đủ ${penLimit(s, what.pen)} ${PEN_DEFS[what.pen].name.toLowerCase()}, lên cấp ${nx} để xây thêm` : `Đã đủ số ${PEN_DEFS[what.pen].name.toLowerCase()} tối đa`);
     }
   }
+  if (!old && WATER_BUILD[what.kind]) {   // công trình nước (issue 57): bồn cần máy bơm, bồn phụ / trạm bơm cần bồn, số cái tối đa
+    const nm = BUILDING_DEFS[what.kind].name.toLowerCase(), max = WATER_BUILD[what.kind].max;
+    if (what.kind === 'tank' && wellLv(s) < WELL.length) return no('well', `Cần nâng giếng lên ${WELL[WELL.length - 1].name.toLowerCase()} mới xây ${nm} được`);
+    if (what.kind !== 'tank' && !f.ents.some(e => e.kind === 'tank')) return no('no_tank', `Cần xây bồn chứa trước rồi mới xây ${nm}`);
+    if (f.ents.filter(e => e.kind === what.kind).length >= max) return no('max', max > 1 ? `Đã đủ ${max} ${nm}` : `Vườn chỉ có một ${nm}`);
+  }
   const e = { ...(old ?? what), c, r }, ft = footprint(e), o = f.owned;
   if (ft.c < o.c || ft.r < o.r || ft.c + ft.w > o.c + o.w || ft.r + ft.h > o.r + o.h) return no('outside', 'Chỗ này ngoài đất của bạn');
   if (f.ents.some(x => CLUTTER[x.kind] && overlaps(ft, footprint(x)))) return no('uncleared', 'Còn bụi cây, đá chưa dọn');
@@ -3569,9 +3669,12 @@ export function canPlace(s, what, c, r) {
     const nx = fieldNextLevel(s);
     return no('max_fields', nx ? `Đã đủ ${fieldLimit(s)} khối ruộng, lên cấp ${nx} để có thêm` : 'Đã đủ số khối ruộng tối đa');
   }
+  const ents = old ? f.ents.map(x => (x === old ? e : x)) : [...f.ents, e];
+  const wet = waterCheck(s, e, ents);   // công trình cần nước phải nằm trong tầm nước (issue 57, ADR 0015)
+  if (wet) return wet;
   // Thử bố cục mới: chỗ nào trước đi tới được từ cổng thì sau vẫn phải tới được (cái mới đặt thì phải tới được).
   const before = new Map(access(mapOf(s)).map(t => [t.key, t.ok]));
-  const after = access(buildMap({ ...f, ents: old ? f.ents.map(x => (x === old ? e : x)) : [...f.ents, e] }));
+  const after = access(buildMap({ ...f, ents }));
   const lost = after.find(t => !t.ok && (before.get(t.key) ?? true));
   if (lost) return no('blocks_path', lost.key === 'house' ? 'Chặn mất đường từ cổng vào nhà' : `Chặn mất đường tới ${lost.name.toLowerCase()}`);
   return { ok: true };
@@ -3677,7 +3780,7 @@ export function upgradePen(s, id) {
 export function placeCost(s, what) {
   if (what.kind === 'field') return fieldCost(s);
   if (what.kind === 'pen') return PEN_PRICES[what.pen] ?? 0;
-  return BUILD_PRICES[what.kind] ?? 0;
+  return BUILD_PRICES[what.kind] ?? WATER_BUILD[what.kind]?.price ?? 0;
 }
 export function canAfford(s, what) {
   if (what.kind === 'deco') return have(s, what.item) > 0 ? { ok: true } : no('no_item', 'Bạn chưa có món này');
@@ -3687,7 +3790,7 @@ export function canAfford(s, what) {
   } else if (BUILD_PRICES[what.kind]) {
     const t = PEN_TABLE[what.kind];
     if (level(s) < t.lv) return no('level', `Cần cấp ${t.lv} mới xây ${BUILDING_DEFS[what.kind].name.toLowerCase()} được`);
-  } else if (what.kind !== 'field') return no('missing', 'Không đặt được món này');
+  } else if (what.kind !== 'field' && !WATER_BUILD[what.kind]) return no('missing', 'Không đặt được món này');
   return s.coins >= placeCost(s, what) ? { ok: true } : no('coins', 'Chưa đủ xu, cố lên nhé');
 }
 

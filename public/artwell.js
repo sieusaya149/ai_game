@@ -279,3 +279,5 @@ const build = k => DRAW.map(d => make(k, d));
 const NODOC = typeof document === 'undefined';
 export const WELLS = NODOC ? [] : build(1);      // 16x24, theo cấp 1..4
 export const WELLS_HD = NODOC ? [] : build(2);   // 32x48
+// Dùng lại cho bồn chứa, trạm bơm, ống nước (arttank.js, issue 57)
+export { Pix, pen, outline, mix, OUT, IRON, CONC, WATER, GRASS, WOOD, tuft };

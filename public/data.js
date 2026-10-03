@@ -29,6 +29,16 @@ export const WELL = [
   { name: 'Bơm tay',   can: 25, refillMs: 350, price: 2000 },
   { name: 'Máy bơm',   can: 40, refillMs: 250, price: 5000 },
 ];
+// Bồn chứa và mạng nước (issue 57, ADR 0015): bồn là một con số "lần nước". cap: bồn chính chứa · extra: mỗi bồn phụ thêm ·
+// perHour: máy bơm (giếng cấp 4) bơm vào bồn mỗi giờ vườn chạy, hạn hán × drought · range: tầm nước (ô) quanh bồn, trạm bơm phụ ·
+// power: số điện mỗi giờ chạy (máy bơm khi đang bơm, mỗi trạm bơm phụ khi có điện), issue 58 tính tiền điện từ đây.
+export const TANK = { cap: 200, extra: 150, perHour: 20, drought: 0.5, range: 8, power: { pump: 1, booster: 0.5 } };
+// Công trình nước đặt ở chế độ xây dựng: giá xây, số cái tối đa
+export const WATER_BUILD = {
+  tank:    { price: 1500, max: 1 },
+  tank2:   { price: 800,  max: 4 },
+  booster: { price: 1200, max: 4 },
+};
 // Làm n ô một lần tốn thể lực = cost × GROUP_COST[n] (làm nhiều ô một lần nhẹ hơn làm từng ô: 3×3 tốn 5 thay vì 9)
 export const GROUP_COST = [0, 1, 2, 2, 3, 3, 4, 4, 5, 5];
 export const SPEEDS =[1, 5, 20];       // nút tốc độ để review nhanh

@@ -652,6 +652,7 @@ export function nameOf(state, t) {
     case 'scale': return 'Cân heo';
     case 'nest': return 'Ổ ấp trứng';
     case 'building': {
+      if (t.id === 'tank') { const k = ST.tankInfo(state); return `Bồn chứa · ${k.level}/${k.cap} lần nước`; }   // issue 57
       if (t.id === 'well' && (state.scene ?? 'farm') === 'farm') { const w = ST.wellInfo(state); return `${w.name} · cấp ${w.lv} · bình ${w.can} lần`; }   // giếng 4 cấp (issue 56)
       return M.buildings.find(b => b.id === t.id)?.name ?? '';
     }

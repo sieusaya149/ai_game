@@ -541,6 +541,8 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
 #ui #build-msg { pointer-events: none; max-width: 420px; padding: 7px 14px; font-size: 14px; font-weight: 900; text-align: center; }
 #build-msg[data-ok="1"] { background: #dff7d4; border-color: var(--green-d); }
 #build-msg[data-ok="0"] { background: #ffd9d2; border-color: var(--red-d); }
+#ui #build-water { pointer-events: none; max-width: 420px; padding: 4px 12px; font-size: 13px; font-weight: 900; text-align: center; background: #dcefff; border-color: #3a6fa8; }
+.bt-card img.ico { object-fit: contain; image-rendering: pixelated; }
 #build-store, #build-upgrade { pointer-events: auto; min-height: 44px; padding: 8px 18px; font-size: 15px; }
 #build-upgrade.dim { opacity: 0.65; }
 #ui #build-tray { pointer-events: auto; width: 100%; max-width: 560px; padding: 6px; }
