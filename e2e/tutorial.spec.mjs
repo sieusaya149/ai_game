@@ -169,7 +169,8 @@ test('sổ tay mở từ túi đồ, lật đủ các trang (cấp cao)', async 
   const head = page.locator('.sheet-head h2'), body = page.locator('.guide-page');
   await expect(head).toHaveText(/Sổ tay/);
   const titles = ['Thể lực', 'Công cụ', 'Chế độ xây dựng', 'Mở đất', 'Thùng giao hàng', 'Chợ và giờ mở cửa', 'Đực, cái và sinh sản', 'Vịt', 'Chó Mực và dạy lệnh', 'Chó canh nhà',
-    'Vòng đời', 'Xe rùa', 'Tắm cho vật nuôi', 'Bệnh và thú y', 'Lùa về chuồng', 'Kẻ săn mồi'];
+    'Vòng đời', 'Xe rùa', 'Tắm cho vật nuôi', 'Bệnh và thú y', 'Lùa về chuồng', 'Kẻ săn mồi',
+    'Bốn mùa', 'Chất lượng ★', 'Thành thạo cây', 'Thời tiết', 'Nhà kính', 'Nước: giếng, bồn, tầm nước', 'Tự động hóa khối ruộng', 'Hố ủ phân'];
   for (let i = 0; i < titles.length; i++) {
     await expect(body.locator('h3')).toHaveText(titles[i]);
     await expect(body.locator('canvas.guide-art')).toBeVisible();

@@ -36,6 +36,7 @@ const bright = async (browser, s) => {
 
 for (const scene of ['farm', 'village', 'house']) {
   test(`màn hình tối dần theo đồng hồ: ${scene}`, async ({ browser }) => {
+    test.setTimeout(90_000);   // ba lần tải vườn lớn Phase 3 sát 30 giây
     const noon = await bright(browser, save(12, scene)), eve = await bright(browser, save(19.5, scene)), night = await bright(browser, save(23, scene));
     expect(eve, 'chữ "tối" mà màn hình chưa tối').toBeLessThan(noon * 0.93);
     expect(night).toBeLessThan(eve);
