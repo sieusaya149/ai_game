@@ -15,7 +15,7 @@ const put = (s, type, extra) => {
   return a;
 };
 // chạy `ms` giờ vườn, mỗi phút đổ đầy máng để con vật không đói
-const run = (s, ms, weather = 'sun') => { for (let t = 0; t < ms; t += MIN) { s.weather = weather; for (const k of Object.keys(s.troughs)) s.troughs[k] = 20; for (const a of s.animals) a.hunger = 100; withRandom(weather === 'rain' ? 0.9 : 0.1, () => G.tick(s, Math.min(MIN, ms - t))); } };   // 0.9 = ngày mới cũng mưa
+const run = (s, ms, weather = 'sun') => { for (let t = 0; t < ms; t += MIN) { s.weather = weather; for (const k of Object.keys(s.troughs)) s.troughs[k] = 20; for (const a of s.animals) a.hunger = 100; withRandom(weather === 'rain' ? 0.9 : 0.1, () => G.tick(s, Math.min(MIN, ms - t))); } };   // trời đặt lại mỗi phút (ngày mới thì theo hạt giống)
 const day = s => { s.weather = 'sun'; s.day = Math.floor(s.time / (24 * HOUR)) + 1; };
 
 test('độ dơ tăng 0 → 100 trong 3 giờ vườn; mưa và chuồng bẩn nhanh gấp đôi', () => {
@@ -39,6 +39,7 @@ test('độ dơ tăng 0 → 100 trong 3 giờ vườn; mưa và chuồng bẩn n
 test('vườn đóng băng thì không dơ thêm', () => {
   const s = newGame(); day(s);
   const a = put(s, 'ga', { dirty: 10 });
+  s.wseed = 2;   // hạt giống thời tiết: ngày 36–42 không mưa (issue 55), để chạy bù chỉ dơ theo tốc độ thường
   s.savedAt = Date.now() - 20 * HOUR;
   s.simMs = 0;
   store[G.SAVE_KEY] = JSON.stringify(s);
@@ -131,9 +132,9 @@ test('ổ cát: gà có ổ cát giữ dơ thấp, mưa thì vẫn dơ', () => {
   const pen = G.mapOf(s).pens.chicken;
   pen.ent.sand = true;   // lát 35 đặt cờ này trên chuồng gia cầm cấp 3
   const a = put(s, 'ga');
-  run(s, 4 * HOUR);
+  run(s, 4 * HOUR - 10 * MIN);   // dừng giữa ngày (trời đặt lại mỗi phút; sáng ngày mới trời theo hạt giống)
   assert.ok(a.dirty <= DIRT.sandCap, `${a.dirty}`);
-  run(s, 3 * HOUR, 'rain');
+  run(s, 3 * HOUR, 'rain');   // vẫn dừng giữa ngày: sáng ngày mới trời theo hạt giống (issue 55), chưa chắc mưa
   assert.ok(a.dirty > DIRT.sandCap);
   delete pen.ent.sand;
 });

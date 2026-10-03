@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { bootServer } from './helpers/server.mjs';
 import { createGame, buyStrip, placeEntity, canPlace, buyAnimal, mapOf } from '../public/state.js';
 import { GUEST, MAX_CATCHUP_MS, CLUTTER, levelInfo } from '../public/data.js';
+import { villageCal } from '../public/clock.js';
 
 const H = 3600_000;
 async function setup(t) {
@@ -53,7 +54,8 @@ async function poll(get, pred, ms = 3000) {
 }
 const crop = p => { p.soil = 'tilled'; p.crop = { id: 'cai', progress: 0.3, planted: 0, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: { dry: false, bugMax: 0, hand: false } }; };
 // mọi ô có cây khô và cỏ: 9 ô x 2 việc = 18 việc giúp
-const garden = s => { for (const p of s.plots) { crop(p); p.water = 0; p.weeds = true; } };
+// trời hôm nay của làng chốt là nắng (s.wday = ngày làng hiện tại): ngày mưa thì đất tự đủ nước, khách không tưới giúp được (issue 55)
+const garden = s => { for (const p of s.plots) { crop(p); p.water = 0; p.weeds = true; } s.weather = 'sun'; s.wday = villageCal(Date.now()).day; };
 const op = (id, act, idx) => ({ id, kind: 'help', act, idx });
 
 // ---------- Rớt WebSocket rồi nối lại ----------

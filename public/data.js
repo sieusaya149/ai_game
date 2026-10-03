@@ -89,6 +89,41 @@ export const OVERRIPE = 1.5;              // chín quá (grow × 1.5) mà chưa 
 // Dưới cấp minLevel mùa chưa ảnh hưởng. Nhiệm vụ Bà Tư giải thích mùa: mở từ ngày game questFromDay (đầu mùa thứ 2), thưởng một lần.
 export const SEASON = { slow: 0.6, minLevel: 5, bonusChance: 0.1, bonusQty: 1, questFromDay: 8, questCoins: 100, questExp: 30 };
 
+// Thời tiết (issue 55, ADR 0014): hàm thuần của ngày game và hạt giống (weather.js), đọc bảng này.
+// table[mùa]: tỉ lệ từng loại trời trong ngày (phần còn lại là nắng). Hạn hán: đúng 1 đợt mỗi mùa Hạ, dài drought[0]..drought[1] ngày,
+// không có bão trong đợt hạn. Cầu vồng: hôm trước mưa (hay bão) mà hôm nay nắng / mây thì rainbow = 30% thành cầu vồng.
+// Dưới cấp minLevel chưa có thời tiết xấu: bão → mưa, hạn hán → nắng, sương muối → mây (mild).
+export const WEATHER = {
+  minLevel: 5,
+  table: {
+    xuan: { rain: 0.3, cloud: 0.3 },
+    ha:   { storm: 0.05, rain: 0.2, cloud: 0.2 },
+    thu:  { storm: 0.05, rain: 0.25, cloud: 0.3 },
+    dong: { frost: 0.15, rain: 0.15, cloud: 0.35 },
+  },
+  drought: [2, 3],
+  rainbow: 0.3,
+  bad: ['storm', 'drought', 'frost'],
+  mild: { storm: 'rain', drought: 'sun', frost: 'cloud' },
+  sunDry: 1.5,               // nắng: đất khô nhanh ×1.5 (như Phase 0)
+  droughtDry: 2,             // hạn hán: khô nhanh gấp 2 ngày nắng
+  mulchDry: 0.5,             // ô phủ rơm: khô chậm một nửa; rơm còn chống sương muối
+  stormUnhappyPerMin: 3,     // bão: con vật đang ở ngoài trời mất vui mỗi phút (trong chuồng thì không)
+  rainbowHappy: 15,          // cầu vồng: sáng ra mọi con vật vui thêm chừng này
+  scarecrowFix: 40,          // dựng lại bù nhìn bị bão quật đổ
+  outage: 0.5,               // ngày bão: 50% mất điện nửa ngày đầu (6h–18h; máy bơm, máy phun ngừng, issue 57–58)
+  // icon, tên, câu báo lúc sáng ra, câu radio / bảng tin báo cho ngày mai
+  kinds: {
+    sun:     { icon: '☀️', name: 'Nắng đẹp', toast: 'Trời nắng đẹp ☀️', tip: 'Trời nắng ráo, đất khô nhanh hơn chút, nhớ tưới.' },
+    cloud:   { icon: '⛅', name: 'Nhiều mây', toast: 'Trời nhiều mây ⛅', tip: 'Trời mát, nhiều mây.' },
+    rain:    { icon: '🌧️', name: 'Mưa', toast: 'Trời mưa rồi, ruộng tự có nước 🌧️', tip: 'Có mưa, ruộng tự đủ nước.' },
+    storm:   { icon: '⛈️', name: 'Bão', toast: 'Bão tới rồi! Lùa con vật vào chuồng ⛈️', tip: 'Lùa gà vịt vào chuồng trước, bão quật đổ bù nhìn, có thể mất điện nửa ngày.' },
+    drought: { icon: '🔥', name: 'Hạn hán', toast: 'Nắng hạn gay gắt, đất khô nhanh gấp đôi 🔥', tip: 'Đất khô nhanh gấp đôi, giếng hồi nước chậm. Phủ rơm cho ruộng giữ ẩm.' },
+    frost:   { icon: '❄️', name: 'Sương muối', toast: 'Sương muối phủ trắng ruộng, cây non ngừng lớn hôm nay ❄️', tip: 'Cây mới gieo và cây mầm ngừng lớn cả ngày. Phủ rơm để chống sương.' },
+    rainbow: { icon: '🌈', name: 'Cầu vồng', toast: 'Cầu vồng sau mưa, con vật vui hẳn lên 🌈', tip: 'Trời đẹp sau mưa, con vật vui hơn.' },
+  },
+};
+
 export const FARMING = {
   waterDrainPerMin: 25,   // đất mất bao nhiêu % nước mỗi phút (trời nắng ×1.5, trời mưa luôn đầy)
   canMax: 10,             // bình tưới cấp 1 chứa 10 lần tưới, ra giếng múc lại (cấp cao hơn: TOOLS.can.canMax)
@@ -424,6 +459,7 @@ export const ITEMS = {
   medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 3, desc: 'Mệt: 1 liều là khỏi. Bệnh nặng: 2 liều. Nguy kịch: phải gọi bác sĩ thú y.' },
   vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 60, lv: 3, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
+  straw:      { name: 'Rơm phủ luống',     kind: 'supply', price: 5,  lv: 1, desc: 'Phủ lên ô ruộng: đất giữ ẩm lâu gấp đôi (đỡ khổ lúc hạn hán), cây non không sợ sương muối. Thu hoạch hay dọn ô thì rơm mất.' },
   soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
   manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Hố ủ phân sẽ dùng sau.' },
   feed_ga:    { name: 'Cám gà',           kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },
@@ -601,6 +637,7 @@ export const NOTIFY_CATS = {
   guard: 'Chó canh khách lạ', visit: 'Bạn bè ghé',
   old: 'Con vật sắp già, ra đi', stray: 'Con lạc ngủ ngoài', ill: 'Con vật mệt',
   pest: 'Chuột ăn cám, trộm trứng', birth: 'Vật nuôi sinh con',
+  weather: 'Báo thời tiết xấu ngày mai',
 };
 const cropN = id => (CROPS[id]?.name ?? id).toLowerCase();
 const animalN = a => String(a).toLowerCase();
@@ -664,6 +701,9 @@ export const EVENT_LEVEL = {
   vaccinated: { level: 'info', group: e => 'vaccinated:' + e.id, label: 'Đã tiêm vắc-xin' },
   mucked:    { level: 'info', group: e => 'mucked:' + e.pen, label: 'Đã xúc phân chuồng' },
   shipped:   { level: 'info', group: () => 'shipped', label: 'Lái buôn lấy hàng' },
+  // thời tiết (issue 55): sáng ra mà ngày mai có bão / hạn hán / sương muối thì báo trước 1 ngày
+  forecast:  { level: 'important', cat: 'weather', group: e => 'forecast:' + e.kind, label: 'Báo thời tiết xấu ngày mai', text: (n, e) => `Đài báo ngày mai ${WEATHER.kinds[e.kind]?.icon ?? ''} ${(WEATHER.kinds[e.kind]?.name ?? '').toLowerCase()}, chuẩn bị nhé` },
+  scarecrow: { level: 'info', group: () => 'scarecrow', label: 'Bão quật đổ bù nhìn' },
   log:       { level: 'info', group: () => 'log', label: 'Nhật ký' },
   toast:     { level: 'direct', group: e => 'toast:' + e.text, label: 'Thông báo của luật chơi' },
   achievement: { level: 'direct', group: e => 'achievement:' + e.id, label: 'Thành tựu' },

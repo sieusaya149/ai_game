@@ -5,16 +5,17 @@ import {
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
-  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON, MASTERY, masteryLevel,
+  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON, WEATHER, MASTERY, masteryLevel,
 } from './data.js';
 import { WELL } from './data.js';
 import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng ★ (issue 52)
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
-import { now, villageCal, serverDay } from './clock.js';
+import { now, villageCal, serverDay, VILLAGE_SEED } from './clock.js';
+import { weatherOn, outageOn, droughtOf, isWet } from './weather.js';
 
-export { animalPrice, levelInfo, mapOf, reachable, footprint, sceneMap, stageStart, stageAt, lifeEnd };
+export { animalPrice, levelInfo, mapOf, reachable, footprint, sceneMap, stageStart, stageAt, lifeEnd, weatherOn, outageOn, droughtOf, isWet };
 export const SAVE_KEY = 'nongtrai-save-v4';
 // Bản cũ: đọc được để chuyển, không bao giờ ghi đè hay xóa. Mỗi bản có cờ riêng "đã chuyển (hoặc đã chơi lại từ đầu)"
 // để không đọc lại nữa; đọc lần lượt v4 → v3 → v2 → v1.
@@ -222,6 +223,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
   const s = {
     v: SAVE_VERSION, name, look: lk, owned, coins: START.coins, exp: 0,
     time: 0, speed: 1, day: 1, weather: 'sun', savedAt: now(),
+    wseed: Math.floor(Math.random() * 2 ** 32), wday: null,   // hạt giống thời tiết của vườn chơi đơn · ngày game của s.weather (issue 55)
     simMs: 0, frozenMs: 0, frozenTotal: 0,   // giờ vườn đã chạy · khoảng đóng băng lần mở gần nhất · tổng đóng băng
     farm: nf.farm, scene: 'farm',     // scene: bản đồ đang đứng; player.x/y tính theo bản đồ đó
     player: { x: 0, y: 0, dir: 0 }, stamina: STAMINA.max, sit: false, can: FARMING.canMax, selectedSeed: 'cai',
@@ -342,6 +344,9 @@ export function loadGame(raw) {
   s.dog.chained = !!s.dog.chained;
   s.seasonQuest = s.seasonQuest === 'done' || s.seasonQuest === 'skipped' ? s.seasonQuest : null;   // nhiệm vụ mùa của Bà Tư (issue 54)
   s.coUtQuest ??= null;   // bản lưu cũ chưa có nhiệm vụ làm quen của Cô Út (issue 48)
+  // thời tiết (issue 55): bản lưu cũ chưa có hạt giống thì lấy theo tên vườn (thuần, server và trình duyệt ra như nhau)
+  if (!Number.isInteger(s.wseed)) s.wseed = [...String(s.name)].reduce((h, ch) => Math.imul(h ^ ch.codePointAt(0), 16777619) >>> 0, 2166136261);
+  s.wday = Number.isFinite(s.wday) ? s.wday : null;
   // trộm NPC (issue 46): bản lưu cũ chưa có thì bắt đầu từ con số không
   s.teoCaught = Math.max(0, Math.floor(s.teoCaught) || 0);
   s.choreWeek = Number.isFinite(s.choreWeek) ? s.choreWeek : -1;
@@ -482,6 +487,44 @@ export const seasonGrowMul = (s, cropId) => (seasonActive(s) && seasonFit(s, cro
 // Cây từng lớn lúc trái mùa (đã tính bảo hộ): không ra ★3
 export const cropOffSeason = c => !!c?.offSeason;
 
+// ---------- Thời tiết (issue 55, ADR 0014) ----------
+// Trời của một ngày là hàm thuần weatherOn(hạt giống, ngày game) ở weather.js. Online: hạt giống làng (VILLAGE_SEED) + lịch làng,
+// nên cả làng cùng một trời và server chạy bù ra đúng trời đã qua; chơi đơn: hạt giống của vườn (s.wseed) + s.day.
+// s.weather = trời hôm nay (chốt lúc 6h sáng theo dayOf, nằm trong bản lưu), s.wday = ngày game của s.weather.
+export const weatherSeed = s => (online(s) ? VILLAGE_SEED : (s.wseed >>> 0));
+// Bảo hộ người mới: dưới WEATHER.minLevel không có bão, hạn hán, sương muối (đổi thành mưa, nắng, mây)
+export const weatherActive = s => level(s) >= WEATHER.minLevel;
+// Thời tiết của hôm nay + `ahead` ngày theo lịch game, đã tính bảo hộ người mới
+export function weatherOf(s, ahead = 0) {
+  const k = weatherOn(weatherSeed(s), dayOf(s) + ahead);
+  return weatherActive(s) ? k : WEATHER.mild[k] ?? k;
+}
+// Báo trước cho ngày mai: radio trong nhà, bảng tin làng chỉ việc gọi hàm này
+export const forecast = s => weatherOf(s, 1);
+// Mất điện (issue 57–58 đọc): ngày bão có cờ mất điện thì nửa ngày đầu (6h–18h) máy bơm, máy phun ngừng
+export const powerOut = s => s.weather === 'storm' && outageOn(weatherSeed(s), s.wday ?? dayOf(s)) && dayFrac(s) < 0.5;
+// Sương muối giữ cây hạt và mầm đứng yên cả ngày; ô phủ rơm thì không (issue 60: ô trong nhà kính cũng không)
+export const frostHold = (s, p) => s.weather === 'frost' && !p.mulch && !!p.crop && !p.crop.dead && !p.crop.rotten && stageOf(p.crop) <= 1;
+// Hệ số đất khô của một ô: nắng ×1.5, hạn hán gấp đôi ngày nắng, phủ rơm ×0.5 (mưa, bão thì đất luôn đủ nước)
+export const dryMul = (s, p) => (s.weather === 'sun' ? WEATHER.sunDry : s.weather === 'drought' ? WEATHER.sunDry * WEATHER.droughtDry : 1) * (p.mulch ? WEATHER.mulchDry : 1);
+// 6h sáng ngày game mới (theo dayOf): chốt trời hôm nay, bão quật đổ bù nhìn, cầu vồng làm con vật vui, báo trước ngày mai xấu
+function newWeatherDay(s, wd) {
+  const first = s.wday == null;
+  s.wday = wd;
+  if (first && !online(s) && WEATHER.kinds[s.weather]) return;   // bản lưu cũ, vườn mới chơi đơn: giữ trời đang có tới hết hôm nay
+  s.weather = weatherOf(s);
+  if (first) return;
+  if (s.weather === 'storm') {
+    const down = s.farm.ents.filter(e => e.item === 'deco_scarecrow' && !e.down);
+    for (const e of down) e.down = true;
+    if (down.length) { log(s, `Bão quật đổ ${down.length} bù nhìn, dựng lại thì quạ mới sợ`); emit({ type: 'scarecrow', n: down.length }); }
+  }
+  if (s.weather === 'rainbow') for (const a of s.animals) a.happy = Math.min(100, a.happy + WEATHER.rainbowHappy);
+  toast(WEATHER.kinds[s.weather].toast);
+  const f = forecast(s);
+  if (!catchUp && WEATHER.bad.includes(f)) emit({ type: 'forecast', kind: f, day: wd + 1 });
+}
+
 // ---------- Thời gian ----------
 // Online: ngày đêm, ngày, mùa theo lịch làng (giờ server); chơi đơn theo state.time. Đóng băng không làm lịch làng dừng.
 const online = s => s.mode === 'online';
@@ -608,14 +651,13 @@ function step(s, d) {
   const day = Math.floor(s.time / DAY_MS) + 1;
   if (day !== s.day) {
     s.day = day;
-    const r = Math.random();
-    s.weather = r < 0.45 ? 'sun' : r < 0.75 ? 'cloud' : 'rain';
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.morningRegen);   // mỗi sáng 6h tự hồi một ít
     settleShip(s);
     if (s.chore?.day === s.day) doChore(s);   // trộm bị phạt sang làm thợ không công (issue 46)
     if (!catchUp) cockCrow(s);
-    toast({ sun: 'Trời nắng đẹp ☀️', cloud: 'Trời nhiều mây ⛅', rain: 'Trời mưa rồi, ruộng tự có nước 🌧️' }[s.weather]);
   }
+  const wd = dayOf(s);   // thời tiết theo lịch game: online là lịch làng (có thể lệch với s.day của vườn)
+  if (s.wday !== wd) newWeatherDay(s, wd);
   if (s.sit) {   // ngồi ghế đá: hồi chậm, đầy thì tự đứng dậy
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.benchPerMin * d / MIN);
     if (s.stamina >= STAMINA.max) { s.sit = false; toast('Khỏe re rồi, làm tiếp thôi 💪'); }
@@ -642,8 +684,8 @@ function cockCrow(s) {
 
 function stepPlot(s, p, d) {
   const wet = p.water > 0;
-  if (s.weather === 'rain') p.water = 100;
-  else if (p.water > 0) p.water = Math.max(0, p.water - FARMING.waterDrainPerMin * (d / MIN) * (s.weather === 'sun' ? 1.5 : 1));
+  if (isWet(s.weather)) p.water = 100;
+  else if (p.water > 0) p.water = Math.max(0, p.water - FARMING.waterDrainPerMin * (d / MIN) * dryMul(s, p));
   if (!p.weeds && chance(FARMING.weedChancePerMin, d)) p.weeds = true;
   const c = p.crop;
   if (!c || c.dead || c.rotten) return;
@@ -662,7 +704,7 @@ function stepPlot(s, p, d) {
     if (s.time - c.bugSince >= FARMING.bugToSick) { c.bugs = false; c.sick = true; c.sickSince = s.time; fxEv(at.x, at.y, 'Cây bệnh rồi 🤒', COL.bad); log(s, `${def.name} bị bệnh vì sâu`); }
     return;
   }
-  if (p.water > 0) {
+  if (p.water > 0 && !frostHold(s, p)) {   // sương muối: cây hạt, mầm đứng yên hôm nay (không chết)
     const sm = seasonGrowMul(s, c.id);
     if (sm < 1) c.offSeason = true;   // đã lớn lúc trái mùa: không ra ★3 (issue 54)
     c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm;
@@ -860,7 +902,7 @@ function dusk(s) {
   const cand = s.animals.filter(a => a.tile && canRoam(s, a));
   if (!cand.length) return;
   const n = cand.length, [lo, hi] = FREE.strayPerDusk;
-  let k = s.weather === 'rain' ? Math.max(FREE.stormMin, Math.round(n * FREE.stormShare)) : Math.min(rint(lo, hi), Math.max(1, Math.ceil(n / 2)));
+  let k = isWet(s.weather) ? Math.max(FREE.stormMin, Math.round(n * FREE.stormShare)) : Math.min(rint(lo, hi), Math.max(1, Math.ceil(n / 2)));
   k = Math.min(k, n);
   const weight = a => {
     const g = animalPen(s, a)?.gates[0], far = g ? Math.max(Math.abs(a.tile.c - g[0]), Math.abs(a.tile.r - g[1])) : 0;
@@ -913,14 +955,14 @@ function scatter(s, t, at) {
   return res(true, msg, [say(at, near.length ? `Rải thóc 🌾 ${h.home}/${h.total} đã về` : 'Rải thóc 🌾')], 'eat', { grain: { x: g.x, y: g.y } });
 }
 function stepFree(s, d) {
-  const roam = roamOf(s), day = !isDusk(s);
+  const roam = roamOf(s), day = !isDusk(s), storm = s.weather === 'storm';   // bão: con đang trong chuồng ở yên trong chuồng
   if (!day && (s.duskDay || 0) !== s.day) dusk(s);
   let n = 0;
   for (const a of s.animals) {
     if (a.stray && a.tile && !day && canRoam(s, a)) { n++; continue; }   // ngủ ngoài tới sáng
     if (a.stray) a.stray = false;
     if (s.time < (a.homeUntil || 0)) { if (a.tile) goHome(s, a); continue; }   // chó vừa lùa về: ở yên trong chuồng một lúc
-    if (!day || !roam.tiles.length || !canRoam(s, a) || n >= FREE.max) { if (a.tile) goHome(s, a); continue; }
+    if (!day || (storm && !a.tile) || !roam.tiles.length || !canRoam(s, a) || n >= FREE.max) { if (a.tile) goHome(s, a); continue; }
     n++;
     const mom = duckMom(s, a);
     if (mom) { if (!a.tile) Object.assign(a, tileMid(mom.tile)); a.tile = { ...mom.tile }; a.tileAt = mom.tileAt; continue; }
@@ -946,7 +988,7 @@ function bushSpot(s, a) {
 export const hiddenEggs = s => s.eggs.filter(e => e.tile);
 
 function stepAnimals(s, d) {
-  const stink = s.poops.length * DOG.stinkUnhappyPerPoop * (d / MIN);
+  const stink = s.poops.length * DOG.stinkUnhappyPerPoop * (d / MIN), stormy = s.weather === 'storm';
   const penKey = a => a.pen ?? ANIMALS[a.type].pen;   // id chuồng của con vật (chưa xếp chuồng thì theo loại chuồng)
   const joy = new Set(s.animals.filter(a => a.retired).map(penKey));   // những chuồng có con nghỉ hưu
   for (const a of [...s.animals]) {
@@ -964,6 +1006,7 @@ function stepAnimals(s, d) {
     // vui: trôi dần về 50, mùi hôi kéo xuống
     if (a.happy > 50) a.happy = Math.max(50, a.happy - HUSBANDRY.happyDecayPerMin * d / MIN);
     a.happy = Math.max(0, a.happy - stink);
+    if (stormy && a.tile) a.happy = Math.max(0, a.happy - WEATHER.stormUnhappyPerMin * d / MIN);   // bão: con ngoài trời mất vui (issue 55)
     if (joy.has(penKey(a))) a.happy = Math.max(a.happy, TRADE.retireHappy);
     // để đói hay dơ lâu thì bớt thân (heo, bò đầm bùn là tính tự nhiên: dơ bùn chỉ tăng nguy cơ bệnh, không bớt thân)
     if (a.hunger <= BOND.hungerBelow || (a.dirty || 0) >= BOND.dirtyAbove && !DIRT.mud.includes(a.type)) bondShift(a, -BOND.lossPerMin * d / MIN);
@@ -1130,7 +1173,7 @@ function stepDirt(s, a, d) {
     if (a.dirty < 100 && s.time >= (a.wallowAt || 0)) { a.dirty = 100; emit({ type: 'wallow', id: a.id }); }
     return;
   }
-  const rain = s.weather === 'rain';
+  const rain = isWet(s.weather);
   a.dirty = Math.min(100, a.dirty + 100 * d / DIRT.fullMs * (rain || penDirty(s, pen) ? DIRT.fastMul : 1));
   if (POULTRY.includes(a.type) && !rain && penSand(s, pen)) a.dirty = Math.min(a.dirty, DIRT.sandCap);   // tự tắm cát
   if (isDirty(a)) a.happy = Math.max(0, a.happy - DIRT.unhappyPerMin * d / MIN);
@@ -1617,7 +1660,7 @@ function stepThreats(s, d) {
   const busy = new Set(s.threats.map(t => t.plot));
   const ripe = s.plots.filter(p => p.unlocked && isRipe(p) && !busy.has(p.idx));
   const m = mapOf(s), v = m.view;
-  const scare = m.decos.filter(o => o.kind === 'deco_scarecrow');
+  const scare = m.decos.filter(o => o.kind === 'deco_scarecrow' && !o.ent?.down);   // bù nhìn bị bão quật đổ thì quạ không sợ
   // quạ
   const open = ripe.filter(p => { const c = plotCenter(s, p.idx); return !scare.some(o => Math.hypot(o.x - c.x, o.y - c.y) <= 5 * TS); });
   if (open.length && s.threats.filter(t => t.kind === 'crow').length < 2 && chance(THREATS.crowChancePerMin, d)) {
@@ -2215,6 +2258,7 @@ function plotActs(s, t) {
     else {
       const def = CROPS[s.selectedSeed], n = have(s, `seed_${s.selectedSeed}`);
       A.push(mk('plant', '🌱', `Gieo ${def.name} (còn ${n})`, level(s) < def.lv ? `Cần cấp ${def.lv}` : n <= 0 ? 'Hết hạt, mua ở chợ nhé' : null));
+      if (!p.mulch) A.push(mulchAct(s));
     }
     if (p.weeds) A.push(mk('weed', '🌿', 'Nhổ cỏ'));
     return A;
@@ -2230,10 +2274,14 @@ function plotActs(s, t) {
   if (!A.includes(water)) A.push(water);
   if (!c.fert) A.push(mk('fertilize', '💩', `Bón phân (còn ${have(s, 'fertilizer')})`, have(s, 'fertilizer') <= 0 ? noItem('fertilizer') : null));
   A.push(mk('growth', '⚡', `Thuốc tăng trưởng (còn ${have(s, 'growth')})`, c.boosts >= FARMING.growthMax ? 'Cây đã dùng tối đa rồi' : have(s, 'growth') <= 0 ? noItem('growth') : null));
-  const j = A.findIndex(a => !a.disabled);
+  if (!p.mulch) A.push(mulchAct(s));
+  const j = A.findIndex(a => !a.disabled && a.id !== 'mulch');   // phủ rơm không bao giờ tự thành việc chính (khỏi chạm nhầm tốn rơm)
   if (j > 0 && A[0].disabled) A.unshift(...A.splice(j, 1)); // hành động chính phải làm được nếu có thể
   return A;
 }
+
+// Phủ rơm (issue 55): tốn 1 rơm trong kho, giữ ẩm và chống sương muối tới lúc thu hoạch / dọn ô
+const mulchAct = s => mk('mulch', '🌾', `Phủ rơm (còn ${have(s, 'straw')})`, have(s, 'straw') <= 0 ? noItem('straw') : null);
 
 function lockedActs(s, t) {
   if (t.idx !== nextLockedPlot(s)) return [];
@@ -2395,7 +2443,7 @@ const TALK = {
 function buildingActs(s, t) {
   const b = sceneMap(s).building(t.id);
   if (!b) return [];
-  const open = { shed: ['📦', 'Vào nhà kho'], shipbin: ['📮', 'Mở thùng giao hàng'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'], smithy: ['🔨', 'Vào tiệm rèn'], vet: ['💊', 'Vào trạm thú y Cô Út'], phone: ['📞', 'Gọi bác sĩ thú y'] }[b.id];
+  const open = { shed: ['📦', 'Vào nhà kho'], shipbin: ['📮', 'Mở thùng giao hàng'], board: ['📋', 'Xem đơn hàng'], wardrobe: ['👕', 'Mở tủ đồ'], smithy: ['🔨', 'Vào tiệm rèn'], vet: ['💊', 'Vào trạm thú y Cô Út'], phone: ['📞', 'Gọi bác sĩ thú y'], radio: ['📻', 'Nghe đài báo thời tiết'], newsboard: ['📰', 'Xem bảng tin làng'] }[b.id];
   if (open) return [mk('open', open[0], open[1])];
   if (b.id === 'market') return [mk('open', '🛒', 'Mua bán ở chợ', marketOpen(s) ? null : CLOSED)];
   if (TALK[b.id]) return [mk('talk', TALK[b.id].icon, TALK[b.id].label)];
@@ -2418,6 +2466,7 @@ const benchActs = s => [mk('sit', '🪑', 'Ngồi nghỉ', s.stamina >= STAMINA.
 function decoActs(s, t) {
   const e = s.farm.ents.find(x => x.id === t.id);
   if (e?.kind === 'grave') return [mk('flower', '🌸', e.flower ? 'Mộ đã có hoa' : `Đặt hoa lên mộ (chậu hoa còn ${have(s, 'deco_flower')})`, e.flower ? 'Mộ đã có hoa rồi' : have(s, 'deco_flower') <= 0 ? 'Cần một chậu hoa, mua ở chợ nhé' : null)];
+  if (e?.item === 'deco_scarecrow' && e.down) return [mk('raise', '🧑‍🌾', `Dựng lại bù nhìn bị bão quật đổ (${WEATHER.scarecrowFix} xu)`, s.coins < WEATHER.scarecrowFix ? 'Chưa đủ xu' : null)];
   if (e?.item === 'deco_rattrap') return [mk('arm', '🪤', e.shut ? 'Gài lại bẫy chuột' : 'Bẫy chuột đã gài', e.shut ? null : 'Bẫy đang gài sẵn, chờ chuột thôi')];
   return e?.item === 'deco_bench' ? benchActs(s) : [];
 }
@@ -2520,6 +2569,7 @@ const DO = {
       }
       case 'water': s.can--; p.water = 100; handCare(c); return res(true, 'Đã tưới nước', [say(at, '💧', '#7ad7ff')], 'water');
       case 'weed': p.weeds = false; return res(true, 'Đã nhổ cỏ', [say(at, '🌿')], 'pop');
+      case 'mulch': take(s, 'straw'); p.mulch = true; return res(true, 'Đã phủ rơm, đất giữ ẩm lâu hơn', [say(at, 'Phủ rơm 🌾')], 'plant');
       case 'spray': {
         take(s, 'pesticide');
         if (c.bugs) s.stats.bugs++;
@@ -2543,10 +2593,10 @@ const DO = {
         give(s, key, qty); s.stats.harvests++; addExp(s, def.exp);
         if (chance1(MASTERY.seedBack[mastery(s, c.id).lv - 1])) { give(s, `seed_${c.id}`); fx.push(say({ x: at.x, y: at.y - 20 }, '+1 hạt 🌱')); }
         fx.push(...bumpMastery(s, c.id, at));
-        p.crop = null; p.soil = 'untilled';
+        p.crop = null; p.soil = 'untilled'; p.mulch = false;
         return res(true, `Thu hoạch ${qty} ${nm}${bonus ? ` (đúng mùa +${bonus})` : ''}`, [say(at, `+${qty} ${nm}`, starOf(key) > 2 ? COL.coin : COL.good), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp), ...fx], 'harvest');
       }
-      case 'clear': p.crop = null; p.soil = 'untilled'; return res(true, 'Đã dọn sạch ô đất', [say(at, '🧹')], 'dig');
+      case 'clear': p.crop = null; p.soil = 'untilled'; p.mulch = false; return res(true, 'Đã dọn sạch ô đất', [say(at, '🧹')], 'dig');
     }
   },
 
@@ -2723,6 +2773,12 @@ const DO = {
 
   deco(s, t, id, at) {
     if (id === 'flower') { const r = placeFlower(s, t.id); return r.ok ? res(true, r.msg, [say(at, '🌸')], 'pop') : bad(r.msg, at); }
+    if (id === 'raise') {   // dựng lại bù nhìn bị bão quật đổ
+      const e = s.farm.ents.find(x => x.id === t.id);
+      s.coins -= WEATHER.scarecrowFix; e.down = false;
+      log(s, `Dựng lại bù nhìn (${WEATHER.scarecrowFix} xu)`);
+      return res(true, 'Bù nhìn đứng dậy rồi, quạ lại sợ', [say(at, `-${WEATHER.scarecrowFix} xu`, COL.coin)], 'coin');
+    }
     if (id === 'arm') {
       const e = s.farm.ents.find(x => x.id === t.id);
       e.shut = false;
@@ -2830,7 +2886,7 @@ export function takeGifts(s, box) {
 // Khách `me` bước vào vườn `owner`: dựng bản đi dạo từ bản lưu chủ `raw` (server đã chạy bù). Đất, cây, con vật, chó...
 // là bản sao của chủ, không bao giờ lưu lại hay gửi đi. Phần của khách (tên, ngoại hình, giỏ, kho, đơn hàng...) dùng chung
 // đối tượng với `me`; xu, kinh nghiệm, thể lực, bình nước đọc ghi thẳng vào `me`. Trả null nếu không đọc được bản lưu chủ.
-const VISIT_WORLD = ['farm', 'plots', 'animals', 'troughs', 'manure', 'eggs', 'clutch', 'nest', 'dog', 'cats', 'poops', 'shipbin', 'time', 'day', 'weather', 'simMs', 'nextId', 'today', 'guests'];
+const VISIT_WORLD = ['farm', 'plots', 'animals', 'troughs', 'manure', 'eggs', 'clutch', 'nest', 'dog', 'cats', 'poops', 'shipbin', 'time', 'day', 'weather', 'wday', 'simMs', 'nextId', 'today', 'guests'];
 const VISIT_LIVE = ['coins', 'exp', 'stamina', 'can', 'selectedSeed'];
 export function startVisit(me, raw, owner) {
   const h = raw && loadGame(structuredClone(raw));

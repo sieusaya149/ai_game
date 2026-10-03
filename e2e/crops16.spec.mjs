@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { makeSave, seedSave, tapPlot } from './helpers.mjs';
 import { canPlace, placeEntity, buyStrip, sceneMap } from '../public/state.js';
-import { CROPS, levelInfo } from '../public/data.js';
+import { CROPS, SEASON, levelInfo } from '../public/data.js';
 
 const fixture = name => JSON.parse(readFileSync(new URL(`../tests/fixtures/${name}.json`, import.meta.url), 'utf8'));
 const pref = battery => async context => context.addInitScript(b => { try { localStorage.setItem('nongtrai-pref', JSON.stringify({ battery: b, hinted: true })); } catch {} }, battery);
@@ -30,8 +30,10 @@ test('bản lưu v3 ghi sẵn có cây đang lớn: game mở, cây còn nguyên
   // ô 0 đã chín: thu hoạch được, giỏ thêm đúng sản lượng
   const ripe = old.plots.find(p => p.crop?.progress >= 1);
   await tapPlot(page, ripe.idx, touch, () => page.evaluate(i => !globalThis.__farm.state.plots[i].crop, ripe.idx));
-  const cai = await page.evaluate(() => { const st = globalThis.__farm.state; return (st.basket.cai || 0) + (st.inv.cai || 0); });
-  expect(cai).toBe(s.cai + CROPS.cai.yield);
+  // đếm cả cải có sao (issue 52); đúng mùa thì 10% lần được thêm SEASON.bonusQty (issue 54)
+  const cai = await page.evaluate(() => { const st = globalThis.__farm.state; return ['cai', 'cai@2', 'cai@3'].reduce((n, k) => n + (st.basket[k] || 0) + (st.inv[k] || 0), 0); });
+  expect(cai).toBeGreaterThanOrEqual(s.cai + CROPS.cai.yield);
+  expect(cai).toBeLessThanOrEqual(s.cai + CROPS.cai.yield + SEASON.bonusQty);
   // bản v3 vẫn còn nguyên
   expect(await page.evaluate(() => localStorage.getItem('nongtrai-save-v3'))).toBe(json);
 });
