@@ -19,14 +19,14 @@ Ba nâng cấp mua cho cả một **khối ruộng 3×3** (thuộc tính của t
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): khối có tưới nhỏ giọt thì ô khô tự được tưới và bồn giảm đúng 1 lần mỗi ô; bồn cạn thì không tưới và không trừ âm.
-- [ ] Unit test: khối có phun tự động, ô có sâu thì sau 20 giây sâu hết và kho trừ đúng 1 thuốc; kho hết thuốc thì không phun.
-- [ ] Unit test: đất màu mỡ làm cỏ mọc chậm và thêm sản lượng so với khối không nâng.
-- [ ] Unit test: tiền điện trừ lúc 6h sáng game, ghi nhật ký; không đủ xu thì máy ngừng, đủ xu lại chạy; đoạn đóng băng không bị tính. Chỉ tính cho máy có thật.
-- [ ] Unit test: dời khối ruộng thì nâng cấp đi theo; dời ra ngoài tầm nước thì bị `canPlace` từ chối.
-- [ ] Unit test: tưới tự động cả vụ không chăm tay thì tối đa ★2.
-- [ ] Unit test (seam 3): server chạy bù vườn có tưới nhỏ giọt trong hạn hán cho kết quả giống hệt chạy bù trên trình duyệt với cùng bản lưu.
-- [ ] E2E (desktop + 360px): dựng bản lưu có máy bơm và bồn → mua tưới nhỏ giọt cho một khối → tua thời gian thì ô tự được tưới → khối hiện biểu tượng nâng cấp. Bồn cạn thì ngừng, nhật ký ghi tiền điện lúc 6h.
+- [x] Unit test (seam 1): khối có tưới nhỏ giọt thì ô khô tự được tưới và bồn giảm đúng 1 lần mỗi ô; bồn cạn thì không tưới và không trừ âm.
+- [x] Unit test: khối có phun tự động, ô có sâu thì sau 20 giây sâu hết và kho trừ đúng 1 thuốc; kho hết thuốc thì không phun.
+- [x] Unit test: đất màu mỡ làm cỏ mọc chậm và thêm sản lượng so với khối không nâng.
+- [x] Unit test: tiền điện trừ lúc 6h sáng game, ghi nhật ký; không đủ xu thì máy ngừng, đủ xu lại chạy; đoạn đóng băng không bị tính. Chỉ tính cho máy có thật.
+- [x] Unit test: dời khối ruộng thì nâng cấp đi theo; dời ra ngoài tầm nước thì bị `canPlace` từ chối.
+- [x] Unit test: tưới tự động cả vụ không chăm tay thì tối đa ★2.
+- [x] Unit test (seam 3): server chạy bù vườn có tưới nhỏ giọt trong hạn hán cho kết quả giống hệt chạy bù trên trình duyệt với cùng bản lưu.
+- [x] E2E (desktop + 360px): dựng bản lưu có máy bơm và bồn → mua tưới nhỏ giọt cho một khối → tua thời gian thì ô tự được tưới → khối hiện biểu tượng nâng cấp. Bồn cạn thì ngừng, nhật ký ghi tiền điện lúc 6h.
 
 ## Blocked by
 

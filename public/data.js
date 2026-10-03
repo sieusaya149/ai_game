@@ -33,6 +33,23 @@ export const WELL = [
 // perHour: máy bơm (giếng cấp 4) bơm vào bồn mỗi giờ vườn chạy, hạn hán × drought · range: tầm nước (ô) quanh bồn, trạm bơm phụ ·
 // power: số điện mỗi giờ chạy (máy bơm khi đang bơm, mỗi trạm bơm phụ khi có điện), issue 58 tính tiền điện từ đây.
 export const TANK = { cap: 200, extra: 150, perHour: 20, drought: 0.5, range: 8, power: { pump: 1, booster: 0.5 } };
+// Nâng cấp theo khối ruộng 3×3 (issue 58): mua cho cả khối, dời khối thì đi theo. ups: tên, biểu tượng, giá, mô tả.
+// dripAt: tưới nhỏ giọt khi nước trong đất dưới mức này (trước khi khô hẳn, để máy giữ được "chăm kỹ") · sprayMs: có sâu bấy lâu
+// (giờ vườn) thì máy phun · richWeed: đất màu mỡ nhân xác suất mọc cỏ · richYield: +sản lượng (cộng vào hệ số như bón phân) ·
+// power.spray: số điện mỗi giờ của mỗi khối có máy phun (lúc có điện) · price: xu mỗi số điện, trừ lúc 6h sáng.
+export const AUTO = {
+  ups: {
+    drip:  { name: 'Tưới nhỏ giọt', icon: '💧', price: 800,  desc: 'Đất sắp khô thì tự tưới, lấy 1 lần nước bồn cho mỗi ô. Khối phải trong tầm nước.' },
+    spray: { name: 'Phun thuốc tự động', icon: '🧴', price: 1200, desc: 'Có sâu 20 giây thì tự phun, trừ 1 thuốc trừ sâu trong kho. Tốn điện.' },
+    rich:  { name: 'Đất màu mỡ', icon: '🌱', price: 1500, desc: 'Cỏ mọc chậm hơn, thêm 25% sản lượng, tính như đã bón phân khi xét sao. Không cần nước.' },
+  },
+  dripAt: 5,
+  sprayMs: 20_000,
+  richWeed: 0.35,
+  richYield: 0.25,
+  power: { spray: 0.5 },
+  price: 50,
+};
 // Công trình nước đặt ở chế độ xây dựng: giá xây, số cái tối đa
 export const WATER_BUILD = {
   tank:    { price: 1500, max: 1 },

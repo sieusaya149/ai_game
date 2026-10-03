@@ -1,6 +1,6 @@
 // Vẽ thế giới: lớp nền tĩnh (vẽ một lần) + lớp động mỗi khung hình. Không giữ trạng thái game.
 import { SPR, canvas as mkCanvas, sprite, flip, paint, hash, rect, disc, fenceTile } from './art.js';
-import { TS, GROUND, tileHash, BUILDING_DEFS } from './layout.js';
+import { TS, GROUND, tileHash, BUILDING_DEFS, FIELD_SIZE } from './layout.js';
 import { SPR2 } from './art2.js';
 import { SPR4 } from './art4.js';
 import { SPR3, muddy } from './art3.js';
@@ -9,8 +9,9 @@ import { WELLS } from './artwell.js';
 import { SPR52_OLD } from './art52.js';   // sao trên ô ruộng (issue 52)
 import { WX } from './artw.js';
 import { TANK_ART, BAR_IN } from './arttank.js';
+import { AUTO_ART } from './art58.js';
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, frostHold, tankInfo, waterNet, waterOn } from './state.js';
+import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, frostHold, tankInfo, waterNet, waterOn, autoInfo } from './state.js';
 import { cropStar } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS, TANK } from './data.js';
@@ -620,6 +621,17 @@ export function cropImg(p) {
   if (c.sick) img = st >= 1 && SPR.sick ? SPR.sick : tinted(img, '#d4c23a', 0.6);
   return img;
 }
+// Khối ruộng có nâng cấp (issue 58): Map ô → { f: khối, info: autoInfo } (cùng một object cho cả 9 ô của khối)
+const FIELD_PX = FIELD_SIZE * TS;
+function fieldUps(state) {
+  const out = new Map();
+  for (const f of state.farm?.ents ?? []) {
+    if (f.kind !== 'field' || !f.up || !(f.up.drip || f.up.spray || f.up.rich)) continue;
+    const u = { f, info: autoInfo(state, f) };
+    for (const i of f.plots ?? []) out.set(i, u);
+  }
+  return out;
+}
 // Biểu tượng trong bong bóng của một ô (theo độ ưu tiên)
 export function plotProblem(p) {
   const c = p.crop;
@@ -798,6 +810,7 @@ export function render(ctx, f) {
 
   // 1) đất ruộng
   const nextLocked = wd.nextLocked(state);
+  const ups = farm ? fieldUps(state) : null;   // ô → khối có nâng cấp (issue 58)
   for (const p of state.plots) {
     const pt = m.plotTile(p.idx);
     if (!pt) continue;
@@ -815,6 +828,12 @@ export function render(ctx, f) {
       blit(soilImg(p), px, py);
       if (p.soil === 'tilled' && p.water <= 0 && state.weather === 'drought') blit(WX.crack, px, py);   // hạn hán: đất khô nứt nẻ
       if (p.mulch) blit(WX.mulch, px, py);   // rơm phủ (issue 55)
+      const u = ups?.get(p.idx);
+      if (u && AUTO_ART) {   // đất màu mỡ, ống nhỏ giọt dưới gốc cây (issue 58)
+        if (u.f.up.rich) blit(AUTO_ART.rich, px, py);
+        const st = u.info.drip;
+        if (st) blit(st === 'on' ? AUTO_ART.drip.on[Math.floor(now / 500 + p.idx * 0.37) % 2] : AUTO_ART.drip[st], px, py);
+      }
     }
   }
 
@@ -839,6 +858,14 @@ export function render(ctx, f) {
   const bub = (x, y, icon, key, tone) => { if (icon) bubbles.push({ x, y, icon, key, tone }); };
 
   for (const t of [...m.trees, ...m.border]) if (vis(t.x, t.y, 30)) add(t.y, () => blit(SPR.tree, t.x - 16, t.y - 44));
+  // máy phun dựng ở góc trên phải khối, biểu tượng nâng cấp ở góc trên trái (issue 58)
+  for (const { f, info } of new Set(ups?.values() ?? [])) {
+    const x = f.c * TS, y = f.r * TS, A = AUTO_ART;
+    if (!A || !vis(x + 24, y + 24, 40)) continue;
+    if (info.spray) add(y + 3, () => blit(info.spray === 'on' ? A.sprayer.on[Math.floor(now / 260) % 2] : A.sprayer[info.spray], x + FIELD_PX - 6, y - 21));
+    const ks = ['drip', 'spray', 'rich'].filter(k => f.up[k]);
+    if (ks.length) add(y + 13, () => ks.forEach((k, i) => blit(A.badge[k], x - 3 + i * 8, y - 5)));
+  }
   for (const b of m.bushes) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
   // bụi, đá chưa dọn trên đất mới mua
   for (const o of m.clutter ?? []) if (vis(o.x, o.y, 20)) add(o.y + TS, () => {

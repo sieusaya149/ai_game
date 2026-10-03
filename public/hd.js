@@ -55,6 +55,9 @@ if (wellArt) { stats.files.push('artwell.js'); wellArt.WELLS.forEach((o, i) => l
 // Bồn chứa, bồn phụ, trạm bơm phụ, ống nước, vùng phủ, thanh mực nước (issue 57): cùng cây khóa trong arttank.js
 const tankArt = await import('./arttank.js').catch(() => null);
 if (tankArt?.TANK_ART) { stats.files.push('arttank.js'); link(tankArt.TANK_ART, tankArt.TANK_ART_HD, 'TANK_ART'); }
+// Tự động hóa khối ruộng (issue 58): đất màu mỡ, ống nhỏ giọt, máy phun, biểu tượng nâng cấp, cùng cây khóa trong art58.js
+const autoArt = await import('./art58.js').catch(() => null);
+if (autoArt?.AUTO_ART) { stats.files.push('art58.js'); link(autoArt.AUTO_ART, autoArt.AUTO_ART_HD, 'AUTO_ART'); }
 
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);

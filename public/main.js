@@ -709,7 +709,7 @@ function buildUp(e) {
   b.drag = null; b.ghost = null;
   if (d.tap && !g) {   // chạm không kéo: chọn món, hiện nút Cất nếu cất được
     const ent = state.farm.ents.find(x => x.id === d.id);
-    if (ent && (ent.kind === 'deco' || ent.kind === 'field')) { b.sel = ent.id; ui.buildSel(entName(ent)); }
+    if (ent && (ent.kind === 'deco' || ent.kind === 'field')) { b.sel = ent.id; ui.buildSel(entName(ent), null, ent.kind === 'field' ? ent.id : null); }   // khối ruộng: thêm nút Nâng cấp khối (issue 58)
     else if (ent && upgradeInfo(state, ent.id)) { b.sel = ent.id; ui.buildSel(null, upgradeInfo(state, ent.id)); }   // chuồng, chuồng chó: nâng cấp
     ui.buildMsg(BUILD_HINT, null);
     return;
