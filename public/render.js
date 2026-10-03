@@ -7,6 +7,7 @@ import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
 import { WELLS } from './artwell.js';
 import { SPR52_OLD } from './art52.js';   // sao trên ô ruộng (issue 52)
+import { SPR53_OLD } from './art53.js';   // trái khổng lồ (issue 53)
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul } from './state.js';
 import { cropStar } from './state.js';
@@ -542,6 +543,11 @@ export function cropImg(p) {
   if (c.sick) img = st >= 1 && SPR.sick ? SPR.sick : tinted(img, '#d4c23a', 0.6);
   return img;
 }
+// Hình trái khổng lồ của ô (issue 53): sprite riêng từng cây (art53); null nếu ô không có trái khổng lồ hay thiếu sprite
+export function giantImg(p) {
+  const c = p.crop;
+  return c?.giant && !c.dead && !c.rotten && c.progress >= 1 ? SPR53_OLD.giant?.[c.id] ?? null : null;
+}
 // Biểu tượng trong bong bóng của một ô (theo độ ưu tiên)
 export function plotProblem(p) {
   const c = p.crop;
@@ -656,6 +662,17 @@ export function render(ctx, f) {
   drawStatic(ctx, m, camX / scale, camY / scale, (camX + width) / scale, (camY + height) / scale);
 
   const blit = (img, x, y) => put(ctx, img, x, y);
+  // Trái khổng lồ trên ô (issue 53): đáy hình chạm mép dưới ô, giữa ô theo chiều ngang (hình 24x24 tràn 4 điểm mỗi bên, 8 điểm
+  // phía trên); hai đốm lấp lánh (SPR53.giantSpark) nhấp nháy lệch pha
+  const giant = (im, px, py, idx) => {
+    const x = px + (16 - im.width) / 2, y = py + 16 - im.height, fr = SPR53_OLD.giantSpark;
+    blit(im, x, y);
+    for (const [i, sx, sy] of [[0, 0.25, 0.3], [1, 0.72, 0.55]]) {
+      const f = [0, 1, 2, 1, 0][Math.floor(now / 140 + idx * 3 + i * 4) % 8];
+      const sp = fr?.[f] ?? (f === 2 ? SPR.sparkle : null);
+      if (f != null && sp) blit(sp, Math.round(x + im.width * sx - sp.width / 2), Math.round(y + im.height * sy - sp.height / 2));
+    }
+  };
   // người (người chơi, người khác, thằng Tèo): khung theo ngoại hình, có bản 2x (art5) thì put() tự dùng
   const person = (look, dir, k, wx, wy) => blit(charFrames(look)[dir][k], wx, wy);
   // Biển "đã về" trên cửa chuồng: SPR3.homeBoard nếu có, không thì tấm gỗ vẽ tạm. Còn con chưa về thì chữ đỏ.
@@ -775,10 +792,11 @@ export function render(ctx, f) {
     const prob = plotProblem(p);
     add(py + 12, () => {
       if (p.crop) {
-        const im = cropImg(p);
-        blit(im, px + (16 - im.width) / 2, py + 15 - im.height);
+        const im = cropImg(p), gi = giantImg(p);
+        if (gi) giant(gi, px, py, p.idx);   // trái khổng lồ: hình to tràn ra ngoài ô, lấp lánh (issue 53)
+        else blit(im, px + (16 - im.width) / 2, py + 15 - im.height);
         if (p.crop.sick && !p.crop.dead && !p.crop.rotten && !SPR.sick) { /* đã nhuộm vàng */ }
-        if (cropStage(p.crop) >= 4 && !p.crop.dead && !p.crop.rotten) {
+        if (!gi && cropStage(p.crop) >= 4 && !p.crop.dead && !p.crop.rotten) {
           for (let i = 0; i < sparkles; i++) {
             const ph = (now / 450 + p.idx * 0.7 + i * 0.5) % 2;
             if (ph < 1) blit(SPR.sparkle, px + 2 + i * 8 + (p.idx % 3), py + 1 + i * 4);
@@ -792,7 +810,7 @@ export function render(ctx, f) {
           else { ctx.font = '6px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🐌', px + 13, py + 6); }
         }
         // vụ này đang giữ mấy sao (issue 52): ba sao nhỏ ở mép trên ô (mép dưới là chỗ hạt, mầm), tụt ngay khi lỡ chăm
-        const pips = !p.crop.dead && !p.crop.rotten && SPR52_OLD.plotStars?.[cropStar(p.crop) - 1];
+        const pips = !gi && !p.crop.dead && !p.crop.rotten && SPR52_OLD.plotStars?.[cropStar(p.crop) - 1];
         if (pips) blit(pips, px + 2, py);
       }
       if (p.weeds) blit(SPR.problem.weed, px + 3, py + 9);

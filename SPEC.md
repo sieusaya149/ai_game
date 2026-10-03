@@ -40,6 +40,7 @@ Mọi file trong `public/` đều **được sửa** khi tính năng cần (Phas
 | `public/perf.js` | Hiệu năng: mảng nền `CHUNK`, `dirtyChunks`, `chunksIn`, AI ngoài màn hình `aiStep`, đo FPS `createFps`, tiết kiệm pin (`BATTERY_FPS`, `shouldSuggestBattery`), tùy chọn máy `loadPrefs`/`savePrefs` (khóa `nongtrai-pref`) |
 | `public/art.js`, `public/art2.js`, `public/art3.js` | Sprite vẽ bằng code. `art.js` giữ các export `canvas, sprite, flip, paint, hash, rect, disc, fenceTile, character, SPR, icon`; `art2.js` export `SPR2` (sprite của Phase 0: làng, chợ, tiệm rèn, nội thất, thùng giao hàng, bụi/đá, công cụ...; Phase 1 thêm hộp quà và sổ lưu bút ở cổng, đồ phụ của chó canh khách `barkBubble`, `dogChain`, `stunStars`, `barkArrow`, `sausage`/`sausageGround`; xem `public/_sprites2.html`); `art3.js` export `SPR3` (Phase 2: `SPR3.animal[loài][non|nho|truong|gia] = { left, right }` với loài `ga gaTrong vit vitDuc heo bo boDuc cuu cuuXoan cho meo`, `sleepBy[loài][giai đoạn]`, `angel`, chuồng, kẻ săn mồi, dáng lệnh của chó `dogSitBy/dogBegBy/dogHerdBy/dogBarkBy[giai đoạn]`...; xem `_sprites3.html`). `render.animalImg(a, face, frame, sleep)` chọn hình theo `a.type/stage/sex` (đực: `gaTrong`, `vitDuc`, `boDuc`), thiếu art thì dùng sprite cũ. Thêm sprite mới thì giữ nguyên mọi export cũ |
 | `public/art52.js` | Art chất lượng ★ (issue 52), hình mới nên tự mang cả hai bản: `SPR52_OLD` (bản thường: `starBadge[2|3]` 7x7, `starSpark` 3x3, `plotStars[0..2]` 13x5) và `SPR52` (bản 2x cùng khóa, đúng gấp đôi); `hd.js` nối hai bản qua `SPR52_OLD` (file art nào xuất `SPRn_OLD` thì khóa đó nối với bản thường của chính nó). `starIcon(img, sao, k)` dựng icon nông sản có sao. Trang xem: `public/_hd52.html` |
+| `public/art53.js` | Art trái khổng lồ (issue 53), hình mới nên tự mang cả hai bản: `SPR53_OLD` (bản thường: `giant[cây]` 24x24 cho 16 cây, đáy chạm đất, giữa ô; `giantIcon[cây]` 16x16; `giantSpark[0..2]` 5x5 lấp lánh) và `SPR53` (bản 2x cùng khóa, đúng gấp đôi); `hd.js` nối qua `SPR53_OLD`. Mỗi cây một hình riêng. Trang xem: `public/_hd53.html` |
 | `public/render.js`, `public/world.js`, `public/main.js` | Vẽ (theo khung nhìn, nền chia mảng 16x16 ô), di chuyển/tìm đường/AI/chế độ xây dựng/camera, vòng lặp, chuyển cảnh mờ dần, input. **Không tự quyết luật**, chỉ gọi `state.js` |
 | `public/index.html`, `public/style.css`, `public/ui.js`, `public/sound.js` | HUD, nút hành động, các bảng, tạo nhân vật, thông báo, âm thanh |
 | `public/net.js`, `public/sync.js` | Phía trình duyệt của làng: tài khoản (`net.js`, issue 21) và đồng bộ vườn online (`sync.js`, issue 22), xem mục Server |
@@ -179,6 +180,8 @@ Lát dọn đường cho cả Phase 3 (issue 50). Người chơi gần như chư
 |---|---|---|---|
 | ô ruộng | `plot.mulch` | `false` | phủ rơm (issue 55) |
 | vụ đang trồng | `crop.q = { dry, bugMax, hand }` (`cropQuality()`) | `{ dry: false, bugMax: 0, hand: false }` | chất lượng ★ (issue 52, xem "Chất lượng nông sản ★"): `dry` = đã có lúc khô hẳn, `bugMax` = sâu lâu nhất (ms giờ vườn), `hand` = có ít nhất một lần chăm tay. "Có bón phân" là `crop.fert` có sẵn. Vụ mới (`plant`) có `q` mới, thu hoạch xong mất cùng `crop` |
+| vụ đang trồng | `crop.giant` | `false` | trái khổng lồ (issue 53, xem "Trái khổng lồ"): tung một lần lúc cây vừa chín. Thống kê `stats.giants` (mặc định 0) |
+| nông sản | khóa `giantKey(id, sao)`: `'giant_cai'`, `'giant_cai@3'` | — | trái khổng lồ: món riêng theo cây, có sao như nông sản |
 | nông sản | khóa `starKey(id, sao)`: `'cai'` ★1, `'cai@2'` ★2, `'cai@3'` ★3 | đồ cũ giữ khóa = ★1 | issue 52: giỏ, kho, thùng giao hàng, đơn hàng (`orders[].items`), quà, trộm tách theo sao vì khóa khác nhau. Chỉ nông sản cây trồng có sao; sản phẩm vật nuôi có món "sao" riêng (`sua_ngon`, `len_xoan`) |
 | vườn | `mastery[cropId] = { lv, n }` | `{ lv: 1, n: 0 }` cho cả 16 cây | thành thạo (issue 51): cấp lưu thẳng (cân bằng lại ngưỡng không làm tụt cấp), `n` = số lần thu hoạch loại đó |
 | giếng | `ent.lv` (kind `well`) | `1` | giếng 4 cấp (issue 56); `wellLv(state)` |
@@ -248,6 +251,9 @@ checkSaveJump(prev, next, dtMs)   // → R { reason: 'time'|'coins'|'exp' }: ch�
                                   // + giá trần của con vật có ở bản trước mà mất ở bản sau (bán cho Chú Ba, Phase 2)
                                   // + giá trần của cây có ở bản trước mà đã hái (issue 52): sản lượng có bón phân × giá ★3
                                   //   (cây đã lỡ chăm kỹ thì giá ★1), nên hái cả ruộng ★3 trong một nhịp lưu 10 giây vẫn hợp lý
+                                  //   + issue 53: cây có cờ giant, hoặc chưa chín mà cây đã thành thạo ≥ cấp 2 (cấp lấy max hai bản), thêm giá
+                                  //   một trái khổng lồ cùng sao; EXP cũng được thêm EXP vụ × GIANT.expMul cho mỗi cây như vậy. Cây đã chín
+                                  //   sẵn mà không có cờ giant thì không ra trái khổng lồ nữa
 wealthOf(state), SAVE_JUMP        // wealthOf tính nông sản theo sellPrice của khóa (★2 ×1.5, ★3 ×2): đổi nhãn ★1 thành ★3 là của cải tăng
 resetGame()                       // xóa save hiện tại và đặt mọi cờ "đã chuyển" (không đụng bản v1, v2, v3)
 wellLv(state)                     // → 1..4: cấp giếng (Phase 3, v4; vườn cũ 1; lv lạ trong bản lưu kẹp về 1..4). Xem mục "Giếng 4 cấp"
@@ -760,6 +766,21 @@ cropStar(crop)                    // 1..3: số sao vụ này cho nếu thu ho�
 - Thu hoạch cho khóa `starKey(id, cropStar(c))`; trộm cây chín được đúng hàng có sao, `ripeValue` tính theo sao. Giá: `sellPrice` ★2 ×1.5, ★3 ×2 (`STARS.mul`), chợ, thùng giao hàng (`shipValue`) và đơn hàng đều theo khóa.
 - Giao diện: tên target ô ruộng kèm sao (`world.nameOf`: "Dưa hấu ★★☆"); ô có cây sống vẽ hàng ba sao nhỏ trên nền thẻ tối ở mép trên ô (mép dưới là chỗ hạt, mầm; `art52.SPR52_OLD.plotStars`); icon nông sản ★2 / ★3 có viền màu, dấu sao bạc / vàng, ★3 thêm lấp lánh (`art52.starIcon`).
 
+### Trái khổng lồ (issue 53)
+```js
+giantChance(state, crop)          // tỉ lệ ra trái khổng lồ nếu vụ chín ngay bây giờ: MASTERY.giant[cấp thành thạo] (0 / 10% / 20%) × GIANT.star3Mul (1.5) nếu vụ ★3
+// data.js
+GIANT = { star3Mul: 1.5, priceMul: 3, slots: 5, expMul: 5, orderP: 0.15, orderMul: 1.5 }
+giantKey(id, sao = 1)             // 'giant_<cây>' (+ '@2' / '@3'); giantOf(key) → id cây | null; itemSlots(key) → số chỗ giỏ (5 / 1)
+```
+- **Tung:** đúng một lần lúc cây vừa chín (`tick` cả chạy bù, hay thuốc lớn nhanh làm chín): `crop.giant = true` với xác suất `giantChance`. Cấp 1 = 0 (không tốn số ngẫu nhiên); cao nhất cấp 3 + ★3 = 30%. Cây chín sẵn trước bản cập nhật không tung lại.
+- **Thu hoạch:** ô có trái khổng lồ cho sản lượng thường như cũ **cộng 1 trái khổng lồ** `giantKey(id, cropStar(c))` (món riêng của cây đó, không phải nông sản thường nhân lên), thêm EXP vụ × `GIANT.expMul`, event `giant` `{ crop, item }` (🟡 important, cat `levelup`, gộp theo `giant:<cây>`), nhật ký, `stats.giants++`. Héo (chín quá) thì mất luôn trái khổng lồ.
+- **Giỏ:** trái khổng lồ chiếm `GIANT.slots` = 5 chỗ: `basketCount` đếm theo chỗ. Không đủ chỗ cho sản lượng + 5 thì nút thu hoạch mờ "Giỏ đầy, về kho cất đồ" như món thường; thu nhiều ô bằng liềm, lấy từ kho, lấy lại từ thùng giao hàng cũng tính 5 chỗ; thưởng đúng mùa chỉ khi còn chỗ sau trái khổng lồ. Túi đồ có ô viền vàng ghi "🧺 5 chỗ".
+- **Giá:** `sellPrice` = giá một trái thường × `GIANT.priceMul` (3) × hệ số sao; bán ở chợ, bỏ thùng giao hàng được. Không tặng được (hộp quà chia theo số món).
+- **Đơn hàng đặc biệt** (bản đơn giản, đơn cư dân đầy đủ ở Phase 4): khi có cây (đã mở theo cấp) thành thạo ≥ cấp 2, mỗi đơn mới có `GIANT.orderP` = 15% là đơn `{ items: { giant_<cây>: 1 }, giant: true }`, thưởng `GIANT.orderMul` × giá bán, EXP như lúc thu trái khổng lồ. Món trái khổng lồ ★n nhận trái khổng lồ cùng cây từ ★n trở lên; nông sản thường không thay được. Bảng đơn ghi "✨ Đơn đặc biệt".
+- **Trộm:** khách vẫn trộm được phần cây chín thường có sao của ô đó (`act: 'crop'`, sản lượng không gồm trái khổng lồ); `act: 'giant'` luôn `cant_steal` ("Trái khổng lồ nặng quá, vác không nổi"). Ở cảnh `visit`, ô có trái khổng lồ có thêm nút `steal_giant` luôn mờ kèm lý do đó. `ripeValue` không tính trái khổng lồ. Trộm NPC (thằng Tèo, cả lúc chạy bù) và quạ bỏ qua ô còn trái khổng lồ chưa thu; ô đó cũng không tính vào số ô chín gọi thằng Tèo tới.
+- **Giao diện:** ô chín có trái khổng lồ vẽ `art53.SPR53_OLD.giant[cây]` (24x24 tràn ra ngoài ô, đáy chạm mép dưới ô) thay cho hình chín thường, hai đốm `giantSpark` nhấp nháy, không vẽ hàng sao nhỏ; tên target "Dâu tây ★★★ · khổng lồ ✨"; nút thu hoạch "Thu hoạch Dâu tây (11 + 1 khổng lồ)"; icon túi/giỏ `giantIcon` (★2/★3 thêm viền và dấu sao của art52). Test: `tests/giant.test.mjs`, `tests/server-giant.test.mjs`, `e2e/giant.spec.mjs`.
+
 ### Thông báo, Việc cần làm, cài đặt
 ```js
 notifyOn(state, cat)  setNotify(state, cat, on)   // cat ∈ NOTIFY_CATS (ripe, spoil, hungry, loss, levelup, order, help, gate, guard, visit, old, stray, ill, pest, birth)
@@ -841,6 +862,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `tisun` | `n` (số trứng bị lấy) | important (`loss`) |
 | `civet` | `animal` (tên loài bị tha đi) | important (`loss`) |
 | `levelup` | `level` | important (`levelup`) |
+| `giant` | `crop`, `item` (khóa trái khổng lồ) | important (`levelup`) — thu được trái khổng lồ (issue 53) |
 | `order` | — | important (`order`) |
 | `helped` | `by` (tên khách), `act` ('water'/'weed'/'catch'/'shoo'), `at` | important (`help`) |
 | `stolen` | `by` (tên kẻ trộm), `item`, `qty`, `at` (giờ ngoài đời) | urgent |

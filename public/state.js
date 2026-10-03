@@ -9,6 +9,7 @@ import {
 } from './data.js';
 import { WELL } from './data.js';
 import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng ★ (issue 52)
+import { GIANT, giantKey, giantOf, itemSlots } from './data.js';   // trái khổng lồ (issue 53)
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
@@ -52,9 +53,12 @@ export function takeItem(s, k, n = 1) {
   if (n > fromBasket) drop(s.inv, k, n - fromBasket);
   return true;
 }
-export const basketCount = s => Object.values(s.basket || {}).reduce((a, n) => a + n, 0);
+// Số chỗ đã dùng trong giỏ: trái khổng lồ chiếm GIANT.slots chỗ (issue 53), món khác 1 chỗ
+export const basketCount = s => Object.entries(s.basket || {}).reduce((a, [k, n]) => a + n * itemSlots(k), 0);
 export const basketCap = s => TOOLS.basket.cap[toolLv(s, 'basket') - 1];
 const room = s => basketCap(s) - basketCount(s);
+// Số món `k` còn bỏ vừa giỏ
+const roomFor = (s, k) => Math.floor(Math.max(0, room(s)) / itemSlots(k));
 const FULL = 'Giỏ đầy, về kho cất đồ';
 const have = haveItem;
 const give = (s, k, n = 1) => {
@@ -155,6 +159,8 @@ export function animalPen(s, a) {
   return m.penById[a.pen] ?? m.pens[ANIMALS[a.type].pen] ?? null;
 }
 const isRipe = p => p.crop && !p.crop.dead && !p.crop.rotten && p.crop.progress >= 1;
+// Ô chín mà trộm NPC và quạ nhắm được: ô còn trái khổng lồ chưa thu thì bỏ qua (issue 53: nặng quá, không vác nổi)
+const robbable = p => isRipe(p) && !p.crop.giant;
 const nextPoopAt = s => s.time + rnd(...DOG.poopEvery) * (s.dog?.stage === 'non' ? DOG.poopPupMul : 1);   // chó con ỉa nhiều hơn
 
 // Con vật mới ở đầu giai đoạn `stage`. Các trường còn lại lấy mặc định của bản lưu v3 (migrate.js animalDefaults).
@@ -243,7 +249,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     raid: null, caught: null, chore: null, teoCaught: 0, choreWeek: -1,
     // chased/barks: chó đã đớp và đã sủa bao nhiêu lần · robStreak: chuỗi trộm chưa bị đớp (issue 31, 32)
     // · helps: số việc mình đã giúp vườn bạn (issue 32)
-    stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, rats: 0, preds: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0, chased: 0, barks: 0, robStreak: 0, helps: 0 },
+    stats: { harvests: 0, bugs: 0, eggs: 0, poops: 0, slips: 0, piglets: 0, hatches: 0, orders: 0, thieves: 0, crows: 0, rats: 0, preds: 0, earned: 0, planted: 0, shipped: 0, bought: 0, slept: 0, chased: 0, barks: 0, robStreak: 0, helps: 0, giants: 0 },
     achievements: {}, log: [], tutorial: 0, nextId: nf.nextId,
     notify: {},   // loại thông báo 🟡 đã tắt: { ripe: false }; thiếu = bật. Mức 🔴 không tắt được
     // Trường cho online (issue 22, không đổi phiên bản v2): chơi đơn hay vườn trên làng, tên tài khoản,
@@ -448,6 +454,20 @@ function goneCropsValue(prev, next) {
     if (!c || c.dead || c.rotten || !CROPS[c.id] || (n && n.id === c.id && n.planted === c.planted)) continue;
     const top = careLost(c) ? 1 : STARS.max;   // chưa lỡ chăm kỹ thì còn kịp bón phân, chăm tay lên ★3
     v += sellPrice(starKey(c.id, top)) * Math.max(0, cropYield({ ...c, fert: true }, prev) + SEASON.bonusQty - (c.stolen || 0));
+    if (mayGiant(prev, next, c)) v += sellPrice(giantKey(c.id, top));
+  }
+  return v;
+}
+// Trái khổng lồ (issue 53): vụ đã có cờ giant, hoặc chưa chín mà loại cây đã thành thạo tới cấp ra được trái khổng lồ (cấp đọc ở
+// bản sau vì có thể vừa lên cấp giữa hai lần lưu). Cây đã chín sẵn mà không có trái khổng lồ thì không ra nữa.
+const mayGiant = (prev, next, c) => !!c.giant || (c.progress < 1 && MASTERY.giant[Math.max(mastery(prev, c.id).lv, mastery(next, c.id).lv) - 1] > 0);
+// EXP của các trái khổng lồ có thể đã thu giữa hai lần lưu (mỗi trái EXP vụ × GIANT.expMul): cho EXP tăng thêm chừng đó
+function goneGiantsExp(prev, next) {
+  let v = 0;
+  for (const p of prev.plots ?? []) {
+    const c = p.crop, n = next.plots?.[p.idx]?.crop;
+    if (!c || c.dead || c.rotten || !CROPS[c.id] || (n && n.id === c.id && n.planted === c.planted)) continue;
+    if (mayGiant(prev, next, c)) v += CROPS[c.id].exp * GIANT.expMul;
   }
   return v;
 }
@@ -459,7 +479,7 @@ export function checkSaveJump(prev, next, dtMs) {
   if (sim > Math.max(0, dtMs) * speed + J.simSlack) return { ok: false, reason: 'time', msg: 'Vườn chạy nhanh hơn thời gian thật' };
   const k = ((prev.plots ?? []).filter(p => p.unlocked && !p.removed).length + J.plotsExtra) * sim / MIN;
   if (wealthOf(next) - wealthOf(prev) > J.wealth + J.wealthPerPlotMin * k + goneAnimalsValue(prev, next) + goneCropsValue(prev, next)) return { ok: false, reason: 'coins', msg: 'Xu và đồ tăng nhanh vô lý' };
-  if ((next.exp || 0) - (prev.exp || 0) > J.exp + J.expPerPlotMin * k) return { ok: false, reason: 'exp', msg: 'Kinh nghiệm tăng nhanh vô lý' };
+  if ((next.exp || 0) - (prev.exp || 0) > J.exp + J.expPerPlotMin * k + goneGiantsExp(prev, next)) return { ok: false, reason: 'exp', msg: 'Kinh nghiệm tăng nhanh vô lý' };
   return { ok: true };
 }
 
@@ -667,7 +687,7 @@ function stepPlot(s, p, d) {
     if (sm < 1) c.offSeason = true;   // đã lớn lúc trái mùa: không ra ★3 (issue 54)
     c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm;
   }
-  if (c.progress >= 1) { c.ripeAt = s.time; emit({ type: 'ripe', crop: c.id }); fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
+  if (c.progress >= 1) { ripen(s, c); emit({ type: 'ripe', crop: c.id }); fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
   else if (chance(FARMING.bugChancePerMin * MASTERY.bugMul[mastery(s, c.id).lv - 1], d)) { c.bugs = true; c.bugSince = s.time; fxEv(at.x, at.y, 'Có sâu! 🐛', COL.bad); }
 }
 
@@ -689,6 +709,15 @@ export function cropStar(c) {
   if (!c || !c.fert || careLost(c)) return 1;
   return c.q?.hand && !c.offSeason ? 3 : 2;
 }
+// ---------- Trái khổng lồ (issue 53) ----------
+// Tỉ lệ ra trái khổng lồ của vụ này nếu chín ngay bây giờ: theo cấp thành thạo (MASTERY.giant), vụ ★3 thì nhân GIANT.star3Mul
+export const giantChance = (s, c) => MASTERY.giant[mastery(s, c.id).lv - 1] * (cropStar(c) >= STARS.max ? GIANT.star3Mul : 1);
+// Cây vừa chín: ghi giờ chín và tung trái khổng lồ đúng một lần (crop.giant). Cấp 1 không tung (không tốn số ngẫu nhiên).
+function ripen(s, c) {
+  c.ripeAt = s.time;
+  if (chance1(giantChance(s, c))) c.giant = true;
+}
+
 // Chăm tay của chính người chơi (tưới, bắt sâu, phun thuốc, bón phân): điều kiện để ra ★3. Máy (issue 58) và khách không gọi.
 const handCare = c => { if (c) qOf(c).hand = true; };
 
@@ -1424,7 +1453,7 @@ export const guestRaids = s => stealsToday(s);
 export function raidPool(s) {
   if (guestRaids(s) > 0) return [];
   const out = [];
-  if (s.plots.filter(p => p.unlocked && isRipe(p)).length >= RAID.ripeNeed) out.push('thief');
+  if (s.plots.filter(p => p.unlocked && robbable(p)).length >= RAID.ripeNeed) out.push('thief');
   if (level(s) >= RAID.minLevel) {   // bảo hộ người mới: cấp thấp chưa gặp hai trộm mới
     if ((s.eggs?.length ?? 0) >= RAID.eggNeed) out.push('tisun');
     if (strays(s).length) out.push('civet');
@@ -1432,7 +1461,7 @@ export function raidPool(s) {
   return out;
 }
 // Số món đáng trộm trong vườn: ô chín + trứng dưới đất + con ngủ ngoài
-const raidLoot = s => s.plots.filter(p => p.unlocked && isRipe(p)).length + (s.eggs?.length ?? 0) + strays(s).length;
+const raidLoot = s => s.plots.filter(p => p.unlocked && robbable(p)).length + (s.eggs?.length ?? 0) + strays(s).length;
 // Xác suất đêm nay có một vụ trộm NPC: vườn thường 1 vụ mỗi 2 đêm, vườn giàu thường hơn (chặn trên 1 vụ mỗi đêm);
 // đèn lồng, hàng rào thấp và chó canh nhà đều làm trộm ngại.
 export function raidChance(s) {
@@ -1473,7 +1502,7 @@ function makeRaider(s, kind) {
   const m = mapOf(s), gateIn = m.gateIn ?? m.spawn;
   let at = null, target = null, plot = -1;
   if (kind === 'thief') {
-    const p = pick(s.plots.filter(x => x.unlocked && isRipe(x)));
+    const p = pick(s.plots.filter(x => x.unlocked && robbable(x)));
     if (!p) return null;
     plot = p.idx; at = plotCenter(s, p.idx);
   } else if (kind === 'tisun') {
@@ -1550,7 +1579,7 @@ function stepRaidAway(s) {
     return;
   }
   if (r.kind === 'thief') {
-    const p = pick(s.plots.filter(x => x.unlocked && isRipe(x)));
+    const p = pick(s.plots.filter(x => x.unlocked && robbable(x)));
     if (!p) return;
     const nm = CROPS[p.crop.id].name;
     p.crop = null;
@@ -1615,7 +1644,7 @@ export function setChained(s, on) {
 
 function stepThreats(s, d) {
   const busy = new Set(s.threats.map(t => t.plot));
-  const ripe = s.plots.filter(p => p.unlocked && isRipe(p) && !busy.has(p.idx));
+  const ripe = s.plots.filter(p => p.unlocked && robbable(p) && !busy.has(p.idx));
   const m = mapOf(s), v = m.view;
   const scare = m.decos.filter(o => o.kind === 'deco_scarecrow');
   // quạ
@@ -2073,11 +2102,21 @@ function orderStar(lv, id) {
   return starKey(id, r < p3 ? 3 : r < p3 + p2 ? 2 : 1);
 }
 // Đơn hàng đọc sao: món ★n nhận nông sản cùng loại từ ★n trở lên (khóa xếp sao thấp trước, giao thì lấy sao thấp trước)
-const orderKeys = k => (CROPS[baseOf(k)] ? [1, 2, 3].filter(n => n >= starOf(k)).map(n => starKey(baseOf(k), n)) : [k]);
+const orderKeys = k => (CROPS[baseOf(k)] || giantOf(k) ? [1, 2, 3].filter(n => n >= starOf(k)).map(n => starKey(baseOf(k), n)) : [k]);   // trái khổng lồ cũng vậy
 export const orderHave = (s, k) => orderKeys(k).reduce((a, x) => a + have(s, x), 0);
 
+// Đơn hàng đặc biệt (issue 53, bản đơn giản; đơn cư dân đầy đủ ở Phase 4): đòi 1 trái khổng lồ của một cây đã thành thạo từ cấp 2
+// (cây có thể ra trái khổng lồ), thưởng GIANT.orderMul × giá bán và EXP như lúc thu được nó. Chưa có cây nào cấp 2 thì không có.
+function giantOrder(s, pool) {
+  const ok = pool.filter(k => MASTERY.giant[mastery(s, k).lv - 1] > 0);
+  if (!ok.length || Math.random() >= GIANT.orderP) return null;
+  const id = pick(ok), k = giantKey(id);
+  return { id: s.nextId++, who: pick(ORDERS.people), items: { [k]: 1 }, coins: Math.round(sellPrice(k) * GIANT.orderMul), exp: CROPS[id].exp * GIANT.expMul, giant: true };
+}
 function makeOrder(s) {
   const lv = level(s), pool = Object.keys(CROPS).filter(k => CROPS[k].lv <= lv), items = {};
+  const sp = giantOrder(s, pool);
+  if (sp) return sp;
   for (let i = rint(1, 2); i > 0 && pool.length; i--) items[orderStar(lv, pool.splice(rint(0, pool.length - 1), 1)[0])] = rint(2, 5);
   // trứng: gà, hoặc trứng vịt khi làng đã biết nhà mình nuôi được vịt
   if (Math.random() < 0.3) items[lv >= ANIMALS.vit.lv && Math.random() < 0.4 ? 'trung_vit' : 'trung'] = rint(2, 4);
@@ -2131,7 +2170,7 @@ export function toolArea(s, tool, idx, id = TOOLS[tool]?.act[0]) {
 // Thu hoạch nhiều ô: lấy theo thứ tự tới khi giỏ không chứa thêm được nữa
 function fitBasket(s, tiles) {
   let left = room(s);
-  return tiles.filter(i => { const q = harvestQty(s.plots[i].crop, s); if (q > left) { left = 0; return false; } left -= q; return true; });
+  return tiles.filter(i => { const q = harvestRoom(s.plots[i].crop, s); if (q > left) { left = 0; return false; } left -= q; return true; });
 }
 
 // Gắn danh sách ô (tiles) và khóa theo công cụ vào các hành động trên ô ruộng
@@ -2220,7 +2259,7 @@ function plotActs(s, t) {
     return A;
   }
   if (c.dead || c.rotten) return [mk('clear', '🧹', c.dead ? 'Dọn cây chết' : 'Dọn cây héo')];
-  if (c.progress >= 1) return [mk('harvest', '🧺', `Thu hoạch ${CROPS[c.id].name} (${harvestQty(c, s)})`, room(s) < harvestQty(c, s) ? FULL : null)];
+  if (c.progress >= 1) return [mk('harvest', '🧺', `Thu hoạch ${CROPS[c.id].name} (${harvestQty(c, s)}${c.giant ? ' + 1 khổng lồ' : ''})`, room(s) < harvestRoom(c, s) ? FULL : null)];
   const noPest = have(s, 'pesticide') <= 0 ? noItem('pesticide') : null;
   if (c.sick) A.push(mk('spray', '🧴', 'Phun thuốc chữa bệnh', noPest));
   if (c.bugs) A.push(mk('spray', '🧴', 'Phun thuốc trừ sâu', noPest), mk('catch', '🤏', 'Bắt sâu bằng tay'));
@@ -2446,6 +2485,8 @@ function doorActs(s, t) {
 // Thành thạo cộng thẳng vào sản lượng (đọc cấp lúc thu hoạch)
 const cropYield = (c, s) => Math.round(CROPS[c.id].yield * (c.fert ? 1 + FARMING.fertYield : 1)) + (s ? MASTERY.yield[mastery(s, c.id).lv - 1] : 0);
 const harvestQty = (c, s) => Math.max(0, cropYield(c, s) - (c.stolen || 0));
+// Số chỗ giỏ cần để hái ô này: sản lượng + trái khổng lồ (GIANT.slots chỗ) nếu có (issue 53)
+const harvestRoom = (c, s) => harvestQty(c, s) + (c.giant ? GIANT.slots : 0);
 const res = (ok, msg, fx = [], sound, extra) => ({ ok, msg, fx, ...(sound ? { sound } : {}), ...extra });
 const bad = (msg, at) => res(false, msg, at ? [{ text: msg, color: COL.bad, x: at.x, y: at.y }] : [], 'error');
 
@@ -2515,7 +2556,7 @@ const DO = {
       case 'plant': {
         const def = CROPS[s.selectedSeed];
         take(s, `seed_${s.selectedSeed}`); s.stats.planted++;
-        p.crop = { id: s.selectedSeed, progress: 0, planted: s.time, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: cropQuality() };
+        p.crop = { id: s.selectedSeed, progress: 0, planted: s.time, bugs: false, bugSince: 0, sick: false, sickSince: 0, fert: false, boosts: 0, dead: false, rotten: false, ripeAt: 0, q: cropQuality(), giant: false };
         return res(true, `Đã gieo ${def.name}`, [say(at, '🌱')], 'plant');
       }
       case 'water': s.can--; p.water = 100; handCare(c); return res(true, 'Đã tưới nước', [say(at, '💧', '#7ad7ff')], 'water');
@@ -2532,19 +2573,27 @@ const DO = {
       case 'fertilize': take(s, 'fertilizer'); c.fert = true; handCare(c); return res(true, 'Đã bón phân', [say(at, '+50% thu hoạch')], 'plant');
       case 'growth':
         take(s, 'growth'); c.boosts++; c.progress += FARMING.growthBoost;
-        if (c.progress >= 1 && !c.ripeAt) c.ripeAt = s.time;
+        if (c.progress >= 1 && !c.ripeAt) ripen(s, c);
         return res(true, 'Cây lớn vọt lên', [say(at, 'Lớn vọt! ⚡')], 'spray');
       case 'harvest': {
         const def = CROPS[c.id], fx = [], key = starKey(c.id, cropStar(c)), nm = itemName(key);   // nông sản theo sao (issue 52)
         let qty = harvestQty(c, s);
         // đúng mùa: 10% lần thu thêm sản lượng (chỉ khi giỏ còn chỗ), từ cấp SEASON.minLevel
-        const bonus = seasonActive(s) && seasonFit(s, c.id) === 'in' && qty > 0 && room(s) >= qty + SEASON.bonusQty && Math.random() < SEASON.bonusChance ? SEASON.bonusQty : 0;
+        const bonus = seasonActive(s) && seasonFit(s, c.id) === 'in' && qty > 0 && room(s) >= qty + SEASON.bonusQty + (c.giant ? GIANT.slots : 0) && Math.random() < SEASON.bonusChance ? SEASON.bonusQty : 0;
         qty += bonus;
         give(s, key, qty); s.stats.harvests++; addExp(s, def.exp);
+        const gk = c.giant ? giantKey(c.id, cropStar(c)) : null;   // trái khổng lồ (issue 53): món riêng, cùng sao với vụ
+        if (gk) {
+          give(s, gk); addExp(s, def.exp * GIANT.expMul); s.stats.giants = (s.stats.giants || 0) + 1;
+          emit({ type: 'giant', crop: c.id, item: gk });
+          log(s, `Thu được ${itemName(gk).toLowerCase()}!`);
+          fx.push(say({ x: at.x, y: at.y - 30 }, `${itemName(gk)}! ✨`, COL.coin), say({ x: at.x, y: at.y - 40 }, `+${def.exp * GIANT.expMul} EXP`, COL.exp));
+          snd('levelup');
+        }
         if (chance1(MASTERY.seedBack[mastery(s, c.id).lv - 1])) { give(s, `seed_${c.id}`); fx.push(say({ x: at.x, y: at.y - 20 }, '+1 hạt 🌱')); }
         fx.push(...bumpMastery(s, c.id, at));
         p.crop = null; p.soil = 'untilled';
-        return res(true, `Thu hoạch ${qty} ${nm}${bonus ? ` (đúng mùa +${bonus})` : ''}`, [say(at, `+${qty} ${nm}`, starOf(key) > 2 ? COL.coin : COL.good), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp), ...fx], 'harvest');
+        return res(true, `Thu hoạch ${qty} ${nm}${bonus ? ` (đúng mùa +${bonus})` : ''}${gk ? ` + 1 ${itemName(gk)}` : ''}`, [say(at, `+${qty} ${nm}`, starOf(key) > 2 ? COL.coin : COL.good), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp), ...fx], 'harvest');
       }
       case 'clear': p.crop = null; p.soil = 'untilled'; return res(true, 'Đã dọn sạch ô đất', [say(at, '🧹')], 'dig');
     }
@@ -2774,7 +2823,8 @@ export function enterScene(s, to) {
 // Khách tặng được hạt giống (trong kho) hoặc nông sản / sản phẩm (trong giỏ hoặc kho); chủ nhận nông sản vào giỏ (tới khi đầy),
 // hạt giống vào kho. Mỗi quà có mã thao tác op duy nhất: áp dụng lại cùng mã thì không làm gì.
 export const GATE_BOXES = ['giftbox', 'guestbook'];
-export const giftable = k => ITEMS[k]?.kind === 'seed' || isProduce(k);
+// trái khổng lồ (issue 53) không tặng được: hộp quà chia theo số món, không theo 5 chỗ giỏ
+export const giftable = k => ITEMS[k]?.kind === 'seed' || (isProduce(k) && !giantOf(k));
 // Hộp đã chứa thêm được một quà qty món item chưa (server gọi đúng hàm này; không biết giỏ khách nên chỉ kiểm hộp)
 export function giftBoxCheck(box, item, qty) {
   if (!giftable(item)) return no('bad_item', 'Món này không tặng được');
@@ -2857,6 +2907,7 @@ export function guestCheck(s, t, id) {
     if (helpLeft(s) <= 0) return no('help_full', HELP_FULL);
     return guestOps(s, t).some(o => o.act === id.slice(5)) ? { ok: true } : no('nothing', NOTHING);
   }
+  if (id === 'steal_giant') return no('cant_steal', NO_STEAL.giant);   // trái khổng lồ (issue 53): nút chỉ để báo lý do
   if (id === 'steal') {
     const o = guestOps(s, t).find(x => x.kind === 'steal');
     return o ? guestOpCheck(s, meAsGuest(s), { ...o, id: 'xem-thu' }) : no('nothing', NOTHING_STEAL);
@@ -2876,9 +2927,13 @@ function guestActs(s, t) {
   const ops = guestOps(s, t);
   if (ops.length) {   // ô ruộng, trứng, con vật, con quạ: việc giúp và việc trộm làm được ở đây (bị chặn thì mờ kèm lý do)
     const full = helpLeft(s) <= 0 ? HELP_FULL : null;
-    return ops.map(o => (o.kind === 'steal'
+    const A = ops.map(o => (o.kind === 'steal'
       ? mk('steal', '😈', stealLabel(s, o), why('steal'))
       : mk('help_' + o.act, HELP_JOBS[o.act].icon, HELP_JOBS[o.act].label, full)));
+    // ô còn trái khổng lồ: nút trộm nó luôn mờ kèm lý do (issue 53)
+    const c = t.kind === 'plot' && s.plots[t.idx]?.crop;
+    if (c?.giant && ripeCrop(s.plots[t.idx])) A.push(mk('steal_giant', giantKey(c.id, cropStar(c)), `Trộm ${itemName(giantKey(c.id)).toLowerCase()}`, why('steal_giant')));
+    return A;
   }
   if (t.kind === 'building') {
     const b = sceneMap(s).building(t.id);
@@ -3348,7 +3403,7 @@ export function shipTake(s, itemId, qty = 1) {
   const n = Math.min(qty === 'all' ? inBin : Math.floor(qty), inBin);
   if (!(n > 0)) return R(false, 'Thùng không có món này', { moved: 0 });
   drop(s.shipbin.items, itemId, n);
-  const toBasket = Math.min(n, Math.max(0, room(s)));
+  const toBasket = Math.min(n, roomFor(s, itemId));
   if (toBasket) give(s, itemId, toBasket);
   if (n > toBasket) s.inv[itemId] = (s.inv[itemId] || 0) + n - toBasket;
   return R(true, `Lấy lại ${n} ${itemName(itemId).toLowerCase()}`, { moved: n });
@@ -3398,7 +3453,7 @@ function ensureGateBoxes(s) {
 
 // Nhà kho: cất hết nông sản & sản phẩm từ giỏ vào kho
 export function stashAll(s) {
-  const n = basketCount(s);
+  const n = Object.values(s.basket || {}).reduce((a, q) => a + q, 0);
   if (!n) return R(false, 'Giỏ đang trống rồi');
   for (const [k, q] of Object.entries(s.basket)) s.inv[k] = (s.inv[k] || 0) + q;
   s.basket = {};
@@ -3407,7 +3462,7 @@ export function stashAll(s) {
 // Lấy từ kho ra giỏ (qty 'all' = lấy được bao nhiêu thì lấy, tới khi giỏ đầy)
 export function withdraw(s, itemId, qty = 1) {
   if (!inBasket(itemId)) return R(false, 'Món này không bỏ vào giỏ', { moved: 0 });
-  const inKho = s.inv[itemId] || 0, n = Math.min(qty === 'all' ? inKho : Math.floor(qty), inKho, Math.max(0, room(s)));
+  const inKho = s.inv[itemId] || 0, n = Math.min(qty === 'all' ? inKho : Math.floor(qty), inKho, roomFor(s, itemId));
   if (!(n > 0)) return R(false, inKho > 0 ? 'Giỏ đầy rồi' : 'Kho không có món này', { moved: 0 });
   drop(s.inv, itemId, n); give(s, itemId, n);
   return R(true, `Lấy ${n} ${itemName(itemId).toLowerCase()} ra giỏ`, { moved: n });

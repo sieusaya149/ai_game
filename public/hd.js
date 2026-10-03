@@ -8,7 +8,7 @@ import { SPR3 } from './art3.js';
 import { SPR4 } from './art4.js';
 import { characterHD } from './art5.js';
 
-const FILES = [6, 7, 8, 9, 10, 11, 12, 13, 52];   // art52: dấu sao nông sản (issue 52), hình mới nên tự mang bản thường SPR52_OLD
+const FILES = [6, 7, 8, 9, 10, 11, 12, 13, 52, 53];   // art52: dấu sao nông sản (issue 52), art53: trái khổng lồ (issue 53) — hình mới nên tự mang bản thường SPRn_OLD
 const OLD = [SPR, SPR2, SPR3, SPR4];
 const MAP = new WeakMap();
 const stats = { files: [], linked: 0, bad: [] };

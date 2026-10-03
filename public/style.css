@@ -248,6 +248,7 @@ kbd {
 .cell-n { position: absolute; top: 4px; right: 6px; font-size: 12px; font-weight: 900; color: var(--wood); }
 .cell-name { font-size: 12.5px; font-weight: 900; line-height: 1.1; }
 .cell-sub { font-size: 11px; opacity: 0.7; }
+.cell.giant { border-color: #e2bc44; background: #fff8dc; }
 .empty { padding: 32px 12px; text-align: center; font-size: 15px; opacity: 0.75; line-height: 1.4; }
 .note { margin-top: 10px; padding: 8px 12px; border-radius: 12px; background: #fff0c8; font-size: 13px; line-height: 1.4; }
 .note.closed { margin: 0 0 10px; background: #ffd9d0; border: 2px solid #d9483b; color: #7a1d10; font-size: 14px; font-weight: 800; }
@@ -262,6 +263,7 @@ kbd {
 .order { padding: 10px 12px; border-radius: 15px; background: var(--paper); border: 2px solid var(--line); box-shadow: 0 2px 0 var(--line); }
 .order.ready { background: #eaf7d8; border-color: #8cc65a; box-shadow: 0 2px 0 #8cc65a; }
 .order-who { font-size: 15px; }
+.order-special { color: #b8860b; font-weight: bold; }
 .order-items { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .need { display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px 3px 4px; border-radius: 999px; background: #ffe0d8; border: 2px solid #f0a898; font-weight: 900; font-size: 14px; }
 .need.ok { background: #dcf3c4; border-color: #9bd46a; }

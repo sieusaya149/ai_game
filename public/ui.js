@@ -13,6 +13,7 @@ import { drawMini } from './minimap.js';
 import * as net from './net.js';
 import { hdOf, charFrames } from './hd.js';
 import { starIcon } from './art52.js';
+import { SPR53_OLD } from './art53.js';   // biểu tượng trái khổng lồ (issue 53)
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -72,7 +73,18 @@ function seasonTag(tag) {
   return h(tag, { class: 'season-tag' }, seasonTagUrl ? h('img', { class: 'season-ico', src: seasonTagUrl, alt: '', draggable: false }) : '🌿 ', 'Đúng mùa');
 }
 // Nông sản có sao ('cai@2'): icon của nông sản đó, thêm viền và dấu sao (art52.starIcon, bản 2x nếu có)
-const iconKey = key => (D.starOf(key) > 1 && starUrl(key) ? key : D.baseOf(key));
+// Trái khổng lồ ('giant_cai', 'giant_cai@3', issue 53): biểu tượng riêng từng cây trong art53 (bản 2x nếu có), có sao thì thêm viền và dấu sao
+const iconKey = key => (D.giantOf(key) ? (giantUrl(key) ? key : D.giantOf(key)) : D.starOf(key) > 1 && starUrl(key) ? key : D.baseOf(key));
+function giantUrl(key) {
+  if (iconCache.has(key)) return iconCache.get(key);
+  let u = null;
+  try {
+    const src = SPR53_OLD.giantIcon?.[D.giantOf(key)], big = src && hdOf(src), n = D.starOf(key);
+    u = src ? (n > 1 ? starIcon(big ?? src, n, big ? 2 : 1) : big ?? src).toDataURL() : null;
+  } catch { u = null; }
+  iconCache.set(key, u);
+  return u;
+}
 function starUrl(key) {
   if (iconCache.has(key)) return iconCache.get(key);
   let u = null;
@@ -93,7 +105,7 @@ function ico(key, cls = '') {
   return u ? h('img', { class: 'ico ' + cls, src: u, alt: '', draggable: false }) : h('span', { class: 'ico emo ' + cls }, emojiFor(iconKey(key)));
 }
 // Icon của hành động có thể là emoji hoặc khóa vật phẩm
-const isKey = s => typeof s === 'string' && /^[a-z][a-z_0-9]+$/i.test(s);
+const isKey = s => typeof s === 'string' && /^[a-z][a-z_0-9]+(@[23])?$/i.test(s);   // khóa có sao: 'giant_dau@3'
 const actIcon = s => (isKey(s) ? ico(s) : h('span', { class: 'ico emo' }, s || '✋'));
 const itemLabel = k => D.itemName(k);
 
@@ -900,8 +912,9 @@ PANELS.bag = {
         const it = D.ITEMS[k];
         const act = it?.kind === 'seed' ? btn(s.selectedSeed === it.crop ? 'Đang chọn' : 'Chọn gieo', () => { S.selectSeed(st(), it.crop); sound.play('pop'); commit(); }, 'plain sm', { disabled: s.selectedSeed === it.crop })
           : it?.kind === 'deco' ? btn('Đặt ở 🔨', () => { closePanel(); api.buildStart(); }, 'green sm')
-          : inShed && src === s.inv && isProduce(k) ? btn('Lấy ra', () => res(S.withdraw(st(), k, 'all'), 'pop'), 'plain sm', { disabled: S.basketCount(s) >= S.basketCap(s) }) : null;
-        list.append(h('div', { class: 'cell' }, ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + src[k]), h('div', { class: 'cell-name' }, itemLabel(k)), act));
+          : inShed && src === s.inv && isProduce(k) ? btn('Lấy ra', () => res(S.withdraw(st(), k, 'all'), 'pop'), 'plain sm', { disabled: S.basketCap(s) - S.basketCount(s) < D.itemSlots(k) }) : null;
+        const big = D.giantOf(k) ? h('div', { class: 'cell-sub giant-slots' }, `🧺 ${D.itemSlots(k)} chỗ`) : null;   // trái khổng lồ chiếm 5 chỗ giỏ (issue 53)
+        list.append(h('div', { class: 'cell' + (D.giantOf(k) ? ' giant' : '') }, ico(k, 'big'), h('b', { class: 'cell-n' }, '×' + src[k]), h('div', { class: 'cell-name' }, itemLabel(k)), big, act));
       }
       body.append(list);
     }
@@ -1176,7 +1189,7 @@ PANELS.board = {
     for (const o of orders) {
       const ok = Object.entries(o.items).every(([k, q]) => S.orderHave(s, k) >= q);   // món ★n nhận hàng từ ★n trở lên (issue 52)
       list.append(h('div', { class: 'order' + (ok ? ' ready' : '') },
-        h('div', { class: 'order-who' }, '🧑 ', h('b', {}, o.who), ' cần:'),
+        h('div', { class: 'order-who' }, '🧑 ', h('b', {}, o.who), ' cần:', o.giant ? h('span', { class: 'order-special' }, ' ✨ Đơn đặc biệt') : null),
         h('div', { class: 'order-items' }, Object.entries(o.items).map(([k, q]) => {
           const g = S.orderHave(s, k);
           return h('span', { class: 'need' + (g >= q ? ' ok' : '') }, ico(k), ` ${Math.min(g, 999)}/${q}`);

@@ -18,12 +18,12 @@ Thỉnh thoảng thu hoạch ra một **trái khổng lồ**, bất ngờ có th
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): thống kê nhiều lượt với hạt giống ngẫu nhiên cố định: cấp 1 không bao giờ ra, cấp 2 ≈ 10%, cấp 3 ≈ 20%, cấp 3 + ★3 cao hơn cấp 3 thường (dung sai rộng).
-- [ ] Unit test: trái khổng lồ bán ×3 (nhân thêm hệ số sao nếu có), chiếm 5 chỗ trong giỏ; giỏ không đủ chỗ thì xử lý đúng như đã chốt cho món thường.
-- [ ] Unit test: luật trộm từ chối trái khổng lồ nhưng vẫn lấy được cây chín thường có sao; ô đang có trái khổng lồ không bị lấy mất nó.
-- [ ] Unit test: đơn hàng đặc biệt nhận trái khổng lồ.
-- [ ] E2E (desktop + 360px): dựng bản lưu cây cấp thành thạo 3 ★3 với hạt giống ngẫu nhiên đã chọn cho ra trái khổng lồ → thấy hình to lấp lánh, thu hoạch, giỏ chiếm 5 chỗ, có thông báo.
-- [ ] E2E (hai trình duyệt qua server): khách vào vườn có trái khổng lồ, thử trộm thì không lấy được.
+- [x] Unit test (seam 1): thống kê nhiều lượt với hạt giống ngẫu nhiên cố định: cấp 1 không bao giờ ra, cấp 2 ≈ 10%, cấp 3 ≈ 20%, cấp 3 + ★3 cao hơn cấp 3 thường (dung sai rộng).
+- [x] Unit test: trái khổng lồ bán ×3 (nhân thêm hệ số sao nếu có), chiếm 5 chỗ trong giỏ; giỏ không đủ chỗ thì xử lý đúng như đã chốt cho món thường.
+- [x] Unit test: luật trộm từ chối trái khổng lồ nhưng vẫn lấy được cây chín thường có sao; ô đang có trái khổng lồ không bị lấy mất nó.
+- [x] Unit test: đơn hàng đặc biệt nhận trái khổng lồ.
+- [x] E2E (desktop + 360px): dựng bản lưu cây cấp thành thạo 3 ★3 với hạt giống ngẫu nhiên đã chọn cho ra trái khổng lồ → thấy hình to lấp lánh, thu hoạch, giỏ chiếm 5 chỗ, có thông báo. (Bản lưu ghi sẵn kết quả lần tung `crop.giant`; tỉ lệ tung theo hạt giống cố định kiểm ở unit test.)
+- [x] E2E (hai trình duyệt qua server): khách vào vườn có trái khổng lồ, thử trộm thì không lấy được.
 
 ## Blocked by
 

@@ -77,10 +77,20 @@ export const masteryLevel = (group, n) => 1 + MASTERY.thresholds[group].filter(t
 // orderLv: từ cấp này đơn hàng có lúc đòi ★2 / ★3 (xác suất orderP)
 export const STARS = { max: 3, mul: [1, 1.5, 2], bugMs: 30_000, orderLv: 5, orderP: [0.25, 0.1] };
 export const starKey = (id, star = 1) => (star > 1 ? `${id}@${star}` : id);
-export const starOf = k => { const m = /@([23])$/.exec(k); return m && CROPS[k.slice(0, -2)] ? +m[1] : 1; };
+// Trái khổng lồ (issue 53): món riêng theo loại cây, khóa 'giant_<cây>' (★2/★3 thêm hậu tố như nông sản: 'giant_cai@3').
+// Tung một lần lúc cây vừa chín: tỉ lệ MASTERY.giant theo cấp thành thạo, vụ đang ★3 thì nhân star3Mul (cao nhất ở cấp 3 + ★3).
+// priceMul: giá bán so với một trái thường (còn nhân hệ số sao) · slots: số chỗ chiếm trong giỏ · expMul: EXP khi thu = EXP vụ × hệ số
+// orderP: xác suất một đơn hàng mới là đơn đặc biệt đòi trái khổng lồ (khi đã có cây thành thạo cấp 2) · orderMul: thưởng đơn đó so với giá bán
+export const GIANT = { star3Mul: 1.5, priceMul: 3, slots: 5, expMul: 5, orderP: 0.15, orderMul: 1.5 };
+export const giantKey = (id, star = 1) => starKey(`giant_${id}`, star);
+// id cây của một khóa trái khổng lồ (mọi mức sao), null nếu không phải trái khổng lồ
+export const giantOf = k => { const b = String(k).replace(/@[23]$/, ''); return b.startsWith('giant_') && CROPS[b.slice(6)] ? b.slice(6) : null; };
+export const starOf = k => { const m = /@([23])$/.exec(k); return m && (CROPS[k.slice(0, -2)] || giantOf(k)) ? +m[1] : 1; };
 export const baseOf = k => (starOf(k) > 1 ? k.slice(0, -2) : k);
-// Nông sản (mọi mức sao) hay sản phẩm vật nuôi: đồ bỏ giỏ, bán ở chợ, bỏ thùng giao hàng được
-export const isProduce = k => !!(CROPS[baseOf(k)] || PRODUCTS[k]);
+// Nông sản (mọi mức sao, cả trái khổng lồ) hay sản phẩm vật nuôi: đồ bỏ giỏ, bán ở chợ, bỏ thùng giao hàng được
+export const isProduce = k => !!(CROPS[baseOf(k)] || giantOf(k) || PRODUCTS[k]);
+// Số chỗ một món chiếm trong giỏ: trái khổng lồ GIANT.slots, còn lại 1
+export const itemSlots = k => (giantOf(k) ? GIANT.slots : 1);
 // Các giai đoạn theo % thời gian lớn: 0 hạt · 1 mầm · 2 cây non · 3 ra hoa/trái non · 4 chín.
 export const CROP_STAGES = [0, 0.1, 0.35, 0.7, 1];
 export const OVERRIPE = 1.5;              // chín quá (grow × 1.5) mà chưa hái thì héo, mất trắng
@@ -481,11 +491,13 @@ export const BOND = {
   lifeMul: 1.1,      // ❤️5: tuổi thọ (mốc già, mốc ra đi) +10%
   runRange: 80,      // ❤️4+: chạy lại khi người chơi trong tầm này
 };
-export const sellPrice = k => (CROPS[baseOf(k)] ? Math.round(CROPS[baseOf(k)].price * STARS.mul[starOf(k) - 1]) : PRODUCTS[k]?.price ?? 0);
+export const sellPrice = k => (CROPS[baseOf(k)] ? Math.round(CROPS[baseOf(k)].price * STARS.mul[starOf(k) - 1])
+  : giantOf(k) ? Math.round(CROPS[giantOf(k)].price * GIANT.priceMul * STARS.mul[starOf(k) - 1]) : PRODUCTS[k]?.price ?? 0);
 // Thùng giao hàng: lái buôn trả 80% giá chợ cho đồ trong thùng, chốt lúc 6h sáng (làm tròn xuống)
 export const SHIP_RATE = 0.8;
 export const shipValue = items => Math.floor(Object.entries(items).reduce((a, [k, n]) => a + sellPrice(k) * n, 0) * SHIP_RATE);
-export const itemName = k => ITEMS[k]?.name ?? (starOf(k) > 1 ? `${CROPS[baseOf(k)].name} ★${starOf(k)}` : CROPS[k]?.name) ?? PRODUCTS[k]?.name ?? k;
+export const itemName = k => ITEMS[k]?.name ?? (giantOf(k) ? `${CROPS[giantOf(k)].name} khổng lồ${starOf(k) > 1 ? ` ★${starOf(k)}` : ''}` : null)
+  ?? (starOf(k) > 1 ? `${CROPS[baseOf(k)].name} ★${starOf(k)}` : CROPS[k]?.name) ?? PRODUCTS[k]?.name ?? k;
 
 // ---------- Ngoại hình (skinset) ----------
 // Các phần cơ bản miễn phí; mũ và phụ kiện mua ở sạp (price 0 = có sẵn).
@@ -622,6 +634,7 @@ export const EVENT_LEVEL = {
   tisun:     { level: 'important', cat: 'loss', group: () => 'loss:tisun', label: 'Tí Sún trộm trứng', text: (n, e) => `Tí Sún lấy trộm mất ${e.n ?? n} quả trứng 😢` },
   civet:     { level: 'important', cat: 'loss', group: () => 'loss:civet', label: 'Chồn hương bắt con vật', text: (n, e) => `Chồn hương tha mất ${n} con ${animalN(e.animal)} 😿` },
   levelup:   { level: 'important', cat: 'levelup', group: () => 'levelup', label: 'Lên cấp', text: (n, e) => `Lên cấp ${e.level}! Thưởng ${e.level * 20} xu 🎉` },
+  giant:     { level: 'important', cat: 'levelup', group: e => 'giant:' + e.crop, label: 'Thu được trái khổng lồ', text: (n, e) => n > 1 ? `Thu được ${n} ${cropN(e.crop)} khổng lồ! ✨` : `Thu được ${cropN(e.crop)} khổng lồ! ✨` },
   mastery:   { level: 'important', cat: 'levelup', group: e => 'mastery:' + e.crop, label: 'Thành thạo cây', text: (n, e) => `Thành thạo ${cropN(e.crop)} lên cấp ${e.lv}! 🟡` },
   order:     { level: 'important', cat: 'order', group: () => 'order', label: 'Đơn hàng mới', text: n => n > 1 ? `${n} đơn hàng mới 📋` : 'Hàng xóm có đơn hàng mới 📋' },
   helped:    { level: 'important', cat: 'help', group: e => `helped:${e.by}:${e.act}`, label: 'Khách giúp vườn', text: (n, e) => `${e.by} đã ${helpN(e.act)} ${n} ${HELP_JOBS[e.act]?.unit ?? 'việc'} giúp bạn 🙏` },
