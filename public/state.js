@@ -2097,6 +2097,9 @@ function makeOrder(s) {
   for (let i = rint(1, 2); i > 0 && pool.length; i--) items[pool.splice(rint(0, pool.length - 1), 1)[0]] = rint(2, 5);
   // trứng: gà, hoặc trứng vịt khi làng đã biết nhà mình nuôi được vịt
   if (Math.random() < 0.3) items[lv >= ANIMALS.vit.lv && Math.random() < 0.4 ? 'trung_vit' : 'trung'] = rint(2, 4);
+  // sản phẩm các loài còn lại (sữa bò, lông cừu...): chỉ xin khi nhà đang nuôi loài đó và đã đủ cấp
+  const prods = Object.entries(ANIMALS).filter(([k, a]) => a.product && !items[a.product] && a.lv <= lv && !['ga', 'vit'].includes(k) && s.animals.some(x => x.type === k)).map(([, a]) => a.product);
+  if (prods.length && Math.random() < 0.3) items[pick(prods)] = rint(2, 4);
   let price = 0, exp = 0;
   for (const [k, n] of Object.entries(items)) { price += sellPrice(k) * n; exp += (CROPS[k]?.exp ?? 2) * n; }
   return { id: s.nextId++, who: pick(ORDERS.people), items, coins: Math.round(price * ORDERS.rewardMul), exp: Math.round(exp * ORDERS.rewardMul / 2) };

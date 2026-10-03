@@ -704,7 +704,9 @@ buyAnimal(state, type, sex = 'm')   // → R { price }: sex 'm' đực | 'f' cá
 sell(state, itemId, qty|'all')    // → R { coins }
 sellAll(state)                    // → R { coins } bán mọi nông sản & sản phẩm (không bán vật tư/hạt)
 buyOutfit(state, 'hat'|'acc', index)  setLook(state, look)
-fulfillOrder(state, orderId)      // → R
+fulfillOrder(state, orderId)      // → R. Đơn của làng xin: cây trồng đã mở khoá, trứng gà/vịt, và (30% đơn) sản phẩm vật nuôi
+                                  // khác (sữa bò, lông cừu) chỉ khi nhà đang nuôi loài đó và đủ cấp; heo, chó, mèo không có sản phẩm nên không có đơn.
+                                  // Thưởng vẫn = tổng giá bán × ORDERS.rewardMul; dạng đơn không đổi nên bản lưu cũ không cần migrate.
 ```
 Chợ Bà Tư thay sạp hàng và nhà kho bán hàng cũ (sạp bị bỏ khỏi vườn).
 
