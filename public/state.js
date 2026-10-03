@@ -3332,9 +3332,11 @@ export function buyAnimal(s, type, sex = 'm', coat) {
 // thì người giao hàng (s.courier) đi từ cổng tới nhà kho, tới nơi thì hàng vào kho (s.inv). Luật chạy trong step nên trình duyệt
 // và server chạy bù cho cùng kết quả. Vật nuôi, quần áo vẫn phải ra làng mua.
 export const canOrder = id => { const it = ITEMS[id]; return !!it && it.price > 0 && ['seed', 'supply', 'feed', 'deco'].includes(it.kind); };
-export const deliveryFee = cost => (cost > 0 ? Math.max(DELIVERY.feeMin, Math.ceil(cost * DELIVERY.feePct)) : 0);
+// Kiểu giao: thiếu hoặc lạ (client cũ) thì như 'm2' (2 phút, rẻ nhất)
+export const deliveryMode = id => DELIVERY.modes.find(m => m.id === id) ?? DELIVERY.modes.find(m => m.id === 'm2');
+export const deliveryFee = (cost, mode) => (cost > 0 ? Math.max(DELIVERY.feeMin, Math.ceil(cost * deliveryMode(mode).fee)) : 0);
 // Tính tiền giỏ hàng: { ok, msg?, items, cost, fee, total }. Hàm thuần, bảng đặt hàng dùng để hiện tổng.
-export function orderQuote(s, cart) {
+export function orderQuote(s, cart, mode) {
   const items = {};
   for (const [id, q] of Object.entries(cart ?? {})) {
     const n = Math.floor(q);
@@ -3343,21 +3345,30 @@ export function orderQuote(s, cart) {
     if (level(s) < ITEMS[id].lv) return R(false, `Cần cấp ${ITEMS[id].lv} mới mua được ${ITEMS[id].name.toLowerCase()}`, { items: {}, cost: 0, fee: 0, total: 0 });
     items[id] = Math.min(DELIVERY.maxQty, n);
   }
-  const cost = Object.entries(items).reduce((a, [id, n]) => a + ITEMS[id].price * n, 0), fee = deliveryFee(cost);
+  const cost = Object.entries(items).reduce((a, [id, n]) => a + ITEMS[id].price * n, 0), fee = deliveryFee(cost, mode);
   if (!cost) return R(false, 'Giỏ hàng đang trống', { items, cost, fee, total: 0 });
   return R(true, undefined, { items, cost, fee, total: cost + fee });
 }
-export function orderOnline(s, cart) {
+export function orderOnline(s, cart, mode) {
   if (s.visit) return R(false, 'Về vườn nhà rồi hẵng đặt hàng nhé', { reason: 'visit' });
-  const q = orderQuote(s, cart);
+  const dm = deliveryMode(mode), q = orderQuote(s, cart, dm.id);
   if (!q.ok) return q;
-  if ((s.deliveries ??= []).length >= DELIVERY.maxPending) return R(false, `Đang chờ giao ${DELIVERY.maxPending} đơn rồi, đợi hàng tới đã nhé`, { reason: 'pending' });
+  const now = dm.ms <= 0;
+  if (!now && (s.deliveries ??= []).length >= DELIVERY.maxPending) return R(false, `Đang chờ giao ${DELIVERY.maxPending} đơn rồi, đợi hàng tới đã nhé`, { reason: 'pending' });
   if (s.coins < q.total) return R(false, 'Chưa đủ xu, cố lên nhé', { reason: 'coins' });
   s.coins -= q.total;
-  const o = { id: s.nextId++, items: q.items, cost: q.cost, fee: q.fee, at: s.time, due: s.time + DELIVERY.waitMs };
-  s.deliveries.push(o);
   if (Object.keys(q.items).some(id => ITEMS[id].kind === 'seed')) { s.stats.bought++; advanceTutorial(s); }
-  return R(true, `Đã đặt hàng (${q.total} xu), người giao hàng sẽ mang tới kho`, { order: o });
+  if (now) {   // giao ngay: hàng vào kho tức thì, không có đơn chờ
+    for (const [id, n] of Object.entries(q.items)) s.inv[id] = (s.inv[id] || 0) + n;
+    emit({ type: 'delivered', orders: 1, items: q.items });
+    log(s, `Giao ngay tới kho: ${Object.entries(q.items).map(([id, n]) => `${n} ${itemName(id).toLowerCase()}`).join(', ')}`);
+    snd('pop');
+    return R(true, `Hàng đã giao tới kho (${q.total} xu)`, { order: null });
+  }
+  // by = hạn hàng phải vào kho (tổng thời gian đã chọn, gồm đi bộ); due = lúc người giao hàng phải lên đường để kịp
+  const o = { id: s.nextId++, items: q.items, cost: q.cost, fee: q.fee, at: s.time, due: s.time + Math.max(0, dm.ms - courierPath(s).ms), by: s.time + dm.ms };
+  s.deliveries.push(o);
+  return R(true, `Đã đặt hàng (${q.total} xu), hàng sẽ tới kho sau ${Math.round(dm.ms / 60000)} phút`, { order: o });
 }
 // Thời gian đi từ cổng tới nhà kho (giờ vườn): quãng thẳng / tốc độ đi × hệ số đường vòng
 function courierPath(s) {
@@ -3372,7 +3383,8 @@ export function deliveryEta(s, o) {
   let w = Math.max(0, o.due - s.time);
   const f = (dayFrac(s) + w / DAY_MS) % 1, closeAt = (MARKET.close - MARKET.open) / 24;
   if (f >= closeAt) w += Math.round((1 - f) * DAY_MS);
-  return w + courierPath(s).ms;
+  const e = w + courierPath(s).ms;
+  return o.by != null && marketOpen(s) ? Math.min(e, Math.max(0, o.by - s.time)) : e;   // quá hạn by thì hàng vào kho dù người giao còn đi
 }
 // Đơn đang chờ giao, kèm thời gian dự kiến và cờ đang trên đường
 export const pendingDeliveries = s => (s.deliveries ?? []).map(o => ({
@@ -3381,6 +3393,14 @@ export const pendingDeliveries = s => (s.deliveries ?? []).map(o => ({
 // Mỗi bước: người giao hàng tới nơi thì giao, đi ra hết thì biến mất; rảnh mà có đơn tới hạn lúc chợ mở thì lên đường
 function stepDeliveries(s) {
   if (s.visit) return;   // đang ở vườn bạn: đơn của mình chờ về nhà
+  // đơn tới hạn by (lúc chợ mở) thì hàng vào kho đúng hạn, dù người giao hàng còn đang đi
+  if (marketOpen(s) && (s.deliveries ?? []).some(o => o.by != null && s.time >= o.by)) {
+    const late = s.deliveries.filter(o => o.by != null && s.time >= o.by);
+    s.deliveries = s.deliveries.filter(o => !late.includes(o));
+    creditParcel(s, late);
+    const k = s.courier;
+    if (k?.state === 'coming') { k.ids = k.ids.filter(id => !late.some(o => o.id === id)); if (!k.ids.length) { k.state = 'leaving'; k.since = s.time; } }
+  }
   const c = s.courier;
   if (c) {
     if (c.state === 'coming' && s.time >= c.arriveAt) dropParcel(s, c);
@@ -3393,14 +3413,18 @@ function stepDeliveries(s) {
   s.courier = { id: s.nextId++, ids: due.map(o => o.id), state: 'coming', from: p.from, at: p.to, since: s.time, arriveAt: s.time + p.ms };
 }
 function dropParcel(s, c) {
-  const got = {};
-  for (const o of s.deliveries.filter(o => c.ids.includes(o.id))) for (const [id, n] of Object.entries(o.items)) got[id] = (got[id] || 0) + n;
+  const mine = s.deliveries.filter(o => c.ids.includes(o.id));
   s.deliveries = s.deliveries.filter(o => !c.ids.includes(o.id));
-  for (const [id, n] of Object.entries(got)) s.inv[id] = (s.inv[id] || 0) + n;
+  if (mine.length) { creditParcel(s, mine); fxEv(c.at.x, c.at.y - 20, 'Hàng tới rồi 📦', COL.good); }
   c.state = 'leaving'; c.since = s.time;
+}
+// Hàng của các đơn vào kho + event/nhật ký
+function creditParcel(s, orders) {
+  const got = {};
+  for (const o of orders) for (const [id, n] of Object.entries(o.items)) got[id] = (got[id] || 0) + n;
+  for (const [id, n] of Object.entries(got)) s.inv[id] = (s.inv[id] || 0) + n;
   const what = Object.entries(got).map(([id, n]) => `${n} ${itemName(id).toLowerCase()}`).join(', ');
-  emit({ type: 'delivered', orders: c.ids.length, items: got });
-  fxEv(c.at.x, c.at.y - 20, 'Hàng tới rồi 📦', COL.good);
+  emit({ type: 'delivered', orders: orders.length, items: got });
   log(s, `Người giao hàng đã giao tới kho: ${what}`);
   snd('pop');
 }

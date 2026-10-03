@@ -483,6 +483,11 @@ body.alerting #hud { top: calc(var(--alert-h, 40px) + 10px + var(--st)); }
   .guide-dot.on::before { background: var(--orange); border-color: var(--orange-d); }
   .guide-dots { gap: 0; }
 }
+@media (max-width: 400px) {
+  .bb-lbl { font-size: 8.5px; letter-spacing: -0.3px; }   /* 8 nút trên thanh dưới */
+  #bottombar { gap: 2px; padding-left: calc(4px + var(--sl)); padding-right: calc(4px + var(--sr)); }
+  .bb-ico { height: 28px; }
+}
 @media (max-width: 340px) {
   .bb-lbl { display: none; }   /* 7 nút trên 320px không đủ chỗ cho chữ */
   .bb-ico { height: 34px; }
@@ -617,3 +622,12 @@ body:has(#joy-base) #live { bottom: calc(var(--ui-bottom) + 142px); }   /* đi�
 .note-day { font-size: 12px; opacity: 0.7; }
 .note-text { margin-top: 2px; font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
 #vet-coats .row-ico .thumb { width: 44px; height: auto; }
+
+/* Đặt hàng online: ba kiểu giao */
+.modes { display: flex; gap: 6px; margin: 4px 0 8px; }
+.mode { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 2px solid var(--line); background: var(--paper); color: var(--ink); font-family: inherit; cursor: pointer; }
+.mode b { font-size: 13px; font-weight: 900; }
+.mode small { font-size: 11.5px; font-weight: 800; opacity: 0.85; }
+.mode.on { background: var(--orange); border-color: var(--orange-d); color: #fff; box-shadow: 0 2px 0 var(--orange-d); }
+.tabs.shops { position: static; margin-bottom: 0; padding-bottom: 6px; border-bottom: 0; }
+.tabs.shops .tab { flex: 1 1 0; }

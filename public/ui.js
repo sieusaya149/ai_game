@@ -399,6 +399,7 @@ export function renderHUD(s) {
     if (ic) { cv.width = ic.width; cv.height = ic.height; cx.drawImage(ic, 0, 0); } else cx.clearRect(0, 0, cv.width, cv.height);
   }
   $('bb-build').style.display = s.scene && s.scene !== 'farm' ? 'none' : '';   // chế độ xây dựng chỉ có ở vườn
+  $('bb-order').style.display = s.visit ? 'none' : '';   // đang ở vườn bạn thì không đặt hàng (orderOnline từ chối)
   renderMini(s);
 
   const coinsTxt = fmt(s.coins);
@@ -866,8 +867,11 @@ PANELS.phone = {
 // Phiếu đặt hàng (món → số) chỉ nằm ở giao diện; bấm "Đặt hàng" mới trừ xu (S.orderOnline).
 let orderCart = {};
 let orderKey = '';
-const ORDER_TABS = [['seed', '🌱 Hạt giống'], ['supply', '🧴 Vật tư'], ['feed', '🌾 Thức ăn'], ['deco', '🪴 Trang trí'], ['vet', '💊 Thú y']];
-tabs.order = 'seed';
+const ORDER_TABS = [['seed', '🌱 Hạt giống'], ['supply', '🧴 Vật tư'], ['feed', '🌾 Thức ăn'], ['deco', '🪴 Trang trí']];
+const ORDER_SHOPS = [['ba', '🧺 Bà Tư'], ['cou', '💊 Cô Út']];   // chợ Bà Tư: bốn nhóm hàng; trạm thú y Cô Út: đồ thú y
+tabs.order = 'seed'; tabs.orderShop = 'ba';
+let orderMode = 'm2';   // kiểu giao đang chọn (mặc định 2 phút, rẻ nhất)
+const modeName = m => (m.ms ? `Giao sau ${m.ms / 60000} phút` : 'Giao ngay');
 const boxIco = () => (COURIER_ART?.box ? canvasIco(COURIER_ART.box, 'ico big') : h('span', { class: 'ico emo big' }, '📦'));
 const itemsText = items => Object.entries(items).map(([k, n]) => `${itemLabel(k)} ×${n}`).join(', ');
 const etaText = d => (d.onWay ? `🚚 Đang trên đường, còn ${S.mmss(d.eta)}` : `Dự kiến tới kho sau ${S.mmss(d.eta)}`);
@@ -878,7 +882,7 @@ PANELS.order = {
   render(body, s) {
     const lv = level(s), pend = S.pendingDeliveries(s);
     orderKey = JSON.stringify(pend.map(d => [d.id, d.onWay]));
-    body.append(h('div', { class: 'note' }, `Đặt hàng chợ Bà Tư và trạm thú y Cô Út lúc nào cũng được, người giao hàng mang tới tận nhà kho. Phí giao ${Math.round(D.DELIVERY.feePct * 100)}% tiền hàng (ít nhất ${D.DELIVERY.feeMin} xu). Chợ đóng cửa (${D.MARKET.close}h–${D.MARKET.open}h) thì sáng mai mới giao. Vật nuôi và quần áo vẫn phải ra làng mua.`));
+    body.append(h('div', { class: 'note' }, `Đặt hàng chợ Bà Tư và trạm thú y Cô Út lúc nào cũng được, người giao hàng mang tới tận nhà kho. Chọn kiểu giao: càng nhanh phí càng cao (ít nhất ${D.DELIVERY.feeMin} xu). Chợ đóng cửa (${D.MARKET.close}h–${D.MARKET.open}h) thì sáng mai mới giao. Vật nuôi và quần áo vẫn phải ra làng mua.`));
     // đơn đang chờ giao
     body.append(section(`🚚 Đang chờ giao (${pend.length}/${D.DELIVERY.maxPending})`));
     const pl = h('div', { class: 'list', id: 'order-pending' });
@@ -891,7 +895,7 @@ PANELS.order = {
       }));
     }
     // phiếu đặt hàng
-    const q = S.orderQuote(s, orderCart), picked = Object.keys(q.items);
+    const q = S.orderQuote(s, orderCart, orderMode), picked = Object.keys(q.items);
     body.append(section('🧾 Phiếu đặt hàng'));
     const cl = h('div', { class: 'list', id: 'order-cart' });
     body.append(cl);
@@ -904,17 +908,28 @@ PANELS.order = {
           btn('✕', () => { delete orderCart[k]; sound.play('click'); refreshPanel(); }, 'plain sm nosound', { title: 'Bỏ món này' })),
       }));
     }
+    const dm = S.deliveryMode(orderMode);
+    // ba kiểu giao, mỗi kiểu ghi thời gian và phí (xu) cho phiếu hiện tại
+    body.append(h('div', { class: 'modes', id: 'order-modes' }, D.DELIVERY.modes.map(m => {
+      const f = S.deliveryFee(q.cost, m.id);
+      return h('button', { class: 'mode' + (m.id === dm.id ? ' on' : ''), type: 'button', 'data-mode': m.id, 'aria-pressed': m.id === dm.id ? 'true' : 'false',
+        on: { click: () => { orderMode = m.id; sound.play('click'); refreshPanel(); } } },
+        h('b', {}, modeName(m)), h('small', {}, `Phí ${Math.round(m.fee * 100)}% = ${fmt(f)} xu`));
+    })));
     if (picked.length) {
-      const full = pend.length >= D.DELIVERY.maxPending, poor = s.coins < q.total;
+      const full = dm.ms > 0 && pend.length >= D.DELIVERY.maxPending, poor = s.coins < q.total;
       body.append(h('div', { class: 'sell-all order-total', id: 'order-total' },
         h('div', {}, `Tiền hàng ${fmt(q.cost)} + phí giao ${fmt(q.fee)} = `, h('b', {}, fmt(q.total) + ' xu')),
-        btn('Đặt hàng', () => { const r = res(S.orderOnline(st(), orderCart), 'coin'); if (r?.ok) { orderCart = {}; refreshPanel(); } }, 'green', { disabled: full || poor, id: 'order-buy' })));
+        btn('Đặt hàng', () => { const r = res(S.orderOnline(st(), orderCart, orderMode), 'coin'); if (r?.ok) { orderCart = {}; refreshPanel(); } }, 'green', { disabled: full || poor, id: 'order-buy' })));
       if (full) body.append(h('div', { class: 'note closed' }, `Đang chờ giao ${D.DELIVERY.maxPending} đơn rồi, đợi hàng tới đã nhé!`));
       else if (poor) body.append(h('div', { class: 'note closed' }, 'Chưa đủ xu cho phiếu này.'));
     }
     // các món đặt được
-    body.append(tabBar(ORDER_TABS, 'order'));
-    const t = tabs.order, list = h('div', { class: 'list' });
+    const shops = tabBar(ORDER_SHOPS, 'orderShop', () => { tabs.order = tabs.orderShop === 'cou' ? 'vet' : 'seed'; });
+    shops.classList.add('shops'); shops.id = 'order-shops';
+    body.append(shops);
+    if (tabs.orderShop === 'ba') body.append(tabBar(ORDER_TABS, 'order'));
+    const t = tabs.orderShop === 'cou' ? 'vet' : tabs.order, list = h('div', { class: 'list' });
     body.append(list);
     const ids = t === 'vet' ? D.VET_ITEMS : Object.keys(D.ITEMS).filter(id => D.ITEMS[id].kind === t && !D.VET_ITEMS.includes(id));
     for (const id of ids.filter(S.canOrder).sort((a, b) => D.ITEMS[a].lv - D.ITEMS[b].lv)) {
