@@ -809,6 +809,12 @@ function frame(now) {
   world.baths = (world.baths ?? []).filter(b => now - b.t0 < R.BATH_MS);
   world.grains = (world.grains ?? []).filter(g => now - g.t0 < R.GRAIN_MS);
   if (state.scene === 'farm') for (const e of events) if (e.type === 'wallow') world.baths.push({ id: e.id, t0: now, wallow: true });
+  // vòi sen chuồng cấp 3 tắm sáng (issue 59): vòi sen phun nước, từng con có hạt nước rơi rồi lắc mình, lấp lánh
+  world.showers = (world.showers ?? []).filter(x => now - x.t0 < R.SHOWER_FX_MS);
+  if (state.scene === 'farm') for (const e of events) if (e.type === 'shower') {
+    world.showers.push({ pen: e.pen, t0: now });
+    for (const id of e.ids) world.baths.push({ id, t0: now, shower: true });
+  }
   R.render(ctx, {
     state, w: world, cam, scale, width: canvas.width, height: canvas.height, dpr, now,
     target: curTarget ? { target: curTarget } : null,

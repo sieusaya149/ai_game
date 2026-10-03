@@ -775,8 +775,8 @@ Mạng nước là **ngân sách nước theo giờ** và vùng phủ theo kho�
 - **Mạng nước** (`waterNet`): bắt đầu từ bồn chứa, lan sang bồn phụ và trạm bơm phụ nằm trong tầm của một nút đã nối (theo thứ tự trong vườn). Vùng phủ = mọi ô trong tầm của một nút. Lúc đặt công trình, vùng phủ không tính điện; lúc máy chạy (`live`) thì mất điện là trạm bơm phụ không nối (vùng phủ của trạm tạm mất), nước đã có trong bồn vẫn dùng được.
 - **Máy bơm bơm** khi: giếng cấp 4, có bồn chứa trong tầm giếng, có điện, bồn chưa đầy. Bơm dồn theo ms giờ vườn (`water.pump`), đủ `3.600.000 / 20` ms thì thêm 1 lần nước; đầy thì dừng, không bơm vượt sức chứa. Chỉ tính lúc vườn chạy (`step`), nên phần vắng quá 8 giờ (đóng băng) không bơm; chạy bù trình duyệt và server cùng một hàm nên ra cùng mực nước.
 - **Thời tiết** (issue 55 dựng lịch): `drought(state)` = `weather === 'drought'` (bơm một nửa), `powerOut(state)` = `weather === 'storm'` (mất điện cả ngày bão; issue 55 có thể thu lại nửa ngày).
-- **Trừ nước** theo `WATER_ORDER` mỗi lượt `step` (sau khi ô ruộng khô đi): `['drip']`, vòi sen (issue 59) thêm sau. `drip`: khối ruộng `up.drip` đang có nước (`waterOn`), ô có cây đang lớn mà `water <= 0` thì lấy 1 lần nước và đặt `water = 100`, theo thứ tự khối trong vườn rồi ô trong khối. Bồn cạn (`level < 1`) thì máy ngừng: không trừ âm, không phạt gì. (Mua tưới nhỏ giọt, sao, tiền điện: issue 58.)
-- **Đặt công trình** (`canPlace`, ADR 0005): bồn chứa phải trong tầm giếng; bồn phụ, trạm bơm phụ, khối ruộng có tưới nhỏ giọt phải trong vùng phủ của mạng nước (không tính chính nó). Không đạt → `reason: 'no_water'`, `msg` bắt đầu bằng "Ngoài tầm nước". Bước này đứng trước bước tìm đường. Công trình đã có mà sau đó dời nguồn nước đi xa thì chỉ tạm ngừng (không nối, không có nước), không bị xóa.
+- **Trừ nước** theo `WATER_ORDER` mỗi lượt `step` (sau khi ô ruộng khô đi): `['drip', 'shower']`. `drip`: khối ruộng `up.drip` đang có nước (`waterOn`), ô có cây đang lớn mà `water <= 0` thì lấy 1 lần nước và đặt `water = 100`, theo thứ tự khối trong vườn rồi ô trong khối. Bồn cạn (`level < 1`) thì máy ngừng: không trừ âm, không phạt gì. (Mua tưới nhỏ giọt, sao, tiền điện: issue 58.) `shower`: xem Vòi sen bên dưới.
+- **Đặt công trình** (`canPlace`, ADR 0005): bồn chứa phải trong tầm giếng; bồn phụ, trạm bơm phụ, khối ruộng có tưới nhỏ giọt phải trong vùng phủ của mạng nước (không tính chính nó); chuồng có vòi sen đang ở trong vùng phủ thì dời tới chỗ mới cũng phải trong vùng phủ (chuồng chưa có vòi sen, hay đang ở ngoài vùng phủ sẵn rồi thì dời tự do). Không đạt → `reason: 'no_water'`, `msg` bắt đầu bằng "Ngoài tầm nước". Bước này đứng trước bước tìm đường. Công trình đã có mà sau đó dời nguồn nước đi xa thì chỉ tạm ngừng (không nối, không có nước), không bị xóa.
 ```js
 TANK, WATER_BUILD                 // data.js
 tankInfo(state)                   // → { has, level, cap (0 = chưa có bồn), full, pumping, why (lý do không bơm: giếng chưa máy bơm, bồn xa giếng, mất điện, bồn đầy), perHour }
@@ -784,13 +784,25 @@ waterNet(state, live = false)     // → [{ e, ft, from }] các nút mạng nư�
 waterAt(state, c, r, live = false) // ô có trong vùng phủ không
 waterOn(state, ent)               // công trình đang có nước để chạy không (live): nút mạng nước thì đang nối, thứ khác thì chạm vùng phủ
 drought(state)  powerOut(state)   // thời tiết xấu đọc từ state.weather
-WATER_ORDER                       // ['drip']: thứ tự trừ nước cố định
+WATER_ORDER                       // ['drip', 'shower']: thứ tự trừ nước cố định
 ```
 Chạm bồn chứa: tên đích `"Bồn chứa · level/cap lần nước"`, hành động `tank` luôn tắt, lý do là trạng thái máy bơm ("Máy bơm đang bơm khoảng 20 lần nước mỗi giờ" hoặc `why`). Khách thăm vườn thấy mực nước của chủ (`water` thuộc `VISIT_WORLD`).
 
 **Chế độ xây dựng:** khay có tab **Nước** (bồn chứa, bồn phụ, trạm bơm phụ; tắt kèm "Cần máy bơm" / "Cần bồn chứa" / "Đã tối đa"), dòng `#build-water` "💧 Bồn level/cap lần nước" (kèm lý do khi máy bơm ngừng). Bản đồ vẽ vùng phủ màu xanh nước có viền, ống nước chữ L từ giếng tới bồn và từ mỗi nút về nút nó nối vào (ống xanh có nước, ống xám khi khô: bồn cạn, mất điện, máy bơm không tới), thanh mực nước trên đỉnh bồn. Đang đặt hay kéo bồn chứa thì vùng xanh là tầm của giếng. Bóng đặt thử ngoài tầm thì đỏ kèm lý do "Ngoài tầm nước...".
 
 Hình: `public/arttank.js` `TANK_ART` (bộ thường) và `TANK_ART_HD` (2x), cùng cây khóa, hd.js nối: `tank[0..4]` 32x48 và `tank2[0..4]` 16x28 theo mức nước (`TANK_FRAC` = cạn, 1/4, 1/2, 3/4, đầy; `render.tankStage`), `booster.on|off` 16x26 (có điện và đang nối / không), `pipe.wet|dry.h|v|j` (16x6, 6x16, 8x8), `cover` 16x16 (ô vùng phủ, trong suốt), `bar` 22x7 (thanh mực nước, lòng `BAR_IN`). `render.buildingImg(b, state)` chọn hình theo mực nước và điện. Xem `public/_hdtank.html`.
+
+**Vòi sen chuồng cấp 3 (issue 59).** Chuồng heo và đồng cỏ cấp 3 có vòi sen (`PEN_TABLE[...].extra3` có `'shower'`; chuồng gà, cách ly không có). Số liệu `SHOWER` (data.js): `{ happy: 5, until: 0.25, fxMs: 3000 }`.
+- **Buổi sáng** (từ 6h tới trước `dayFraction < SHOWER.until`, tức 12h trưa, theo lịch game: online là lịch làng), mỗi lượt `step` sau tưới nhỏ giọt: chuồng có vòi sen đang có nước (`waterOn`, tính cả trạm bơm phụ mất điện), con nào trong chuồng (`a.pen`) chưa tắm sáng nay (`a.shower !== dayOf(state)`) thì lấy 1 lần nước bồn và tắm: `dirty = 0`, `wallowAt = time + DIRT.wallowAfterMs` (như tắm tay), `happy += 5` (tối đa 100), `a.shower = dayOf(state)`. Theo thứ tự chuồng trong vườn rồi con trong `state.animals`. Event `{ type: 'shower', pen, ids }`.
+- **Bồn cạn** giữa chừng: con chưa tắm để nguyên (không trừ vui, không mất xu), có nước lại trong buổi sáng thì tắm tiếp; qua 12h thì chờ sáng hôm sau. Mất điện vì bão chỉ làm máy bơm ngừng, nước còn trong bồn vẫn tắm được. Chạy bù trình duyệt và server cùng hàm nên ra cùng kết quả. `a.shower` là trường mới tùy chọn (bản lưu cũ không có thì coi như chưa tắm, save vẫn v4).
+```js
+SHOWER                            // data.js
+hasShower(ent)                    // chuồng cấp 3 có vòi sen không
+showerInfo(state, ent)            // → null (không có vòi sen) | { on, why (lý do tắt: chưa có bồn, ngoài tầm nước, bồn cạn), done, total (số con đã tắm sáng nay / cả chuồng) }
+```
+Chạm máng chuồng cấp 3: hành động `shower` luôn tắt, nhãn "🚿 Vòi sen đang bật (sáng nay tắm done/total con)" hoặc "🚿 Vòi sen đang tắt", lý do là `why` (hay câu giải thích khi đang bật). Chạm máng thì thanh hành động giữ theo máng 6 giây như chạm con vật (`world.js` `KEEP_KINDS`), để heo đứng chen quanh máng không giành mất.
+
+Hình: `public/art59.js` `SHOWER_ART` / `SHOWER_ART_HD` (2x), hd.js nối: `pig` 24x34 và `pasture` 32x40, mỗi cái `idle` (có nước), `off` (không nước), `spray[0..2]` (đang phun), `ax` = cột x của điểm neo (chân cột ở hàng cuối); `drops[0..2]` 16x14 hạt nước trên lưng con vật. Chân cột ở `PEN_DEFS.pig|pasture.shower` (mép trong rào trái, không chắn đường); `mapOf(state).penById[id].shower` = điểm chân (chỉ có ở cấp 3). render vẽ `spray` trong `SHOWER.fxMs` sau event `shower` (`world.showers`), ngoài ra `idle` nếu `showerInfo().on`, không thì `off`; con được tắm có pha `rain` (hạt nước rơi) thay cho bọt xà phòng rồi lắc mình, lấp lánh (`bathPhase` với `b.shower`).
 
 ### Giỏ và kho
 ```js

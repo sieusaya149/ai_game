@@ -307,7 +307,7 @@ test('thứ tự trừ nước cố định: chạy lại cùng bản lưu ra c�
   assert.equal(a.water.level, 0);
   assert.equal(f1.plots.filter(i => a.plots[i].water > 0).length, 6, 'khối đặt trước được tưới trước');
   assert.equal(f2.plots.filter(i => a.plots[i].water > 0).length, 0);
-  assert.deepEqual(G.WATER_ORDER, ['drip']);
+  assert.deepEqual(G.WATER_ORDER, ['drip', 'shower']);   // vòi sen (issue 59) sau tưới nhỏ giọt
 });
 
 test('bản lưu cũ chưa có bồn: nạp vẫn chạy, mực nước 0, điện 0', () => {

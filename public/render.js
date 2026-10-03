@@ -9,11 +9,14 @@ import { WELLS } from './artwell.js';
 import { SPR52_OLD } from './art52.js';   // sao trên ô ruộng (issue 52)
 import { WX } from './artw.js';
 import { TANK_ART, BAR_IN } from './arttank.js';
+import { SHOWER_ART } from './art59.js';   // vòi sen chuồng cấp 3 (issue 59)
 import { sceneMap, footprint } from './farm.js';
 import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, frostHold, tankInfo, waterNet, waterOn } from './state.js';
+import { showerInfo } from './state.js';
 import { cropStar } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS, TANK } from './data.js';
+import { SHOWER } from './data.js';
 
 const FONT = "'Nunito', system-ui, sans-serif";
 
@@ -248,10 +251,11 @@ export function animalImg(a, face, frame, sleep, run) {
   return stage === 'gia' ? tinted(im, '#d8d0c0', 0.35) : im;
 }
 // Hoạt cảnh tắm: bọt phủ (1.2 giây), lắc mình văng nước (0.8), lấp lánh sạch (1.0). main.js đẩy vào wd.baths khi tắm.
-export const BATH_MS = 3000, WALLOW_MS = 2200;
+// Vòi sen tắm (b.shower, issue 59): hạt nước rơi thay cho bọt xà phòng.
+export const BATH_MS = 3000, WALLOW_MS = 2200, SHOWER_FX_MS = SHOWER.fxMs;
 export function bathPhase(b, now) {
   const e = now - b.t0;
-  return e < 1200 ? { name: 'soap', t: e / 1200 } : e < 2000 ? { name: 'shake', t: (e - 1200) / 800 } : e < BATH_MS ? { name: 'sparkle', t: (e - 2000) / 1000 } : null;
+  return e < 1200 ? { name: b.shower ? 'rain' : 'soap', t: e / 1200 } : e < 2000 ? { name: 'shake', t: (e - 1200) / 800 } : e < BATH_MS ? { name: 'sparkle', t: (e - 2000) / 1000 } : null;
 }
 // Con cái mang thai: thân nở ra một chút (bụng to)
 const bellied = img => derived(img, 'belly', (im, k) => {
@@ -870,6 +874,12 @@ export function render(ctx, f) {
   for (const p of m.penList) {   // nhà/mái chuồng theo cấp, rồi máng
     const hs = p.house, hi = hs.sprite === 'quarantine' ? SPR3?.quarantine : SPR3?.pen?.[hs.sprite]?.[p.lv - 1];
     if (hi && vis(hs.x, hs.y - hi.height / 2, hi.width)) add(hs.y, () => blit(hi, hs.x - hi.width / 2, hs.y - hi.height));
+    const sa = p.shower && SHOWER_ART?.[p.type];   // vòi sen chuồng cấp 3 (issue 59): phun khi đang tắm, có nước thì chờ, không nước thì tắt
+    if (sa && vis(p.shower.x + 8, p.shower.y - 18, 30)) {
+      const on = (wd.showers ?? []).some(x => x.pen === p.id && now - x.t0 < SHOWER_FX_MS);
+      const im = on ? sa.spray[Math.floor(now / 110) % sa.spray.length] : showerInfo(state, p.ent)?.on ? sa.idle : sa.off;
+      add(p.shower.y, () => blit(im, p.shower.x - sa.ax, p.shower.y - im.height));
+    }
     const hm = farm && isDusk(state) ? penHome(state, p.id) : null, gt = hm?.total ? gateOf(state, p.id) : null;
     if (gt && vis(gt.x, gt.y, 24)) add(gt.y + 3, () => homeSign(gt, hm));   // biển số con đã về trên cửa chuồng
     const tr = p.trough, n = state.troughs?.[p.type] ?? 0;
@@ -997,6 +1007,7 @@ export function render(ctx, f) {
       else blit(body, bx, by);
       if (lv >= 2 && SPR3?.fx?.flies) { const f = SPR3.fx.flies[Math.floor(now / 160 + a.id) % 3]; blit(f, a.x - f.width / 2, by - f.height + 2); }
       if (ph?.name === 'soap') { const sz = im.width < 14 ? 's' : im.width < 20 ? 'm' : 'l', o = SPR3.fx.soap[sz][Math.floor(now / 250) % 2]; blit(o, a.x - o.width / 2, a.y - (im.height + o.height) / 2 + 1); }
+      if (ph?.name === 'rain' && SHOWER_ART) { const o = SHOWER_ART.drops[Math.floor(now / 130) % 3]; blit(o, a.x - o.width / 2, a.y - im.height - o.height / 2 + 3); }
       if (ph?.name === 'shake') { const sp = SPR3.fx.splash[Math.floor(ph.t * 3.2) % 3]; blit(sp, a.x - sp.width / 2, a.y - im.height - sp.height / 2); }
       if (ph?.name === 'sparkle') { const sp = SPR3.fx.sparkleClean[Math.floor(ph.t * 3) % 3]; blit(sp, a.x - sp.width / 2, a.y - im.height - sp.height / 2 + 2); }
       if (a.hurt && SPR3?.hurtPatch) { const hp = SPR3.hurtPatch; blit(hp, a.x - hp.width / 2 + 1, a.y - im.height / 2 - hp.height / 2 + 1); }   // băng gạc vết chuột cắn

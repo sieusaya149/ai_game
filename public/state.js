@@ -9,6 +9,7 @@ import {
 } from './data.js';
 import { WELL, TANK, WATER_BUILD } from './data.js';
 import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng ★ (issue 52)
+import { SHOWER } from './data.js';   // vòi sen chuồng cấp 3 (issue 59)
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
 import { migrate, newFarm, fillAnimal, fillSave, cropQuality, fieldUpgrades, SAVE_VERSION } from './migrate.js';
@@ -2269,7 +2270,7 @@ const needsWater = e => e.kind === 'tank2' || e.kind === 'booster' || (e.kind ==
 function waterCheck(s, e, ents) {
   const ft = footprint(e);
   if (e.kind === 'tank') return ents.some(x => x.kind === 'well' && near(footprint(x), ft)) ? null : no('no_water', `Ngoài tầm nước: bồn phải trong ${TANK.range} ô quanh giếng`);
-  if (!needsWater(e)) return null;
+  if (!needsWater(e) && !showerKeep(s, e)) return null;
   return netOf(s, ents.filter(x => x !== e), false).some(n => near(ft, n.ft)) ? null : no('no_water', `Ngoài tầm nước: phải trong ${TANK.range} ô quanh bồn hoặc trạm bơm phụ`);
 }
 // Máy bơm không bơm vì sao (null = đang bơm)
@@ -2290,7 +2291,7 @@ export function tankInfo(s) {
   return { has: true, level, cap, full: level >= cap, pumping: !why, why, perHour };
 }
 // Thứ tự trừ nước cố định mỗi lượt (ADR 0015): chạy bù trên trình duyệt và server ra cùng kết quả. Vòi sen (issue 59) đứng sau.
-export const WATER_ORDER = ['drip'];
+export const WATER_ORDER = ['drip', 'shower'];
 const WATER_USE = {
   // tưới nhỏ giọt: khối ruộng có nước, ô có cây đang lớn mà đất khô thì tưới, mỗi ô 1 lần nước (theo thứ tự khối trong vườn, ô trong khối)
   drip(s, take) {
@@ -2302,6 +2303,7 @@ const WATER_USE = {
       }
     }
   },
+  shower: showerUse,   // vòi sen chuồng cấp 3 (issue 59)
 };
 function stepWater(s, d) {
   const w = s.water, t = tankInfo(s);
@@ -2316,6 +2318,47 @@ function stepWater(s, d) {
   if (!powerOut(s)) w.power += d / HOUR * TANK.power.booster * waterNet(s, true).filter(n => n.e.kind === 'booster').length;
   const take = () => (w.level >= 1 ? (w.level--, true) : false);
   for (const k of WATER_ORDER) WATER_USE[k](s, take);
+}
+
+// ---------- Vòi sen chuồng cấp 3 (issue 59) ----------
+// Chuồng heo, đồng cỏ cấp 3 có vòi sen (PEN_TABLE extra3). Buổi sáng (6h tới trước SHOWER.until của ngày game) con nào trong
+// chuồng chưa tắm sáng nay thì vòi sen tắm, mỗi con 1 lần nước bồn: hết dơ như tắm tay, +SHOWER.happy vui. a.shower = ngày game
+// con đó đã được vòi sen tắm. Bồn cạn thì con chưa tắm chờ tới khi có nước (trong buổi sáng), không phạt. Mất điện vì bão chỉ làm
+// máy bơm ngừng: nước còn trong bồn vẫn tắm được (chuồng chỉ nhờ trạm bơm phụ mới tới nước thì mất nước theo trạm).
+export const hasShower = e => e?.kind === 'pen' && penLv(e) >= PEN_LEVELS && !!PEN_TABLE[e.pen]?.extra3.includes('shower');
+const showerDue = (s, e, day) => s.animals.filter(a => a.pen === e.id && a.shower !== day);
+function showerUse(s, take) {
+  if (s.water.level < 1 || dayFrac(s) >= SHOWER.until) return;
+  const day = dayOf(s);
+  for (const e of s.farm.ents) {
+    if (!hasShower(e)) continue;
+    const due = showerDue(s, e, day);
+    if (!due.length || !waterOn(s, e)) continue;
+    const ids = [];
+    for (const a of due) {
+      if (!take()) break;
+      a.dirty = 0; a.wallowAt = s.time + DIRT.wallowAfterMs;
+      a.happy = Math.min(100, a.happy + SHOWER.happy);
+      a.shower = day;
+      ids.push(a.id);
+    }
+    if (ids.length) emit({ type: 'shower', pen: e.id, ids });
+  }
+}
+// Vòi sen của chuồng e cho UI: null (chuồng không có) | { on, why (lý do đang tắt), done, total (số con đã tắm sáng nay / cả chuồng) }
+export function showerInfo(s, e) {
+  if (!hasShower(e)) return null;
+  const k = tankInfo(s), total = penUse(s, e.id), done = total - showerDue(s, e, dayOf(s)).length;
+  const why = !k.has ? 'Chưa có bồn chứa, vòi sen chưa có nước'
+    : !waterOn(s, e) ? `Ngoài tầm nước: chuồng phải trong ${TANK.range} ô quanh bồn hoặc trạm bơm phụ`
+    : k.level < 1 ? 'Bồn cạn, vòi sen chờ có nước' : null;
+  return { on: !why, why, done, total };
+}
+// Dời chuồng có vòi sen đang có nước: chỗ mới cũng phải trong tầm nước (canPlace "ngoài tầm nước"). Chuồng chưa có vòi sen,
+// hay đang ở ngoài tầm sẵn rồi thì dời tự do.
+function showerKeep(s, e) {
+  const old = hasShower(e) && s.farm.ents.find(x => x.id === e.id);
+  return !!old && waterNet(s).some(n => near(footprint(old), n.ft));
 }
 function finishUpgrade(s) {
   const k = s.smith.tool;
@@ -2415,6 +2458,9 @@ function troughActs(s, t) {
   const well = s.animals.filter(a => a.pen === penId && !a.sick && !vaccinated(s, a)).length;   // số con tiêm được
   acts.push(mk('vaccinatePen', 'vaccine', `Tiêm vắc-xin cả chuồng (${well} con, còn ${have(s, 'vaccine')})`,
     have(s, 'vaccine') <= 0 ? noItem('vaccine') : !well ? 'Cả chuồng đã tiêm hoặc đang bệnh' : null));
+  const sh = showerInfo(s, s.farm.ents.find(e => e.id === penId));   // vòi sen chuồng cấp 3 (issue 59): chỉ để xem bật/tắt
+  if (sh) acts.push(mk('shower', '🚿', sh.on ? `Vòi sen đang bật (sáng nay tắm ${sh.done}/${sh.total} con)` : 'Vòi sen đang tắt',
+    sh.why ?? `Mỗi sáng tự tắm cả chuồng bằng nước bồn, mỗi con 1 lần nước, +${SHOWER.happy} vui`));
   const up = upgradeInfo(s, penId);   // chạm vào chuồng (qua máng) cũng nâng cấp được
   if (up) acts.push(mk('upgrade', '⬆️', `Nâng chuồng lên cấp ${up.lv} (${fmtXu(up.price)} xu)`, up.error));
   return acts;
