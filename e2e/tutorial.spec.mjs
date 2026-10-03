@@ -158,7 +158,7 @@ test('v1 vắng nhà lâu: màn "Trong lúc bạn vắng nhà" trước, đóng 
   await expect(page.locator('#whatsnew')).toBeVisible();
 });
 
-test('sổ tay mở từ túi đồ, lật đủ 14 trang (cấp cao)', async ({ page, context }) => {
+test('sổ tay mở từ túi đồ, lật đủ mọi trang (cấp cao)', async ({ page, context }) => {
   await noHint(context);
   await seedSave(context, makeSave(s => { s.exp = 1e6; }));
   await page.goto('/');
@@ -168,8 +168,11 @@ test('sổ tay mở từ túi đồ, lật đủ 14 trang (cấp cao)', async ({
   await page.getByRole('button', { name: /Sổ tay hướng dẫn/ }).click();
   const head = page.locator('.sheet-head h2'), body = page.locator('.guide-page');
   await expect(head).toHaveText(/Sổ tay/);
-  const titles = ['Thể lực', 'Công cụ', 'Chế độ xây dựng', 'Mở đất', 'Thùng giao hàng', 'Chợ và giờ mở cửa', 'Đực, cái và sinh sản', 'Vịt', 'Chó Mực và dạy lệnh',
-    'Vòng đời', 'Tắm cho vật nuôi', 'Bệnh và thú y', 'Lùa về chuồng', 'Kẻ săn mồi'];
+  // số trang tăng dần theo từng đợt: lấy danh sách từ các chấm trang, chỉ đòi các trang cốt lõi có mặt đúng thứ tự
+  const titles = await page.locator('.guide-dot').evaluateAll(a => a.map(x => x.title));
+  expect(titles.length).toBeGreaterThanOrEqual(14);
+  const core = ['Thể lực', 'Công cụ', 'Chế độ xây dựng', 'Mở đất', 'Thùng giao hàng', 'Chợ và giờ mở cửa', 'Đực, cái và sinh sản', 'Vịt', 'Chó Mực và dạy lệnh', 'Vòng đời', 'Tắm cho vật nuôi', 'Bệnh và thú y', 'Lùa về chuồng', 'Kẻ săn mồi'];
+  expect(titles.filter(t => core.includes(t))).toEqual(core);
   for (let i = 0; i < titles.length; i++) {
     await expect(body.locator('h3')).toHaveText(titles[i]);
     await expect(body.locator('canvas.guide-art')).toBeVisible();
@@ -181,7 +184,7 @@ test('sổ tay mở từ túi đồ, lật đủ 14 trang (cấp cao)', async ({
   await expect(body.locator('h3')).toHaveText(titles.at(-2));
 });
 
-test('sổ tay mở dần theo cấp: cấp 1 chỉ có 10 trang, chưa thấy tắm, bệnh, lùa, kẻ săn mồi', async ({ page, context }) => {
+test('sổ tay mở dần theo cấp: cấp 1 chỉ có các trang đầu, chưa thấy tắm, lùa, kẻ săn mồi', async ({ page, context }) => {
   await noHint(context);
   await seedSave(context, makeSave());
   await page.goto('/');
@@ -189,9 +192,10 @@ test('sổ tay mở dần theo cấp: cấp 1 chỉ có 10 trang, chưa thấy t
   await page.keyboard.press('Shift');
   await page.locator('.bb-btn[data-panel="bag"]').click();
   await page.getByRole('button', { name: /Sổ tay hướng dẫn/ }).click();
-  await expect(page.locator('.guide-nav .mini')).toHaveText('Trang 1/10');
   const dots = page.locator('.guide-dot');
-  await expect(dots).toHaveCount(10);
-  await expect(dots.nth(9)).toHaveAttribute('title', 'Vòng đời');
-  for (const t of ['Tắm cho vật nuôi', 'Bệnh và thú y', 'Lùa về chuồng', 'Kẻ săn mồi']) await expect(page.locator(`.guide-dot[title="${t}"]`)).toHaveCount(0);
+  const n = await dots.count();
+  expect(n).toBeGreaterThanOrEqual(10);
+  await expect(page.locator('.guide-nav .mini')).toHaveText(`Trang 1/${n}`);
+  await expect(page.locator('.guide-dot[title="Vòng đời"]')).toHaveCount(1);
+  for (const t of ['Tắm cho vật nuôi', 'Lùa về chuồng', 'Kẻ săn mồi']) await expect(page.locator(`.guide-dot[title="${t}"]`)).toHaveCount(0);
 });
