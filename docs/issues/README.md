@@ -89,7 +89,7 @@ Nguồn: [PRD 0004](../prd/0004-phase-3-cay-va-nuoc.md).
 | 50 | [Bản lưu v4 và 16 loại cây](50-ban-luu-v4-16-cay.md) | 49 | ✅ |
 | 51 | [Cấp thành thạo](51-cap-thanh-thao.md) | 50 | ✅ |
 | 52 | [Chất lượng ★](52-chat-luong-sao.md) | 50 | ✅ |
-| 53 | [Trái khổng lồ](53-trai-khong-lo.md) | 51, 52 | ⬜ |
+| 53 | [Trái khổng lồ](53-trai-khong-lo.md) | 51, 52 | ✅ |
 | 54 | [Mùa có tác dụng](54-mua-co-tac-dung.md) | 50 | ✅ |
 | 55 | [Thời tiết xấu](55-thoi-tiet-xau.md) | 54 | ✅ |
 | 56 | [Giếng 4 cấp](56-gieng-4-cap.md) | 50 | ✅ |
