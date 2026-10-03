@@ -5,7 +5,7 @@ import {
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
-  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce,
+  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON,
 } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
@@ -228,6 +228,7 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
     mode: 'offline', account: null,
     today: { day: '', helps: 0, steals: 0, stolen: 0, robs: 0 },
     guests: [],
+    seasonQuest: null,   // nhiệm vụ mùa của Bà Tư (issue 54): null | 'done' | 'skipped'
     coUtQuest: null,   // nhiệm vụ làm quen của Cô Út (issue 48): { step } sau khi mua con heo đầu tiên
   };
   fillSave(s);   // Phase 3 (bản lưu v4): mastery theo loại cây, water mực nước bồn, giếng cấp 1, nâng cấp khối ruộng, rơm phủ
@@ -316,6 +317,7 @@ export function loadGame(raw) {
   s.today = { ...base.today, ...s.today };
   s.guests = Array.isArray(s.guests) ? s.guests : [];
   s.dog.chained = !!s.dog.chained;
+  s.seasonQuest = s.seasonQuest === 'done' || s.seasonQuest === 'skipped' ? s.seasonQuest : null;   // nhiệm vụ mùa của Bà Tư (issue 54)
   s.coUtQuest ??= null;   // bản lưu cũ chưa có nhiệm vụ làm quen của Cô Út (issue 48)
   // trộm NPC (issue 46): bản lưu cũ chưa có thì bắt đầu từ con số không
   s.teoCaught = Math.max(0, Math.floor(s.teoCaught) || 0);
@@ -432,6 +434,17 @@ export function seasonOf(s) {
   return { key, name, dayIn: d % 7 + 1 };
 }
 export const farmHours = s => (s.simMs || 0) / 3600_000;
+
+// ---------- Mùa tác dụng lên cây (issue 54) ----------
+// Mùa đọc từ lịch game (seasonOf: online theo lịch làng, kể cả lúc chạy bù; chơi đơn theo s.day, đóng băng thì không đổi).
+// Bảo hộ người mới: dưới SEASON.minLevel mùa chưa ảnh hưởng gì (seasonActive).
+export const seasonActive = s => level(s) >= SEASON.minLevel;
+// Cây hợp mùa hay trái mùa theo lịch hiện tại: 'in' | 'off' (chưa tính bảo hộ người mới, dùng cho nhãn "đúng mùa")
+export const seasonFit = (s, cropId) => (CROPS[cropId]?.season === seasonOf(s).key ? 'in' : 'off');
+// Hệ số tốc độ lớn của cây theo mùa: SEASON.slow khi trái mùa và đã đủ cấp, ngược lại 1
+export const seasonGrowMul = (s, cropId) => (seasonActive(s) && seasonFit(s, cropId) === 'off' ? SEASON.slow : 1);
+// Cây từng lớn lúc trái mùa (đã tính bảo hộ): không ra ★3
+export const cropOffSeason = c => !!c?.offSeason;
 
 // ---------- Thời gian ----------
 // Online: ngày đêm, ngày, mùa theo lịch làng (giờ server); chơi đơn theo state.time. Đóng băng không làm lịch làng dừng.
@@ -611,7 +624,11 @@ function stepPlot(s, p, d) {
     if (s.time - c.bugSince >= FARMING.bugToSick) { c.bugs = false; c.sick = true; c.sickSince = s.time; fxEv(at.x, at.y, 'Cây bệnh rồi 🤒', COL.bad); log(s, `${def.name} bị bệnh vì sâu`); }
     return;
   }
-  if (p.water > 0) c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1);
+  if (p.water > 0) {
+    const sm = seasonGrowMul(s, c.id);
+    if (sm < 1) c.offSeason = true;   // đã lớn lúc trái mùa: không ra ★3 (issue 54)
+    c.progress += (d / def.grow) * (p.weeds ? FARMING.weedSlow : 1) * (c.fert ? FARMING.fertSpeed : 1) * sm;
+  }
   if (c.progress >= 1) { c.ripeAt = s.time; emit({ type: 'ripe', crop: c.id }); fxEv(at.x, at.y, 'Chín rồi! 🌾', COL.good); snd('pop'); }
   else if (chance(FARMING.bugChancePerMin, d)) { c.bugs = true; c.bugSince = s.time; fxEv(at.x, at.y, 'Có sâu! 🐛', COL.bad); }
 }
@@ -2420,10 +2437,14 @@ const DO = {
         if (c.progress >= 1 && !c.ripeAt) c.ripeAt = s.time;
         return res(true, 'Cây lớn vọt lên', [say(at, 'Lớn vọt! ⚡')], 'spray');
       case 'harvest': {
-        const qty = harvestQty(c), def = CROPS[c.id];
+        const def = CROPS[c.id];
+        let qty = harvestQty(c);
+        // đúng mùa: 10% lần thu thêm sản lượng (chỉ khi giỏ còn chỗ), từ cấp SEASON.minLevel
+        const bonus = seasonActive(s) && seasonFit(s, c.id) === 'in' && qty > 0 && room(s) >= qty + SEASON.bonusQty && Math.random() < SEASON.bonusChance ? SEASON.bonusQty : 0;
+        qty += bonus;
         give(s, c.id, qty); s.stats.harvests++; addExp(s, def.exp);
         p.crop = null; p.soil = 'untilled';
-        return res(true, `Thu hoạch ${qty} ${def.name}`, [say(at, `+${qty} ${def.name}`), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp)], 'harvest');
+        return res(true, `Thu hoạch ${qty} ${def.name}${bonus ? ` (đúng mùa +${bonus})` : ''}`,[say(at, `+${qty} ${def.name}`), say({ x: at.x, y: at.y - 10 }, `+${def.exp} EXP`, COL.exp)], 'harvest');
       }
       case 'clear': p.crop = null; p.soil = 'untilled'; return res(true, 'Đã dọn sạch ô đất', [say(at, '🧹')], 'dig');
     }
@@ -3169,6 +3190,22 @@ export function skipCoUtQuest(s) {
   if (!q || q.step >= CO_UT_QUEST.length) return R(false, 'Không có nhiệm vụ nào đang mở');
   q.step++;
   return R(true, 'Đã bỏ qua bước này');
+}
+
+// ---------- Nhiệm vụ làm quen của Bà Tư: giải thích mùa (issue 54) ----------
+// Mở từ đầu mùa thứ 2 (ngày game SEASON.questFromDay, lịch theo dayOf) khi đã đủ cấp để mùa có tác dụng. s.seasonQuest = null | 'done' | 'skipped'.
+export const seasonQuestInfo = s => (!s.seasonQuest && seasonActive(s) && dayOf(s) >= SEASON.questFromDay ? { coins: SEASON.questCoins, exp: SEASON.questExp } : null);
+export function claimSeasonQuest(s) {
+  const q = seasonQuestInfo(s);
+  if (!q) return R(false, 'Không có nhiệm vụ nào đang mở');
+  s.seasonQuest = 'done'; addCoins(s, q.coins); addExp(s, q.exp);
+  log(s, `Bà Tư: Hiểu mùa rồi nhé! Thưởng ${q.coins} xu`);
+  return R(true, `Bà Tư thưởng ${q.coins} xu và ${q.exp} EXP`, { coins: q.coins });
+}
+export function skipSeasonQuest(s) {
+  if (!seasonQuestInfo(s)) return R(false, 'Không có nhiệm vụ nào đang mở');
+  s.seasonQuest = 'skipped';
+  return R(true, 'Đã bỏ qua');
 }
 
 export function sell(s, itemId, qty = 1) {

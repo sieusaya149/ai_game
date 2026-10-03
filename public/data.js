@@ -64,6 +64,10 @@ export const isProduce = k => !!(CROPS[baseOf(k)] || PRODUCTS[k]);
 export const CROP_STAGES = [0, 0.1, 0.35, 0.7, 1];
 export const OVERRIPE = 1.5;              // chín quá (grow × 1.5) mà chưa hái thì héo, mất trắng
 
+// Mùa tác dụng lên cây (issue 54): trái mùa lớn chậm ×slow và không ra ★3 (cờ crop.offSeason), đúng mùa 10% lần thu thêm bonusQty.
+// Dưới cấp minLevel mùa chưa ảnh hưởng. Nhiệm vụ Bà Tư giải thích mùa: mở từ ngày game questFromDay (đầu mùa thứ 2), thưởng một lần.
+export const SEASON = { slow: 0.6, minLevel: 5, bonusChance: 0.1, bonusQty: 1, questFromDay: 8, questCoins: 100, questExp: 30 };
+
 export const FARMING = {
   waterDrainPerMin: 25,   // đất mất bao nhiêu % nước mỗi phút (trời nắng ×1.5, trời mưa luôn đầy)
   canMax: 10,             // bình tưới cấp 1 chứa 10 lần tưới, ra giếng múc lại (cấp cao hơn: TOOLS.can.canMax)

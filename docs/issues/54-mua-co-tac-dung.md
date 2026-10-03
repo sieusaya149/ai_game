@@ -22,12 +22,12 @@ HUD đã hiện mùa từ Phase 0 nhưng mùa chưa làm gì. Lát này cho mùa
 
 ## Acceptance criteria
 
-- [ ] Unit test (seam 1): cây trái mùa tới chín mất đúng 1/0.6 thời gian; cây đúng mùa không chậm. Cây trái mùa không bao giờ ra ★3 dù chăm kỹ.
-- [ ] Unit test: đúng mùa khoảng 10% lần thu thêm sản lượng (thống kê, dung sai rộng).
-- [ ] Unit test: qua ranh giới mùa giữa vụ cây không chết, tiến độ không lùi, tốc độ đổi đúng từ ranh giới, kể cả khi chạy bù một khoảng dài trong một lượt.
-- [ ] Unit test: người chơi dưới cấp 5 không bị chậm trái mùa; từ cấp 5 thì có.
-- [ ] E2E (desktop + 360px): dựng bản lưu mùa Xuân → chợ hiện nhãn "đúng mùa" ở 4 cây Xuân → trồng cây trái mùa thấy dấu hiệu lớn chậm.
-- [ ] E2E: tua qua đổi mùa giữa vụ → cây vẫn sống, đổi tốc độ. Bà Tư giải thích mùa ở đầu mùa thứ 2.
+- [x] Unit test (seam 1): cây trái mùa tới chín mất đúng 1/0.6 thời gian; cây đúng mùa không chậm. Cây trái mùa không bao giờ ra ★3 dù chăm kỹ.
+- [x] Unit test: đúng mùa khoảng 10% lần thu thêm sản lượng (thống kê, dung sai rộng).
+- [x] Unit test: qua ranh giới mùa giữa vụ cây không chết, tiến độ không lùi, tốc độ đổi đúng từ ranh giới, kể cả khi chạy bù một khoảng dài trong một lượt.
+- [x] Unit test: người chơi dưới cấp 5 không bị chậm trái mùa; từ cấp 5 thì có.
+- [x] E2E (desktop + 360px): dựng bản lưu mùa Xuân → chợ hiện nhãn "đúng mùa" ở 4 cây Xuân → trồng cây trái mùa thấy dấu hiệu lớn chậm.
+- [x] E2E: tua qua đổi mùa giữa vụ → cây vẫn sống, đổi tốc độ. Bà Tư giải thích mùa ở đầu mùa thứ 2.
 
 ## Blocked by
 
