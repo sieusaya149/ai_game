@@ -105,8 +105,50 @@ test('chín quá thì héo', () => {
   const s = newGame();
   G.perform(s, T(0), 'till'); G.perform(s, T(0), 'plant');
   s.weather = 'rain';
-  noBugs(() => run(s, CROPS.cai.grow * 1.6));
+  noBugs(() => run(s, CROPS.cai.grow + 10 * MIN + 1000));
   assert.equal(s.plots[0].crop.rotten, true);
+});
+
+test('cửa sổ chín tới héo: cây ngắn ngày được sàn 10 phút game, cây dài ngày giữ nửa thời gian lớn', () => {
+  assert.equal(G.ripeWindow('cai'), 10 * MIN);
+  assert.equal(G.ripeWindow('lua'), 10 * MIN);
+  assert.equal(G.ripeWindow('duahau'), CROPS.duahau.grow / 2);
+});
+
+test('cải chín chưa tới 10 phút thì chưa héo, quá 10 phút mới héo', () => {
+  const s = newGame();
+  G.perform(s, T(0), 'till'); G.perform(s, T(0), 'plant');
+  s.weather = 'rain';
+  noBugs(() => run(s, CROPS.cai.grow + 9 * MIN));
+  assert.equal(s.plots[0].crop.rotten, false);
+  noBugs(() => run(s, 2 * MIN));
+  assert.equal(s.plots[0].crop.rotten, true);
+});
+
+test('cảnh báo sắp héo: ripeLeft giảm dần, wilting bật khi đã qua 80% cửa sổ', () => {
+  const s = newGame();
+  G.perform(s, T(0), 'till'); G.perform(s, T(0), 'plant');
+  s.weather = 'rain';
+  const c = s.plots[0].crop;
+  assert.equal(G.ripeLeft(c), null);
+  noBugs(() => run(s, CROPS.cai.grow + 1000));
+  assert.ok(G.ripeLeft(c) > 0.9); assert.equal(G.wilting(c), false);
+  noBugs(() => run(s, 5 * MIN));
+  assert.ok(G.ripeLeft(c) < 0.55 && G.ripeLeft(c) > 0.4); assert.equal(G.wilting(c), false);
+  noBugs(() => run(s, 3.5 * MIN));
+  assert.ok(G.ripeLeft(c) < 0.2); assert.equal(G.wilting(c), true);
+});
+
+test('chạy bù offline: cây đã chín không già đi tới héo (ADR 0004)', () => {
+  const s = newGame();
+  G.perform(s, T(0), 'till'); G.perform(s, T(0), 'plant');
+  s.weather = 'rain';
+  noBugs(() => run(s, CROPS.cai.grow + 1000));
+  const c = s.plots[0].crop, before = c.progress;
+  s.savedAt = Date.now() - 6 * 60 * MIN; s.mode = 'online';
+  const l = noBugs(() => G.loadGame(structuredClone(s)));
+  assert.equal(l.plots[0].crop.rotten, false);
+  assert.equal(l.plots[0].crop.progress, before);
 });
 
 test('bình tưới và giếng', () => {
@@ -142,7 +184,8 @@ test('mở rộng đất theo thứ tự (vườn chuyển từ v1 còn ô khóa
   const s = G.loadGame();
   const next = G.nextLockedPlot(s);
   assert.equal(next, G.UNLOCK_ORDER[9]);
-  assert.deepEqual(G.actionsFor(s, { kind: 'lockedPlot', idx: 35 }), []);
+  const far = G.actionsFor(s, { kind: 'lockedPlot', idx: 35 })[0];   // ô khóa không phải kế tiếp: báo ô cần mở trước
+  assert.ok(far.disabled && far.disabled.includes(`ô ${next + 1}`), far.disabled);
   const a = G.actionsFor(s, { kind: 'lockedPlot', idx: next })[0];
   assert.equal(a.id, 'expand');
   s.coins = 500;
@@ -426,4 +469,23 @@ test('lưu và tải lại (có chạy bù offline)', () => {
   assert.equal(later.threats.length, 0);
   G.resetGame();
   assert.equal(G.loadGame(), null);
+});
+
+test('mua đất: lời mời nêu kích thước dải và giá; chưa đủ cấp thì nhắc mua ở mép vườn từ cấp 5', () => {
+  const s = newGame();
+  const d = G.nextStrip(s, 'E'), a = G.actionsFor(s, { kind: 'strip', dir: 'E' })[0];
+  assert.ok(a.label.includes(`${d.w}×${d.h}`) && a.label.includes(String(d.price)), a.label);
+  assert.equal(a.disabled, 'Mua đất ở mép vườn từ cấp 5');
+  s.exp = 1e6; s.coins = 1e6;
+  assert.equal(G.actionsFor(s, { kind: 'strip', dir: 'E' })[0].disabled, undefined);
+});
+
+test('thu hoạch: nhãn thêm "sắp héo" khi đã qua 80% cửa sổ chín', () => {
+  const s = newGame();
+  G.perform(s, T(0), 'till'); G.perform(s, T(0), 'plant');
+  s.weather = 'rain';
+  noBugs(() => run(s, CROPS.cai.grow + 1000));
+  assert.ok(!/sắp héo/.test(G.actionsFor(s, T(0))[0].label));
+  noBugs(() => run(s, 9 * MIN));
+  assert.ok(/sắp héo/.test(G.actionsFor(s, T(0))[0].label));
 });

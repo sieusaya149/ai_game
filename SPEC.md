@@ -698,7 +698,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 **Mức và khóa gộp của event** (`EVENT_LEVEL` trong `data.js`): mỗi event có `level`, `group(e)` (khóa gộp), `label`; mức `important` có thêm `cat` (loại tắt được) và `text(n, e)` (chữ đã gộp, ví dụ "5 ô cà chua đã chín"). Mức: `urgent` 🔴 (băng rôn đỏ, âm thanh, rung, mũi tên; không tắt được) · `important` 🟡 (toast nhỏ, tự gộp) · `info` ⚪ (chỉ ghi nhật ký) · `direct` (hiện ngay không gộp) · `none` (hiệu ứng/âm thanh, không thông báo). **Thêm event mới thì khai báo trong `EVENT_LEVEL`**, thiếu thì `eventMeta` trả `null`.
 
 ### Hằng và tiện ích khác
-`UNLOCK_ORDER`, `nextLockedPlot`, `stageOf(crop)`, `levelInfo`, `mapOf`, `reachable`, `footprint`, `sceneMap`, `mmss`, `TUTORIAL`. `UNLOCK_ORDER`/`lockedPlot` chỉ còn cho ô chưa mở trong khối ruộng chuyển từ v1 (mở theo thứ tự cũ); vườn mới không có ô khóa.
+`UNLOCK_ORDER`, `nextLockedPlot`, `stageOf(crop)`, `levelInfo`, `mapOf`, `reachable`, `footprint`, `sceneMap`, `mmss`, `TUTORIAL`. `UNLOCK_ORDER`/`lockedPlot` chỉ còn cho ô chưa mở trong khối ruộng chuyển từ v1 (mở theo thứ tự cũ); vườn mới không có ô khóa. Chạm ô khóa chưa tới lượt thì hành động `expand` bị vô hiệu kèm lý do "Mở ô N trước (mở đất theo thứ tự)".
 
 ### Danh sách target (`{ kind, ... }`)
 
@@ -719,6 +719,9 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'deco', id }           // đồ trang trí trong vườn (ghế đá: ngồi nghỉ)
 { kind: 'clutter', id }        // bụi / đá chưa dọn: Dọn bụi, Đập đá
 { kind: 'strip', dir }         // mép vườn: mua dải đất 'N'|'S'|'E'|'W'
+// Mua đất theo dải, vườn luôn là hình chữ nhật. Hành động `buy` ghi cỡ dải và giá ("dải 4×24 ô, 500 xu, cấp 5");
+// chưa đủ cấp thì vô hiệu với lý do "Mua đất ở mép vườn từ cấp N", và ui.js nối lý do đó vào tên đích để người chơi đứng ở mép vườn là đọc thấy.
+// Hướng dẫn trong Cài đặt có mục "Mua đất".
 { kind: 'door', to }           // cửa/cổng sang 'house'|'village'|'farm'
 { kind: 'building', id }       // theo bản đồ đang đứng. Vườn (cả vườn người khác đang thăm): house, gate, giftbox, guestbook, shed, shipbin, board, well, doghouse (không tương tác).
                                //   Nhà: bed, wardrobe, phone (gọi bác sĩ thú y), (stove, table, plant chỉ để ngắm). Làng: market (Bà Tư), smithy (Ông Sáu),
@@ -797,7 +800,7 @@ Hành vi của các luật cũ được giữ nguyên; chỉ đổi cách tra v�
 - Chu trình: ô mới là `untilled` → **Cuốc đất** → `tilled` → **Gieo hạt** (tốn 1 `seed_<id>`, theo `selectedSeed`).
 - Cây lớn qua 5 giai đoạn (`CROP_STAGES`). Chỉ lớn khi `water > 0`. Có cỏ thì lớn chậm lại (×`weedSlow`), có sâu hoặc bệnh thì dừng lớn.
 - **Tưới** tốn 1 `can`, đặt `water` về 100; hết nước thì ra giếng múc (`refill`). **Nhổ cỏ** tay. **Sâu:** phun thuốc (chắc chắn, tốn 1 `pesticide`) hoặc bắt tay (50%). Sâu để lâu → **bệnh** → **chết**; thuốc trừ sâu chữa bệnh. **Bón phân** (+50% sản lượng) và **thuốc tăng trưởng** là hành động phụ.
-- **Thu hoạch** khi chín: yield (+50% nếu bón phân), cộng EXP, vào **giỏ**. Chín quá `OVERRIPE` thì **héo**. Cây chết/héo: **Dọn cây**. Thu hoạch xong ô về `untilled`.
+- **Thu hoạch** khi chín: yield (+50% nếu bón phân), cộng EXP, vào **giỏ**. Chín quá thì **héo**: cửa sổ chín→héo `ripeWindow(id)` = `max((OVERRIPE−1) × grow, RIPE_FLOOR)` (nửa thời gian lớn, sàn **10 phút game**, nên với bảng cây hiện tại mọi cây đều có đúng 10 phút; trước đây cải chỉ có 45 giây). **Chạy bù offline (ADR 0004) không cho cây đã chín già đi tới héo** (`stepPlot` đứng yên khi `catchUp`; server và trình duyệt khớp nhau, test `tests/server-catchup.test.mjs`). Cảnh báo **sắp héo**: `ripeLeft(crop)` (1 → 0, `null` nếu chưa chín/đã héo) và `wilting(crop)` (true khi đã qua `WILT_WARN` = 80% cửa sổ); nhãn hành động Thu hoạch thêm "– sắp héo!", tên đích ô thêm "– sắp héo!", cây ngả nâu nhấp nháy. Dưới mỗi ô cây vẽ một thanh nhỏ (render.js `cropBar`, 2 hàng điểm ảnh thế giới): xanh = tiến độ lớn, cam = đếm ngược chín→héo, đỏ nhấp nháy = sắp héo. Cây chết/héo: **Dọn cây**. Thu hoạch xong ô về `untilled`.
 - Dời khối ruộng (kể cả đang có cây) giữ nguyên trạng thái ô. Cất khối chỉ khi chưa có cây.
 - Cuốc/tưới/thu hoạch/nhổ cỏ bằng công cụ cấp cao làm nhiều ô một lần (`tiles`); ô không hợp lệ trong vùng thì bỏ qua. Bình tưới còn bao nhiêu nước thì tưới được bấy nhiêu ô. Công cụ đang nâng cấp thì hành động bị khóa với lý do.
 

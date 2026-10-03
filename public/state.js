@@ -1,6 +1,6 @@
 // Mô hình dữ liệu + luật chơi. Thuần JS, không DOM (localStorage có bọc try/catch).
 import {
-  DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, FARMING,
+  DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, RIPE_FLOOR, WILT_WARN, FARMING,
   ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, GUARD, WALK_SPEED, THREATS, RAID, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
@@ -588,6 +588,15 @@ function cockCrow(s) {
   list.forEach((r, i) => { fxEv(r.x, r.y - 10, 'Ò ó o o! 🐓', COL.coin); emit({ type: 'cockcrow', id: r.id }); if (!i) snd('cockcrow'); });
 }
 
+// Cửa sổ từ chín tới héo (ms): nửa thời gian lớn, tối thiểu RIPE_FLOOR
+export const ripeWindow = id => Math.max((OVERRIPE - 1) * CROPS[id].grow, RIPE_FLOOR);
+// Còn bao nhiêu phần cửa sổ trước khi héo (1 → 0); null nếu chưa chín hay đã héo/chết
+export function ripeLeft(c) {
+  if (!c || c.dead || c.rotten || c.progress < 1) return null;
+  return Math.max(0, 1 - (c.progress - 1) * CROPS[c.id].grow / ripeWindow(c.id));
+}
+export const wilting = c => { const l = ripeLeft(c); return l != null && l <= 1 - WILT_WARN; };
+
 function stepPlot(s, p, d) {
   if (s.weather === 'rain') p.water = 100;
   else if (p.water > 0) p.water = Math.max(0, p.water - FARMING.waterDrainPerMin * (d / MIN) * (s.weather === 'sun' ? 1.5 : 1));
@@ -595,9 +604,10 @@ function stepPlot(s, p, d) {
   const c = p.crop;
   if (!c || c.dead || c.rotten) return;
   const def = CROPS[c.id], at = plotCenter(s, p.idx);
-  if (c.progress >= 1) { // chín: tiếp tục già đi, quá OVERRIPE thì héo
+  if (c.progress >= 1) { // chín: tiếp tục già đi tới hết cửa sổ thì héo; chạy bù offline thì đứng yên (ADR 0004)
+    if (catchUp) return;
     c.progress += d / def.grow;
-    if (c.progress >= OVERRIPE) { c.rotten = true; emit({ type: 'rotten', crop: c.id }); fxEv(at.x, at.y, 'Héo mất rồi 🥀', COL.bad); log(s, `${def.name} chín quá nên héo mất`); }
+    if (c.progress >= 1 + ripeWindow(c.id) / def.grow) { c.rotten = true; emit({ type: 'rotten', crop: c.id }); fxEv(at.x, at.y, 'Héo mất rồi 🥀', COL.bad); log(s, `${def.name} chín quá nên héo mất`); }
     return;
   }
   if (c.sick) {
@@ -2107,7 +2117,7 @@ function plotActs(s, t) {
     return A;
   }
   if (c.dead || c.rotten) return [mk('clear', '🧹', c.dead ? 'Dọn cây chết' : 'Dọn cây héo')];
-  if (c.progress >= 1) return [mk('harvest', '🧺', `Thu hoạch ${CROPS[c.id].name} (${harvestQty(c)})`, room(s) < harvestQty(c) ? FULL : null)];
+  if (c.progress >= 1) return [mk('harvest', '🧺', `Thu hoạch ${CROPS[c.id].name} (${harvestQty(c)})${wilting(c) ? ' – sắp héo!' : ''}`, room(s) < harvestQty(c) ? FULL : null)];
   const noPest = have(s, 'pesticide') <= 0 ? noItem('pesticide') : null;
   if (c.sick) A.push(mk('spray', '🧴', 'Phun thuốc chữa bệnh', noPest));
   if (c.bugs) A.push(mk('spray', '🧴', 'Phun thuốc trừ sâu', noPest), mk('catch', '🤏', 'Bắt sâu bằng tay'));
@@ -2123,7 +2133,8 @@ function plotActs(s, t) {
 }
 
 function lockedActs(s, t) {
-  if (t.idx !== nextLockedPlot(s)) return [];
+  const nx = nextLockedPlot(s);
+  if (t.idx !== nx) return s.plots[t.idx] && !s.plots[t.idx].unlocked && nx >= 0 ? [mk('expand', '🔓', 'Mở rộng đất', `Mở ô ${nx + 1} trước (mở đất theo thứ tự)`)] : [];
   const n = unlockedCount(s), cost = expandCost(n), lv = expandLevel(n);
   return [mk('expand', '🔓', `Mở rộng đất (${cost} xu)`, level(s) < lv ? `Cần cấp ${lv} mới mở rộng được` : s.coins < cost ? 'Chưa đủ xu' : null)];
 }
@@ -2314,7 +2325,7 @@ function clutterActs(s, t) {
 function stripActs(s, t) {
   const d = nextStrip(s, t.dir);
   if (!d) return [];
-  return [mk('buy', '🗺️', `Mua đất phía ${DIR_NAME[t.dir]} — ${d.price} xu, cấp ${d.level}`, level(s) < d.level ? `Cần cấp ${d.level} mới mua được` : s.coins < d.price ? 'Chưa đủ xu' : null)];
+  return [mk('buy', '🗺️', `Mua đất phía ${DIR_NAME[t.dir]}: dải ${d.w}×${d.h} ô, ${d.price} xu, cấp ${d.level}`, level(s) < d.level ? `Mua đất ở mép vườn từ cấp ${d.level}` : s.coins < d.price ? 'Chưa đủ xu' : null)];
 }
 
 // Cửa sang bản đồ khác: { kind: 'door', to }
