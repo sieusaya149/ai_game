@@ -1185,9 +1185,9 @@ const PREG = ['..ooooo..', '.onnnnno.', 'onwnnnnno'.slice(0, 9), 'onrrnrrno', 'o
 
 const CROP_TINT = { cai: '#4fa83a', carot: '#f59a23', lua: '#d19a1c', cachua: '#e5452f', bap: '#f7d547', dau: '#d8388a', bingo: '#e07a10', duahau: '#3d8c2a' };
 
-function seedBag(id, ripe) {
+// Túi hạt giống 14x14: miệng gấp màu tint, in hình cây ripe thu về 8x8. art4.js dùng lại cho 8 cây mới.
+export function seedBag(tint, ripe) {
   return draw(14, 14, x => {
-    const tint = CROP_TINT[id] || '#4fa83a';
     rect(x, OUT, 1, 2, 12, 12);
     rect(x, '#f3ead2', 2, 3, 10, 10);
     rect(x, '#d9c9a0', 11, 3, 1, 10);
@@ -1297,7 +1297,7 @@ function fromDeco(src, sx, sy, w, h, dx = 0, dy = 0) {
 
 function makeItems(ripe, deco) {
   const items = {};
-  for (const id of Object.keys(CROP_TINT)) items[`seed_${id}`] = seedBag(id, ripe[id]);
+  for (const id of Object.keys(CROP_TINT)) items[`seed_${id}`] = seedBag(CROP_TINT[id], ripe[id]);
   const cross = x => { rect(x, '#e5452f', 6, 8, 2, 4); rect(x, '#e5452f', 5, 9, 4, 2); };
   const skull = x => { rect(x, OUT, 5, 8, 4, 3); dot(x, '#ffffff', 5, 9); dot(x, '#ffffff', 8, 9); rect(x, OUT, 6, 11, 2, 1); };
   const pills = x => { rect(x, '#f59a23', 5, 9, 2, 2); rect(x, '#e5452f', 8, 10, 2, 2); };

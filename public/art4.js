@@ -3,7 +3,7 @@
 // khối lá/trái tô sáng từ trên-trái, viền 1px sẫm theo màu điểm bên cạnh.
 // SPR4.crop[id] = { stages: [s0..s4], sick, rotten, dead }: canvas rộng 16, gốc chạm đáy.
 // SPR4.produce[id]: biểu tượng nông sản 12x12 cho 8 cây mới.
-import { canvas, hash } from './art.js';
+import { canvas, hash, seedBag, SPR } from './art.js';
 
 const PI = Math.PI, UP = -PI / 2, DOWN = PI / 2;
 
@@ -664,6 +664,10 @@ export const SPR4 = {
   crop: Object.fromEntries(CROP4_IDS.map(id => [id, build(DEF[id])])),
   produce: Object.fromEntries(Object.entries(PRODUCE).map(([id, f]) => [id, toCanvas12(f())])),
 };
+// Túi hạt giống 14x14 cho 8 cây mới: ghi vào SPR.items.seed_<id>, cùng khóa với túi 8 cây cũ, nên chợ, túi đồ, bảng chọn hạt
+// (ui.js) và bản 2x (art12.js qua hd.js) tự nhận. Miệng túi màu theo nông sản, in hình nông sản.
+const SEED_TINT = { hanhla: '#6cb466', dauphong: '#b07a45', raumuong: '#3f8a34', dualeo: '#8aa83e', khoailang: '#c04a78', ot: '#cc2a36', suhao: '#7a46a8', bapcai: '#5e9e7a' };
+for (const [id, tint] of Object.entries(SEED_TINT)) SPR.items[`seed_${id}`] = seedBag(tint, SPR4.produce[id]);
 function toCanvas12(g) {
   const o = outline(g), c = canvas(12, 12), x = c.getContext('2d');
   for (let y = 0; y < 12; y++) for (let i = 0; i < 12; i++) { const col = o.get(i, y); if (col) { x.fillStyle = col; x.fillRect(i, y, 1, 1); } }

@@ -2,6 +2,7 @@
 //   SPR10.crop[id] = { stages: [s0..s4], sick, rotten, dead }  thay SPR4.crop[id] (art4.js), 16 loại cây.
 //     Canvas rộng 32 (bộ cũ 16), cao gấp đôi bộ cũ, gốc chạm đáy như cũ; vẽ vào ô 16 px thì thu nhỏ một nửa.
 //   SPR10.produce[id]: biểu tượng nông sản 24x24  thay SPR4.produce[id] (art4.js, 12x12) cho 8 cây mới.
+//   SEEDPIC10[id]: hình 22x18 in trên túi hạt giống 2x (art12.js seedBag), đủ 16 cây; không phải sprite thay thế nên ngoài SPR10.
 // Mỗi loại cây, mỗi giai đoạn một hình riêng; bệnh / héo / chết biến đổi từ chính dáng cây đó (như bộ cũ).
 // Phong cách theo art5.js: viền tối 1px (mép hứng sáng viền nhạt hơn), mỗi mảng 4 sắc độ, sáng từ trên trái,
 // điểm sáng trên trái chín và lá bóng, gân lá, đường tối ngăn lá chồng lên nhau.
@@ -810,3 +811,74 @@ export const SPR10 = {
   crop: Object.fromEntries(CROP10_IDS.map(id => [id, build(id)])),
   produce: Object.fromEntries(Object.entries(PRODUCE).map(([id, f]) => [id, finish(f(new G(24, 24)))])),
 };
+
+// ---------- hình in trên túi hạt giống: 22x18, art12.js seedBag (túi 28x28) dùng, đủ 16 loại cây ----------
+// 8 cây mới: vẽ lại đúng nét nông sản 24x24 ở trên trên lưới nhỏ hơn (toạ độ và cỡ khối nhân k rồi tô lại từng điểm ảnh,
+// không co ảnh nên nét vẫn sắc). 8 cây cũ: vẽ thẳng ở lưới 22x18 bằng cùng bộ khối, dải màu với cây trên ruộng.
+const PIC_W = 22, PIC_H = 18, PIC_K = 0.72;
+class Small extends G {
+  constructor(k) { super(PIC_H, PIC_W); this.k = k; this.ox = (PIC_W - 24 * k) / 2; this.oy = (PIC_H - 24 * k) / 2; }
+  X(v) { return v * this.k + this.ox; }
+  Y(v) { return v * this.k + this.oy; }
+  pX(v) { return Math.round((v + 0.5) * this.k + this.ox - 0.5); }   // toạ độ ô điểm ảnh: lấy tâm ô
+  pY(v) { return Math.round((v + 0.5) * this.k + this.oy - 0.5); }
+  shape(cx, cy, len, wid, ang, ramp, o) { return super.shape(this.X(cx), this.Y(cy), len * this.k, wid * this.k, ang, ramp, o); }
+  stroke(x0, y0, cx, cy, x1, y1, col, w0, w1) { return super.stroke(this.X(x0), this.Y(y0), this.X(cx), this.Y(cy), this.X(x1), this.Y(y1), col, w0, w1); }
+  line(x0, y0, x1, y1, c) { return super.line(this.pX(x0), this.pY(y0), this.pX(x1), this.pY(y1), c); }
+  dots(pts, c) { return super.dots(pts.map(([x, y, col]) => [this.pX(x), this.pY(y), col]), c); }
+}
+const kernel = (dx, dy, i, u, v, x, y) => { const cell = (x + Math.floor(y / 2)) % 2, row = y % 2; return R.yellow[Math.min(5, Math.max(1, i + (row ? -1 : 0) + (cell ? 0 : 1) - 1))]; };
+const PIC_OLD = {
+  // cây cải bẹ: bẹ trắng mập xòe từ gốc, phiến lá xanh tròn có gân ở ngọn
+  cai: g => { const bx = 11, by = 16;
+    for (const a of [UP - 0.62, UP + 0.62, UP - 0.2, UP + 0.2]) {
+      g.shape(bx + Math.cos(a) * 3.2, by + Math.sin(a) * 3.2, 3.4, 1.5, a, R.cream, { round: true, lo: 1, hi: 4 });
+      g.shape(bx + Math.cos(a) * 8, by + Math.sin(a) * 8, 4.4, 3.1, a, L, { round: true, rib: R.cream[3], ribW: 0.7, ribTo: 0.3, veins: 2.5 });
+    }
+    return g; },
+  // củ cà rốt nằm chéo, vai to, vân ngang, chùm lá lông chim
+  carot: g => {
+    for (const [x, y] of [[11, 1.5], [16, 1], [20, 4.5]]) g.stroke(14.6, 6.8, (14.6 + x) / 2 + 0.5, (6.8 + y) / 2 + 0.3, x, y, L, 1);
+    g.dots([[10, 2, L[4]], [12, 3, L[2]], [11, 4, L[3]], [14, 2, L[4]], [17, 2, L[2]], [15, 3, L[3]], [18, 4, L[4]], [20, 6, L[2]], [19, 6, L[3]], [11, 1, L[5]], [16, 1, L[5]], [20, 4, L[5]]]);
+    const prof = u => (u < -0.55 ? Math.sqrt(Math.max(0, 1 - ((u + 0.55) / 0.45) ** 2)) : 1 - ((u + 0.55) / 1.55) ** 1.3 * 0.85);
+    g.shape(9.8, 11, 7.4, 3.0, PI * 0.75, R.orange, { prof, spec: true, specAt: 0.7,
+      fill: (dx, dy, i, u, v, x, y) => (u > -0.6 && u < 0.75 && Math.abs(v) < 0.75 && Math.floor((u + 1) * 7) % 3 === 0 && (x + y) % 3 ? R.orange[Math.max(1, i - 1)] : null) });
+    return g; },
+  // bó lúa: cọng vàng buộc lạt, ba bông trĩu hạt rủ ra hai bên
+  lua: g => {
+    g.layer++;
+    for (let x = 8; x <= 14; x++) for (let y = 7; y <= 16; y++) g.set(x + (y < 11 ? Math.round((x - 11) * (11 - y) * 0.12) : 0), y, (x + (y >> 1)) % 3 === 0 ? R.gold[1] : x < 11 ? R.gold[3] : R.gold[2]);
+    g.dots([[8, 11, R.wood[3]], [9, 11, R.wood[4]], [10, 11, R.wood[4]], [11, 11, R.wood[3]], [12, 11, R.wood[3]], [13, 11, R.wood[2]], [14, 11, R.wood[2]],
+      [8, 12, R.wood[1]], [9, 12, R.wood[2]], [10, 12, R.wood[2]], [11, 12, R.wood[2]], [12, 12, R.wood[1]], [13, 12, R.wood[1]], [14, 12, R.wood[1]]]);
+    panicle(g, 7, 3, -1, 6, R.gold); panicle(g, 14, 3, 1, 6, R.gold); panicle(g, 11, 1, 1, 4, R.gold);
+    return g; },
+  // quả cà chua chín đỏ bóng, tai lá xanh, một quả nhỏ phía sau
+  cachua: g => {
+    g.ball(16.4, 11.8, 3.6, 3.4, R.red, { spec: true, specAt: 0.82 });
+    g.dots([[15, 8, L[3]], [16, 8, L[2]], [17, 8, L[3]], [16, 7, L[4]]]);
+    g.ball(9.6, 10.6, 6.6, 5.6, R.red, { spec: true, specAt: 0.82 });
+    for (const [x, y, a] of [[7.0, 5.2, PI + 0.3], [12.2, 5.2, -0.3], [8.6, 4.2, UP - 0.8], [10.6, 4.2, UP + 0.8]]) g.shape(x, y, 2.0, 0.9, a, L);
+    g.dots([[9, 2, L[4]], [10, 2, L[3]], [9, 3, L[2]], [10, 3, L[1]]]); return g; },
+  // trái bắp nằm chéo, hạt vàng xếp hàng, lá bẹ ôm gốc, râu nâu ở ngọn
+  bap: g => {
+    g.shape(12.2, 8.0, 7.0, 3.3, -0.8, R.yellow, { round: true, fill: kernel, lo: 2, hi: 4 });
+    g.dots([[18, 2, R.wood[3]], [19, 1, R.wood[4]], [19, 2, R.wood[2]], [20, 2, R.wood[3]], [18, 1, R.wood[4]], [20, 1, R.wood[2]]]);
+    g.shape(8.2, 12.4, 6.6, 2.0, -0.5, L, { veins: 2 }); g.shape(11.0, 12.8, 5.6, 1.7, -1.15, L, { veins: 2 });
+    g.stroke(3, 16, 4, 15, 5, 14.4, L, 2); return g; },
+  // quả dâu tây đỏ lấm tấm hạt vàng, đài lá xanh
+  dau: g => {
+    g.shape(11, 10.8, 5.4, 5.4, DOWN, R.red, { prof: u => (u < 0 ? Math.sqrt(1 - u * u * 0.8) : 1 - u * u * 0.85), spec: true, specAt: 0.8,
+      fill: (dx, dy, i, u, v, px, py) => (py % 3 === 1 && (px + ((py / 3) | 0) * 2) % 3 === 0 && Math.abs(v) < 0.8 && u > -0.6 ? (i >= 3 ? R.yellow[3] : R.yellow[1]) : null) });
+    for (const [x, y, a] of [[7.4, 5.6, PI + 0.25], [14.6, 5.6, -0.25], [9.2, 4.4, UP - 0.75], [12.8, 4.4, UP + 0.75]]) g.shape(x, y, 2.6, 1.1, a, L, { rib: L[2], ribTo: 0.4 });
+    g.dots([[11, 2, L[4]], [11, 3, L[2]], [12, 1, L[3]]]); return g; },
+  // quả bí ngô cam có múi, cuống gỗ, một lá nhỏ
+  bingo: g => {
+    pumLeaf(g, 16.8, 4.8, 0.55);
+    g.ball(11, 10.6, 8.6, 5.2, R.orange, { spec: true, specAt: 0.85, fill: (dx, dy, i) => ([-5.4, -1.8, 1.8, 5.4].some(k => Math.abs(dx - k * (1 - (dy / 7) ** 2 * 0.3)) < 0.6) ? R.orange[Math.max(1, i - 1)] : null) });
+    g.stroke(11, 6.4, 11, 4.2, 12.6, 2.6, R.wood, 2); return g; },
+  // quả dưa hấu sọc, cuống và tua cuốn
+  duahau: g => {
+    g.ball(11, 10.6, 8.8, 5.4, R.wmel, { fill: stripe, spec: true, specAt: 0.84 });
+    g.stroke(11, 5.6, 11.4, 3.8, 13, 3, R.grey, 1); tendril(g, 14, 3, 1, R.grey[3]); return g; },
+};
+export const SEEDPIC10 = Object.fromEntries(CROP10_IDS.map(id => [id, finish(PIC_OLD[id] ? PIC_OLD[id](new G(PIC_H, PIC_W)) : PRODUCE[id](new Small(PIC_K)))]));

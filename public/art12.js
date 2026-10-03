@@ -4,8 +4,8 @@
 //
 // SPR12 gom khóa của nhiều bộ cũ; SPR12_FROM ghi khóa cấp trên nào thay cho bộ nào (hd.js tự dò theo tên khóa):
 //   từ SPR  (art.js):  soil.{untilled,tilledWet,tilledDry}, plot, plotDry, wild, select, mud, tree, bush, tuft, flowers[3],
-//                      problem.{weed,bug,dry}, deco.{deco_scarecrow,deco_flower,deco_lamp,deco_bench}, items.{...không phải hạt
-//                      giống...}, grain, bubble, sparkle, arrow, sign, status.{hungry,sick,heart,zzz,milk,wool,pregnant}
+//                      problem.{weed,bug,dry}, deco.{deco_scarecrow,deco_flower,deco_lamp,deco_bench}, items.{seed_<16 cây> (8 túi cây
+//                      mới do art4.js ghi thêm vào SPR.items), ...}, grain, bubble, sparkle, arrow, sign, status.{hungry,sick,heart,zzz,milk,wool,pregnant}
 //   từ SPR2 (art2.js): bush, bushes[3], rock, rocks[3], stump, forestTile, forest[6], lampPost, bench, tools.{hoe,can,sickle,
 //                      basket}[3], stamina, staminaTired, sweat[2], season.{xuan,ha,thu,dong}, wood, stone, guidebook, todo,
 //                      giftIcon, alertArrow, barkBubble, dogChain, stunStars[3], barkArrow, sausage, sausageGround,
@@ -21,6 +21,7 @@
 // (cùng luật: viền đường đất theo ô kề, chọn màu theo băm toạ độ nên tất định và liền mạch qua mọi ô / mọi mảng).
 import { canvas as rawCanvas, flip, hash, SPR } from './art.js';
 import { ramp } from './art5.js';
+import { SEEDPIC10 } from './art10.js';
 import { GROUND } from './layout.js';
 
 const canvas = (w, h) => { const c = rawCanvas(w, h); c.getContext('2d', { willReadFrequently: true }); return c; };
@@ -990,10 +991,22 @@ const RIPE = { cai: ripeCai(), carot: ripeCarot(), lua: ripeLua(), cachua: ripeC
 // =====================================================================
 // VẬT PHẨM TÚI ĐỒ (SPR.items 28x28)
 // =====================================================================
-const CROP_TINT = { cai: C6.leaf, carot: C6.orange, lua: C6.gold, cachua: C6.red, bap: C6.yellow, dau: C6.pink, bingo: C6.orange, duahau: C6.wmel };
-// Túi hạt giống: túi giấy kraft, miệng gấp màu theo cây (mép răng cưa), in hình nông sản (ảnh cũ 1:1 = nửa cỡ)
+const CROP_TINT = {
+  cai: C6.leaf, carot: C6.orange, lua: C6.gold, cachua: C6.red, bap: C6.yellow, dau: C6.pink, bingo: C6.orange, duahau: C6.wmel,
+  // 8 cây mới (art4.js): dải màu theo nông sản, gốc [3] trùng màu miệng túi bản 1x
+  hanhla: ['#1f4a2a', '#2e6e3a', '#47924c', '#6cb466', '#a0d890', '#d8f4c8'],
+  dauphong: C6.wood,
+  raumuong: ['#163a14', '#24561c', '#2f7028', '#3f8a34', '#5ea84a', '#8fcc6a'],
+  dualeo: ['#2f4a12', '#4a6a1c', '#6a8c2c', '#8aa83e', '#b4c862', '#dce49a'],
+  khoailang: ['#3e0c22', '#6e1c3e', '#9c2e58', '#c04a78', '#e07aa0', '#f8b8d0'],
+  ot: ['#3a0610', '#6e0e1c', '#a0182a', '#cc2a36', '#ee5a5a', '#ffc0b8'],
+  suhao: ['#24103a', '#3e1c5e', '#5c2e84', '#7a46a8', '#a070c8', '#d0b0e8'],
+  bapcai: ['#1c4038', '#2a5e4c', '#3f7e62', '#5e9e7a', '#8cc49c', '#c4e6c8'],
+};
+// Túi hạt giống: túi giấy kraft, miệng gấp màu theo cây (mép răng cưa), in hình nông sản 22x18 vẽ cùng nét với cây trồng 2x
+// (art10.js SEEDPIC10)
 function seedBag(id) {
-  const T = CROP_TINT[id], pic = SPR.ripe[id];
+  const T = CROP_TINT[id], pic = SEEDPIC10[id];
   return draw(28, 28, x => {
     shadow(x, 14, 26, 11, 1.6, 0.22);
     // thân túi
@@ -1006,7 +1019,7 @@ function seedBag(id) {
     R(x, T[3], 2, 1, 24, 7); R(x, T[4], 2, 1, 24, 2); R(x, T[2], 2, 6, 24, 1); R(x, T[1], 2, 7, 24, 1);
     for (let px = 2; px < 26; px += 4) { R(x, '#ffffff', px, 2, 2, 1); R(x, T[5], px, 3); }
     // hình nông sản
-    if (pic) x.drawImage(pic, Math.round(14 - pic.width / 2), Math.round(17 - pic.height / 2) + 1);
+    if (pic) x.drawImage(pic, 3, 8);
   });
 }
 // Lọ thuốc: nắp màu, cổ kính, thân bo góc, nhãn trắng có dấu

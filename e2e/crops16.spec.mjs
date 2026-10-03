@@ -160,6 +160,8 @@ test('chợ Bà Tư ở cấp 7: thấy hạt cây mới đã mở và mua đư�
     await expect(row(`Hạt ${CROPS[id].name.toLowerCase()}`).getByRole('button', { name: '×1' }), id).toBeEnabled();
   }
   for (const id of ['dauphong', 'bapcai']) await expect(row(`Hạt ${CROPS[id].name.toLowerCase()}`)).toContainText(`Cấp ${CROPS[id].lv}`);
+  // túi hạt cây mới có hình vẽ riêng như túi cây cũ, không còn hiện emoji thay thế
+  for (const id of ['hanhla', 'dauphong', 'raumuong', 'dualeo', 'khoailang', 'ot', 'suhao', 'bapcai']) await expect(row(`Hạt ${CROPS[id].name.toLowerCase()}`).locator('.row-ico img.ico'), id).toBeVisible();
   await row('Hạt ớt').scrollIntoViewIfNeeded();
   await row('Hạt ớt').getByRole('button', { name: '×5' }).click();
   await expect.poll(() => page.evaluate(() => globalThis.__farm.state.inv.seed_ot)).toBe(5);
