@@ -12,7 +12,7 @@ test('ô cây sắp héo hiện chữ "sắp héo" ở tên đích và nút thu 
   });
   await seedSave(context, save);
   await page.goto('/'); await wait(page);
-  await expect(page.locator('#target-name')).toHaveText('Cải xanh – sắp héo!');
+  await expect(page.locator('#target-name')).toHaveText(/^Cải xanh( ★+☆*)? – sắp héo!$/);
   await expect(page.locator('#main-action')).toContainText('sắp héo');
   if (process.env.SHOT) await page.screenshot({ path: `${process.env.SHOT}-${testInfo.project.name === 'mobile' ? 360 : 1280}.png` });
 });
@@ -20,7 +20,7 @@ test('ô cây sắp héo hiện chữ "sắp héo" ở tên đích và nút thu 
 test('cây chín chưa gần héo thì không có chữ "sắp héo"', async ({ page, context }) => {
   await seedSave(context, makeSave(s => { s.weather = 'rain'; plantedCrop(s, 0, 1.2); Object.assign(s.player, { ...mapOf(s).plotCenter(0), dir: 0 }); }));
   await page.goto('/'); await wait(page);
-  await expect(page.locator('#target-name')).toHaveText('Cải xanh');
+  await expect(page.locator('#target-name')).toHaveText(/^Cải xanh( ★+☆*)?$/);
   await expect(page.locator('#main-action')).not.toContainText('sắp héo');
 });
 

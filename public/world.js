@@ -676,7 +676,7 @@ export function nameOf(state, t) {
     case 'plot': {   // cây còn sống: kèm số sao vụ này đang giữ (issue 52), vd "Cải xanh ★★☆"
       const c = state.plots[t.idx]?.crop, n = c && !c.dead && !c.rotten ? ST.cropStar(c) : 0;
       const big = c?.giant && n && c.progress >= 1 ? ' · khổng lồ ✨' : '';   // trái khổng lồ (issue 53)
-      return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (ST.wilting(c) ? ' – sắp héo!' : '') + (n ? ` ${'★'.repeat(n)}${'☆'.repeat(3 - n)}` : '') + big : `Ô ruộng ${t.idx + 1}`;
+      return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (n ? ` ${'★'.repeat(n)}${'☆'.repeat(3 - n)}` : '') + (ST.wilting(c) ? ' – sắp héo!' : '') + big : `Ô ruộng ${t.idx + 1}`;
     }
     case 'lockedPlot': return 'Đất hoang';
     case 'animal': { const a = findBy(state.animals, t.id), why = a && ST.breedNote(state, a); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}${why ? `\n💡 ${why}` : ''}` : 'Vật nuôi'; }
