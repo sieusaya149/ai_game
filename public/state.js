@@ -2,7 +2,7 @@
 import {
   DAY_MS, NIGHT_FROM, MAX_CATCHUP_MS, GRID, START_PLOTS, CROPS, CROP_STAGES, OVERRIPE, RIPE_FLOOR, WILT_WARN, FARMING,
   ANIMALS, PEN_TABLE, PEN_LEVELS, HUSBANDRY, DIRT, MANURE, DOG, GUARD, WALK_SPEED, THREATS, RAID, ITEMS, PRODUCTS, LOOK, HATS, ACCS, DEFAULT_LOOK, START, MARKET, STAMINA, TOOLS, TOOL_MAX, TOOL_LEVEL, GROUP_COST,
-  expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
+  expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, PEN_REFUND, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
   TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, COATS, COAT, DELIVERY,
@@ -3812,6 +3812,32 @@ export function storeEntity(s, id) {
   return R(true, `Đã cất ${entName(e).toLowerCase()}`);
 }
 
+// Hoàn khi phá chuồng: một phần giá xây + giá các lần đã nâng cấp
+export function demolishRefund(e) {
+  const t = PEN_TABLE[e?.pen];
+  if (e?.kind !== 'pen' || !t) return 0;
+  return Math.floor(((PEN_PRICES[e.pen] ?? 0) + t.up.slice(0, penLv(e) - 1).reduce((n, x) => n + x, 0)) * PEN_REFUND);
+}
+// Phá bỏ chuồng trống: không còn con vật nào (kể cả đang đi lang thang hay nằm cách ly), không còn trứng / ổ ấp.
+// Máng của chuồng mất theo; phân là theo loại nên chỉ dọn khi đó là chuồng cuối của loại.
+export function demolishPen(s, id) {
+  const e = s.farm.ents.find(x => x.id === id);
+  if (e?.kind !== 'pen') return R(false, 'Món này không phải chuồng', { reason: 'missing' });
+  settlePens(s);
+  const n = penUse(s, id);
+  if (n) return R(false, `${PEN_DEFS[e.pen].name} còn ${n} vật nuôi, chuyển hoặc bán hết rồi hãy phá nhé`, { reason: 'has_animals' });
+  if (e.incub || s.eggs.some(o => inPen(e, o)) || (e.pen === 'chicken' && s.nest.egg))
+    return R(false, `${PEN_DEFS[e.pen].name} còn trứng, lấy hết rồi hãy phá nhé`, { reason: 'has_eggs' });
+  const refund = demolishRefund(e);
+  s.coins += refund;
+  delete s.troughs[id];
+  s.farm.ents.splice(s.farm.ents.indexOf(e), 1);
+  if (!penEnts(s, e.pen).length && s.manure[e.pen] != null) s.manure[e.pen] = 0;
+  bumpLayout(s);
+  unstick(s);
+  return R(true, `Đã phá ${PEN_DEFS[e.pen].name.toLowerCase()}, hoàn 🪙 ${refund}`, { id, refund, sound: 'coin' });
+}
+
 // Ô trống (đi được, trong đất nhà) gần điểm o nhất
 function nearestFree(m, o) {
   const c0 = Math.floor(o.x / TS), r0 = Math.floor(o.y / TS);
@@ -3856,11 +3882,12 @@ const posMap = list => Object.fromEntries((list ?? []).map(o => [o.id, o.scaredU
 export function snapLayout(s) {
   return structuredClone({ farm: s.farm, player: { x: s.player.x, y: s.player.y }, dog: { x: s.dog.x, y: s.dog.y }, animals: posMap(s.animals), eggs: posMap(s.eggs),
     // xu, đồ trong túi, ô ruộng: đặt/cất đồ mới đổi cả những thứ này
-    coins: s.coins, deco: Object.fromEntries(Object.entries(s.inv).filter(([k]) => ITEMS[k]?.kind === 'deco')), plots: s.plots });
+    coins: s.coins, troughs: s.troughs, manure: s.manure, deco: Object.fromEntries(Object.entries(s.inv).filter(([k]) => ITEMS[k]?.kind === 'deco')), plots: s.plots });
 }
 export function restoreLayout(s, snap) {
   s.farm = structuredClone(snap.farm);
   s.coins = snap.coins;
+  if (snap.troughs) { s.troughs = structuredClone(snap.troughs); s.manure = structuredClone(snap.manure); }   // phá chuồng làm mất máng, phân
   for (const k of Object.keys(s.inv)) if (ITEMS[k]?.kind === 'deco') delete s.inv[k];
   Object.assign(s.inv, snap.deco);
   s.plots.length = Math.min(s.plots.length, snap.plots.length);   // bỏ ô của khối mới đặt; ô của khối đã cất thì trả lại

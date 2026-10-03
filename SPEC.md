@@ -498,6 +498,8 @@ canPlace(state, what, c, r)       // → { ok: true } | { ok: false, reason, msg
 moveEntity(state, id, c, r)       // → R { reason? } dời miễn phí, không giới hạn; dời chuồng thì con vật/trứng đi theo, con vật hoảng (scaredUntil)
 placeEntity(state, what, c, r)    // → R { id } đặt mới (khối ruộng/chuồng trừ xu, đồ trang trí lấy từ kho); qua canPlace rồi canAfford
 storeEntity(state, id)            // → R { reason? } cất: đồ trang trí về kho; khối ruộng chỉ khi không có cây và không phải khối cuối
+demolishPen(state, id)            // → R { refund, reason? } phá bỏ chuồng trống (chuồng không cất vào túi được): từ chối 'has_animals' khi còn con nào (kể cả đang đi lang thang, nằm cách ly), 'has_eggs' khi còn trứng trong chuồng / ổ ấp; hoàn floor(PEN_REFUND 0.5 x (giá xây + giá các lần nâng cấp)); xóa máng s.troughs[id], phân của loại nếu là chuồng cuối loại; bumpLayout. Chuồng cuối của loài cũng phá được. UI: chạm chuồng ở chế độ xây dựng -> nút "Phá bỏ (hoàn xu)" + hộp xác nhận; Hủy trả lại chuồng, máng, phân, xu (snapLayout/restoreLayout giữ troughs, manure)
+demolishRefund(entity)            // → số xu hoàn khi phá chuồng đó
 canAfford(state, what)            // → { ok } | { ok: false, reason: 'no_item'|'missing'|'level'|'coins', msg }
 placeCost(state, what)            // giá xu của món định đặt
 snapLayout(state) / restoreLayout(state, snap)   // chụp bố cục lúc vào chế độ xây dựng / trả lại đúng như cũ (nút Hủy)
