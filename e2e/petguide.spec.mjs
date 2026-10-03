@@ -53,7 +53,7 @@ test('Cô Út dạy heo đầu tiên ở cấp 3: tắm, chữa bệnh, vắc-xi
   const touch = !!testInfo.project.use.hasTouch;
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
-  let dirtyId, sickId;
+  let dirtyId, sickId, awayAt;
   const save = makeSave(s => {
     s.coins = 5000; s.can = 5; s.animals = []; s.inv = { soap: 1, medicine: 1, vaccine: 1 };
     s.time = 10 * 3600_000; s.day = 1; lvl(s, 3);
@@ -63,7 +63,7 @@ test('Cô Út dạy heo đầu tiên ở cấp 3: tắm, chữa bệnh, vắc-xi
     const [a, b] = s.animals;
     Object.assign(a, { x: ar.x + ar.w - 10, y: ar.y + 12, dirty: 100, wallowAt: 1e15 });
     Object.assign(b, { x: ar.x + 10, y: ar.y + 14, sick: 1, sickMs: 0 });
-    dirtyId = a.id; sickId = b.id;
+    dirtyId = a.id; sickId = b.id; awayAt = { x: a.x, y: a.y };
     const g = mapOf(s).building('gate').at;
     Object.assign(s.player, { x: g.x, y: g.y, dir: 0 });
   });
@@ -91,6 +91,9 @@ test('Cô Út dạy heo đầu tiên ở cấp 3: tắm, chữa bệnh, vắc-xi
   // 2. chữa con heo mệt
   await expect(async () => {
     const p = await animalPt(page, sickId);
+    // chuồng đông, heo đi lại: đứng sát con bệnh trước rồi mới chạm, khỏi chạm nhầm
+    // con heo kia lùi về góc xa (không đè lên con bệnh, hit-test sẽ chọn nhầm nó)
+    await page.evaluate(([x, y, id, away]) => { const s = globalThis.__farm.state; Object.assign(s.player, { x, y: y + 10 }); Object.assign(s.animals.find(a => a.id === id), away); }, [p.x, p.y, dirtyId, awayAt]);
     await tap(page, touch, p.x, p.y);
     await page.waitForTimeout(1200);   // chờ người chơi đi tới con vật xong rồi mới bấm hành động chính
     const main = page.locator('#main-action');
@@ -103,6 +106,8 @@ test('Cô Út dạy heo đầu tiên ở cấp 3: tắm, chữa bệnh, vắc-xi
   // 3. tiêm vắc-xin cho con khỏe
   await expect(async () => {   // con đã chữa khỏi, đứng bên trái chuồng (bên phải bị các chip hành động che)
     const p = await animalPt(page, sickId);
+    // con heo kia lùi về góc xa (không đè lên con bệnh, hit-test sẽ chọn nhầm nó)
+    await page.evaluate(([x, y, id, away]) => { const s = globalThis.__farm.state; Object.assign(s.player, { x, y: y + 10 }); Object.assign(s.animals.find(a => a.id === id), away); }, [p.x, p.y, dirtyId, awayAt]);
     await tap(page, touch, p.x, p.y);
     await page.waitForTimeout(1800);   // chạm vào con vật là làm hành động chính (vuốt ve), đợi xong mới bấm chip được
     await page.locator('#chips .chip', { hasText: /Tiêm vắc-xin/ }).first().click({ timeout: 2000 });
