@@ -492,6 +492,12 @@ export const speedOf = s => online(s) ? 1 : s.speed || 1;
 export const isNight = s => dayFrac(s) >= NIGHT_FROM;
 // Đã qua chạng vạng (18h) chưa: mốc gà vịt thôi thả rông mà về chuồng, cũng là lúc cửa chuồng có biển "đã về" và rải thóc được (issue 42)
 export const isDusk = s => dayFrac(s) >= FREE.duskAt;
+// Độ tối màn hình 0..1, cùng đồng hồ với chữ trên HUD: tối dần từ 18h (chữ "tối"), tối hẳn từ 21h tới 5h, sáng dần tới 6h
+const smooth = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+export function nightAmount(s) {
+  const f = dayFrac(s);
+  return Math.min(smooth(FREE.duskAt, FREE.duskAt + 0.125, f), 1 - smooth(0.958, 1, f));
+}
 export function clockText(s) {
   const t = (6 + dayFrac(s) * 24) % 24;
   const h = Math.floor(t), m = Math.floor((t - h) * 60);

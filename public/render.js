@@ -9,7 +9,7 @@ import { recolor } from './coat.js';
 import { COURIER_ART } from './artcourier.js';
 const BARROW = (await import('./artbarrow.js').catch(() => null))?.BARROW ?? null;   // art xe rùa vẽ sau: chưa có thì không vẽ xe cạnh người
 import { sceneMap, footprint } from './farm.js';
-import { canMove, ripeLeft, wilting, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, haveItem, catsIn, catHouses } from './state.js';
+import { nightAmount, canMove, ripeLeft, wilting, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, haveItem, catsIn, catHouses } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
@@ -512,11 +512,7 @@ function outdoorChunk(m, ci, cw, R = 1) {
 }
 
 // ---------- Ban đêm ----------
-const smooth = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
-export function nightAmount(state) {
-  const f = dayFraction(state);
-  return Math.min(smooth(NIGHT_FROM - 0.07, NIGHT_FROM + 0.02, f), 1 - smooth(0.93, 1, f));
-}
+export { nightAmount };
 
 // ---------- Ô ruộng ----------
 export function cropStage(crop) {
@@ -1183,7 +1179,7 @@ export function render(ctx, f) {
       g.addColorStop(1, `rgba(${rgb},0)`);
       ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
     };
-    for (const d of m.decos) if (d.kind === 'deco_lamp') { const im = decoImg(d.kind); glow(d.x, d.y - im.height * 0.75, 46, '255,190,90', 0.6); }
+    for (const d of m.decos) if (d.kind === 'deco_lamp') { const im = decoImg(d.kind); glow(d.x, d.y - im.height * 0.75, 60, '255,190,90', 0.8); }
     const house = m.building('house');
     if (house) for (const wx of [19, 62]) glow(house.x + wx, house.y + 62, 24, '255,205,110', 0.55);
     for (const b of m.buildings) if (b.sprite === 'lampPost') glow(b.x + 6, b.y + 8, 44, '255,190,90', 0.6);   // đèn đường trong làng
