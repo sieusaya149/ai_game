@@ -14,7 +14,7 @@
 //        cd ~/project/ai_game && docker compose exec web node server/admin.mjs delete-account zzsmokeYYYYY
 //
 // Kịch bản: đăng ký bằng mã mời, mang vườn chơi đơn lên làng, thấy nhau trong làng, chat + biểu cảm, kết bạn,
-// B thăm vườn A và tưới giúp một ô (A đang online thấy ngay), B mua gà con ở chợ, cả hai đăng xuất rồi đăng nhập lại
+// B thăm vườn A và tưới giúp một ô (A đang online thấy ngay, B thấy vườn A cập nhật theo A), B mua gà con ở chợ, cả hai đăng xuất rồi đăng nhập lại
 // thấy vườn còn nguyên, /api/health trả ok. Tên tài khoản test có tiền tố `zzsmoke` để dễ nhận ra và xóa.
 // Chợ chỉ mở ban ngày giờ làng: tới bước mua, trình duyệt B mới lệch giờ làng sang sáng (villageAt, chỉ đổi phản hồi
 // /api/health phía trình duyệt test). Lệch sớm hơn thì vườn nào mở trên máy đó cũng bị chạy bù quãng lệch (kể cả vườn A
@@ -219,6 +219,8 @@ test('smoke live online: hai người chơi làng, kết bạn, giúp vườn, m
       await expect.poll(() => st(B.page, () => globalThis.__farm.state.coins), NET).toBeGreaterThanOrEqual(coins + GUEST.helpCoins);
       await expect.poll(() => st(A.page, () => globalThis.__farm.state.plots[0].water), NET).toBeGreaterThan(50);
       await expect(A.page.locator('#toasts')).toContainText(`${B.name} đã tưới 1 ô giúp bạn`, NET);
+      // B thấy vườn A theo A ngay (tin `world` A gửi qua server): nhật ký khách trong bản đi dạo là của A, việc tưới đã được A xem
+      await expect.poll(() => st(B.page, n => globalThis.__farm.state.guests?.some(g => g.by === n && g.act === 'water' && g.seen), B.name), NET).toBe(true);
     });
 
     await test.step('7. B về làng, mua một gà con ở chợ Bà Tư', async () => {

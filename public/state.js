@@ -2712,12 +2712,62 @@ export function startVisit(me, raw, owner) {
   const v = { ...me, threats: (h.threats ?? []).filter(t => t.kind === 'crow'), sit: false, scene: 'visit', visit: { owner, fed: false, level: levelInfo(h.exp || 0).level } };
   for (const k of VISIT_LIVE) Object.defineProperty(v, k, { get: () => me[k], set: x => { me[k] = x; }, enumerable: true });
   for (const k of VISIT_WORLD) v[k] = h[k];
-  // kẻ săn mồi và trộm NPC là chuyện của chủ vườn; chó của chủ ở lại vườn, thôi lệnh đi theo / lùa (issue 45)
+  // kẻ săn mồi và trộm NPC là chuyện của chủ vườn
   v.preds = []; v.raid = null; v.caught = null; v.chore = null;
-  v.dog = { ...h.dog, scene: 'farm', cmd: ['follow', 'herd'].includes(h.dog.cmd?.id) ? null : h.dog.cmd };
+  v.dog = guestDog(h.dog);
   const a = sceneMap(v).exit;
   v.player = { x: a.x, y: a.y, dir: a.dir ?? 0 };
   return v;
+}
+// chó của chủ ở lại vườn, thôi lệnh đi theo / lùa (issue 45)
+const guestDog = d => ({ ...d, scene: 'farm', cmd: ['follow', 'herd'].includes(d?.cmd?.id) ? null : d?.cmd ?? null });
+
+// ---------- Khách thấy chủ làm gì ngay (sửa lỗi online: chủ thu hoạch mà cây vẫn nằm trên máy khách) ----------
+// Trình duyệt chủ gửi `visitWorld(chủ)` cho khách đang đứng trong vườn (qua server, tin `world`) mỗi khi vườn đổi;
+// trình duyệt khách áp lên bản đi dạo bằng `visitSync`. Bản đi dạo không tự chạy mô phỏng, chỉ đổi theo tin này.
+const crowsOf = h => (h.threats ?? []).filter(t => t.kind === 'crow');
+export function visitWorld(h) {
+  const w = {};
+  for (const k of VISIT_WORLD) w[k] = h[k];
+  return Object.assign(w, { threats: crowsOf(h), level: levelInfo(h.exp || 0).level });
+}
+// Tên các trường của tin `world` (server chỉ chuyển tiếp đúng các trường này)
+export const VISIT_KEYS = [...VISIT_WORLD, 'threats', 'level'];
+const PENDING_MS = 15_000;   // việc khách vừa làm: giữ trên máy khách chừng này chờ tin chủ có nó
+const near = (a, b) => b && Number.isFinite(b.x) && Number.isFinite(b.y) && Math.hypot((a.x ?? 1e9) - b.x, (a.y ?? 1e9) - b.y) < 64;
+// Con nào còn (cùng id) và chưa bị chủ dời đi xa thì giữ chỗ đứng trên máy khách: world.js đang cho nó đi lại
+function keepPlaces(list, old) {
+  const by = new Map((old ?? []).map(o => [o.id, o]));
+  for (const o of list) { const p = by.get(o.id); if (p && near(o, p)) { o.x = p.x; o.y = p.y; } }
+  return list;
+}
+// Áp phần vườn chủ `w` (tin `world`) lên bản đi dạo `v`. Trả false nếu tin hỏng hoặc `v` không phải bản đi dạo.
+// Giữ của khách: chỗ đứng, phần của khách, chỗ con vật đang đi; lần sủa / nghỉ của chó (mới hơn thì giữ);
+// việc khách vừa làm (giúp, trộm) mà tin chủ chưa có thì áp lại, tin chủ có rồi hay quá PENDING_MS thì thôi.
+const LISTS = ['plots', 'animals', 'eggs', 'cats', 'poops', 'threats', 'guests'];
+export function visitSync(v, w) {
+  if (!v?.visit || !w || typeof w !== 'object' || Array.isArray(w)) return false;
+  if (!Array.isArray(w.plots) || LISTS.some(k => w[k] != null && !Array.isArray(w[k])) || !w.dog || typeof w.dog !== 'object' || !w.farm || typeof w.farm !== 'object') return false;
+  const old = { animals: v.animals, cats: v.cats, threats: v.threats, dog: v.dog };
+  for (const k of VISIT_WORLD) {
+    if (k === 'farm' && JSON.stringify(w.farm) === JSON.stringify(v.farm)) continue;   // bố cục y nguyên: khỏi dựng lại bản đồ
+    if (k in w) v[k] = w[k];
+  }
+  v.threats = crowsOf(w);
+  if (Number.isInteger(w.level)) v.visit.level = w.level;
+  keepPlaces(v.animals ?? [], old.animals);
+  keepPlaces(v.cats ?? [], old.cats);
+  keepPlaces(v.threats, old.threats);
+  const d = v.dog = guestDog(w.dog), od = old.dog;
+  if (od) {
+    if (near(d, od)) { d.x = od.x; d.y = od.y; }
+    if ((od.barkAt || 0) > (d.barkAt || 0)) { d.barkAt = od.barkAt; d.barkX = od.barkX; d.barkY = od.barkY; }
+    d.quiet = Math.max(d.quiet || 0, od.quiet || 0);
+  }
+  // việc khách vừa làm: tin chủ có rồi (nhật ký khách có mã đó) hay quá lâu thì thôi, còn lại áp lại
+  const seen = new Set((v.guests ?? []).map(g => g.id)), t = now();
+  v.visit.mine = (v.visit.mine ?? []).filter(op => !seen.has(op.id) && t - op.at < PENDING_MS && guestOpApply(v, meAsGuest(v), op).ok);
+  return true;
 }
 
 // Khách được làm `id` với target `t` không (t.kind 'build' = chế độ xây dựng): { ok: true } hoặc { ok: false, reason, msg }.
@@ -3045,10 +3095,13 @@ export function awayGuests(s, gate = {}) {
 // để main.js gửi lên server. Thưởng và đồ trộm được chỉ cộng khi server xác nhận (main.js gọi guestReward).
 const opId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 const meAsGuest = s => ({ name: s.name, level: level(s), room: room(s), sausage: haveItem(s, 'sausage') });
+// nhớ việc vừa làm trên bản đi dạo cho tới khi tin của chủ có nó (visitSync)
+const mine = (s, op) => { if (s.visit) (s.visit.mine ??= []).push(op); };
 function helpDo(s, t, act, at) {
   const op = { id: opId(), kind: 'help', act, ...(t.kind === 'threat' ? { crow: t.id } : { idx: t.idx }), at: now() };
   const r = guestOpApply(s, meAsGuest(s), op);
   if (!r.ok) return bad(r.msg, at);
+  mine(s, op);
   return res(true, r.msg, [say(at, HELP_JOBS[act].icon)], SOUND_OF[act], { guestOp: op });
 }
 // Nhãn nút Trộm: lấy được mấy món và ô (hay con) còn lại bao nhiêu
@@ -3062,6 +3115,7 @@ function stealDo(s, t, at) {
   const op = { ...o, id: opId(), at: now() };
   const r = guestOpApply(s, meAsGuest(s), op);
   if (!r.ok) return bad(r.msg, at);
+  mine(s, op);
   spend(s, STAMINA.cost.steal);
   return res(true, r.msg, [say(at, '😈')], 'pop', { guestOp: op });
 }
