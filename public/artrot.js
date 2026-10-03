@@ -5,6 +5,9 @@
 //   troughV              máng ăn nằm dọc (1 ô ngang × 2 ô dọc)
 //   scale                cân heo nằm dọc, mặt đồng hồ quay sang trái
 //   mudV                 vũng bùn SPR.mud đổi chiều rộng/cao (22x40)
+//   incubator            ổ ấp trứng (SPR.coop) nhìn đầu hồi, cửa thanh gỗ trên vách hông trái; khung 30x36 như layout.penGeo nest.spr
+//   shower: { pig, pasture } × { idle, off, spray: [3 khung] }   vòi sen cấp 3 (art59.SHOWER_ART): cần vươn vào chuồng theo chiều sâu,
+//                        giữa đáy ảnh = chân cột (khung đối xứng quanh cột)
 // Nhà chuồng: đầu hồi (tường tam giác) quay ra phía người xem, mái chạy lùi về sau-trái (mỗi 2 hàng lùi 1 cột),
 // nên thấy được vách hông bên trái có cửa và cầu thang / rơm đi ra bên trái. Game lật ngang ảnh cho chuồng cổng bên phải:
 // ánh sáng từ trên (hai mái cùng sắc độ, vách hông chỉ sẫm hơn đầu hồi một bậc), không chữ, nên lật vẫn đúng.
@@ -159,7 +162,10 @@ function makePair(draw) {
     return { P, k, marks, bb: [Math.floor(x0 / k), Math.floor(y0 / k), Math.ceil(x1 / k), Math.ceil(y1 / k)] };
   });
   const bx = sets[0].marks.box; delete sets[0].marks.box;   // khung cố định (vd vũng bùn đúng 22x40)
-  const [a, b] = bx ? [[bx[0] + OFFX, bx[1] + OFFY, bx[2] + OFFX, bx[3] + OFFY], [bx[0] + OFFX, bx[1] + OFFY, bx[2] + OFFX, bx[3] + OFFY]] : [sets[0].bb, sets[1].bb], X0 = Math.min(a[0], b[0]), Y0 = Math.min(a[1], b[1]), X1 = Math.max(a[2], b[2]), Y1 = Math.max(a[3], b[3]);
+  const fr = sets[0].marks.frame; delete sets[0].marks.frame;   // khung cỡ cố định [w, h]: giữa ngang theo hình, đáy theo đáy hình
+  const [a, b] = bx ? [[bx[0] + OFFX, bx[1] + OFFY, bx[2] + OFFX, bx[3] + OFFY], [bx[0] + OFFX, bx[1] + OFFY, bx[2] + OFFX, bx[3] + OFFY]] : [sets[0].bb, sets[1].bb];
+  let X0 = Math.min(a[0], b[0]), Y0 = Math.min(a[1], b[1]), X1 = Math.max(a[2], b[2]), Y1 = Math.max(a[3], b[3]);
+  if (fr) { X0 = Math.round((X0 + X1 - fr[0]) / 2); X1 = X0 + fr[0]; Y0 = Y1 - fr[1]; }
   const w = X1 - X0, h = Y1 - Y0;
   const [lo, hi] = sets.map(({ P, k }) => {
     const c = canvas(w * k, h * k), x = c.getContext('2d'), img = x.createImageData(w * k, h * k);
@@ -741,6 +747,217 @@ function mudV() {
   };
 }
 
+// ---------- ổ ấp trứng (SPR.coop) nhìn đầu hồi: vách trát kem, mái ngói đỏ, cửa thanh gỗ trên vách hông trái ----------
+const PLASTER = ['#d8c49a', '#ecd8b0', '#f4e2bd', '#fff4dc'];
+const HUT_TILE = ['#8e2a20', '#b8352b', '#d9483b', '#ef7a6a'];
+// Vách trát (art11.plaster): bóng diềm mái ở mép trên, đốm vữa, chân vách lấm đất
+function plasterM(rp, H, seed = 0) {
+  const eave = mix(rp[2], '#5a3719', 0.35), eave2 = mix(rp[2], '#5a3719', 0.16), dirt = mix(rp[1], '#8a6a44', 0.4);
+  return (s, v, X, Y, k) => {
+    if (v < 1) return k === 2 && v >= 0.5 ? eave2 : eave;
+    if (v > H - (k === 1 ? 1 : 0.5)) return hash(X + seed, Y) < 0.5 ? dirt : rp[1];
+    if (k === 1) { const n = hash(X * 3 + seed, Y * 7 + seed); return n < 0.06 ? rp[0] : n < 0.24 ? rp[1] : n > 0.95 ? rp[3] : rp[2]; }
+    const n = hash(X + seed * 13, Y * 3 + seed);
+    if (n < 0.05) return rp[0];
+    if (n > 0.96) return rp[3];
+    if (hash((X >> 2) + seed, (Y >> 1) * 5) < 0.05) return rp[0];
+    if (v < 1.5) return eave2;
+    return rp[n < 0.3 ? 1 : 2];
+  };
+}
+// cửa thanh gỗ ngang trên vách hông: lòng tối, thanh gỗ cách một, mép sau thanh sẫm, lanh tô trên
+function slatDoorSide(g, o, u0, u1, h) {
+  g.layer(L => L.G((x, y) => {
+    const [u, hh] = sideUV(o, x, y);
+    if (hh > h - 1) return '#120804';
+    const j = mod(hh, 2);
+    if (j >= 1 && hh > 0.5) return u > u1 - 0.6 ? WOOD[0] : g.k === 2 && j >= 1.5 ? WOOD[3] : WOOD[2];
+    return DARK_IN;
+  }, sideQuad(o, u0, u1, 0, h)));
+  g.layer(L => L.G(WOOD[2], sideQuad(o, u0 - 0.5, u1 + 0.5, h, h + 0.5)), WOOD[0]);
+}
+function incubatorSide() {
+  return g => {
+    const o = house(g, {
+      W: 14, H: 11, T: 5, D: 10, eaveL: 1, eaveR: 2,
+      side: plasterM(dim(PLASTER, 0.12), 11, 5), front: plasterM(PLASTER, 11, 3), gable: plasterM(PLASTER, 99, 3),
+      roof: { m: tileM(HUT_TILE, 2) },
+      deco: (g, o) => {
+        slatDoorSide(g, o, 2.5, 7.5, 7);
+        // lỗ thông hơi nhỏ trên đầu hồi
+        const cx = o.fx + o.W / 2;
+        g.layer(L => { L.R('#2a1608', cx - 1, o.by - o.H - 2.5, 2, 1.5); L.R('#120804', cx - 1, o.by - o.H - 2.5, 2, 0.5); });
+        // vài cọng rơm lót rơi ra trước ngưỡng cửa
+        for (const [sx, sy] of [[-5, -2], [-3, -1], [-6, -4], [-2, -3.5]]) { g.R(THATCH[3], o.fx + sx, o.by + sy, 2, 1); g.R(THATCH[4], o.fx + sx, o.by + sy, 1, 0.5); g.R(THATCH[1], o.fx + sx + 1.5, o.by + sy + 0.5, 0.5, 0.5); }
+      },
+      top: (g, o) => g.R(HUT_TILE[3], o.Af[0] - 0.5, o.Af[1] + 0.5, 1, 0.5),
+    });
+    return { frame: [30, 36], door: o.side(5.75, 0) };   // cùng khung 30 rộng với SPR.coop; đáy khung = chân ô dưới của chân 1x2 (layout.penGeo nest.spr)
+  };
+}
+
+// ---------- vòi sen chuồng cấp 3 (art59.SHOWER_ART) nhìn nghiêng: cột ở rào gần người xem, cần vươn vào trong chuồng ----------
+// Cần chạy theo chiều sâu (lùi lên trên, lệch trái SK như mái nhà), bát sen ở đầu cần, nước xối xuống đất ở cùng độ sâu.
+// Gốc toạ độ: chân cột (giữa cột, mặt đất) = giữa đáy ảnh (khung cố định đối xứng quanh cột, lật ngang vẫn đúng chỗ).
+const PVC = ['#234a78', '#3a6fa8', '#5f98d2', '#a8d0f2'];
+const DRY = ['#4c4a48', '#6f6b66', '#9a958d', '#c9c3b8'];
+const CHROME = ['#4e5864', '#7c8894', '#b4bec8', '#e4eaee'];
+const DULL = CHROME.map(c => mix(c, '#8a7a66', 0.35));
+const LEVER = { on: ['#1f6e2a', '#3cc24e', '#9ce88a'], off: ['#6e1a12', '#b8352b', '#ef6a54'] };
+const CONC = ['#6a6a64', '#8c8c84', '#adada4', '#d2d2c8'];
+const WATER = ['#123e7a', '#1f6fd1', '#5fb8ff', '#cfeaff'];
+const GRASS = ['#2f6b1f', '#4fa83a', '#8fd65a'];
+const SMUD = ['#4a2c14', '#6b4020', '#8a5a2b'];
+const MIST = '#cfeaff88';
+// ống đứng (x0: mép trái, rộng 2): sáng trái, tối phải
+function pipeUp(g, x, y0, y1, C) {
+  g.R(C[1], x, y0, 2, y1 - y0);
+  if (g.k === 1) g.R(C[2], x, y0, 1, y1 - y0);
+  else { g.R(C[2], x, y0, 0.5, y1 - y0); g.R(C[3], x + 0.5, y0, 0.5, y1 - y0); g.R(C[0], x + 1.5, y0, 0.5, y1 - y0); }
+}
+// ống chạy theo chiều sâu từ (x, y) (mép trái, rộng w) lùi d hàng: dải xiên, mép trên-trái hứng sáng
+function pipeBack(g, x, y, d, C, w = 2) {
+  const dx = -d * SK;
+  g.G((px, py) => {
+    const t = (px - (x + ((y - py) / d) * dx)) / w;
+    if (g.k === 1) return t < 0.45 ? C[2] : C[1];
+    return t < 0.22 ? C[3] : t < 0.5 ? C[2] : t > 0.78 ? C[0] : C[1];
+  }, [[x, y], [x + w, y], [x + w + dx, y - d], [x + dx, y - d]]);
+}
+function sideBand(g, x, y, w) { g.R(CHROME[2], x, y, w, 1); g.R(CHROME[3], x, y, w, 0.5); g.R(CHROME[0], x + w - 0.5, y, 0.5, 1); }
+// van tay trên cột, cần gạt chĩa sang trái: mở = cần xanh dựng, khóa = cần đỏ nằm ngang
+function sideValve(g, x, y, on) {
+  g.R(CHROME[1], x - 0.5, y, 3, 3); g.R(CHROME[2], x - 0.5, y, 3, 1); g.R(CHROME[3], x, y + 0.5, 0.5, 0.5); g.R(CHROME[0], x + 2, y + 1, 0.5, 2);
+  g.R(CHROME[2], x - 1.5, y + 1, 1, 1);   // trục van
+  const L = on ? LEVER.on : LEVER.off;
+  if (on) { g.R(L[1], x - 2.5, y - 3, 1, 4.5); g.R(L[2], x - 2.5, y - 3, 0.5, 4.5); g.R(L[2], x - 2.5, y - 3.5, 1, 0.5); g.R(L[0], x - 2, y - 3, 0.5, 0.5); }
+  else { g.R(L[1], x - 6.5, y + 1, 5, 1); g.R(L[2], x - 6.5, y + 1, 5, 0.5); g.R(L[0], x - 6.5, y + 1, 0.5, 1); }
+}
+// bát sen úp xuống (art59.rose): cx giữa bát, y đáy cổ nối cần
+function sideRose(g, cx, y, C) {
+  g.R(C[1], cx - 1, y, 2, 1.5); g.R(C[2], cx - 1, y, 0.5, 1.5);
+  g.R(C[2], cx - 2.5, y + 1.5, 5, 1);
+  g.R(C[1], cx - 3, y + 2.5, 6, 1.5);
+  g.R(C[3], cx - 2.5, y + 1.5, 2, 0.5); g.R(C[3], cx - 3, y + 2.5, 0.5, 0.5);
+  g.R(C[0], cx + 2, y + 2.5, 1, 1.5);
+  g.hd(N => { for (let i = 0; i < 5; i++) N(C[0], Math.round((cx - 2.5) * 2) + i * 2 + 1, Math.round((y + 3.5) * 2), 1, 1); });
+}
+function sideTuft(g, x, y) {
+  g.R(GRASS[0], x, y, 1.5, 1);
+  g.R(GRASS[1], x, y - 0.5, 0.5, 1); g.R(GRASS[1], x + 1, y - 1, 0.5, 1.5);
+  g.R(GRASS[2], x + 0.5, y - 0.5, 0.5, 0.5);
+}
+function sideDrip(g, cx, y) {
+  g.R(WATER[1], cx - 0.5, y, 1, 1.5); g.R(WATER[3], cx - 0.5, y, 0.5, 0.5);
+  g.hd(N => N(WATER[0], Math.round(cx * 2), Math.round((y + 1.5) * 2) - 1, 1, 1));
+}
+const HW = (x, y) => hash(Math.floor(x * 7), Math.floor(y * 13));
+// tia nước (art59.spray): từ đáy bát sen (cx, y0) xuống mặt đất y1, khung f 0..2
+function sideSpray(g, cx, y0, y1, f) {
+  const h = y1 - y0, n = 4;
+  g.E('#3f9cf066', cx, y1 - 0.5, 6, 1.5);
+  g.hd(N => { N('#cfeaffaa', Math.round((cx - 4) * 2), Math.round((y1 - 1) * 2), 3, 1); N('#cfeaffaa', Math.round((cx + 2) * 2), Math.round((y1 - 0.5) * 2), 2, 1); });
+  for (let j = 0; j < n; j++) {
+    const off = j - (n - 1) / 2, xAt = t => cx + off * 1.3 + off * 1.6 * t * t * 1.4;
+    g.hd(N => {
+      for (let Y = Math.round(y0 * 2); Y < Math.round(y1 * 2) - 2; Y++) {
+        const t = (Y / 2 - y0) / h;
+        if (mod(Y + f * 3 + j * 5, 9) < 6) N(t < 0.5 ? '#a8dcffb0' : '#8fd0ff80', Math.round(xAt(t) * 2), Y, 1, 1);
+      }
+    });
+    for (let s = ((f * 2 + j * 3) % 5) + 0.5; s < h - 1.5; s += 4.5 + (j % 2)) {
+      const t = s / h, x = Math.round(xAt(t) - 0.25), y = y0 + s, len = 1.5 + (HW(j, s) > 0.5 ? 0.5 : 0);
+      g.R(WATER[2], x, y, 1, len);
+      g.R(WATER[3], x, y + len - 0.5, 0.5, 0.5);
+      g.hd(N => N(WATER[1], x * 2 + 1, Math.round(y * 2), 1, 1));
+    }
+  }
+  const w = 3.5 + f;
+  for (const sgn of [-1, 1]) {
+    const x = cx + sgn * w, hop = (f + (sgn > 0 ? 1 : 0)) % 3;
+    g.R(WATER[3], Math.round(x), y1 - 2 - hop, 1, 1);
+    g.R(WATER[2], Math.round(x - sgn * 1.5), y1 - 1.5 - (hop ? 0.5 : 0), 1, 1);
+    g.hd(N => N('#ffffff', Math.round(x * 2), Math.round((y1 - 2 - hop) * 2), 1, 1));
+  }
+  g.hd(N => { for (let i = 0; i < 8; i++) N(MIST, Math.round((cx - 6 + HW(i, f + 3) * 12) * 2), Math.round((y0 + 3 + HW(f + 3, i) * h * 0.8) * 2), 1, 1); });
+}
+// nước: chờ = giọt đọng ở bát sen, tắm = tia xối; (cx, y) đáy bát sen, d độ sâu (mặt đất dưới bát ở y = -d)
+function showerWater(g, state, f, heads) {
+  for (const [i, [cx, y, d]] of heads.entries()) {
+    if (state === 'idle') sideDrip(g, cx, y);
+    if (state === 'spray') sideSpray(g, cx, y, -d, (f + i) % 3);
+  }
+}
+
+// Chuồng heo: ống nhựa dựng trên bệ xi măng lấm bùn, cần lùi 12 hàng, một bát sen
+const PIG_ARM = 12;
+function pigShowerSide(state, f = 0) {
+  const on = state !== 'off', C = on ? PVC : DRY, R = on ? CHROME : DULL;
+  const top = -27, hx = -PIG_ARM * SK, hy = top - PIG_ARM;   // đầu cần
+  return g => {
+    shadowE(g, -1, -0.5, 6, 1.6, 0.22);
+    // nước ở xa (sau cần, sau cột): vẽ trước, không viền
+    if (state === 'spray') showerWater(g, state, f, [[hx, hy + 4, PIG_ARM]]);
+    // cần lùi vào chuồng + bát sen
+    g.layer(L => { pipeBack(L, -1, top + 1, PIG_ARM, C); L.R(C[1], hx - 1, hy - 0.5, 2, 1.5); L.R(C[2], hx - 1, hy - 0.5, 1, 0.5); });
+    g.layer(L => sideRose(L, hx, hy + 0.5, R));
+    if (state === 'idle') showerWater(g, state, f, [[hx, hy + 4.5, PIG_ARM]]);
+    // bệ xi măng: mặt trên lùi về sau, mặt trước sáng mép
+    g.layer(L => {
+      L.G(CONC[2], [[-4, -3], [4, -3], [4 - 3 * SK, -6], [-4 - 3 * SK, -6]]);
+      L.R(CONC[1], -4, -3, 8, 3); L.R(CONC[3], -4, -3, 8, 0.5);
+    });
+    g.R(CONC[3], -4 - 3 * SK + 0.5, -6, 7, 0.5); g.R(CONC[0], -4, -0.5, 8, 0.5);
+    g.R(SMUD[1], 1.5, -2, 2, 1.5); g.R(SMUD[2], 1.5, -2, 1, 0.5); g.R(SMUD[0], -3, -1, 1.5, 1);
+    g.R(SMUD[1], -5.5, -5, 2, 1); g.hd(N => { N(SMUD[2], -9, -11, 2, 1); N(SMUD[0], 4, -3, 1, 1); });
+    // cột ống, khuỷu, đai, van
+    g.layer(L => {
+      pipeUp(L, -1, top, -3, C);
+      L.R(C[1], -1, top - 1.5, 2, 2); L.R(C[2], -1, top - 1.5, 1, 0.5); L.R(C[3], -0.5, top - 1.5, 0.5, 0.5);
+      sideBand(L, -1.5, top + 7, 3); sideBand(L, -1.5, -7, 3);
+    });
+    g.layer(L => sideValve(L, -1, -17, on));
+    if (!on) { g.R(mix(C[1], '#8a5a2b', 0.45), -1, top + 10, 1, 1.5); g.hd(N => N(mix(C[0], '#8a5a2b', 0.4), 1, -24, 2, 1)); }
+    sideTuft(g, 4.5, -0.5); sideTuft(g, -8, -6);
+    return { box: [-17, -44, 17, 1], foot: [0, 0] };
+  };
+}
+// Đồng cỏ: cột gỗ trên đá kê, ống ốp mé phải cột (thanh chống nằm sau cột, khuất), cần dài lùi 18 hàng, hai bát sen
+const PAS_HEADS = [9, 17];
+function pastureShowerSide(state, f = 0) {
+  const on = state !== 'off', C = on ? PVC : DRY, R = on ? CHROME : DULL;
+  const top = -35, end = PAS_HEADS[1] + 1;
+  const heads = PAS_HEADS.map(d => [-d * SK + 3, top - d + 5, d]);
+  return g => {
+    shadowE(g, 0.5, -0.5, 6, 1.8, 0.22);
+    if (state === 'spray') showerWater(g, state, f, heads.slice().reverse());
+    // cần dài lùi vào chuồng, bát sen treo dưới cần
+    g.layer(L => pipeBack(L, 2, top + 1, end, C));
+    for (const [cx, y] of heads) g.layer(L => sideRose(L, cx, y - 4, R));
+    if (state === 'idle') showerWater(g, state, f, heads);
+    // đá kê chân cột
+    g.layer(L => { L.E(STONE[2], 0.5, -2, 5, 2.5); L.E(STONE[3], -0.5, -2.5, 2.5, 1.5); L.R(STONE[4], -2, -3.5, 2, 0.5); });
+    // cột gỗ, mũ cột
+    g.layer(L => {
+      const h = -2 - (top - 1);
+      L.R(WOOD[1], -2, top - 1, 4, h); L.R(WOOD[2], -2, top - 1, 2, h); L.R(WOOD[3], -2, top - 1, 0.5, h); L.R(WOOD[0], 1.5, top - 1, 0.5, h);
+      L.hd(N => { for (let Y = (top + 4) * 2; Y < -8; Y += 7) N(WOOD[0], -2 + mod(Y, 3), Y, 1, 3); });
+    });
+    g.layer(L => { L.R(WOOD[0], -2.5, top - 2, 5, 1.5); L.R(WOOD[2], -2.5, top - 2, 5, 0.5); });
+    // ống ốp mé phải cột, khuỷu lên cần, đai, van
+    g.layer(L => {
+      pipeUp(L, 2, top + 1, -3, C);
+      L.R(C[1], 2, top - 0.5, 2, 2); L.R(C[2], 2, top - 0.5, 1, 0.5); L.R(C[3], 2.5, top - 0.5, 0.5, 0.5);
+      for (const y of [top + 7, -20, -9]) sideBand(L, 1.5, y, 3);
+    });
+    g.layer(L => sideValve(L, 2, -15, on));
+    if (!on) { g.R(mix(C[1], '#8a5a2b', 0.45), 2, top + 11, 1, 1.5); g.hd(N => N(mix(C[0], '#8a5a2b', 0.4), 5, -40, 2, 1)); }
+    sideTuft(g, 5.5, -0.5); sideTuft(g, -6, -0.5);
+    return { box: [-20, -58, 20, 1], foot: [0, 0] };
+  };
+}
+const showerSet = mk => ({ idle: mk('idle'), off: mk('off'), spray: [0, 1, 2].map(f => mk('spray', f)) });
+
 // ---------- dựng ----------
 const DEFS = {
   pen: { coop: [0, 1, 2].map(coopSide), pig: [0, 1, 2].map(pigSide), barn: [0, 1, 2].map(barnSide) },
@@ -750,6 +967,8 @@ const DEFS = {
   troughV: troughV(),
   scale: scaleSide(),
   mudV: mudV(),
+  incubator: incubatorSide(),
+  shower: { pig: showerSet((st, f) => pigShowerSide(st, f)), pasture: showerSet((st, f) => pastureShowerSide(st, f)) },
 };
 function build() {
   const lo = {}, hi = {}, info = {};
@@ -767,5 +986,5 @@ const B = DOM ? build() : null;
 export const PENROT = B ? B.lo : null;
 export const PENROT_HD = B ? B.hi : null;
 // Điểm mốc theo đơn vị bộ thường, tính từ giữa đáy ảnh (x sang phải, y âm = lên trên); bộ 2x nhân đôi.
-// { w, h, door: ngưỡng cửa hông (giữa cửa, chân vách), rampFoot: chân cầu thang gà trên mặt đất (chuồng gà) }
+// { w, h, door: ngưỡng cửa hông (giữa cửa, chân vách), rampFoot: chân cầu thang gà trên mặt đất (chuồng gà), foot: chân cột vòi sen }
 export const PENROT_INFO = B ? B.info : null;

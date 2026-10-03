@@ -401,6 +401,7 @@ export function buildingImg(b, s) {
   if (b.sprite === 'doghouse' && SPR3?.doghouse) return SPR3.doghouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.doghouse[0];   // chuồng chó 3 cấp
   if (b.sprite === 'cathouse' && SPR3?.cathouse) return SPR3.cathouse[(b.ent?.lv ?? 1) - 1] ?? SPR3.cathouse[0];   // nhà mèo 3 cấp
   if (b.sprite === 'compost') return SPR61_OLD.compost?.[0] ?? null;   // cỡ hố ủ (hình theo trạng thái: compostImg)
+  if (b.sprite === 'coop' && b.rot && PENROT?.incubator) return sideImg(PENROT.incubator, b.rot);   // ổ ấp chuồng xoay: nhìn đầu hồi 30x36, đáy khung = chân ô (layout nest.spr)
   return SPR[b.sprite] ?? SPR2?.[b.sprite] ?? null;
 }
 // Hố ủ phân (issue 61): hình theo trạng thái rỗng / đang bỏ đồ / đang ủ / đã xong
@@ -1006,8 +1007,9 @@ export function render(ctx, f) {
     const sa = p.shower && SHOWER_ART?.[p.type];   // vòi sen chuồng cấp 3 (issue 59): phun khi đang tắm, có nước thì chờ, không nước thì tắt
     if (sa && vis(p.shower.x + 8, p.shower.y - 18, 30)) {
       const on = (wd.showers ?? []).some(x => x.pen === p.id && now - x.t0 < SHOWER_FX_MS);
-      const im = on ? sa.spray[Math.floor(now / 110) % sa.spray.length] : showerInfo(state, p.ent)?.on ? sa.idle : sa.off;
-      add(p.shower.y, () => blit(im, p.shower.x - sa.ax, p.shower.y - im.height));
+      const sv = p.rot && PENROT?.shower?.[p.type], A = sv || sa;   // chuồng xoay: vòi sen nhìn nghiêng, giữa đáy ảnh = chân cột
+      const im0 = on ? A.spray[Math.floor(now / 110) % A.spray.length] : showerInfo(state, p.ent)?.on ? A.idle : A.off, im = sv ? sideImg(im0, p.rot) : im0;
+      add(p.shower.y, () => blit(im, sv ? p.shower.x - im.width / 2 : p.shower.x - sa.ax, p.shower.y - im.height));
     }
     const hm = farm && isDusk(state) ? penHome(state, p.id) : null, gt = hm?.total ? gateOf(state, p.id) : null;
     if (gt && vis(gt.x, gt.y, 24)) add(gt.y + 3, () => homeSign(gt, hm));   // biển số con đã về trên cửa chuồng
