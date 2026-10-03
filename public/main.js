@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, commandDog,
+  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, speedOf, sellQuote, barrowTargets, commandDog,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -117,6 +117,12 @@ async function askAnimal(target, id) {
 async function doAction(target, id) {
   if (!state || busy || fading || world.stun > 0) return;
   if (target.kind === 'animal' && (id === 'sell' || id === 'retire') && !(target = await askAnimal(target, id))) return;
+  if (target.kind === 'animal' && id === 'barrow') {
+    const t = barrowTargets(state, target.id);
+    const pen = await ui.pickPen('Chở sang chuồng nào?', t);
+    if (pen == null) return;
+    target = { ...target, penId: pen };
+  }
   if (busy || !V.exists(state, target)) return;
   const pos = V.targetPos(state, target);
   if (pos) V.faceTo(state, pos.x, pos.y);

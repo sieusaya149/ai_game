@@ -403,6 +403,7 @@ export const ITEMS = {
   medicine:   { name: 'Thuốc thú y',       kind: 'supply', price: 40, lv: 1, desc: 'Mệt: 1 liều là khỏi. Bệnh nặng: 2 liều. Nguy kịch: phải gọi bác sĩ thú y.' },
   vaccine:    { name: 'Vắc-xin thú y',     kind: 'supply', price: 60, lv: 1, desc: 'Tiêm một lần, chống bệnh khoảng 10 giờ vườn. Tiêm theo con hoặc cả chuồng.' },
   vitamin:    { name: 'Vitamin thú nuôi',  kind: 'supply', price: 35, lv: 4, desc: 'Con non, con nhỡ lớn vọt thêm nửa giai đoạn.' },
+  barrow:     { name: 'Xe rùa',           kind: 'supply', price: 250, lv: 3, once: true, desc: 'Mua một lần. Chạm con vật chọn "Chở sang chuồng khác" để đưa nó sang chuồng cùng loại còn chỗ.' },
   soap:       { name: 'Xà phòng',         kind: 'supply', price: 10, lv: 1, desc: 'Tắm cho vật nuôi: sạch bong, vui hơn, ít bệnh. Mỗi lần tắm tốn 1 xà phòng và 1 nước trong bình.' },
   manure:     { name: 'Phân chuồng',       kind: 'material', price: 0, lv: 0, desc: 'Xúc ở chuồng bẩn. Hố ủ phân sẽ dùng sau.' },
   feed_ga:    { name: 'Cám gà',           kind: 'feed',   price: 6,  lv: 1, desc: 'Đổ vào máng chuồng gà (5 phần ăn) hoặc cho ăn tận tay.' },

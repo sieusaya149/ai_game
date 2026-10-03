@@ -7,8 +7,9 @@ import { SPR3, muddy } from './art3.js';
 import { hdOf, linkPair, charFrames, hdFn } from './hd.js';
 import { recolor } from './coat.js';
 import { COURIER_ART } from './artcourier.js';
+const BARROW = (await import('./artbarrow.js').catch(() => null))?.BARROW ?? null;   // art xe rùa vẽ sau: chưa có thì không vẽ xe cạnh người
 import { sceneMap, footprint } from './farm.js';
-import { canMove, ripeLeft, wilting, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses } from './state.js';
+import { canMove, ripeLeft, wilting, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, haveItem, catsIn, catHouses } from './state.js';
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS } from './data.js';
 
@@ -1070,6 +1071,8 @@ export function render(ctx, f) {
     const fr = wd.moving ? [1, 0, 2, 0][Math.floor(wd.walkT * 8) % 4] : 0;
     const k = dir === 1 || dir === 2 ? (fr === 2 ? 0 : fr) : fr;
     const shake = wd.stun > 0 ? (Math.floor(now / 60) % 2 ? 1 : -1) : 0;
+    const bw = farm && !state.visit && haveItem(state, 'barrow') > 0 ? BARROW?.barrow?.[dir === 1 ? 'left' : 'right']?.[wd.moving ? Math.floor(now / 160) % 2 : 0] : null;
+    if (bw && !wd.sleeping) add(p.y - 0.1, () => blit(bw, p.x + (dir === 1 ? -bw.width - 3 : 3), p.y - bw.height + 2));   // xe rùa dắt bên người
     if (!wd.sleeping) add(p.y, () => {
       if (state.sit && !wd.moving) {   // ngồi ghế đá: hạ thân xuống, cắt phần chân (chưa có sprite ngồi riêng)
         ctx.save(); ctx.beginPath(); ctx.rect(p.x - 12, p.y - 36, 24, 37); ctx.clip();

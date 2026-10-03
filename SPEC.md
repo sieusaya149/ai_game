@@ -314,6 +314,8 @@ vaccinatePen(state, penId)       // tiêm cho mọi con khỏe trong chuồng, h
 vaccinated(state, a)             // đang còn vắc-xin bảo vệ?
 isolate(state, animalId)         // chuyển vào chuồng cách ly còn chỗ (một hành động) → { ok, msg, reason? } ('no_quarantine'|'full')
 unisolate(state, animalId)       // đưa về chuồng thường đúng loài
+barrowTargets(state, animalId)   // xe rùa: [{ id, name, use, cap, disabled? }] chuồng cùng loại (trừ chuồng hiện tại, trừ cách ly); đầy thì disabled = lý do
+carryAnimal(state, animalId, penId) // chở sang chuồng cùng loài, cần có `barrow` trong kho → { ok, msg, reason? } ('visit'|'no_barrow'|'missing'|'species'|'same'|'full'); đứng vào trong chuồng mới, giữ nguyên chỉ số
 sickLeft(a)                      // ms giờ vườn còn lại trước khi mất (chỉ khác null khi Nguy kịch) — render vẽ đếm ngược trên đầu
 SICK_NAME                        // ['Khỏe','Mệt','Bệnh nặng','Nguy kịch']
 graves(state)                    // các thực thể `grave` trong vườn
@@ -334,6 +336,9 @@ hiddenEggs(state)        // → trứng đang nằm trong bụi: s.eggs có `til
 ```
 Mỗi bước tick (ban ngày, FREE trong data.js): tối đa `FREE.max` (30) con loài `FREE.types` (gà, vịt), không bệnh, không ở chuồng cách ly, có `a.tile`; cứ `FREE.moveMs` đổi sang ô khác cách ≤ `FREE.radius` ô (`a.tileAt` = lúc đổi kế). Sáng ra bước từ cửa chuồng; từ chạng vạng `isDusk` (18h) trở đi, hoặc bệnh/cách ly/vượt 30, thì `tile = null` và về chuồng (trừ con lạc, xem issue 42). Vịt con thì không tự chọn ô: bám `tile` của vịt mái gần nhất đang thả rông (đi thành hàng theo mẹ). Đứng ở ô ruộng có cây: con nhỡ trở lên mổ sâu (`stats.pecks`), 5% (`FREE.seedLoss`) lần mổ mất hạt vừa gieo (cây ở giai đoạn 0). Gà/vịt mái trưởng thành thả rông đẻ trứng ở ô cỏ gần bụi/đá/cây trong `FREE.layRadius`, mỗi ô một ổ. Chạy bù offline dùng đúng luật này.
 Hàng rào thấp: vật phẩm `deco_lowfence` (ITEMS, kind deco, bán ở chợ), đặt bằng `placeEntity` như đồ trang trí (qua `canPlace`), người chơi bước qua được, chỉ chặn gà. `world.js` diễn hoạt gà theo `a.tile` (`freeWalk`); `render.js` vẽ `SPR3.lowFence` (ngang/dọc theo hàng xóm) và `SPR3.eggNest` / `SPR3.eggNestDuck` cho trứng có `tile`.
+
+### Xe rùa (hotfix)
+`ITEMS.barrow` (kind `supply`, 250 xu, cấp 3, `once: true`): bán ở chợ Bà Tư tab Vật tư, chỉ mua được một lần (`buy` từ chối khi đã có, không đặt online được). Có xe thì `actionsFor` vật nuôi thêm `barrow` "Chở sang chuồng khác" (disabled khi không còn chuồng cùng loại khác). `main.js` hỏi chuồng đích (`ui.pickPen`, mỗi chuồng hiện `n/cap`, đầy thì khóa) rồi gọi `perform` với `target.penId`; chở tức thì. Chuồng cách ly không qua xe rùa (vào bằng `isolate`, ra bằng `unisolate`; con nằm cách ly vẫn chở được về chuồng thường). Ở cảnh thăm vườn không có hành động này. Art tùy chọn `artbarrow.js` (`BARROW`/`BARROW_HD`: `barrowIcon`, `barrow.{left,right}[2]`, `barrowLoaded`), thiếu thì dùng 🛒 và không vẽ xe cạnh người.
 
 ### Chạng vạng về chuồng, con lạc, lùa tay, rải thóc (issue 42, ADR 0013)
 ```js
@@ -774,7 +779,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
                                //   Nhà: bed, wardrobe, phone (gọi bác sĩ thú y), (stove, table, plant chỉ để ngắm). Làng: market (Bà Tư), smithy (Ông Sáu),
                                //   vet (trạm thú y Cô Út), houseC (nhà Chú Ba, lái buôn mua vật nuôi đứng trước nhà), friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; bát ăn `fill`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet barrow bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; bát ăn `fill`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 

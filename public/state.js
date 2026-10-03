@@ -2251,6 +2251,7 @@ function animalActs(s, t) {
   // cách ly: chỉ hiện khi con đang bệnh, hoặc đang nằm chuồng cách ly (để đưa về)
   const quar = penTypeOf(s, a) === 'quarantine';
   if (a.sick || quar) A.isolate = quar ? mk('unisolate', '🏠', 'Đưa về chuồng thường') : mk('isolate', '🏥', 'Chuyển vào chuồng cách ly');
+  if (have(s, 'barrow') > 0) A.barrow = mk('barrow', 'barrow', 'Chở sang chuồng khác', barrowTargets(s, a.id).length ? null : 'Chưa có chuồng nào khác cùng loại');
   if (animalCan(a, 'vitamin') && !a.sick) A.vitamin = mk('vitamin', '💉', `Cho uống vitamin (còn ${have(s, 'vitamin')})`, have(s, 'vitamin') <= 0 ? noItem('vitamin') : null);
   const first = (a.sick || a.hurt) ? 'medicine' : a.ready ? 'collect' : a.hunger < 40 ? 'feed' : isDirty(a) ? 'bath' : 'pet';
   const list = [A[first], ...Object.entries(A).filter(([k]) => k !== first).map(([, v]) => v)];
@@ -2571,6 +2572,7 @@ const DO = {
         return res(true, r.msg, r.cured ? [say(at, 'Khỏe rồi! 💪'), ...heartFx(s, a, at, 'cure')] : [say(at, `Thuốc ${r.dose}/${SICK.doses[2]} 💊`)], 'spray');
       }
       case 'vaccinate': { const r = vaccinate(s, a.id); return r.ok ? res(true, r.msg, [say(at, 'Tiêm xong! 💉')], 'spray') : bad(r.msg, at); }
+      case 'barrow': { const r = carryAnimal(s, a.id, t.penId); return r.ok ? res(true, r.msg, [say(at, 'Đi nào! 🛒')], 'pop') : bad(r.msg, at); }
       case 'isolate': case 'unisolate': { const r = id === 'isolate' ? isolate(s, a.id) : unisolate(s, a.id); return r.ok ? res(true, r.msg, [say(at, id === 'isolate' ? 'Cách ly 🏥' : 'Về chuồng 🏠')], 'pop') : bad(r.msg, at); }
       case 'vitamin':
         // lớn vọt thêm một nửa giai đoạn đang ở (không vượt quá đầu giai đoạn trưởng thành)
@@ -3298,6 +3300,7 @@ export function buy(s, itemId, qty = 1) {
   qty = Math.floor(qty);
   if (!it || !(qty > 0)) return R(false, 'Món này không có bán');
   if (level(s) < it.lv) return R(false, `Cần cấp ${it.lv} mới mua được`);
+  if (it.once && (have(s, itemId) > 0 || qty > 1)) return R(false, `Bạn đã có ${it.name.toLowerCase()} rồi`);
   const cost = it.price * qty;
   if (s.coins < cost) return R(false, 'Chưa đủ xu, cố lên nhé');
   s.coins -= cost; give(s, itemId, qty);
@@ -3331,7 +3334,7 @@ export function buyAnimal(s, type, sex = 'm', coat) {
 // s.deliveries = [{ id, items: { món: số }, cost, fee, at, due }] (giờ vườn s.time). Trả tiền lúc đặt; tới due mà chợ đang mở
 // thì người giao hàng (s.courier) đi từ cổng tới nhà kho, tới nơi thì hàng vào kho (s.inv). Luật chạy trong step nên trình duyệt
 // và server chạy bù cho cùng kết quả. Vật nuôi, quần áo vẫn phải ra làng mua.
-export const canOrder = id => { const it = ITEMS[id]; return !!it && it.price > 0 && ['seed', 'supply', 'feed', 'deco'].includes(it.kind); };
+export const canOrder = id => { const it = ITEMS[id]; return !!it && it.price > 0 && !it.once && ['seed', 'supply', 'feed', 'deco'].includes(it.kind); };
 // Kiểu giao: thiếu hoặc lạ (client cũ) thì như 'm2' (2 phút, rẻ nhất)
 export const deliveryMode = id => DELIVERY.modes.find(m => m.id === id) ?? DELIVERY.modes.find(m => m.id === 'm2');
 export const deliveryFee = (cost, mode) => (cost > 0 ? Math.max(DELIVERY.feeMin, Math.ceil(cost * deliveryMode(mode).fee)) : 0);
@@ -3731,6 +3734,28 @@ export function moveAnimal(s, animalId, penId) {
   const p = penPoint(s, e.pen, e.id);
   Object.assign(a, { x: p.x, y: p.y, tile: null });
   return R(true, `Đã chuyển ${ANIMALS[a.type].name.toLowerCase()} sang ${PEN_DEFS[e.pen].name.toLowerCase()}`, { id: a.id });
+}
+
+// Xe rùa: chở con vật sang chuồng khác cùng loài (chuồng cách ly đi đường isolate/unisolate, không qua xe rùa).
+// → [{ id, name, use, cap, disabled? }] các chuồng đích có thể chọn, chuồng đầy thì có disabled là lý do.
+export function barrowTargets(s, animalId) {
+  const a = s.animals.find(x => x.id === animalId);
+  if (!a) return [];
+  settlePens(s);
+  const type = ANIMALS[a.type].pen, list = penEnts(s, type);
+  return list.filter(e => e.id !== a.pen).map(e => {
+    const use = penUse(s, e.id), cap = penCapOf(e);
+    return { id: e.id, name: `${PEN_DEFS[type].name} ${list.indexOf(e) + 1}`, use, cap, ...(use >= cap ? { disabled: 'Chuồng này chật rồi' } : {}) };
+  });
+}
+export function carryAnimal(s, animalId, penId) {
+  if (s.visit || s.scene === 'visit') return R(false, 'Về vườn nhà rồi hẵng chở nhé', { reason: 'visit' });
+  if (have(s, 'barrow') <= 0) return R(false, 'Bạn chưa có xe rùa, mua ở chợ Bà Tư nhé', { reason: 'no_barrow' });
+  const e = s.farm.ents.find(x => x.id === penId && x.kind === 'pen'), a = s.animals.find(x => x.id === animalId);
+  if (!a || !e) return R(false, 'Không thấy con vật hoặc chuồng', { reason: 'missing' });
+  if (e.pen !== ANIMALS[a.type].pen) return R(false, `${PEN_DEFS[e.pen].name} không nhận ${ANIMALS[a.type].name.toLowerCase()}`, { reason: 'species' });
+  if (a.pen === e.id) return R(false, 'Nó đang ở chuồng này rồi', { reason: 'same' });
+  return moveAnimal(s, animalId, penId);
 }
 
 // Nâng cấp chuồng (hoặc chuồng chó) id lên cấp kế: trừ xu, sức chứa tăng ngay, con vật giữ nguyên.
