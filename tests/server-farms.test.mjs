@@ -38,7 +38,7 @@ test('vườn online: tài khoản mới chưa có vườn; đẩy bản lưu r�
   const play = r.body.play;
   assert.ok(play);
 
-  const s = garden(s => { s.coins = 1234; s.plots[0].soil = 'tilled'; s.plots[0].crop = { id: 'cai', progress: 0.5, q: { dry: false, bugMax: 0, hand: false } }; });
+  const s = garden(s => { s.coins = 1234; s.plots[0].soil = 'tilled'; s.plots[0].crop = { id: 'cai', progress: 0.5, q: { dry: false, bugMax: 0, hand: false }, giant: false }; });
   r = await a.save(play, s);
   assert.equal(r.status, 200);
   assert.equal(r.body.rev, 1);

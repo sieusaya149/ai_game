@@ -637,7 +637,8 @@ export function nameOf(state, t) {
   switch (t.kind) {
     case 'plot': {   // cây còn sống: kèm số sao vụ này đang giữ (issue 52), vd "Cải xanh ★★☆"
       const c = state.plots[t.idx]?.crop, n = c && !c.dead && !c.rotten ? ST.cropStar(c) : 0;
-      return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (n ? ` ${'★'.repeat(n)}${'☆'.repeat(3 - n)}` : '') : `Ô ruộng ${t.idx + 1}`;
+      const big = c?.giant && n && c.progress >= 1 ? ' · khổng lồ ✨' : '';   // trái khổng lồ (issue 53)
+      return c ? (CROPS[c.id]?.name ?? 'Cây trồng') + (n ? ` ${'★'.repeat(n)}${'☆'.repeat(3 - n)}` : '') + big : `Ô ruộng ${t.idx + 1}`;
     }
     case 'lockedPlot': return 'Đất hoang';
     case 'animal': { const a = findBy(state.animals, t.id); return a ? `${ST.animalLabel(a)} ${'❤️'.repeat(a.bond || 1)}` : 'Vật nuôi'; }

@@ -1,0 +1,83 @@
+<!doctype html><meta charset="utf-8"><title>HD53</title>
+<style>
+  body { margin: 0; padding: 8px; background: #3a5a2a; font: 11px sans-serif; color: #fff; width: 1320px; }
+  h2 { margin: 10px 0 4px; font-size: 13px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+  .pair { display: flex; gap: 4px; align-items: flex-end; background: rgba(0,0,0,0.18); padding: 3px; }
+  .cell { display: flex; flex-direction: column; gap: 1px; }
+  .cell span { font-size: 9px; color: #ffe9a8; }
+  canvas { image-rendering: pixelated; }
+  #bad { font-weight: bold; }
+  #bad.err { color: #ff6060; }
+</style>
+<body>
+<div id="bad"></div>
+<div id="root"></div>
+<script type="module">
+// Trang xem art issue 53 (trái khổng lồ): cây chín thường để so cỡ, trái khổng lồ bản thường (×4) và 2x (×2),
+// biểu tượng, lấp lánh, ô ruộng mô phỏng; kiểm mọi ảnh SPR53 đúng gấp đôi ảnh SPR53_OLD cùng khóa.
+import { SPR } from './art.js';
+import { SPR4 } from './art4.js';
+import { SPR53_OLD, SPR53, GIANT_IDS } from './art53.js';
+import { hdOf } from './hd.js';
+const isImg = v => v instanceof HTMLCanvasElement;
+const root = document.getElementById('root');
+const cv = (img, z) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); c.style.width = img.width * z + 'px'; c.style.height = img.height * z + 'px'; return c; };
+const cell = (img, label, z) => { const d = document.createElement('div'); d.className = 'cell'; const s = document.createElement('span'); s.textContent = label; d.append(s, cv(img, z)); return d; };
+const sec = t => { const h = document.createElement('h2'); h.textContent = t; const r = document.createElement('div'); r.className = 'row'; root.append(h, r); return r; };
+
+// kiểm cỡ 2x
+const bad = [], ok = [];
+(function walk(o, n, path) {
+  if (isImg(o) || isImg(n)) {
+    if (!isImg(o) || !isImg(n)) bad.push(`${path}: thiếu ảnh`);
+    else if (n.width !== o.width * 2 || n.height !== o.height * 2) bad.push(`${path}: ${o.width}x${o.height} → ${n.width}x${n.height}`);
+    else ok.push(path);
+    return;
+  }
+  const keys = new Set([...Object.keys(o ?? {}), ...Object.keys(n ?? {})]);
+  for (const k of keys) walk(o?.[k], n?.[k], `${path}.${k}`);
+})(SPR53_OLD, SPR53, 'SPR53');
+const sizes = `giant ${SPR53_OLD.giant.cai.width}x${SPR53_OLD.giant.cai.height}/${SPR53.giant.cai.width}x${SPR53.giant.cai.height}, icon ${SPR53_OLD.giantIcon.cai.width}/${SPR53.giantIcon.cai.width}, spark ${SPR53_OLD.giantSpark[0].width}/${SPR53.giantSpark[0].width}`;
+const badEl = document.getElementById('bad');
+if (bad.length) { badEl.className = 'err'; badEl.textContent = 'SAI: ' + bad.join(' | '); }
+else badEl.textContent = `Kiểm cỡ: ${ok.length} ảnh SPR53 đều đúng 2× SPR53_OLD (${sizes})`;
+window.__check = { ok: ok.length, bad };
+
+// ô ruộng mô phỏng: đất 16x16, trái khổng lồ ở (−4, −8) so với ô, lấp lánh khung to
+function plot(id, k) {
+  const S = k === 2 ? SPR53 : SPR53_OLD, c = document.createElement('canvas'); c.width = 24 * k; c.height = 24 * k;
+  const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  x.fillStyle = '#4f8a35'; x.fillRect(0, 0, c.width, c.height);
+  const soil = SPR.soil.tilledWet, s2 = k === 2 ? hdOf(soil) : null;
+  x.drawImage(s2 ?? soil, 4 * k, 8 * k, 16 * k, 16 * k);
+  x.drawImage(S.giant[id], 0, 0);
+  x.drawImage(S.giantSpark[1], 16 * k, 2 * k);
+  x.drawImage(S.giantSpark[0], 3 * k, 12 * k);
+  return c;
+}
+
+for (const id of GIANT_IDS) {
+  const row = sec(id);
+  const p = document.createElement('div'); p.className = 'pair';
+  p.append(
+    cell(SPR4.crop[id].stages[4], 'chín thường ×4', 4),
+    cell(SPR53_OLD.giant[id], 'khổng lồ 1x ×4', 4),
+    cell(SPR53.giant[id], 'khổng lồ 2x ×2', 2),
+    cell(SPR53_OLD.giantIcon[id], 'icon 1x ×4', 4),
+    cell(SPR53.giantIcon[id], 'icon 2x ×2', 2),
+    cell(SPR53_OLD.giantIcon[id], 'icon 1x ×2', 2),
+    cell(SPR53.giantIcon[id], 'icon 2x ×1', 1),
+    cell(plot(id, 1), 'ô ruộng 1x ×4', 4),
+    cell(plot(id, 2), 'ô ruộng 2x ×2', 2),
+  );
+  row.append(p);
+}
+const sp = sec('giantSpark: 1x ×8 | 2x ×4');
+for (let i = 0; i < 3; i++) {
+  const p = document.createElement('div'); p.className = 'pair';
+  p.append(cell(SPR53_OLD.giantSpark[i], `1x [${i}]`, 8), cell(SPR53.giantSpark[i], `2x [${i}]`, 4));
+  sp.append(p);
+}
+window.__ready = true;
+</script>

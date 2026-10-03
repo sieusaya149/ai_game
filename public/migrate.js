@@ -112,8 +112,9 @@ export function fillSave(s) {
   }
   for (const p of s.plots ?? []) {
     p.mulch ??= false;
-    if (p.crop) p.crop.q = { ...cropQuality(), ...p.crop.q };
+    if (p.crop) { p.crop.q = { ...cropQuality(), ...p.crop.q }; p.crop.giant ??= false; }   // trái khổng lồ (issue 53)
   }
+  if (isObj(s.stats)) s.stats.giants ??= 0;
   return s;
 }
 
