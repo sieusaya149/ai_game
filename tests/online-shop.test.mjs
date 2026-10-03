@@ -78,7 +78,7 @@ test('không đặt được: giỏ trống, món không bán online (vật nuô
     assert.equal(r.ok, false, JSON.stringify(cart));
   }
   const low = G.createGame({ name: 'Mới' }); low.coins = 1000;
-  assert.match(G.orderOnline(low, { medicine: 1 }).msg, /Cần cấp/);
+  assert.match(G.orderOnline(low, { vitamin: 1 }).msg, /Cần cấp/);
   const poor = newGame(); poor.coins = 10;
   assert.match(G.orderOnline(poor, { deco_lamp: 1 }).msg, /Chưa đủ xu/);
   assert.equal(poor.coins, 10);
