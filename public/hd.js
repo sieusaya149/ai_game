@@ -58,6 +58,9 @@ if (tankArt?.TANK_ART) { stats.files.push('arttank.js'); link(tankArt.TANK_ART, 
 // Vòi sen chuồng cấp 3 (issue 59): cùng cây khóa trong art59.js
 const showerArt = await import('./art59.js').catch(() => null);
 if (showerArt?.SHOWER_ART) { stats.files.push('art59.js'); link(showerArt.SHOWER_ART, showerArt.SHOWER_ART_HD, 'SHOWER_ART'); }
+// Tự động hóa khối ruộng (issue 58): đất màu mỡ, ống nhỏ giọt, máy phun, biểu tượng nâng cấp, cùng cây khóa trong art58.js
+const autoArt = await import('./art58.js').catch(() => null);
+if (autoArt?.AUTO_ART) { stats.files.push('art58.js'); link(autoArt.AUTO_ART, autoArt.AUTO_ART_HD, 'AUTO_ART'); }
 
 // Ảnh 2x của một ảnh cũ (hoặc undefined)
 export const hdOf = img => (img ? MAP.get(img) : undefined);

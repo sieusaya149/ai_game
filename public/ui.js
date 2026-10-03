@@ -18,6 +18,7 @@ import { TANK_ART } from './arttank.js';
 import { SPR53_OLD } from './art53.js';   // biểu tượng trái khổng lồ (issue 53)
 import { GH } from './art60.js';   // nhà kính (issue 60)
 import { SPR61_OLD } from './art61.js';   // hố ủ phân (issue 61): icon cây héo, cây chết, phân chó, hố ủ
+import { AUTO_ART } from './art58.js';
 
 // Kiểu A: ảnh DOM có kích thước do CSS quyết định nên dùng thẳng bản 2x (nét hơn, cỡ không đổi)
 const hd = im => (im && hdOf(im)) || im;
@@ -217,8 +218,11 @@ function buildCard(s, kind, card) {
 }
 const penIco = pen => (pen === 'quarantine' ? h('span', { class: 'ico emo' }, '🏥') : ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]));
 // Nút Cất cho món đang chạm (label = tên món, null = ẩn)
-export function buildSel(label, up) {   // label: món cất được (nút Cất); up: S.upgradeInfo của chuồng đang chọn (nút Nâng cấp)
+// label: món cất được (nút Cất); up: S.upgradeInfo của chuồng đang chọn (nút Nâng cấp); field: id khối ruộng đang chọn (nút Nâng cấp khối)
+export function buildSel(label, up, field = null) {
   const b = $('build-store'), u = $('build-upgrade');
+  fieldSel = field;
+  $('build-fieldup').hidden = field == null;
   b.hidden = !label;
   if (label) b.textContent = `Cất ${label.toLowerCase()}`;
   u.hidden = !up;
@@ -1403,6 +1407,40 @@ PANELS.log = {
   },
 };
 
+// ---------- Nâng cấp khối ruộng 3×3 (issue 58) ----------
+// Mở từ chế độ xây dựng (chạm khối ruộng → "Nâng cấp khối"). Liệt kê mọi khối: khối nào đã có gì, máy đang chạy hay ngừng vì sao,
+// nâng cấp chưa có thì có giá và nút mua. Đầu bảng: tiền điện tạm tính (trừ lúc 6h) hoặc tiền điện chưa trả được.
+let fieldSel = null;
+const UP_KINDS = Object.keys(D.AUTO.ups);
+function upIco(k) {
+  let u = null;
+  try { u = hd(AUTO_ART?.badge?.[k])?.toDataURL?.() || null; } catch { u = null; }
+  return u ? h('img', { class: 'ico up-ico', src: u, alt: '' }) : h('span', { class: 'ico emo' }, D.AUTO.ups[k].icon);
+}
+const RUN_TXT = { on: 'đang chạy', idle: 'đang chờ việc', off: 'đang ngừng' };
+PANELS.fieldup = {
+  title: '🔧 Nâng cấp khối ruộng',
+  render(body, s) {
+    const pw = S.powerInfo(s), k = S.tankInfo(s);
+    body.append(h('div', { class: 'note' + (pw.bill ? ' closed' : ''), id: 'fu-power' }, pw.bill
+      ? `⚡ Chưa đủ xu trả tiền điện ${fmt(pw.bill)} xu: máy bơm, máy phun đang ngừng. Có đủ xu thì tự trả, máy chạy lại.`
+      : `⚡ Tiền điện tạm tính ${fmt(pw.owe)} xu, trừ lúc 6h sáng. Máy bơm, trạm bơm phụ và máy phun tốn điện.`));
+    if (k.has) body.append(h('div', { class: 'note' }, `💧 Bồn ${fmt(k.level)}/${fmt(k.cap)} lần nước`));
+    s.farm.ents.filter(e => e.kind === 'field').forEach((f, i) => {
+      const info = S.autoInfo(s, f), sel = f.id === fieldSel;
+      body.append(h('div', { class: 'fu-block' + (sel ? ' on' : ''), 'data-field': String(f.id) },
+        h('h3', { class: 'sec' }, `Khối ruộng ${i + 1}${sel ? ' · đang chọn' : ''}`, h('span', { class: 'fu-badges' }, UP_KINDS.filter(u => f.up?.[u]).map(upIco))),
+        S.fieldUpInfo(s, f.id).map(u => row({
+          icon: upIco(u.kind), name: u.name,
+          desc: u.has ? (info[u.kind] && typeof info[u.kind] === 'string' ? `Đã có, ${RUN_TXT[info[u.kind]]}${info.why[u.kind] ? ': ' + info.why[u.kind] : ''}` : 'Đã có') : u.error && u.reason !== 'coins' ? `⚠️ ${u.error}` : u.desc,
+          right: u.has ? h('span', { class: 'tick' }, '✓') : btn(`🪙 ${fmt(u.price)}`, () => res(S.buyFieldUp(st(), f.id, u.kind), 'coin'), 'green sm', { disabled: !!u.error, title: u.error ?? '' }),
+          locked: !u.has && !!u.error && u.reason !== 'coins', data: { up: u.kind, has: u.has ? '1' : '0' },
+        }))));
+    });
+  },
+  open() { document.querySelector('.fu-block.on')?.scrollIntoView({ block: 'nearest' }); },
+};
+
 // ---------- Việc cần làm 📋 & bản đồ nhỏ ----------
 PANELS.todo = {
   title: '📋 Việc cần làm',
@@ -2134,6 +2172,7 @@ export function initUI(a) {
   $('build-cancel').addEventListener('click', () => api.buildCancel());
   $('build-store').addEventListener('click', () => api.buildStore());
 $('build-upgrade').addEventListener('click', () => api.buildUpgrade());
+$('build-fieldup').addEventListener('click', () => openPanel('fieldup'));
 
   addEventListener('keydown', e => {
     if (e.key === 'Escape') {

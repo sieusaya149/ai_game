@@ -7,7 +7,7 @@ import {
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
   TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, isProduce, SEASON, WEATHER, MASTERY, masteryLevel,
 } from './data.js';
-import { WELL, TANK, WATER_BUILD } from './data.js';
+import { WELL, TANK, WATER_BUILD, AUTO } from './data.js';
 import { GLASS } from './data.js';   // nhà kính (issue 60)
 import { STARS, starKey, starOf, baseOf } from './data.js';   // chất lượng ★ (issue 52)
 import { GIANT, giantKey, giantOf, itemSlots } from './data.js';   // trái khổng lồ (issue 53)
@@ -454,7 +454,7 @@ function goneAnimalsValue(prev, next) {
   return v;
 }
 // Cây có ở bản trước mà đã hái (ô trống hoặc đã gieo vụ khác) đã thành nông sản: cho tăng thêm chừng giá trần của chúng
-// (issue 52: thu hoạch cả ruộng ★3 một lúc). Giá trần = sản lượng có bón phân, thưởng thành thạo (issue 51) và thưởng đúng mùa
+// (issue 52: thu hoạch cả ruộng ★3 một lúc). Giá trần = sản lượng có bón phân và đất màu mỡ (issue 58), thưởng thành thạo (issue 51) và thưởng đúng mùa
 // (issue 54) × giá sao cao nhất vụ đó còn giữ được.
 function goneCropsValue(prev, next) {
   let v = 0;
@@ -462,7 +462,7 @@ function goneCropsValue(prev, next) {
     const c = p.crop, n = next.plots?.[p.idx]?.crop;
     if (!c || c.dead || c.rotten || !CROPS[c.id] || (n && n.id === c.id && n.planted === c.planted)) continue;
     const top = careLost(c) ? 1 : STARS.max;   // chưa lỡ chăm kỹ thì còn kịp bón phân, chăm tay lên ★3
-    v += sellPrice(starKey(c.id, top)) * Math.max(0, cropYield({ ...c, fert: true }, prev) + SEASON.bonusQty - (c.stolen || 0));
+    v += sellPrice(starKey(c.id, top)) * Math.max(0, cropYield({ ...c, fert: true, rich: true }, prev) + SEASON.bonusQty - (c.stolen || 0));
     if (mayGiant(prev, next, c)) v += sellPrice(giantKey(c.id, top));
   }
   return v;
@@ -731,6 +731,7 @@ function step(s, d) {
     s.day = day;
     s.stamina = Math.min(STAMINA.max, s.stamina + STAMINA.morningRegen);   // mỗi sáng 6h tự hồi một ít
     settleShip(s);
+    billPower(s);   // tiền điện hôm qua (issue 58)
     if (s.chore?.day === s.day) doChore(s);   // trộm bị phạt sang làm thợ không công (issue 46)
     if (!catchUp) cockCrow(s);
   }
@@ -742,8 +743,11 @@ function step(s, d) {
   }
   if (s.smith && s.time >= s.smith.doneAt) finishUpgrade(s);
   heatGlass(s, false);   // nhà kính đang ngừng sưởi vì thiếu xu: đủ xu thì tự trả
-  for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d);
+  const rich = richPlots(s);
+  for (const p of s.plots) if (p.unlocked) stepPlot(s, p, d, rich.has(p.idx));
+  settlePower(s);    // tiền điện còn treo: đủ xu thì trả, máy chạy lại (issue 58)
   stepWater(s, d);   // bơm vào bồn rồi trừ nước theo thứ tự cố định (issue 57)
+  stepAuto(s, d);    // máy phun tự động, điện của máy phun (issue 58)
   stepFree(s, d);
   stepAnimals(s, d);
   stepManure(s, d);
@@ -763,13 +767,15 @@ function cockCrow(s) {
   list.forEach((r, i) => { fxEv(r.x, r.y - 10, 'Ò ó o o! 🐓', COL.coin); emit({ type: 'cockcrow', id: r.id }); if (!i) snd('cockcrow'); });
 }
 
-function stepPlot(s, p, d) {
+// rich: ô thuộc khối đất màu mỡ (issue 58): cỏ mọc chậm, cây lớn ở đó ghi crop.rich (thêm sản lượng, tính như đã bón khi xét sao)
+function stepPlot(s, p, d, rich = false) {
   const wet = p.water > 0;
   if (isWet(s.weather)) p.water = 100;
   else if (p.water > 0) p.water = Math.max(0, p.water - FARMING.waterDrainPerMin * (d / MIN) * dryMul(s, p));
-  if (!p.weeds && chance(FARMING.weedChancePerMin, d)) p.weeds = true;
+  if (!p.weeds && chance(FARMING.weedChancePerMin * (rich ? AUTO.richWeed : 1), d)) p.weeds = true;
   const c = p.crop;
   if (!c || c.dead || c.rotten) return;
+  if (rich && c.progress < 1) c.rich = true;
   if (c.progress < 1) careWatch(s, p, c, wet);
   const def = CROPS[c.id], at = plotCenter(s, p.idx);
   if (c.progress >= 1) { // chín: tiếp tục già đi, quá OVERRIPE thì héo
@@ -807,9 +813,10 @@ function careWatch(s, p, c, wet) {   // gọi mỗi bước tick, trước khi x
 const careLost = c => { const q = c.q ?? cropQuality(); return !!(q.dry || c.sick || (q.bugMax || 0) > STARS.bugMs); };
 // Số sao vụ này cho nếu thu hoạch ngay bây giờ (1..3). Thuần theo crop: mọi điều kiện đã ghi sẵn trong crop.q / crop.fert.
 // Chăm kỹ (không khô hẳn, sâu ≤ 30 giây, có bón phân) thì ★2; thêm ít nhất một lần chăm tay thì ★3. Còn lại ★1.
+// Cây lớn trên đất màu mỡ (crop.rich, issue 58) tính như đã bón phân, nên khối chạy toàn máy vẫn tới được ★2.
 // Cây trái mùa (issue 54 đặt crop.offSeason) không ra ★3.
 export function cropStar(c) {
-  if (!c || !c.fert || careLost(c)) return 1;
+  if (!c || !(c.fert || c.rich) || careLost(c)) return 1;
   return c.q?.hand && !c.offSeason ? 3 : 2;
 }
 // ---------- Trái khổng lồ (issue 53) ----------
@@ -2340,11 +2347,11 @@ const WATER_KINDS = ['tank', 'tank2', 'booster'];
 const gapOf = (a, b) => Math.max(0, a.c - (b.c + b.w - 1), b.c - (a.c + a.w - 1), a.r - (b.r + b.h - 1), b.r - (a.r + a.h - 1));
 const near = (a, b) => gapOf(a, b) <= TANK.range;
 // Mạng nước của một bố cục: từ bồn chính lan ra bồn phụ, trạm bơm phụ nằm trong tầm của nút đã nối (thứ tự trong vườn).
-// live: lúc đang chạy (mất điện thì trạm bơm phụ không nối). → [{ e, ft, from }] (from: nút nó nối vào, để vẽ ống)
+// live: lúc đang chạy (mất điện hay chưa trả tiền điện thì trạm bơm phụ không nối). → [{ e, ft, from }] (from: nút nó nối vào, để vẽ ống)
 function netOf(s, ents, live) {
   const tank = ents.find(e => e.kind === 'tank');
   if (!tank) return [];
-  const out = [{ e: tank, ft: footprint(tank), from: null }], off = live && powerOut(s);
+  const out = [{ e: tank, ft: footprint(tank), from: null }], off = live && !elecOn(s);
   const left = ents.filter(e => e.kind === 'tank2' || (e.kind === 'booster' && !off));
   for (let i = 0; i < out.length; i++) for (let j = 0; j < left.length; j++) {
     const ft = footprint(left[j]);
@@ -2377,6 +2384,7 @@ function pumpWhy(s, tank, level, cap) {
   if (wellLv(s) < WELL.length) return `Giếng chưa phải ${WELL[WELL.length - 1].name.toLowerCase()}`;
   if (!w || !near(footprint(w), footprint(tank))) return 'Bồn ở xa giếng quá, máy bơm không tới';
   if (powerOut(s)) return 'Bão làm mất điện, máy bơm tạm ngừng';
+  if (unpaid(s)) return 'Chưa đủ xu trả tiền điện, máy bơm tạm ngừng';
   if (level >= cap) return 'Bồn đầy rồi';
   return null;
 }
@@ -2391,13 +2399,14 @@ export function tankInfo(s) {
 // Thứ tự trừ nước cố định mỗi lượt (ADR 0015): chạy bù trên trình duyệt và server ra cùng kết quả. Vòi sen (issue 59) đứng sau.
 export const WATER_ORDER = ['drip', 'shower'];
 const WATER_USE = {
-  // tưới nhỏ giọt: khối ruộng có nước, ô có cây đang lớn mà đất khô thì tưới, mỗi ô 1 lần nước (theo thứ tự khối trong vườn, ô trong khối)
+  // tưới nhỏ giọt: khối ruộng có nước, ô có cây đang lớn mà đất sắp khô (dưới AUTO.dripAt, trước khi khô hẳn để giữ "chăm kỹ")
+  // thì tưới, mỗi ô 1 lần nước (theo thứ tự khối trong vườn, ô trong khối). Máy tưới không tính là chăm tay.
   drip(s, take) {
     for (const f of s.farm.ents) {
       if (f.kind !== 'field' || !f.up?.drip || !waterOn(s, f)) continue;
       for (const i of f.plots ?? []) {
         const p = s.plots[i], c = p?.crop;
-        if (p?.unlocked && c && !c.dead && !c.rotten && p.water <= 0 && take()) p.water = 100;
+        if (p?.unlocked && c && !c.dead && !c.rotten && c.progress < 1 && p.water < AUTO.dripAt && take()) p.water = 100;
       }
     }
   },
@@ -2413,7 +2422,7 @@ function stepWater(s, d) {
     if (w.level >= t.cap) w.pump = 0;
     w.power += d / HOUR * TANK.power.pump;
   }
-  if (!powerOut(s)) w.power += d / HOUR * TANK.power.booster * waterNet(s, true).filter(n => n.e.kind === 'booster').length;
+  if (elecOn(s)) w.power += d / HOUR * TANK.power.booster * waterNet(s, true).filter(n => n.e.kind === 'booster').length;
   const take = () => (w.level >= 1 ? (w.level--, true) : false);
   for (const k of WATER_ORDER) WATER_USE[k](s, take);
 }
@@ -2532,6 +2541,120 @@ export function showerInfo(s, e) {
 function showerKeep(s, e) {
   const old = hasShower(e) && s.farm.ents.find(x => x.id === e.id);
   return !!old && waterNet(s).some(n => near(footprint(old), n.ft));
+}
+
+// ---------- Tự động hóa theo khối ruộng 3×3 (issue 58) ----------
+// Nâng cấp là thuộc tính của khối (f.up: drip, spray, rich; glass để issue 60), dời khối thì đi theo. Tưới nhỏ giọt trừ nước bồn
+// trong WATER_USE.drip; máy phun trừ thuốc trừ sâu trong kho; đất màu mỡ ở stepPlot / cropYield / cropStar.
+// Tiền điện: máy bơm, trạm bơm phụ, máy phun ghi số điện vào s.water.power theo giờ vườn chạy (đóng băng không chạy nên không tính),
+// lúc 6h sáng trừ xu (AUTO.price mỗi số, phần lẻ để sang hôm sau). Không đủ xu thì ghi s.water.bill, máy ngừng tới khi đủ xu.
+const fieldsOf = s => s.farm?.ents.filter(e => e.kind === 'field') ?? [];
+const fieldById = (s, id) => fieldsOf(s).find(e => e.id === id) ?? null;
+const unpaid = s => (s.water?.bill || 0) > 0;
+const elecOn = s => !powerOut(s) && !unpaid(s);
+const elecWhy = s => (powerOut(s) ? 'Bão làm mất điện, máy phun tạm ngừng' : unpaid(s) ? `Chưa đủ xu trả tiền điện (${fmtXu(s.water.bill)} xu), máy phun ngừng` : null);
+function richPlots(s) {
+  const o = new Set();
+  for (const f of fieldsOf(s)) if (f.up?.rich) for (const i of f.plots ?? []) o.add(i);
+  return o;
+}
+const growing = p => { const c = p?.crop; return !!(p?.unlocked && c && !c.dead && !c.rotten && c.progress < 1); };
+// Máy phun: ô có sâu đủ AUTO.sprayMs thì phun, mỗi ô 1 thuốc. Không tính là chăm tay (không đặt q.hand).
+function stepAuto(s, d) {
+  const sp = fieldsOf(s).filter(f => f.up?.spray);
+  if (!sp.length || !elecOn(s)) return;
+  s.water.power += d / HOUR * AUTO.power.spray * sp.length;
+  for (const f of sp) for (const i of f.plots ?? []) {
+    const p = s.plots[i];
+    if (!growing(p) || !p.crop.bugs || s.time - p.crop.bugSince < AUTO.sprayMs) continue;
+    if (have(s, 'pesticide') <= 0) return;
+    take(s, 'pesticide');
+    p.crop.bugs = false;
+    const at = plotCenter(s, i);
+    fxEv(at.x, at.y, 'Máy phun diệt sâu 🧴', COL.good);
+  }
+}
+// 6h sáng: trừ tiền điện đã dùng (phần lẻ dưới 1 xu để dồn sang hôm sau)
+function billPower(s) {
+  const w = s.water;
+  if (!w) return;
+  const cost = Math.floor((w.power || 0) * AUTO.price + 1e-9);
+  if (cost < 1) return;
+  w.power = Math.max(0, w.power - cost / AUTO.price);
+  if (s.coins >= cost) {
+    s.coins -= cost;
+    log(s, `Trả tiền điện ${fmtXu(cost)} xu (máy bơm, máy phun)`);
+    return;
+  }
+  w.bill = (w.bill || 0) + cost;
+  log(s, `Không đủ ${fmtXu(w.bill)} xu trả tiền điện: máy bơm, máy phun ngừng tới khi đủ xu`);
+  toast(`Không đủ xu trả tiền điện, máy bơm và máy phun tạm ngừng ⚡`);
+}
+// Tiền điện còn treo: lúc nào đủ xu thì tự trả, máy chạy lại (không bao giờ trừ thành âm)
+function settlePower(s) {
+  const w = s.water;
+  if (!unpaid(s) || s.coins < w.bill) return;
+  const n = w.bill;
+  s.coins -= n; w.bill = 0;
+  log(s, `Đã trả tiền điện ${fmtXu(n)} xu, máy bơm và máy phun chạy lại`);
+  toast(`Đã trả tiền điện ${fmtXu(n)} xu, máy chạy lại ⚡`);
+}
+// → { owe: xu tiền điện tạm tính tới giờ (trừ lúc 6h), bill: xu chưa trả được (máy đang ngừng), off: lý do máy không có điện | null }
+export function powerInfo(s) {
+  const w = s.water ?? {};
+  return { owe: Math.floor((w.power || 0) * AUTO.price + 1e-9), bill: w.bill || 0, off: powerOut(s) ? 'Bão làm mất điện' : unpaid(s) ? 'Chưa đủ xu trả tiền điện' : null };
+}
+// Trạng thái máy của khối f (để vẽ và cho màn nâng cấp): mỗi máy 'on' (đang chạy) | 'idle' (chờ việc) | 'off' (ngừng) | null (chưa có).
+// why: lý do máy ngừng. rich: có đất màu mỡ.
+export function autoInfo(s, f) {
+  const up = f?.up ?? {}, out = { drip: null, spray: null, rich: !!up.rich, why: {} };
+  const ps = (f?.plots ?? []).map(i => s.plots[i]);
+  if (up.drip) {
+    const why = !tankInfo(s).has ? 'Chưa có bồn chứa' : !waterOn(s, f) ? 'Ngoài tầm nước' : (s.water?.level ?? 0) < 1 ? 'Bồn cạn, tưới nhỏ giọt tạm ngừng' : null;
+    out.drip = why ? 'off' : ps.some(growing) ? 'on' : 'idle';
+    if (why) out.why.drip = why;
+  }
+  if (up.spray) {
+    const why = elecWhy(s) ?? (have(s, 'pesticide') <= 0 ? 'Hết thuốc trừ sâu trong kho, máy phun ngừng' : null);
+    out.spray = why ? 'off' : ps.some(p => growing(p) && p.crop.bugs) ? 'on' : 'idle';
+    if (why) out.why.spray = why;
+  }
+  return out;
+}
+const UP_KINDS = Object.keys(AUTO.ups);
+// Vì sao chưa mua được nâng cấp kind cho khối f (null = mua được)
+function fieldUpWhy(s, f, kind) {
+  const u = AUTO.ups[kind];
+  if (f.up?.[kind]) return no('has', `Khối này đã có ${u.name.toLowerCase()}`);
+  if (kind === 'drip') {
+    if (!s.farm.ents.some(e => e.kind === 'tank')) return no('no_tank', 'Cần xây bồn chứa trước (giếng máy bơm)');
+    if (!waterNet(s).some(n => near(footprint(f), n.ft))) return no('no_water', `Ngoài tầm nước: khối phải trong ${TANK.range} ô quanh bồn hoặc trạm bơm phụ`);
+  }
+  if (s.coins < u.price) return no('coins', 'Chưa đủ xu, cố lên nhé');
+  return null;
+}
+// Bảng nâng cấp của khối id: [{ kind, name, icon, price, desc, has, error?, reason? }]
+export function fieldUpInfo(s, id) {
+  const f = fieldById(s, id);
+  if (!f) return [];
+  return UP_KINDS.map(kind => {
+    const u = AUTO.ups[kind], has = !!f.up?.[kind], why = has ? null : fieldUpWhy(s, f, kind);
+    return { kind, name: u.name, icon: u.icon, price: u.price, desc: u.desc, has, ...(why ? { error: why.msg, reason: why.reason } : {}) };
+  });
+}
+// Số thứ tự khối ruộng (1..) theo thứ tự trong vườn, để gọi tên "Khối ruộng 2"
+export const fieldNo = (s, id) => fieldsOf(s).findIndex(e => e.id === id) + 1;
+// Mua nâng cấp kind ('drip' | 'spray' | 'rich') cho cả khối ruộng id
+export function buyFieldUp(s, id, kind) {
+  if (s.scene && s.scene !== 'farm') return R(false, 'Ra vườn rồi hãy nâng cấp nhé', { reason: 'scene' });
+  const f = fieldById(s, id), u = AUTO.ups[kind];
+  if (!f || !u) return R(false, 'Không có nâng cấp này', { reason: 'missing' });
+  const why = fieldUpWhy(s, f, kind);
+  if (why) return R(false, why.msg, { reason: why.reason });
+  s.coins -= u.price;
+  f.up = { ...fieldUpgrades(), ...f.up, [kind]: true };
+  log(s, `Lắp ${u.name.toLowerCase()} cho khối ruộng ${fieldNo(s, id)} (${fmtXu(u.price)} xu)`);
+  return R(true, `Đã lắp ${u.name.toLowerCase()} cho khối ruộng ${fieldNo(s, id)}`, { kind, sound: 'coin' });
 }
 function finishUpgrade(s) {
   const k = s.smith.tool;
@@ -2807,7 +2930,8 @@ function doorActs(s, t) {
 // ---------- perform ----------
 // Sản lượng một ô: trừ phần khách đã trộm mất (issue 30, `crop.stolen`)
 // Thành thạo cộng thẳng vào sản lượng (đọc cấp lúc thu hoạch)
-const cropYield = (c, s) => Math.round(CROPS[c.id].yield * (c.fert ? 1 + FARMING.fertYield : 1)) + (s ? MASTERY.yield[mastery(s, c.id).lv - 1] : 0);
+// Bón phân +50%, đất màu mỡ (issue 58) +25%, cộng dồn vào hệ số
+const cropYield = (c, s) => Math.round(CROPS[c.id].yield * (1 + (c.fert ? FARMING.fertYield : 0) + (c.rich ? AUTO.richYield : 0))) + (s ? MASTERY.yield[mastery(s, c.id).lv - 1] : 0);
 const harvestQty = (c, s) => Math.max(0, cropYield(c, s) - (c.stolen || 0));
 // Số chỗ giỏ cần để hái ô này: sản lượng + trái khổng lồ (GIANT.slots chỗ) nếu có (issue 53)
 const harvestRoom = (c, s) => harvestQty(c, s) + (c.giant ? GIANT.slots : 0);

@@ -105,7 +105,8 @@ export function fillSave(s) {
   s.water = isObj(s.water) ? s.water : {};
   s.water.level ??= 0;   // lần nước trong bồn (issue 57)
   s.water.pump ??= 0;    // ms bơm dồn tới lần nước kế
-  s.water.power ??= 0;   // số điện máy bơm, trạm bơm phụ đã dùng (issue 58 tính tiền)
+  s.water.power ??= 0;   // số điện máy bơm, trạm bơm phụ, máy phun đã dùng, chưa tính tiền (issue 58 trừ lúc 6h)
+  s.water.bill ??= 0;    // tiền điện chưa trả được vì thiếu xu: máy ngừng tới khi đủ (issue 58)
   for (const e of s.farm?.ents ?? []) {
     if (e.kind === 'well') e.lv ??= 1;
     if (e.kind === 'field') e.up = { ...fieldUpgrades(), ...e.up };

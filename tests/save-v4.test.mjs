@@ -47,7 +47,7 @@ test('mở bản v3 đang chơi dở: thành v4, cây giữ nguyên tiến độ
   assert.equal(wells.length, 1);
   assert.equal(wells[0].lv, 1);
   assert.equal(G.wellLv(s), 1);
-  assert.deepEqual(s.water, { level: 0, pump: 0, power: 0 });
+  assert.deepEqual(s.water, { level: 0, pump: 0, power: 0, bill: 0 });
   const fields = s.farm.ents.filter(e => e.kind === 'field');
   assert.ok(fields.length >= 1);
   for (const f of fields) assert.deepEqual(f.up, UPGRADES);
@@ -147,7 +147,7 @@ test('vườn mới tạo ở v4 có đủ chỗ cho Phase 3', () => {
   assert.deepEqual(Object.keys(s.mastery).sort(), Object.keys(CROPS).sort());
   assert.ok(Object.values(s.mastery).every(m => m.lv === 1 && m.n === 0));
   assert.equal(G.wellLv(s), 1);
-  assert.deepEqual(s.water, { level: 0, pump: 0, power: 0 });
+  assert.deepEqual(s.water, { level: 0, pump: 0, power: 0, bill: 0 });
   for (const f of s.farm.ents.filter(e => e.kind === 'field')) assert.deepEqual(f.up, UPGRADES);
   assert.ok(s.plots.every(p => p.mulch === false));
   // gieo hạt: vụ mới có chỗ theo dõi chất lượng
@@ -159,7 +159,7 @@ test('vườn mới tạo ở v4 có đủ chỗ cho Phase 3', () => {
   delete raw.farm.ents.find(e => e.kind === 'well').lv;
   const m = migrate(raw);
   assert.deepEqual(m.mastery.cai, { lv: 1, n: 0 });
-  assert.deepEqual(m.water, { level: 0, pump: 0, power: 0 });
+  assert.deepEqual(m.water, { level: 0, pump: 0, power: 0, bill: 0 });
   assert.deepEqual(m.plots[0].crop.q, QUALITY);
   assert.equal(m.plots[1].mulch, false);
   assert.equal(G.wellLv(m), 1);

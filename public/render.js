@@ -13,8 +13,9 @@ import { SPR53_OLD } from './art53.js';   // trái khổng lồ (issue 53)
 import { GH, GH_AT } from './art60.js';   // nhà kính (issue 60)
 import { SPR61_OLD } from './art61.js';   // hố ủ phân (issue 61)
 import { sceneMap, footprint } from './farm.js';
-import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, plotSeasonMul, frostHold, glassStatus, tankInfo, waterNet, waterOn } from './state.js';
+import { canMove, marketOpen, dayFraction, actionsFor, nextStrip, dogAsleep as dogNapping, dogQuiet, penUse, penCapOf, penHome, gateOf, isDusk, sickLeft, mmss, dogPost, thiefGear, catsIn, catHouses, seasonGrowMul, plotSeasonMul, frostHold, glassStatus, tankInfo, waterNet, waterOn, autoInfo } from './state.js';
 import { cropStar, compostInfo } from './state.js';
+import { AUTO_ART } from './art58.js';   // tự động hóa khối ruộng (issue 58)
 import { CHUNK_PX, chunkGrid, chunksIn, dirtyChunks } from './perf.js';
 import { CROP_STAGES, DAY_MS, NIGHT_FROM, TRADE, TRICKS, TANK, COMPOST } from './data.js';
 import { SHOWER_ART } from './art59.js';   // vòi sen chuồng cấp 3 (issue 59)
@@ -639,6 +640,18 @@ export function giantImg(p) {
   const c = p.crop;
   return c?.giant && !c.dead && !c.rotten && c.progress >= 1 ? SPR53_OLD.giant?.[c.id] ?? null : null;
 }
+
+// Khối ruộng có nâng cấp (issue 58): Map ô → { f: khối, info: autoInfo } (cùng một object cho cả 9 ô của khối)
+const FIELD_PX = FIELD_SIZE * TS;
+function fieldUps(state) {
+  const out = new Map();
+  for (const f of state.farm?.ents ?? []) {
+    if (f.kind !== 'field' || !f.up || !(f.up.drip || f.up.spray || f.up.rich)) continue;
+    const u = { f, info: autoInfo(state, f) };
+    for (const i of f.plots ?? []) out.set(i, u);
+  }
+  return out;
+}
 // Biểu tượng trong bong bóng của một ô (theo độ ưu tiên)
 export function plotProblem(p) {
   const c = p.crop;
@@ -855,6 +868,7 @@ export function render(ctx, f) {
 
   // 1) đất ruộng
   const nextLocked = wd.nextLocked(state);
+  const ups = farm ? fieldUps(state) : null;   // ô → khối có nâng cấp (issue 58)
   for (const p of state.plots) {
     const pt = m.plotTile(p.idx);
     if (!pt) continue;
@@ -872,6 +886,12 @@ export function render(ctx, f) {
       blit(soilImg(p), px, py);
       if (p.soil === 'tilled' && p.water <= 0 && state.weather === 'drought') blit(WX.crack, px, py);   // hạn hán: đất khô nứt nẻ
       if (p.mulch) blit(WX.mulch, px, py);   // rơm phủ (issue 55)
+      const u = ups?.get(p.idx);
+      if (u && AUTO_ART) {   // đất màu mỡ, ống nhỏ giọt dưới gốc cây (issue 58)
+        if (u.f.up.rich) blit(AUTO_ART.rich, px, py);
+        const st = u.info.drip;
+        if (st) blit(st === 'on' ? AUTO_ART.drip.on[Math.floor(now / 500 + p.idx * 0.37) % 2] : AUTO_ART.drip[st], px, py);
+      }
     }
   }
   // khung chân nhà kính nằm trên đất (vẫn thấy khi mái ẩn); kính vỡ thì có mảnh kính rơi
@@ -898,6 +918,14 @@ export function render(ctx, f) {
   const bub = (x, y, icon, key, tone) => { if (icon) bubbles.push({ x, y, icon, key, tone }); };
 
   for (const t of [...m.trees, ...m.border]) if (vis(t.x, t.y, 30)) add(t.y, () => blit(SPR.tree, t.x - 16, t.y - 44));
+  // máy phun dựng ở góc trên phải khối, biểu tượng nâng cấp ở góc trên trái (issue 58)
+  for (const { f, info } of new Set(ups?.values() ?? [])) {
+    const x = f.c * TS, y = f.r * TS, A = AUTO_ART;
+    if (!A || !vis(x + 24, y + 24, 40)) continue;
+    if (info.spray) add(y + 3, () => blit(info.spray === 'on' ? A.sprayer.on[Math.floor(now / 260) % 2] : A.sprayer[info.spray], x + FIELD_PX - 6, y - 21));
+    const ks = ['drip', 'spray', 'rich'].filter(k => f.up[k]);
+    if (ks.length) add(y + 13, () => ks.forEach((k, i) => blit(A.badge[k], x - 3 + i * 8, y - 5)));
+  }
   for (const b of m.bushes) if (vis(b.x, b.y, 20)) add(b.y, () => blit(SPR.bush, b.x - 8, b.y - 14));
   // bụi, đá chưa dọn trên đất mới mua
   for (const o of m.clutter ?? []) if (vis(o.x, o.y, 20)) add(o.y + TS, () => {
