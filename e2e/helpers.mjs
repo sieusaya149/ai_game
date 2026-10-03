@@ -31,7 +31,7 @@ export function plantedCrop(s, idx, progress) {
 }
 
 // Ghi sẵn bản lưu trước khi trang tải. Chỉ ghi khi chưa có save, nên tải lại không ghi đè.
-// Bản lưu vừa dựng (savedAt trong 20 giây quanh lúc gọi) thì lấy giờ lúc trang tải làm savedAt: máy chậm tải trang quá 3 giây
+// Bản lưu vừa dựng (savedAt trong 20 giây quanh lúc gọi) thì đẩy savedAt về tương lai (loadGame coi là 0 giây vắng): nạp module chậm quá 3 giây
 // thì game tưởng người chơi vắng nhà, chạy bù (xóa kẻ săn mồi, kẹp bệnh) và hiện màn "Trong lúc bạn vắng nhà" chắn đường.
 // Test cố ý lùi savedAt (tua giờ) hay dời về tương lai thì không bị đụng tới.
 export async function seedSave(context, save, opts = {}) {
@@ -39,7 +39,7 @@ export async function seedSave(context, save, opts = {}) {
     try {
       if (localStorage.getItem(key)) return;
       const o = JSON.parse(json);
-      if (o.savedAt >= at - 20_000 && o.savedAt <= at + 1000) o.savedAt = Date.now();
+      if (o.savedAt >= at - 20_000 && o.savedAt <= at + 1000) o.savedAt = Date.now() + 60_000;
       localStorage.setItem(key, JSON.stringify(o));
     } catch {}
   }, [SAVE_KEY, JSON.stringify(save), Date.now()]);
