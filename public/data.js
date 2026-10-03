@@ -210,7 +210,21 @@ export const DOG = {
   guardChance: 0.7,           // chó no & vui đuổi được trộm/quạ
   guardRadius: { non: 0, nho: 4, truong: 6, gia: 4 },   // bán kính phát hiện trộm (ô): chó con chưa canh, chó già mắt kém lại
   guardPostMul: 2,            // đang gác một chỗ (lệnh Canh khu): bán kính ×2 tại chỗ gác
+  // bát ăn cạnh chuồng chó (góp ý người chơi): mỗi lần đổ 1 xương = 1 phần, chó đói dưới bowlHungry thì tự đi tới bát
+  // (mất bowlWalkMs giờ vườn) rồi ăn 1 phần cho no. Chạy bù offline cũng ăn đúng như vậy.
+  bowlMax: 3,
+  bowlHungry: 50,
+  bowlWalkMs: 6000,
 };
+
+// ---------- Màu lông chó, mèo (góp ý người chơi) ----------
+// Chọn lúc nhận nuôi chó (màn tạo nhân vật) / mua mèo, đổi lại ở trạm thú y Cô Út. Thứ tự = thứ tự trên nút chọn.
+// Bảng màu vẽ nằm ở coat.js; mặc định là màu của bộ art gốc (chó Mực đen, mèo mướp vàng).
+export const COATS = {
+  cho: { vang: 'Vàng', den: 'Đen', trang: 'Trắng', dom: 'Đốm' },
+  meo: { muop: 'Mướp', vang: 'Vàng', den: 'Đen', tamthe: 'Tam thể' },
+};
+export const COAT = { price: 20, def: { cho: 'den', meo: 'vang' } };
 
 // ---------- Mèo (issue 44) ----------
 // Mèo sống ở nhà mèo, ra vào tự do qua cửa mèo, tối ngủ trong bản đồ nhà. Không dạy được lệnh, không dơ, không bán.
@@ -606,6 +620,7 @@ export const EVENT_LEVEL = {
   catTrophy: { level: 'info', group: e => 'catTrophy:' + e.id, label: 'Mèo mang chuột tới khoe' },
   catSpat:   { level: 'info', group: () => 'catSpat', label: 'Mèo với chó cãi nhau' },
   catHerd:   { level: 'info', group: () => 'catHerd', label: 'Mèo lùa một con về chuồng' },
+  dogBowl:   { level: 'info', group: () => 'dogBowl', label: 'Chó tự ra bát ăn' },
   shooed:    { level: 'info', group: e => 'shooed:' + e.pred, label: 'Đã đuổi kẻ săn mồi' },
   sickSevere:   { level: 'urgent', group: e => 'sick2:' + e.animal, label: 'Con vật bệnh nặng' },
   sickCritical: { level: 'urgent', group: e => 'sick3:' + e.animal, label: 'Con vật nguy kịch' },

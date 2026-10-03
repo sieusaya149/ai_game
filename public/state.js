@@ -5,7 +5,7 @@ import {
   expandCost, expandLevel, FIELD_LIMITS, FIELD_PRICES, PEN_PRICES, levelInfo, ORDERS, NOTIFY_CATS, ACHIEVEMENTS, itemName, sellPrice, shipValue,
   LAND_STRIP, LAND_STRIPS, DIR_NAME, CLUTTER, CLUTTER_RATE, SPEEDS, GUEST, HELP_JOBS, GIFT,
   LIFE, STAGES, STAGE_NAME, STAGE_CAN, AGING, WEIGHT, stageStart, stageAt, lifeEnd, weightAt, BOND, TRADE, pigKgPrice, BREED, animalPrice, FREE, SICK, VET_ITEMS, PREDATOR,
-  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST,
+  TRICKS, TRICK_BASE, TRAIN, CAT, BUILD_PRICES, CO_UT_QUEST, COATS, COAT,
 } from './data.js';
 import { TS, GROUND, PEN_DEFS, BUILDING_DEFS, FIELD_SIZE, tileHash } from './layout.js';
 import { mapOf, reachable, bumpLayout, footprint, buildMap, sceneMap, hasScene, troughOf } from './farm.js';
@@ -205,7 +205,7 @@ export function pedigree(s, id) {
 const newPlot = (idx, unlocked) => ({ idx, unlocked, soil: 'untilled', water: 0, weeds: false, crop: null });
 
 // ---------- Tạo / lưu / tải ----------
-export function createGame({ name = 'Nông dân', look = {} } = {}) {
+export function createGame({ name = 'Nông dân', look = {}, dogCoat } = {}) {
   const lk = { ...DEFAULT_LOOK, ...look };
   const owned = { hat: HATS.map((h, i) => i).filter(i => HATS[i].price === 0), acc: ACCS.map((h, i) => i).filter(i => ACCS[i].price === 0) };
   if (!owned.hat.includes(lk.hat)) lk.hat = 0;
@@ -228,6 +228,8 @@ export function createGame({ name = 'Nông dân', look = {} } = {}) {
       stage: START.dogStage, age: stageStart('cho', START.dogStage), hunger: 100, happy: 60, x: 0, y: 0, nextPoop: 0, name: DOG.name,
       tricks: {}, trainDay: 0, session: null, cmd: null, herdDay: 0, scene: 'farm',   // dạy lệnh và lệnh đang thi hành (issue 45)
       chained: false, nap: 0, napCheck: 0, quiet: 0, barkAt: 0, barkX: 0, barkY: 0,
+      coat: coatOr('cho', dogCoat),   // màu lông (COATS.cho), chọn lúc nhận nuôi ở màn tạo nhân vật
+      bowl: 0, eatAt: 0,   // bát ăn cạnh chuồng: số phần xương trong bát · lúc chó đi tới bát xong và ăn (giờ vườn, 0 = không đi)
     },
     cats: [],   // mèo (issue 44): thú cưng thứ hai, ở nhà mèo chứ không ở chuồng, tối ngủ trong bản đồ nhà
     poops: [], threats: [], preds: [], orders: [], nextOrderAt: 0,
@@ -331,6 +333,11 @@ export function loadGame(raw) {
   s.today = { ...base.today, ...s.today };
   s.guests = Array.isArray(s.guests) ? s.guests : [];
   s.dog.chained = !!s.dog.chained;
+  // màu lông (góp ý người chơi): bản lưu cũ hay màu hỏng thì về màu của bộ art gốc
+  s.dog.coat = coatOr('cho', s.dog.coat);
+  for (const c of s.cats) c.coat = coatOr('meo', c.coat);
+  s.dog.bowl = clamp(Math.floor(s.dog.bowl) || 0, 0, DOG.bowlMax);   // bát ăn (bản lưu cũ chưa có: trống)
+  s.dog.eatAt = Number.isFinite(s.dog.eatAt) ? s.dog.eatAt : 0;
   s.coUtQuest ??= null;   // bản lưu cũ chưa có nhiệm vụ làm quen của Cô Út (issue 48)
   // trộm NPC (issue 46): bản lưu cũ chưa có thì bắt đầu từ con số không
   s.teoCaught = Math.max(0, Math.floor(s.teoCaught) || 0);
@@ -395,6 +402,7 @@ export function awaySummary(events, frozenMs = 0) {
   if (stolenEggs) out.push(`Tí Sún đã lấy trộm ${stolenEggs} quả trứng`);
   const guard = n('guard');
   if (guard) out.push(`Chó đã đuổi quạ và trộm ${guard} lần`);
+  if (n('dogBowl')) out.push(`Chó đã tự ra bát ăn ${n('dogBowl')} bữa`);
   const coins = events.reduce((a, e) => a + (e.type === 'shipped' ? e.coins : 0), 0);
   if (coins) out.push(`Lái buôn trả ${coins} xu`);
   // thành tựu mở trong lúc chạy bù (vd chó đuổi đủ 20 kẻ trộm lúc chủ vắng, issue 32): không có huy hiệu nên ghi vào đây
@@ -1205,6 +1213,7 @@ function stepDog(s, d) {
     if (st === 'truong') { toast(`${g.name} đã lớn thành chó canh nhà 🐕`); log(s, `${g.name} đã trưởng thành`); }
     if (st === 'gia') { toast(`${g.name} già rồi, ngủ nhiều và nhìn xa kém hơn 👴`); log(s, `${g.name} đã già, canh trộm không còn thính như xưa`); }
   }
+  stepBowl(s);
   stepHerd(s);
   autoHerd(s);
   if (s.time >= g.nextPoop) {
@@ -1220,6 +1229,19 @@ function stepDog(s, d) {
     g.napCheck = s.time + GUARD.napEvery;
     if (Math.random() < GUARD.napRate) g.nap = s.time + GUARD.napMs;
   }
+}
+
+// Bát ăn cạnh chuồng: chó ở vườn mà đói thì đi tới bát (DOG.bowlWalkMs), tới nơi ăn 1 phần cho no.
+// Chỉ theo giờ vườn nên chạy bù ra cùng kết quả; world.js chỉ diễn cảnh chó đi tới bát lúc eatAt đang chờ.
+function stepBowl(s) {
+  const g = s.dog;
+  if ((g.scene ?? 'farm') !== 'farm' || !(g.bowl > 0)) { g.eatAt = 0; return; }
+  if (!g.eatAt) { if (g.hunger < DOG.bowlHungry) g.eatAt = s.time + DOG.bowlWalkMs; return; }
+  if (s.time < g.eatAt) return;
+  g.eatAt = 0; g.bowl--; g.hunger = 100;
+  emit({ type: 'dogBowl' });
+  const b = mapOf(s).dogBowl;
+  if (b) fxEv(b.x, b.y - 8, 'Măm măm 🦴', COL.good);
 }
 
 const guardOn = s => (s.dog.stage === 'truong' || s.dog.stage === 'gia') && s.dog.hunger > 40 && s.dog.happy > 50;
@@ -1800,24 +1822,25 @@ function mkCat(s, stage = 'non', extra = {}) {
     sick: 0, sickSince: 0, sickMs: 0, dose: 0, vaccUntil: 0,
     bond: 2, bondXp: 0,
     scene: 'farm', sleep: false, sun: false, x: h.x, y: h.y, tx: h.x, ty: h.y, tile: null, tileAt: 0, inAt: 0,
-    huntAt: s.time + CAT.huntEvery, trophy: null, spatUntil: 0,
+    huntAt: s.time + CAT.huntEvery, trophy: null, spatUntil: 0, coat: COAT.def.meo,
     ...extra,
   };
   (s.cats ??= []).push(c);
   return c;
 }
-// Mua mèo ở chợ Bà Tư: phải có nhà mèo trước, và nhà mèo còn chỗ
-export function buyCat(s, sex = 'm') {
+// Mua mèo ở chợ Bà Tư: phải có nhà mèo trước, và nhà mèo còn chỗ. coat = màu lông (COATS.meo)
+export function buyCat(s, sex = 'm', coat = COAT.def.meo) {
   if (!marketOpen(s)) return closed();
   const def = ANIMALS.meo;
   if (level(s) < def.lv) return R(false, `Cần cấp ${def.lv} mới mua được`, { reason: 'level' });
   if (!catHouses(s).length) return R(false, 'Bạn chưa có nhà mèo, xây một cái trước nhé', { reason: 'no_pen' });
   if (cats(s).length >= catCap(s)) return R(false, 'Nhà mèo chật rồi, nâng cấp hoặc xây thêm nhé', { reason: 'full' });
   if (sex !== 'm' && sex !== 'f') return R(false, 'Chọn đực hay cái nhé', { reason: 'sex' });
+  if (!COATS.meo[coat]) return R(false, 'Chọn màu lông cho mèo nhé', { reason: 'coat' });
   const price = animalPrice('meo', sex);
   if (s.coins < price) return R(false, 'Chưa đủ xu, cố lên nhé', { reason: 'coins' });
   s.coins -= price;
-  mkCat(s, 'non', { sex });
+  mkCat(s, 'non', { sex, coat });
   log(s, `Mang một ${def.baby.toLowerCase()} ở chợ Bà Tư về nuôi`);
   return R(true, `Đã mua ${def.baby.toLowerCase()} ${sex === 'm' ? 'đực' : 'cái'}`, { price });
 }
@@ -1825,6 +1848,22 @@ export function buyCat(s, sex = 'm') {
 const catGuards = s => cats(s).some(c => !c.sick && (c.stage === 'truong' || c.stage === 'gia') && c.hunger >= CAT.guardMinHunger);
 // Số chuột con mèo này đã bắt từ trước tới giờ
 export const catCatches = c => c?.caught ?? 0;
+// ---------- Màu lông chó, mèo (góp ý người chơi) ----------
+// Màu hợp lệ của loài sp ('cho' | 'meo'), không thì màu mặc định (màu của bộ art gốc)
+const coatOr = (sp, coat) => (Object.hasOwn(COATS[sp], coat ?? '') ? coat : COAT.def[sp]);
+// Đổi màu lông ở trạm thú y Cô Út (mở cùng giờ chợ): who = 'dog' hoặc id con mèo. Tốn COAT.price xu.
+export function setCoat(s, who, coat) {
+  const a = who === 'dog' ? s.dog : catOf(s, who), sp = who === 'dog' ? 'cho' : 'meo';
+  if (!a) return R(false, 'Không thấy con vật này', { reason: 'missing' });
+  if (!marketOpen(s)) return R(false, 'Cô Út nghỉ rồi, sáng mai quay lại nhé', { reason: 'closed' });
+  if (!Object.hasOwn(COATS[sp], coat ?? '')) return R(false, 'Không có màu lông này', { reason: 'coat' });
+  if (coatOr(sp, a.coat) === coat) return R(false, `${a.name} đang lông ${COATS[sp][coat].toLowerCase()} rồi`, { reason: 'same' });
+  if (s.coins < COAT.price) return R(false, 'Chưa đủ xu, cố lên nhé', { reason: 'coins' });
+  s.coins -= COAT.price;
+  a.coat = coat;
+  log(s, `Cô Út tỉa lông, nhuộm cho ${a.name} thành màu ${COATS[sp][coat].toLowerCase()}`);
+  return R(true, `${a.name} giờ lông ${COATS[sp][coat].toLowerCase()} rồi (-${COAT.price} xu)`, { price: COAT.price });
+}
 // Hệ số săn của con mèo này lúc này: 0 = không săn (mèo con, đang bệnh, no quá nên lười, mèo già chưa đói)
 function catHuntMul(c) {
   if (c.sick || c.stage === 'non') return 0;
@@ -2132,7 +2171,7 @@ export function actionsFor(s, t) {
   if (!t) return [];
   if (s.scene === 'visit') return guestActs(s, t);
   const f = { plot: (s, t) => withTools(s, t, plotActs(s, t)),lockedPlot: lockedActs, animal: animalActs, egg: eggActs,
-    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, gate: gateActs, scale: () => [mk('weigh', '⚖️', 'Cân heo xem số ký')], nest: nestActs, dog: dogActs, cat: catActs, threat: threatActs, pred: predActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
+    poop: () => [mk('scoop', '💩', 'Xúc phân')], trough: troughActs, gate: gateActs, scale: () => [mk('weigh', '⚖️', 'Cân heo xem số ký')], nest: nestActs, dog: dogActs, bowl: bowlActs, cat: catActs, threat: threatActs, pred: predActs, building: buildingActs, door: doorActs, deco: decoActs, clutter: clutterActs, strip: stripActs }[t.kind];
   return f ? f(s, t) : [];
 }
 
@@ -2239,6 +2278,13 @@ function dogActs(s) {
   if (g.cmd) out.push(mk('cmd_stop', '✋', `Cho ${g.name} nghỉ`));
   for (const t of list) if (t.done && !t.auto) out.push(mk('cmd_' + t.id, t.icon, `Lệnh: ${t.name}`));
   return out;
+}
+
+// Bát ăn cạnh chuồng chó: đổ 1 xương = 1 phần; nhãn nút cho biết bát còn bao nhiêu
+const bowlText = g => (g.bowl > 0 ? `bát còn ${g.bowl}/${DOG.bowlMax} phần` : 'bát đang trống');
+function bowlActs(s) {
+  const g = s.dog, n = have(s, 'dogfood');
+  return [mk('fill', '🦴', `Đổ xương vào bát (${bowlText(g)}, còn ${n} xương)`, g.bowl >= DOG.bowlMax ? 'Bát đầy rồi' : n <= 0 ? noItem('dogfood') : null)];
 }
 
 // Mèo (issue 44): không dạy được lệnh nên không có nút dạy/ra lệnh, không dơ nên không có nút tắm.
@@ -2388,6 +2434,7 @@ function posOf(s, t) {
   if (t.kind === 'deco') return m.decos.find(d => d.id === t.id) ?? s.player;
   if (t.kind === 'clutter') { const e = s.farm.ents.find(x => x.id === t.id); return e ? { x: e.c * TS + 8, y: e.r * TS + 8 } : s.player; }
   if (t.kind === 'dog') return s.dog;
+  if (t.kind === 'bowl') return m.dogBowl ?? s.player;
   const list = { animal: s.animals, egg: s.eggs, poop: s.poops, threat: s.threats, pred: s.preds, cat: s.cats }[t.kind];
   return list?.find(x => x.id === t.id) ?? s.player;
 }
@@ -2572,6 +2619,11 @@ const DO = {
     return res(true, 'Đã đặt trứng vào ổ ấp', [say(at, 'Ấp nào! 🥚')], 'pop');
   },
 
+  bowl(s, t, id, at) {
+    const g = s.dog;
+    take(s, 'dogfood'); g.bowl = Math.min(DOG.bowlMax, (g.bowl || 0) + 1);
+    return res(true, `Đã đổ xương vào bát (${g.bowl}/${DOG.bowlMax}), ${g.name} đói sẽ tự ra ăn`, [say(at, '🦴')], 'pop');
+  },
   dog(s, t, id, at) {
     const g = s.dog;
     if (id === 'feed') { take(s, 'dogfood'); g.hunger = 100; return res(true, `${g.name} ăn ngon lành`, [say(at, 'Gâu gâu! 🦴')], 'bark'); }
@@ -2853,6 +2905,7 @@ function guestActs(s, t) {
     if (b?.id === 'gate' || GATE_BOXES.includes(b?.id)) return buildingActs(s, t);
     return b?.guest ? buildingActs(s, t).map(a => ({ ...a, disabled: b.guest })) : [];
   }
+  if (t.kind === 'bowl') return [mk('fill', '🦴', `Bát ăn của ${s.dog.name}: ${bowlText(s.dog)}`, 'Bát của chủ vườn, khách cho chó ăn tận miệng nhé')];
   if (t.kind === 'dog') return [mk('pet', '🤗', `Vuốt ve ${s.dog.name}`, why('pet')), mk('feed', '🦴', `Cho ${s.dog.name} ăn (giỏ còn ${s.basket.dogfood || 0})`, why('feed')),
     mk('sausage', 'sausage', `Ném xúc xích cho ${s.dog.name} (còn ${haveItem(s, 'sausage')})`, why('sausage'))];
   return [];
@@ -3225,8 +3278,8 @@ export function buy(s, itemId, qty = 1) {
 }
 
 // sex: 'm' đực (giá gốc) | 'f' cái (đắt hơn BREED.femaleMul). Không nói thì mua con đực.
-export function buyAnimal(s, type, sex = 'm') {
-  if (type === 'meo') return buyCat(s, sex);   // mèo không ở chuồng có rào: luật riêng ở buyCat
+export function buyAnimal(s, type, sex = 'm', coat) {
+  if (type === 'meo') return buyCat(s, sex, coat);   // mèo không ở chuồng có rào: luật riêng ở buyCat
   if (!marketOpen(s)) return closed();
   const def = ANIMALS[type];
   if (!def) return R(false, 'Không có con này');

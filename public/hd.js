@@ -8,7 +8,7 @@ import { SPR3 } from './art3.js';
 import { SPR4 } from './art4.js';
 import { characterHD } from './art5.js';
 
-const FILES = [6, 7, 8, 9, 10, 11, 12, 13];
+const FILES = [6, 7, 8, 9, 10, 11, 12, 13, 14];
 const OLD = [SPR, SPR2, SPR3, SPR4];
 const MAP = new WeakMap();
 const stats = { files: [], linked: 0, bad: [] };

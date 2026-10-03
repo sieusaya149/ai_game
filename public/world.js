@@ -289,6 +289,14 @@ function updateDog(state, w, dt0, out) {
     return false;
   };
   if (guardStep(state, w, rt, dt, goTo, out)) return;   // canh khách lạ: sủa rồi đuổi
+  // đói và bát có thức ăn (luật đặt eatAt): đi tới bát, tới nơi thì cúi đầu ăn tới lúc luật cho ăn xong
+  const bw = atFarm() && d.eatAt && M.dogBowl;
+  if (bw) {
+    rt.pose = null; rt.nap = false; rt.mode = 'idle'; rt.timer = rnd(1, 2);
+    if (goTo(bw.x - 9, bw.y + 1, 46) || (rt.stuck > 0.6 && dist(d, bw) < 24)) { rt.face = 'right'; rt.pose = 'eat'; rt.anim += dt; }
+    else if (rt.stuck > 1.5) { d.x = bw.x - 9; d.y = bw.y + 1; }   // kẹt đường: tới thẳng bát
+    return;
+  }
   // đang có lệnh (issue 45): luật đã quyết kết quả, đây chỉ là diễn hoạt
   const cmd = d.cmd?.id;
   rt.pose = rt.barkT ? 'bark' : null;
@@ -539,6 +547,7 @@ export function targetPos(state, t) {
     case 'threat': return findBy(state.threats, t.id);
     case 'pred': return findBy(state.preds, t.id);
     case 'dog': return state.dog;
+    case 'bowl': return M.dogBowl;
     case 'cat': return findBy(state.cats, t.id);
     case 'trough': return troughAnchor(t);
     case 'gate': return ST.gateOf(state, t.id);
@@ -564,7 +573,7 @@ export function exists(state, t) {
 }
 // Đồ đặt trong vườn chạm vào được (ngồi ghế đá, đặt hoa lên mộ)
 const TAPPABLE_DECO = new Set(['deco_bench', 'grave', 'grave_flower', 'deco_rattrap']);
-const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, pred: 26, dog: 20, cat: 20, trough: 22, gate: 24, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
+const RANGE = { animal: 20, egg: 20, poop: 20, threat: 20, pred: 26, dog: 20, bowl: 20, cat: 20, trough: 22, gate: 24, scale: 22, nest: 22, building: 22, door: 22, deco: 22, clutter: 24, strip: 18 };
 // Khoảng cách tới target nếu trong tầm, ngược lại Infinity
 export function rangeDist(state, t) {
   use(state);
@@ -578,7 +587,8 @@ export function rangeDist(state, t) {
   return d <= RANGE[t.kind] ? d : Infinity;
 }
 export const inRange = (state, t) => rangeDist(state, t) < Infinity;
-const BIAS = { threat: 10, pred: 12, poop: 3, egg: 3, animal: 2, dog: 2, cat: 2, lockedPlot: -2 };
+// bát ăn nằm ngay chỗ chó hay nằm: đứng cạnh chó thì chó được chọn trước, muốn đổ bát thì chạm vào bát
+const BIAS = { threat: 10, pred: 12, poop: 3, egg: 3, animal: 2, dog: 2, cat: 2, lockedPlot: -2, bowl: -10 };
 // Kẻ săn mồi chỉ được ưu tiên khi đang trong khoảng cảnh báo (sắp ra tay). Con chuột lang thang ngang qua
 // không được giành mất ô ruộng, quả trứng hay cái máng ngay dưới chân người chơi.
 function biasOf(state, t) {
@@ -619,6 +629,7 @@ export function findTarget(state, w) {
     for (const dir of ['N', 'S', 'E', 'W']) consider({ kind: 'strip', dir });
   }
   if (dogHere(state)) consider({ kind: 'dog' });
+  if (atFarm() && M.dogBowl) consider({ kind: 'bowl' });
   for (const c of catsHere(state)) consider({ kind: 'cat', id: c.id });
   for (const { pen, id } of M.troughs) consider({ kind: 'trough', pen, id });
   for (const p of M.penList) if (p.scale) consider({ kind: 'scale', pen: p.type, id: p.id });
@@ -641,6 +652,7 @@ export function nameOf(state, t) {
     case 'threat': return THREAT_NAME[findBy(state.threats, t.id)?.kind] ?? 'Con quạ';
     case 'pred': { const p = findBy(state.preds, t.id); return p ? 'Con ' + ST.PRED_NAME[p.kind].toLowerCase() : ''; }
     case 'dog': return state.dog.name || DOG.name;
+    case 'bowl': { const n = state.dog.bowl || 0; return `Bát ăn của ${state.dog.name || DOG.name} · ${n ? `còn ${n}/${DOG.bowlMax} phần` : 'trống'}`; }
     case 'cat': { const c = findBy(state.cats, t.id); return c ? `${ST.animalLabel(c)} ${'❤️'.repeat(c.bond || 1)}\n🐀 Đã bắt ${ST.catCatches(c)} con chuột` : 'Mèo'; }
     case 'trough': return `Máng ăn (${(M.penById[t.id] ?? M.pens[t.pen]).name})`;
     case 'gate': { const h = ST.penHome(state, t.id); return `Cửa ${M.penById[t.id]?.name?.toLowerCase() ?? 'chuồng'} (${h.home}/${h.total} đã về)`; }
@@ -669,6 +681,7 @@ export function anchorOf(state, t) {
     case 'threat': { const th = pos; return isBeast(th) ? { x: th.x, top: th.y - 16 } : { x: th.x, top: th.y - 26 }; }
     case 'pred': { const p = findBy(state.preds, t.id); return { x: pos.x, top: pos.y - (p?.kind === 'rat' ? 9 : p?.kind === 'weasel' ? 11 : 15) }; }
     case 'trough': return { x: pos.x, top: pos.y - 12 };
+    case 'bowl': return { x: pos.x, top: pos.y - 9 };
     case 'gate': return { x: pos.x, top: pos.y - 16 };
     case 'scale': return { x: pos.x, top: pos.y - 24 };
     case 'nest': return { x: pos.x, top: pos.y - 14 };
@@ -722,6 +735,8 @@ export function hitTest(state, wx, wy) {
     const dog = state.dog, di = dogImg(dog, 'left', 0);
     if (di && dog.x != null && hitRect(dog.x - di.width / 2, dog.y - di.height, di.width, di.height, wx, wy)) return { kind: 'dog' };
   }
+  const bw = atFarm() && M.dogBowl;   // bát ăn nhỏ: chừa rộng một chút cho dễ chạm
+  if (bw && hitRect(bw.x - 6, bw.y - 8, 12, 8, wx, wy)) return { kind: 'bowl' };
   for (const d of M.decos) if (TAPPABLE_DECO.has(d.kind)) { const z = decoSize(d.kind); if (hitRect(d.x - z.w / 2, d.y - z.h, z.w, z.h, wx, wy)) return { kind: 'deco', id: d.id }; }
   if (atFarm()) for (const p of M.penList) { const g = gateOn(state, p.id) && ST.gateOf(state, p.id); if (g && hitRect(g.x - 14, g.y - 16, 28, 22, wx, wy)) return { kind: 'gate', id: p.id }; }
   for (const p of M.penList) if (p.scale && hitRect(p.scale.x - 8, p.scale.y - 14, 16, 16, wx, wy)) return { kind: 'scale', pen: p.type, id: p.id };

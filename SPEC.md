@@ -108,9 +108,10 @@ state = {
   dog: { stage, age, hunger, happy, x, y, nextPoop, name,     // stage/age như con vật, theo LIFE.cho
          tricks: { <lệnh>: số buổi đã đạt }, trainDay, session,   // dạy lệnh (issue 45); session = buổi đang mở
          cmd: null | { id, spot?, until?, list? }, herdDay, scene,   // lệnh đang thi hành · ngày đã tự lùa · bản đồ chó đang đứng
-         chained, nap, napCheck, quiet, barkAt, barkX, barkY },   // issue 31: xích · ngủ gật ban đêm (giờ vườn) · mải ăn xúc xích tới (giờ ngoài đời) · lần sủa gần nhất
+         chained, nap, napCheck, quiet, barkAt, barkX, barkY,   // issue 31: xích · ngủ gật ban đêm (giờ vườn) · mải ăn xúc xích tới (giờ ngoài đời) · lần sủa gần nhất
+         coat, bowl, eatAt },   // màu lông (COATS.cho, mặc định 'den') · số phần xương trong bát 0..DOG.bowlMax · lúc chó tới bát ăn (giờ vườn, 0 = không)
   cats: [ { id, type: 'meo', name, sex, pet: true, stage, age, hunger, happy, sick, sickSince, sickMs, dose, vaccUntil, bond, bondXp,   // mèo (issue 44)
-          scene: 'farm'|'house', sleep, sun, x, y, tx, ty, tile, tileAt, inAt, huntAt, trophy: null | { until }, spatUntil } ],
+          scene: 'farm'|'house', sleep, sun, x, y, tx, ty, tile, tileAt, inAt, huntAt, trophy: null | { until }, spatUntil, coat } ],   // coat: màu lông (COATS.meo, mặc định 'vang')
   poops: [ { id, x, y, at } ],
   threats: [ { id, kind: 'crow'|'thief'|'tisun'|'civet', plot, at?, target?, x, y, arriveAt, state: 'coming'|'eating'|'leaving', since, loot? } ],
                                               // quạ/Tèo nhắm ô ruộng `plot`; Tí Sún và chồn hương nhắm điểm `at` (chồn hương kèm `target` = id con vật)
@@ -209,7 +210,7 @@ Mối liên hệ vị trí: ô ruộng `idx` có thể có `removed: true` (kh�
 
 ### Vòng đời bản lưu
 ```js
-createGame({ name, look })        // → state v3 mới theo START + START_FARM; gà mái trưởng thành + gà trống con trong chuồng gà, chó con
+createGame({ name, look, dogCoat }) // → state v3 mới theo START + START_FARM; gà mái trưởng thành + gà trống con trong chuồng gà, chó con màu lông dogCoat (lạ / thiếu: 'den')
 loadGame(raw?)                    // → state | null. Không truyền: đọc v3 trong localStorage, chưa có thì v2, rồi v1, và migrate.
                                   // Truyền raw (bản lưu đã parse, vd vườn online từ server): đọc bản đó, không đụng localStorage.
                                   // Bù trường thiếu, tự chạy bù (≤ 8 giờ), đặt frozenMs/away
@@ -369,6 +370,16 @@ outOfPen(s)                       // → [animal] các con đang ngoài chuồng
 - **Giao diện:** hành động trên chó có `train` (mở bảng `dog`), `cmd_<lệnh>` cho từng lệnh đã thuộc, `cmd_stop` khi đang có lệnh. `cmd_guard` trả `pickSpot: 'guard'` — `main.js` chờ chạm một ô rồi gọi `commandDog(s, 'guard', { c, r })`. Bảng `PANELS.dog` (ui.js) liệt kê 6 lệnh và chạy minigame `showTrain(trickId)` (thanh `#train-bar` có vạch `#train-zone`, kim `#train-mark`, nút `#train-hit`).
 - **Pixel art (art3.js):** `SPR3.dogSitBy/dogBegBy/dogHerdBy/dogBarkBy[giai đoạn]` (mỗi giai đoạn một bộ riêng), `SPR3.dogRunBy[giai đoạn]` (dáng chạy đuổi khách của issue 31, 3 khung, mỗi giai đoạn một bộ riêng), `trainBar`, `praise`, `trickIcon` (6 lệnh), `cmdBubble`, `guardPost`, `sniffMark`, `items.treat`. `render.dogPoseImg(dog, pose, face, frame)` chọn dáng theo `world` `rt.pose` (`sit|beg|herd|bark`).
 
+### Màu lông chó, mèo và bát ăn của chó (góp ý người chơi, bản live Phase 1+2)
+```js
+setCoat(state, who, coat)  // who = 'dog' | id con mèo. Ở trạm thú y Cô Út (giờ chợ), tốn COAT.price xu → { ok, msg, price }
+                           //   reason 'missing' | 'closed' | 'coat' (màu không có ở loài này) | 'same' | 'coins'
+```
+- **Màu lông:** `COATS.cho` = vang, den, trang, dom; `COATS.meo` = muop, vang, den, tamthe; `COAT.def` = { cho: 'den', meo: 'vang' } (màu của art gốc). Chó chọn ở màn tạo nhân vật (`api.newGame({ name, look, dogCoat })`), mèo chọn lúc mua ở chợ, đổi lại ở bảng trạm thú y Cô Út (mục "Tỉa lông, đổi màu lông"). `loadGame` bù màu thiếu / lạ về mặc định (không đổi phiên bản bản lưu). Màu nằm trong bản lưu nên khách thăm vườn thấy đúng màu (seam 3: `tests/server-pet.test.mjs`).
+- **Vẽ:** `coat.js` `recolor(img, sp, coat, k)` dựng mọi khung, mọi giai đoạn, mọi dáng từ chính sprite gốc (bộ cũ k = 1, bộ 2x k = 2): mỗi điểm ảnh lông nằm trên dải 4 sắc của bộ gốc được đổi sang dải màu mới đúng vị trí đó; dáng già (phai) và dáng bệnh (nhuốm xanh) nhận ra và dựng lại bằng đúng phép đó. Đốm và tam thể chọn dải theo trường nhiễu cố định tính trên lưới bộ cũ (bản 2x trùng mảng, mép mịn hơn). `render.dogImg / dogPoseImg / catImg` đọc `dog.coat` / `c.coat`, ảnh dẫn xuất nối bản 2x như mọi ảnh dẫn xuất khác.
+- **Bát ăn:** `mapOf(s).dogBowl` (điểm chân, `BUILDING_DEFS.doghouse.bowl`, đi theo chuồng chó). Target `{ kind: 'bowl' }`, hành động `fill` ("Đổ xương vào bát"): lấy 1 `dogfood`, `dog.bowl + 1` tới `DOG.bowlMax`; tên target "Bát ăn của Mực · trống / còn n/3 phần". Mỗi bước, chó ở vườn, bát còn phần mà `hunger < DOG.bowlHungry` thì `eatAt = time + DOG.bowlWalkMs`; tới lúc đó ăn 1 phần (`hunger = 100`, event `dogBowl` mức info, tóm tắt vắng nhà "Chó đã tự ra bát ăn n bữa"). Chó đi theo ra làng / vào nhà thì hoãn. Cùng luật chạy ở trình duyệt, chạy bù `loadGame` và chạy bù ở server. `world.js` chỉ diễn: lúc `eatAt` đang chờ chó đi tới cạnh bát, tới nơi cúi đầu ăn (`dogPoseImg(dog, 'eat', ...)`, khung đứng có phần đầu dịch xuống 1 điểm). Cho ăn tận miệng (`feed` trên chó) vẫn giữ như cũ. Khách thăm vườn: `fill` luôn `disabled`, nhãn cho biết bát còn bao nhiêu.
+- **Art:** `SPR3.dogBowl.{empty,full}` 10x7 (art3, vẽ bằng `art14.dogBowl`), `SPR14.dogBowl` 20x14 bản 2x (hd.js nối, `FILES` có 14).
+
 ### Kẻ săn mồi: chuột, diều hâu, chồn (issue 43, ADR 0004 + 0013)
 ```js
 preds(state)             // → state.preds: [{ id, kind: 'rat'|'hawk'|'weasel', state: 'hunt'|'leaving', strikeAt, x, y, tx, ty, tile?, target? }]
@@ -395,7 +406,7 @@ catOf(state, id)         // → con mèo theo id | null
 catsIn(state, scene)     // → mèo đang ở bản đồ 'farm' (ban ngày) hay 'house' (ban đêm)
 catTrophies(state)       // → mèo đang ngậm chuột tới khoe (c.trophy)
 catHouses(state) · catCap(state)   // → các nhà mèo đã xây · tổng chỗ (PEN_TABLE.cathouse.cap theo cấp)
-buyCat(state, sex)       // mua ở chợ Bà Tư: reason 'closed' | 'level' | 'no_pen' (chưa có nhà mèo) | 'full' | 'sex' | 'coins'; buyAnimal(s, 'meo', sex) gọi vào đây
+buyCat(state, sex, coat = 'vang')   // mua ở chợ Bà Tư: reason 'closed' | 'level' | 'no_pen' (chưa có nhà mèo) | 'full' | 'sex' | 'coat' | 'coins'; buyAnimal(s, 'meo', sex, coat) gọi vào đây
 catHunting(state, c)     // → mèo này đang chịu săn không (ngoài vườn, thức, đói vừa phải)
 catHerd(state, id)       // lùa 1 con ngoài chuồng gần mèo nhất; reason 'stage' | 'mood' (happy < CAT.herdHappy) | 'none'
 praiseCat(state, id)     // khen mèo đang khoe chuột: +happy, +độ thân, trophy = null; reason 'none' khi chưa có gì để khoe
@@ -725,6 +736,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
 { kind: 'gate', id }           // cửa chuồng (id thực thể chuồng); chỉ là target từ chạng vạng (isDusk), cho rải thóc và xem số con đã về
 { kind: 'nest' }
 { kind: 'dog' }           // chó Mực: ở vườn, hay bất cứ bản đồ nào khi đang có lệnh Đi theo
+{ kind: 'bowl' }               // bát ăn của chó cạnh chuồng chó (vườn mình và vườn đang thăm)
 { kind: 'threat', id }
 { kind: 'pred', id }           // chuột, diều hâu, chồn: chạm để đuổi (issue 43)
 { kind: 'cat', id }            // mèo (issue 44): ở vườn ban ngày, trong nhà ban đêm
@@ -739,7 +751,7 @@ Loại việc của `todoList`: `crow`, `thief`, `tisun`, `civet`, `pred` (kẻ 
                                //   Nhà: bed, wardrobe, phone (gọi bác sĩ thú y), (stove, table, plant chỉ để ngắm). Làng: market (Bà Tư), smithy (Ông Sáu),
                                //   vet (trạm thú y Cô Út), houseC (nhà Chú Ba, lái buôn mua vật nuôi đứng trước nhà), friendGate, homeGate, bench0.., (nhà dân, đèn đường để ngắm)
 ```
-Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
+Hành động theo target (id của `actionsFor`): ô ruộng `till plant water weed spray catch fertilize growth harvest clear`; ô khóa `expand`; vật nuôi `collect/milk/shear feed pet bath medicine vaccinate isolate/unisolate vitamin rename sell retire/unretire` (`sell`, `retire` hỏi xác nhận ở `main.js` trước khi gọi `perform`); trứng `collect candle`; phân `scoop` (và `slip` do WORLD gọi); máng `fill muck vaccinatePen` (và `upgrade` nâng cấp chuồng); cân `weigh`; cửa chuồng `scatter` (rải thóc gọi về); ổ ấp `incubate`; chó `feed pet chain train cmd_<lệnh> cmd_stop`; bát ăn `fill`; mèo `praise feed pet medicine vaccinate herd rename`; quạ/trộm `shoo catch`; chuột/diều hâu/chồn `shoo`; bẫy chuột (`deco`) `arm`; `clutter` `clear`; `strip` `buy`; `door` `go`; công trình `open enter talk sleep sit refill`.
 
 ### Danh sách event trả về từ `tick()` (`EVENT_LEVEL`)
 
@@ -768,6 +780,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `catTrophy` | `id` | info — mèo ngậm chuột tới khoe người chơi |
 | `catSpat` | `id` | info — mèo với chó cãi nhau (vui thôi) |
 | `catHerd` | `id`, `animal` | info — mèo lùa một con về chuồng |
+| `dogBowl` | — | info — chó tự ra bát ăn 1 phần (tóm tắt vắng nhà đếm số bữa) |
 | `shooed` | `pred`, `id` | info — đã đuổi được kẻ săn mồi |
 | `ripe` | `crop` | important (`ripe`) |
 | `rotten`, `dead` | `crop` | important (`spoil`) |
@@ -799,7 +812,7 @@ Hành động theo target (id của `actionsFor`): ô ruộng `till plant water 
 | `sound` | `name` | none |
 | `spawn` | `what` ('chick'/'piglet'/'egg'/'poop'/'crow'/'thief'/'tisun'/'civet'/'angel'/'rat'/'hawk'/'weasel'), `x`, `y` | none |
 
-**Khóa gộp của sự kiện vật nuôi** (`EVENT_LEVEL[type].group(e)`, cùng khóa trong `NOTIFY_WINDOW` thì gộp thành một toast "N con ..."): theo loài `sick:<loài>`, `sick2:<loài>` (sickSevere), `sick3:<loài>` (sickCritical), `died:<loài>`, `passed:<loài>`, `oldSoon:<loài>`, `stray:<loài>`, `cured:<loài>`, `born:<loại>`; theo con `pred:<id>` (predator), `hurt:<id>`, `catTrophy:<id>`, `bathed:<id>`, `vaccinated:<id>`, `grave:<id>`, `wallow:<id>`; theo chuồng `mucked:<pen>`; theo kẻ săn mồi `taken:<pred>`, `shooed:<pred>`; một khóa chung `ratFeed`, `ratEgg`, `trapped`, `catRat`, `catSpat`, `catHerd`, `dogHerd`, `cockcrow`; trộm NPC `loss:tisun`, `loss:civet`; chó `trick:<lệnh>`, `guard:<kẻ bị đuổi>`. Loại tắt/bật được trong cài đặt là `cat` của từng dòng (`NOTIFY_CATS`: thêm `old`, `stray`, `ill`, `pest`, `birth` ở Phase 2).
+**Khóa gộp của sự kiện vật nuôi** (`EVENT_LEVEL[type].group(e)`, cùng khóa trong `NOTIFY_WINDOW` thì gộp thành một toast "N con ..."): theo loài `sick:<loài>`, `sick2:<loài>` (sickSevere), `sick3:<loài>` (sickCritical), `died:<loài>`, `passed:<loài>`, `oldSoon:<loài>`, `stray:<loài>`, `cured:<loài>`, `born:<loại>`; theo con `pred:<id>` (predator), `hurt:<id>`, `catTrophy:<id>`, `bathed:<id>`, `vaccinated:<id>`, `grave:<id>`, `wallow:<id>`; theo chuồng `mucked:<pen>`; theo kẻ săn mồi `taken:<pred>`, `shooed:<pred>`; một khóa chung `ratFeed`, `ratEgg`, `trapped`, `catRat`, `catSpat`, `catHerd`, `dogHerd`, `dogBowl`, `cockcrow`; trộm NPC `loss:tisun`, `loss:civet`; chó `trick:<lệnh>`, `guard:<kẻ bị đuổi>`. Loại tắt/bật được trong cài đặt là `cat` của từng dòng (`NOTIFY_CATS`: thêm `old`, `stray`, `ill`, `pest`, `birth` ở Phase 2).
 
 Tên âm thanh (`sound.js`, `play(name)`, `setMuted(bool)`): `click coin harvest water dig plant spray pop bark oink cluck chirp moo baa slip levelup error eat alarm crow` (`chirp`: gà con kêu, world phát kèm chữ "chiếp").
 
@@ -845,7 +858,7 @@ Không có GitHub Actions. Mọi test chạy trên máy local, Chromium ẩn c�
 ```
 npm test            # = node --test (tests/*.test.mjs, gồm cả seam 3 tests/server-*.test.mjs)
 ```
-Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `dogtrick` (vòng đời chó, dạy lệnh, 6 lệnh), `notify`, `todo`, `perf`, `tutorial`, `online-save` (trường online, `checkSaveJump`), `presence` (người khác cùng bản đồ: tên mờ khi đông, nội suy), `visit` (luật khách), `help` (thao tác giúp của khách, giới hạn mỗi ngày, mã thao tác), `steal` (luật trộm: 25% mỗi ô, một lần mỗi người, trần 30% mỗi ngày, bảo vệ người mới, giỏ đầy, thể lực, trộm NPC nhường). Phase 2: `pens` (chuồng 3 cấp, cách ly), `breed` (đực cái, sinh sản, phả hệ), `dirty` (dơ, tắm), `bond` (độ thân), `trade` (bán cho Chú Ba, nghỉ hưu), `free` (thả rông), `herd` (chạng vạng, con lạc, rải thóc), `predator` (kẻ săn mồi), `cat` (mèo), `dog-guard` (một bộ luật chó cho trộm NPC và khách), `thief` (trộm NPC mới, phạt), `duck` (vịt), `coutquest` (nhiệm vụ Cô Út), `todo`/`notify` (mục vật nuôi).
+Mẫu: dựng `localStorage` giả (`globalThis.localStorage = {getItem, setItem, removeItem}`), `G.createGame(...)`, rồi `G.tick/perform/canPlace/...`. Muốn kết quả ngẫu nhiên cố định thì thay `Math.random` tạm (`0.99` = không xảy ra sự kiện nhỏ, `0.0001` = trúng hết). Test mô tả tình huống người chơi gặp ("dời khối ruộng đang có cây thì cây giữ nguyên tiến độ"), không test hàm nội bộ. Các file: `state` (luật gốc), `save-v2` (chuyển bản lưu v1, fixture), `save-v3` (chuyển v2→v3, fixture), `life` (vòng đời 4 giai đoạn), `place` (đặt/dời/cất, mọi `reason`), `build`, `land` (mở đất, dọn), `scene` (chuyển bản đồ), `village` (chợ), `shipbin`, `stamina`, `tools`, `basket`, `time` (chạy bù, đóng băng, mùa), `sick` (bệnh 4 giai đoạn, lây, thú y, ngôi mộ, ranh giới ADR 0004), `dogtrick` (vòng đời chó, dạy lệnh, 6 lệnh), `notify`, `todo`, `perf`, `tutorial`, `online-save` (trường online, `checkSaveJump`), `presence` (người khác cùng bản đồ: tên mờ khi đông, nội suy), `visit` (luật khách), `help` (thao tác giúp của khách, giới hạn mỗi ngày, mã thao tác), `steal` (luật trộm: 25% mỗi ô, một lần mỗi người, trần 30% mỗi ngày, bảo vệ người mới, giỏ đầy, thể lực, trộm NPC nhường). Phase 2: `pens` (chuồng 3 cấp, cách ly), `breed` (đực cái, sinh sản, phả hệ), `dirty` (dơ, tắm), `bond` (độ thân), `trade` (bán cho Chú Ba, nghỉ hưu), `free` (thả rông), `herd` (chạng vạng, con lạc, rải thóc), `predator` (kẻ săn mồi), `cat` (mèo), `coat` (màu lông chó/mèo), `bowl` (bát ăn của chó), `dog-guard` (một bộ luật chó cho trộm NPC và khách), `thief` (trộm NPC mới, phạt), `duck` (vịt), `coutquest` (nhiệm vụ Cô Út), `todo`/`notify` (mục vật nuôi).
 Luật có ngẫu nhiên (kẻ săn mồi, bệnh, con lạc...) thì test phải **tất định**: hoặc dọn sạch nguồn ngẫu nhiên không liên quan (vd `s.preds = []` mỗi bước), hoặc thay `Math.random` bằng bộ sinh số có hạt giống cố định (mulberry32, mẫu ở `tests/cat.test.mjs` `seeded`, `tests/duck.test.mjs` đặt lại hạt giống đầu mỗi test). Không thống kê "thường thì đúng" bằng `Math.random` thật.
 
 **Seam 2: trình duyệt thật qua Playwright**, chỉ cho những gì seam 1 không thấy (kéo thả, đi qua cửa, chạm để tự đi tới, giao diện 360px):
