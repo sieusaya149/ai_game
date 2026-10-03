@@ -511,6 +511,7 @@ export const PEN_TABLE = {
 };
 // Công trình đặt được ở chế độ xây dựng mà không phải chuồng có rào (nhà mèo): giá xây
 export const BUILD_PRICES = { cathouse: 350 };
+export const PEN_REFUND = 0.5;   // phá bỏ chuồng trống: hoàn tỉ lệ này của giá xây + giá các lần nâng cấp
 export const PEN_LEVELS = 3;
 export const expNeed = level => Math.floor(25 * level ** 1.5);
 export function levelInfo(exp) {

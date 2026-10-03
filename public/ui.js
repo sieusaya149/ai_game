@@ -148,8 +148,10 @@ export function buildTray(s, b) {
 const PEN_NAME2 = { chicken: 'Chuồng gà', pig: 'Chuồng heo', pasture: 'Đồng cỏ bò cừu', quarantine: 'Chuồng cách ly', cathouse: 'Nhà mèo' };
 const penIco = pen => (pen === 'quarantine' ? h('span', { class: 'ico emo' }, '🏥') : ico({ chicken: 'ga', pig: 'heo', pasture: 'bo' }[pen]));
 // Nút Cất cho món đang chạm (label = tên món, null = ẩn)
-export function buildSel(label, up) {   // label: món cất được (nút Cất); up: S.upgradeInfo của chuồng đang chọn (nút Nâng cấp)
+export function buildSel(label, up, demolish) {   // label: món cất được (nút Cất); up: S.upgradeInfo của chuồng đang chọn (nút Nâng cấp)
   const b = $('build-store'), u = $('build-upgrade');
+  $('build-demolish').hidden = !demolish;
+  if (demolish) $('build-demolish').textContent = `Phá bỏ (hoàn 🪙 ${fmt(demolish.refund)})`;
   b.hidden = !label;
   if (label) b.textContent = `Cất ${label.toLowerCase()}`;
   u.hidden = !up;
@@ -2115,6 +2117,7 @@ export function initUI(a) {
   $('build-cancel').addEventListener('click', () => api.buildCancel());
   $('build-store').addEventListener('click', () => api.buildStore());
 $('build-upgrade').addEventListener('click', () => api.buildUpgrade());
+$('build-demolish').addEventListener('click', () => api.buildDemolish());
 
   addEventListener('keydown', e => {
     if (e.key === 'Escape') {
