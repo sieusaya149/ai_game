@@ -160,3 +160,22 @@ test('vườn real-time: chủ được báo có khách; vườn chủ gửi đi
   await join(b, { map: 'village' });
   assert.deepEqual(await until(a, 'watch'), { t: 'watch', n: 0 });
 });
+
+test('tin world của chủ bị giới hạn khoảng 4 tin/giây: gửi dồn thì khách chỉ nhận một phần, sau đó vẫn nhận bình thường', async t => {
+  const { player } = await setup(t);
+  const A = await player('Lan'), B = await player('Bình');
+  const a = await A.ws(), b = await B.ws();
+  a.send({ t: 'hello', play: A.play });
+  await until(a, 'hello');
+  await join(a, { map: 'farm' });
+  await join(b, { map: 'farm', owner: 'Lan' });
+  await until(a, 'watch');
+  const w = visitWorld(createGame({ name: 'Lan' }));
+  for (let i = 0; i < 20; i++) a.send({ t: 'world', w: { ...w, day: i } });
+  let n = 0;
+  for (;;) { try { await b.next(500); n++; } catch { break; } }
+  assert.ok(n >= 1 && n <= 4, 'nhận ' + n + ' trên 20 tin gửi dồn');
+  await new Promise(r => setTimeout(r, 300));
+  a.send({ t: 'world', w });
+  assert.equal((await until(b, 'world')).owner, 'Lan');
+});

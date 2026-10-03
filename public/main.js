@@ -1,7 +1,7 @@
 // Khởi động game, vòng lặp, camera, nhập liệu (bàn phím, chạm, joystick) và cầu nối giữa state/ui/world/render.
 import {
   loadGame, loadProblem, saveGame, createGame, resetGame as resetSave, tick, actionsFor, perform, mapOf, sceneMap, enterScene,
-  startVisit, visitWorld, visitSync, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, wake, isAsleep, speedOf, sellQuote, barrowTargets, commandDog,
+  startVisit, visitWorld, visitSync, visitEase, WORLD_MS, guestCheck, guestReward, guestOpApply, takeGuestLog, awayGuests, helpLeft, barkOp, biteOp, keepLoot, nextStrip, buyStrip, canPlace, canMove, moveEntity, placeEntity, storeEntity, demolishPen, demolishRefund, upgradePen, upgradeInfo, canAfford, fieldCount, fieldLimit, entName, footprint, snapLayout, restoreLayout, slowFactor, sleep, wake, isAsleep, speedOf, sellQuote, barrowTargets, commandDog,
 } from './state.js';
 import * as ui from './ui.js';
 import { TS } from './layout.js';
@@ -97,7 +97,7 @@ const SHAKE_MS = 400;
 let shakeUntil = 0;
 
 // ---------- API cho ui.js ----------
-function changed() { dirty = true; worldDirty = true; }
+function changed() { dirty = true; }
 
 // Bán con vật: báo giá, con ❤️4+ phải xác nhận 2 lần. Nghỉ hưu: hỏi một lần (không quay lại được)
 async function askAnimal(target, id) {
@@ -310,15 +310,15 @@ function guestDid(op) {
 }
 // ---------- Khách thấy chủ làm gì ngay (sửa lỗi online: chủ thu hoạch mà cây vẫn nằm trên máy khách) ----------
 // Chủ: có khách đứng trong vườn mình (server báo `watch`) thì gửi phần vườn khách thấy được (state.js visitWorld) mỗi khi
-// vườn đổi, tối đa mỗi WORLD_MS, và đều đặn mỗi WORLD_IDLE_MS cho phần tự đổi (cây lớn, gà đẻ, con vật đói...).
+// mỗi WORLD_MS (1 giây) dù có đổi hay không: chủ chạy, chó chạy, cây lớn, gà đẻ... khách thấy mượt (visitEase). Luôn kèm `farm`
+// (chừng 1 KB) để máy khách bản cũ (bỏ qua tin thiếu `farm`) vẫn nhận được; khách bản mới thì tin thiếu `farm` vẫn giữ bố cục đang có.
 // Khách: áp lên bản đi dạo (visitSync), chỗ đứng của mình và việc vừa làm mà chủ chưa nhận vẫn giữ.
-const WORLD_MS = 1000, WORLD_IDLE_MS = 4000;
-let watchers = 0, worldAt = -Infinity, worldDirty = false;
+let watchers = 0, worldAt = -Infinity;
 function hostWorld(now) {
   const mine = home ?? state;
   if (!sync || !watchers || !mine || world.build) return;   // đang sửa bố cục: chưa lưu nên chưa gửi
-  if (now - worldAt < (worldDirty ? WORLD_MS : WORLD_IDLE_MS)) return;
-  if (sync.send({ t: 'world', w: visitWorld(mine) })) { worldAt = now; worldDirty = false; }
+  if (now - worldAt < WORLD_MS) return;
+  if (sync.send({ t: 'world', w: visitWorld(mine) })) worldAt = now;
 }
 function hostDid(m) {
   const owner = state?.visit?.owner;
@@ -834,6 +834,7 @@ function frame(now) {
     world.input.x = kx || joy.x; world.input.y = ky || joy.y;
     if (plan && (world.input.x || world.input.y)) plan = null;   // tự đi bằng tay thì bỏ kế hoạch
   }
+  visitEase(state, dt);   // khách: con vật, chó của chủ đi dần tới chỗ tin world mới nhất
   const res = V.update(state, world, dt);
   for (const r of res.results) applyResult(r);
   if (res.bark) dogBark();     // chó trong vườn người khác vừa phát hiện mình (issue 31)

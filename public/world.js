@@ -400,7 +400,7 @@ function guardStep(state, w, rt, dt, goTo, out) {
     g.lost += dt * 1000;
     if (g.lost > GUARD.loseMs) g.chasing = false;
   }
-  rt.bark = g.chasing;
+  rt.bark = d.chasing = g.chasing;   // khách: đang đuổi thì visitEase thôi kéo chó về chỗ chủ
   if (!g.chasing) return false;
   // bị xích thì chỉ chạy tới mép vùng xích, thả rông thì đuổi tới chân khách
   const area = ST.guardArea(state);

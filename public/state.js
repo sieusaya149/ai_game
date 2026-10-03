@@ -2939,14 +2939,38 @@ export function visitWorld(h) {
   return Object.assign(w, { threats: crowsOf(h), level: levelInfo(h.exp || 0).level });
 }
 // Tên các trường của tin `world` (server chỉ chuyển tiếp đúng các trường này)
+// Chủ gửi tin `world` mỗi WORLD_MS khi có khách (cả khi không có gì đổi, để khách thấy chó, con vật đi mượt); server cho tối đa 4 tin/giây/chủ
+export const WORLD_MS = 1000;
 export const VISIT_KEYS = [...VISIT_WORLD, 'threats', 'level'];
 const PENDING_MS = 15_000;   // việc khách vừa làm: giữ trên máy khách chừng này chờ tin chủ có nó
-const near = (a, b) => b && Number.isFinite(b.x) && Number.isFinite(b.y) && Math.hypot((a.x ?? 1e9) - b.x, (a.y ?? 1e9) - b.y) < 64;
-// Con nào còn (cùng id) và chưa bị chủ dời đi xa thì giữ chỗ đứng trên máy khách: world.js đang cho nó đi lại
+// Con nào còn (cùng id): gần chỗ chủ gửi (< 64px) thì giữ chỗ đứng trên máy khách (world.js đang cho nó đi lại); xa hơn thì
+// KHÔNG nhảy: đứng nguyên chỗ cũ, ghi đích (ex, ey) cho visitEase đưa tới trong EASE_S giây; xa quá EASE_TELEPORT thì nhảy luôn.
+// `always` (chó): luôn đi tới chỗ chủ gửi, khách thấy chó của chủ chạy mượt.
+const EASE_S = 1, EASE_TELEPORT = 8 * 16;
+function easeFrom(o, p, always) {
+  if (p?.chasing) { o.x = p.x; o.y = p.y; o.chasing = true; return; }
+  if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(o.x) || !Number.isFinite(o.y)) return;
+  const far = Math.hypot(o.x - p.x, o.y - p.y);
+  if (far > EASE_TELEPORT) return;
+  if (!always && far < 64) { o.x = p.x; o.y = p.y; return; }
+  if (far < 0.5) { o.x = p.x; o.y = p.y; return; }
+  Object.assign(o, { ex: o.x, ey: o.y, et: EASE_S, x: p.x, y: p.y });
+}
 function keepPlaces(list, old) {
   const by = new Map((old ?? []).map(o => [o.id, o]));
-  for (const o of list) { const p = by.get(o.id); if (p && near(o, p)) { o.x = p.x; o.y = p.y; } }
+  for (const o of list) easeFrom(o, by.get(o.id), false);
   return list;
+}
+// Mỗi khung hình của khách: đưa con vật, mèo, quạ, chó đang có đích (ex, ey) tới đích dần dần (chia đều trong thời gian còn lại)
+export function visitEase(v, dt) {
+  if (!v?.visit) return;
+  for (const list of [v.animals, v.cats, v.threats, [v.dog]]) for (const o of list ?? []) {
+    if (!o || o.ex == null) continue;
+    if (o.chasing) { delete o.ex; delete o.ey; delete o.et; continue; }   // chó khách đang đuổi khách: do world.js chạy
+    const k = dt >= o.et ? 1 : dt / o.et;
+    o.x += (o.ex - o.x) * k; o.y += (o.ey - o.y) * k; o.et -= dt;
+    if (k >= 1) { o.x = o.ex; o.y = o.ey; delete o.ex; delete o.ey; delete o.et; }
+  }
 }
 // Áp phần vườn chủ `w` (tin `world`) lên bản đi dạo `v`. Trả false nếu tin hỏng hoặc `v` không phải bản đi dạo.
 // Giữ của khách: chỗ đứng, phần của khách, chỗ con vật đang đi; lần sủa / nghỉ của chó (mới hơn thì giữ);
@@ -2954,10 +2978,10 @@ function keepPlaces(list, old) {
 const LISTS = ['plots', 'animals', 'eggs', 'cats', 'poops', 'threats', 'guests'];
 export function visitSync(v, w) {
   if (!v?.visit || !w || typeof w !== 'object' || Array.isArray(w)) return false;
-  if (!Array.isArray(w.plots) || LISTS.some(k => w[k] != null && !Array.isArray(w[k])) || !w.dog || typeof w.dog !== 'object' || !w.farm || typeof w.farm !== 'object') return false;
+  if (!Array.isArray(w.plots) || LISTS.some(k => w[k] != null && !Array.isArray(w[k])) || !w.dog || typeof w.dog !== 'object' || (w.farm != null && typeof w.farm !== 'object')) return false;
   const old = { animals: v.animals, cats: v.cats, threats: v.threats, dog: v.dog };
   for (const k of VISIT_WORLD) {
-    if (k === 'farm' && JSON.stringify(w.farm) === JSON.stringify(v.farm)) continue;   // bố cục y nguyên: khỏi dựng lại bản đồ
+    if (k === 'farm' && (w.farm == null || JSON.stringify(w.farm) === JSON.stringify(v.farm))) continue;   // thiếu (chủ gửi gọn) hay y nguyên: giữ bố cục, khỏi dựng lại bản đồ
     if (k in w) v[k] = w[k];
   }
   v.threats = crowsOf(w);
@@ -2967,7 +2991,7 @@ export function visitSync(v, w) {
   keepPlaces(v.threats, old.threats);
   const d = v.dog = guestDog(w.dog), od = old.dog;
   if (od) {
-    if (near(d, od)) { d.x = od.x; d.y = od.y; }
+    easeFrom(d, od, true);
     if ((od.barkAt || 0) > (d.barkAt || 0)) { d.barkAt = od.barkAt; d.barkX = od.barkX; d.barkY = od.barkY; }
     d.quiet = Math.max(d.quiet || 0, od.quiet || 0);
   }
