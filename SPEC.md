@@ -625,7 +625,12 @@ guardRadius(state, t?)            // bán kính canh tính theo Ô (0 = không c
                                   //   theo giai đoạn DOG.guardRadius (non 0 · nhỡ 4 · trưởng thành 6 · già 4);
                                   //   vui < GUARD.sadHappy (50) còn một nửa; đang gác (lệnh Canh khu) ×DOG.guardPostMul;
                                   //   đói < GUARD.hungryStop (30) hay đang mải ăn xúc xích thì 0; ngủ gật còn
-                                  //   GUARD.napRadius = 1; bị xích thì tối đa GUARD.chainRadius = 3
+                                  //   GUARD.napRadius = 1; bị xích thì tối đa GUARD.chainRadius = 3; chó đang đi theo chủ
+                                  //   sang làng / vào nhà (dog.scene != 'farm') thì 0. Kẻ săn mồi, trộm NPC và chạy bù
+                                  //   offline (guardOn) dùng đúng luật này (> 0), không còn ngưỡng riêng
+dogGuardStatus(state, t?)         // { on, label, why } cho dòng 🐕 khi chạm vào chó: "Đang canh" / "Đang bị xích" /
+                                  //   "Đói nên lười canh" / "Đang ngủ gật" / "Còn bé, chưa biết canh" / "Đang mải ăn xúc xích" /
+                                  //   "Đang đi theo bạn", kèm lý do và tầm nhìn
 dogSees(state, pos, { mul = 1, t }?) // chó có thấy kẻ lạ đứng ở pos ({ x, y } điểm ảnh bản đồ) không. Tâm vùng canh: chỗ gác
                                   //   (lệnh Canh khu), chuồng chó khi bị xích, không thì chính con chó. mul < 1 = đi lặng lẽ
 guardArea(state)                  // vùng chó chạy được khi bị xích: { x, y, r } (điểm ảnh); null = thả rông, khắp vườn
@@ -636,7 +641,8 @@ setChained(state, on)             // chủ xích chó / thả rông (hành độ
                                   //   Canh khu / Lùa / Đi theo (issue 45)
 barkOp(state) / biteOp(state)     // chỉ ở cảnh 'visit': kiểm bằng luật, xem trước ngay trên con chó của bản đi dạo
                                   //   rồi trả { msg, guestOp, ... } cho main.js gửi lên server (biteOp còn trả `stunMs`);
-                                  //   null = chưa làm được. KHÔNG ghi sổ của chủ ở đây: trong bản đi dạo `coins`,
+                                  //   null = chó không canh được. Đang nghỉ GUARD.barkEvery giữa hai lần báo chủ thì trả
+                                  //   `guestOp: null` (khách vẫn nghe sủa và rung máy, chỉ không gửi thêm). KHÔNG ghi sổ của chủ ở đây: trong bản đi dạo `coins`,
                                   //   `stats`, `log` là của khách, nên xu phạt và thống kê để server + trình duyệt chủ làm
 keepLoot(state, items)            // ghi đồ khách vừa trộm được trong lượt thăm (gọi khi server xác nhận); bị đớp là rơi hết
 ```

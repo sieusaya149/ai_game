@@ -174,7 +174,7 @@ test('B trong vườn A: nhà, thùng giao hàng, kho bị chặn kèm lý do, k
     for (let i = 0; i < 12; i++) {
       const d = await st(page, () => globalThis.__farm.state.dog);
       await tapWorld(page, touch, d.x, d.y - 6);
-      try { await expect(page.locator('#target-name')).toHaveText(dogName, { timeout: 2500 }); return; } catch { /* chó chạy đi: chạm lại */ }
+      try { await expect(page.locator('#target-name')).toContainText(dogName, { timeout: 2500 }); return; } catch { /* chó chạy đi: chạm lại */ }
     }
     throw new Error('không tới được chỗ chó');
   };
